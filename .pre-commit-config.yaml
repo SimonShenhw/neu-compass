@@ -2,12 +2,14 @@
 # 安装: uv run pre-commit install
 
 repos:
+  # 严格模式: 无 baseline, 任何检测到的 secret 直接 fail
+  # 私有 repo 在免费档没有 GitHub 端 push protection,
+  # 所以本地 pre-commit 是唯一防线,刻意从严
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: \.env\.example$|package-lock\.json$
+        exclude: \.env\.example$|package-lock\.json$|\.secrets\.baseline$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.5.0

@@ -67,8 +67,20 @@ cp .env.example .env
 
 - F1 合规：不商业化，不收款，不接受投资（详见 PLAN §9）
 - 不爬 NUworks / Trace / RMP HTML（用 GraphQL endpoint）
-- 个人 API key 独立，不共享
+- 个人 API key 独立，不共享（**包括对 AI 助手不发送**）
 - 任何 commit 前 `git diff --cached` 自检
+- API key / token 永远只进 .env 文件，永远不进对话/Slack/邮件/截图
+
+## 安全防线
+
+私有 repo 在 GitHub 免费档没有服务端 push protection，所以本地是唯一防线：
+
+1. **detect-secrets pre-commit 严格模式**：任何 secret 入 commit 直接 fail
+2. **.gitignore 默认排除 .env**：白名单只让 .env.example 进库
+3. **review_status='pending'** 字段控制 LLM 推断的别名不直接生效
+
+如发现泄露：立刻去 https://aistudio.google.com/apikey 撤 key + 重建。
+git history 里有泄露：`git filter-repo` 重写 + force push（破坏性，三人协调后再做）。
 
 ## 团队共识
 
