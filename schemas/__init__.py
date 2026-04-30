@@ -1,3 +1,9 @@
+from schemas.alias import (
+    Alias,
+    AliasReviewStatus,
+    AliasSource,
+    AliasType,
+)
 from schemas.course import (
     SCHEMA_VERSION,
     SOFT_FIELDS_REQUIRING_EVIDENCE,
@@ -19,6 +25,10 @@ __all__ = [
     "SCHEMA_VERSION",
     "SOFT_FIELDS_REQUIRING_EVIDENCE",
     "AIPolicy",
+    "Alias",
+    "AliasReviewStatus",
+    "AliasSource",
+    "AliasType",
     "Course",
     "DataSource",
     "DayOfWeek",

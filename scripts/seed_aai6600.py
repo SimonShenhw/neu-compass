@@ -35,8 +35,10 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 from datetime import date, time  # noqa: E402
 
+from db.alias_repository import AliasRepository  # noqa: E402
 from db.connection import connect  # noqa: E402
 from db.repository import CourseRepository  # noqa: E402
+from schemas.alias import Alias, AliasSource, AliasType  # noqa: E402
 from schemas.course import (  # noqa: E402
     AIPolicy,
     Course,
@@ -266,30 +268,30 @@ def build_course() -> Course:
 
 # Day 3 manually-known aliases. Week 2 will move these into
 # data/aliases_manual.json (one entry per Ground Truth course).
-MANUAL_ALIASES: list[tuple[str, str]] = [
-    ("Applied AI", "slang"),
-    ("6600", "slang"),
-    ("Hema's AI class", "professor_attribution"),
-    ("Dr. Seshadri's class", "professor_attribution"),
-    ("应用 AI", "slang"),
-    ("应用人工智能", "slang"),
+MANUAL_ALIASES: list[tuple[str, AliasType]] = [
+    ("Applied AI", AliasType.SLANG),
+    ("6600", AliasType.SLANG),
+    ("Hema's AI class", AliasType.PROFESSOR_ATTRIBUTION),
+    ("Dr. Seshadri's class", AliasType.PROFESSOR_ATTRIBUTION),
+    ("应用 AI", AliasType.SLANG),
+    ("应用人工智能", AliasType.SLANG),
 ]
 
 
 def insert_aliases(conn: sqlite3.Connection) -> int:
-    inserted = 0
-    for alias_text, alias_type in MANUAL_ALIASES:
-        cursor = conn.execute(
-            """
-            INSERT OR IGNORE INTO course_aliases
-                (alias_text, alias_type, primary_course_id, source, review_status, confidence)
-            VALUES (?, ?, ?, 'manual', 'approved', 0.95)
-            """,
-            (alias_text, alias_type, COURSE_ID),
+    """Persist MANUAL_ALIASES via AliasRepository. Idempotent (add_or_skip)."""
+    repo = AliasRepository(conn)
+    aliases = [
+        Alias(
+            alias_text=text,
+            alias_type=alias_type,
+            primary_course_id=COURSE_ID,
+            source=AliasSource.MANUAL,
+            confidence=0.95,
         )
-        if cursor.rowcount > 0:
-            inserted += 1
-    return inserted
+        for text, alias_type in MANUAL_ALIASES
+    ]
+    return repo.add_many(aliases, skip_duplicates=True)
 
 
 def verify_lookup(conn: sqlite3.Connection) -> list[tuple[str, str]]:
