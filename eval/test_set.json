@@ -1,0 +1,41 @@
+{
+  "_comment": "Eval set v0 — minimal skeleton. Real 100 queries are a Week 4 deliverable; this file is a structural placeholder + 5 examples exercising the existing AAI 6600 seed. PLAN §4.1 distribution target: 30 simple, 30 medium, 20 complex, 10 boundary, 10 adversarial.",
+  "version": "0.1",
+  "queries": [
+    {
+      "query_id": "q001",
+      "category": "simple",
+      "query": "AAI 6600 怎么样",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "Direct primary code lookup via v_course_lookup."
+    },
+    {
+      "query_id": "q002",
+      "category": "simple",
+      "query": "应用 AI",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "Chinese slang alias resolves via course_aliases."
+    },
+    {
+      "query_id": "q003",
+      "category": "simple",
+      "query": "Hema's AI class",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "Professor attribution alias."
+    },
+    {
+      "query_id": "q004",
+      "category": "boundary",
+      "query": "6600",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "Bare 4-digit number; alias system should still resolve."
+    },
+    {
+      "query_id": "q005",
+      "category": "adversarial",
+      "query": "AAI 9999 怎么样",
+      "expected_course_ids": [],
+      "rationale": "Non-existent code; retriever must return empty, not hallucinate."
+    }
+  ]
+}
