@@ -1,21 +1,33 @@
 from schemas.course import (
     SCHEMA_VERSION,
     SOFT_FIELDS_REQUIRING_EVIDENCE,
+    AIPolicy,
     Course,
     DataSource,
+    DayOfWeek,
     DeliveryMode,
     EvidenceSnippet,
     GradingComponent,
+    InstructorContact,
+    MeetingSchedule,
+    MeetingSlot,
+    Textbook,
     migrate,
 )
 
 __all__ = [
     "SCHEMA_VERSION",
     "SOFT_FIELDS_REQUIRING_EVIDENCE",
+    "AIPolicy",
     "Course",
     "DataSource",
+    "DayOfWeek",
     "DeliveryMode",
     "EvidenceSnippet",
     "GradingComponent",
+    "InstructorContact",
+    "MeetingSchedule",
+    "MeetingSlot",
+    "Textbook",
     "migrate",
 ]

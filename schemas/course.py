@@ -1,23 +1,35 @@
-"""Course schema v1: dual-layer Pydantic models for SQLite filter + RAG retrieval.
+"""Course schema v1.1 — adds instructor / textbook / meeting / ai_policy.
 
-Hard fields (L1, Catalog source): SQLite WHERE filter, must be 100% accurate.
-None is allowed (信息缺失) but a wrong value is not.
+Layer model unchanged from v1.0:
+- Hard fields (L1, Catalog source): SQLite WHERE filter, must be 100% accurate.
+  None is allowed (信息缺失) but a wrong value is not.
+- Soft fields (L2, LLM-inferred): semantic retrieval + summarization.
+  Every non-empty soft value must be backed by an evidence_snippet —
+  see SOFT_FIELDS_REQUIRING_EVIDENCE for the enforced subset (PLAN §2.1).
 
-Soft fields (L2, LLM-inferred): semantic retrieval + summarization. Every
-non-empty soft value must be backed by at least one EvidenceSnippet — see
-SOFT_FIELDS_REQUIRING_EVIDENCE for the enforced subset (PLAN §2.1).
+Schema history:
+  1.0 (Day 2): initial release — 18 fields per PLAN §2.2
+  1.1 (Day 4): + instructor_contact, textbooks, meeting_schedule, ai_policy.
+               grading_components.weight made Optional (most CPS syllabi
+               don't publish weights — Day 3 dry run confirmed this).
+               All new fields are Optional/empty by default, so loading
+               a v1.0 record into v1.1 Pydantic class works without
+               migration. scripts/migrate_schema.py canonicalizes on demand.
+
+For SQL DDL changes, see db/init.sql + db/migrations/.
+For data-level migrations, see scripts/migrate_schema.py.
 """
 
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 # CS 5800 / AAI 6600 / DS 5230A — 2-4 letter dept + 4 digits + optional trailing letter
 COURSE_CODE_PATTERN = re.compile(r"^([A-Z]{2,4})\s?(\d{4}[A-Z]?)$")
@@ -39,6 +51,16 @@ class DeliveryMode(StrEnum):
     ASYNC = "async"
 
 
+class DayOfWeek(StrEnum):
+    MONDAY = "monday"
+    TUESDAY = "tuesday"
+    WEDNESDAY = "wednesday"
+    THURSDAY = "thursday"
+    FRIDAY = "friday"
+    SATURDAY = "saturday"
+    SUNDAY = "sunday"
+
+
 class EvidenceSnippet(BaseModel):
     """One quote backing a soft field value (PLAN §2.3)."""
 
@@ -52,17 +74,116 @@ class EvidenceSnippet(BaseModel):
 
 
 class GradingComponent(BaseModel):
-    """One row of the grading rubric, e.g. {'name': 'midterm', 'weight': 0.3}."""
+    """One row of the grading rubric, e.g. {'name': 'midterm', 'weight': 0.3}.
+
+    weight is Optional in v1.1 — most CPS syllabi don't publish exact weights.
+    Recording {name: "discussion board", weight: None} is preferred to dropping
+    the entry entirely (which loses the fact that this component exists).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1)
-    weight: float = Field(ge=0.0, le=1.0)
+    weight: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class InstructorContact(BaseModel):
+    """Instructor contact info (v1.1).
+
+    name typically duplicates Course.professor[0] but stays here for
+    standalone use. Email is OK to store: NEU faculty emails are publicly
+    listed on the directory; this is not protected PII like student emails.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    email: str | None = None
+    office_hours: str | None = Field(
+        default=None,
+        description="Free-form: 'Tue 3-5 PM @ Snell 410' or 'by appointment via email'",
+    )
+    secondary_contact: str | None = Field(
+        default=None,
+        description="e.g. academic lead's name + email",
+    )
+
+
+class Textbook(BaseModel):
+    """Required or optional textbook (v1.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1)
+    authors: list[str] = Field(default_factory=list)
+    is_required: bool = True
+    url: str | None = None
+    isbn: str | None = None
+
+
+class MeetingSlot(BaseModel):
+    """One day-of-week meeting (v1.1).
+
+    A course can have multiple slots (e.g. M+W+F). times use
+    Pydantic's `time` type — accepts '17:50' string and serializes
+    to ISO 'HH:MM:SS'.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    day_of_week: DayOfWeek
+    start_time: time
+    end_time: time
+    location: str | None = Field(default=None, description="e.g. 'Snell Library 119' or 'Online'")
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> MeetingSlot:
+        if self.end_time <= self.start_time:
+            raise ValueError(
+                f"end_time ({self.end_time}) must be after start_time ({self.start_time})"
+            )
+        return self
+
+
+class MeetingSchedule(BaseModel):
+    """Full meeting schedule for a course (v1.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    slots: list[MeetingSlot] = Field(default_factory=list)
+    timezone: str = Field(default="America/New_York")
+    start_date: date | None = None
+    end_date: date | None = None
+
+    @model_validator(mode="after")
+    def _end_after_start_date(self) -> MeetingSchedule:
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError(
+                f"end_date ({self.end_date}) must be on/after start_date ({self.start_date})"
+            )
+        return self
+
+
+class AIPolicy(BaseModel):
+    """Course's AI / generative-tool usage policy (v1.1).
+
+    Structured fields cover what students actually filter on:
+    "is Copilot OK?", "is disclosure required?". Unstructured penalty/
+    nuance text goes in `notes`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    permitted_tools: list[str] = Field(default_factory=list)
+    banned_tools: list[str] = Field(default_factory=list)
+    disclosure_required: bool = True
+    notes: str | None = None
 
 
 # Soft fields that REQUIRE evidence_snippets when non-empty.
-# Structured fields (grading_components, topics_covered) are excluded — their
-# evidence is the source document itself, recorded via source_review_ids.
+# Structured fields (grading_components, topics_covered, instructor_contact,
+# textbooks, meeting_schedule, ai_policy) are excluded — their evidence is the
+# source document itself, recorded via source_review_ids.
 SOFT_FIELDS_REQUIRING_EVIDENCE: frozenset[str] = frozenset(
     {
         "workload_hours_per_week",
@@ -79,7 +200,7 @@ def _utcnow() -> datetime:
 
 
 class Course(BaseModel):
-    """Full course record (PLAN §2.2).
+    """Full course record (PLAN §2.2 + v1.1 additions).
 
     `course_id` is an internal stable UUID (assigned by the ingestion pipeline,
     survives renames). `primary_code` is the human-readable canonical code.
@@ -100,6 +221,12 @@ class Course(BaseModel):
     credits: int | None = Field(default=None, ge=0, le=12)
     prereqs: list[str] = Field(default_factory=list)
     delivery_mode: DeliveryMode | None = None
+
+    # === L1.5: Structured catalog details (v1.1) ===
+    instructor_contact: InstructorContact | None = None
+    textbooks: list[Textbook] = Field(default_factory=list)
+    meeting_schedule: MeetingSchedule | None = None
+    ai_policy: AIPolicy | None = None
 
     # === L2: Soft fields ===
     workload_hours_per_week: float | None = Field(default=None, ge=0.0)
@@ -153,10 +280,30 @@ class Course(BaseModel):
 def migrate(data: dict[str, Any], from_version: str) -> dict[str, Any]:
     """Schema migration entrypoint (PLAN §2.4).
 
-    Each version bump adds a branch here. Only 1.0 exists today.
+    Each version bump adds a branch. Migrations are pure dict transforms;
+    no DB access. Run via scripts/migrate_schema.py to apply across a DB.
     """
     if from_version == SCHEMA_VERSION:
         return data
+    if from_version == "1.0":
+        return _migrate_1_0_to_1_1(data)
     raise NotImplementedError(
-        f"Migration from {from_version} to {SCHEMA_VERSION} not implemented"
+        f"Migration from {from_version!r} to {SCHEMA_VERSION!r} not implemented"
     )
+
+
+def _migrate_1_0_to_1_1(data: dict[str, Any]) -> dict[str, Any]:
+    """v1.0 -> v1.1: add 4 optional fields, no value loss.
+
+    All new fields default to None / [] — Pydantic would apply these
+    defaults anyway when loading into the v1.1 model, but we bake them
+    into the JSON so the on-disk representation matches in-memory.
+    """
+    return {
+        **data,
+        "instructor_contact": data.get("instructor_contact"),
+        "textbooks": data.get("textbooks", []),
+        "meeting_schedule": data.get("meeting_schedule"),
+        "ai_policy": data.get("ai_policy"),
+        "schema_version": "1.1",
+    }

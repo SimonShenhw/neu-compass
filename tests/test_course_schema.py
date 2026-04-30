@@ -47,7 +47,7 @@ def test_minimal_course_passes() -> None:
 
 
 def test_schema_version_default_is_const() -> None:
-    assert _minimal().schema_version == "1.0"
+    assert _minimal().schema_version == SCHEMA_VERSION
 
 
 # === course_code normalization & validation ===
@@ -224,3 +224,171 @@ def test_migrate_same_version_passthrough() -> None:
 def test_migrate_unknown_version_raises() -> None:
     with pytest.raises(NotImplementedError):
         migrate({}, "0.9")
+
+
+# === v1.1: schema bump ===
+
+def test_schema_version_is_1_1() -> None:
+    assert SCHEMA_VERSION == "1.1"
+
+
+def test_grading_component_weight_optional_in_v1_1() -> None:
+    from schemas.course import GradingComponent
+    GradingComponent(name="discussion board")
+    GradingComponent(name="midterm", weight=None)
+    GradingComponent(name="final", weight=0.4)
+    with pytest.raises(ValidationError):
+        GradingComponent(name="x", weight=1.5)
+
+
+# === v1.1: new structured models ===
+
+def test_instructor_contact_minimal() -> None:
+    from schemas.course import InstructorContact
+    c = InstructorContact(name="Dr. Smith")
+    assert c.email is None
+    assert c.office_hours is None
+
+
+def test_instructor_contact_extra_forbidden() -> None:
+    from schemas.course import InstructorContact
+    with pytest.raises(ValidationError):
+        InstructorContact(name="x", phone="x")  # phone not in schema
+
+
+def test_textbook_required_default() -> None:
+    from schemas.course import Textbook
+    t = Textbook(title="Foo")
+    assert t.is_required is True
+    assert t.authors == []
+
+
+def test_meeting_slot_validates_time_strings() -> None:
+    from schemas.course import DayOfWeek, MeetingSlot
+    s = MeetingSlot(
+        day_of_week=DayOfWeek.TUESDAY,
+        start_time="17:50",  # accepted as time(17,50)
+        end_time="19:10",
+        location="Snell 119",
+    )
+    assert s.start_time.hour == 17
+    assert s.end_time.minute == 10
+
+
+def test_meeting_slot_rejects_inverted_times() -> None:
+    from schemas.course import DayOfWeek, MeetingSlot
+    with pytest.raises(ValidationError, match="end_time"):
+        MeetingSlot(
+            day_of_week=DayOfWeek.MONDAY,
+            start_time="14:00",
+            end_time="13:00",
+        )
+
+
+def test_meeting_schedule_rejects_inverted_dates() -> None:
+    from schemas.course import MeetingSchedule
+    with pytest.raises(ValidationError, match="end_date"):
+        MeetingSchedule(start_date="2026-04-26", end_date="2026-01-07")
+
+
+def test_meeting_schedule_default_timezone() -> None:
+    from schemas.course import MeetingSchedule
+    s = MeetingSchedule()
+    assert s.timezone == "America/New_York"
+
+
+def test_ai_policy_defaults() -> None:
+    from schemas.course import AIPolicy
+    p = AIPolicy()
+    assert p.disclosure_required is True
+    assert p.permitted_tools == []
+    assert p.banned_tools == []
+
+
+# === v1.1: Course with new fields ===
+
+def test_course_v1_1_fields_default_none() -> None:
+    """Backward compat: v1.0 callers don't set the new fields — they get defaults."""
+    c = _minimal()
+    assert c.instructor_contact is None
+    assert c.textbooks == []
+    assert c.meeting_schedule is None
+    assert c.ai_policy is None
+
+
+def test_course_v1_1_fields_roundtrip() -> None:
+    from schemas.course import (
+        AIPolicy, DayOfWeek, InstructorContact,
+        MeetingSchedule, MeetingSlot, Textbook,
+    )
+
+    c1 = _minimal(
+        instructor_contact=InstructorContact(name="Dr. Z", email="z@nu.edu"),
+        textbooks=[Textbook(title="Foo", authors=["Bar"])],
+        meeting_schedule=MeetingSchedule(
+            slots=[MeetingSlot(
+                day_of_week=DayOfWeek.WEDNESDAY,
+                start_time="14:00", end_time="15:30",
+            )],
+        ),
+        ai_policy=AIPolicy(permitted_tools=["Claude"]),
+    )
+    c2 = Course.model_validate_json(c1.model_dump_json())
+    assert c1 == c2
+
+
+# === v1.1: migration 1.0 -> 1.1 ===
+
+def test_migrate_1_0_to_1_1_adds_new_fields() -> None:
+    v1_0 = {
+        "course_id": "u1",
+        "primary_code": "CS 5800",
+        "primary_name": "Algorithms",
+        "schema_version": "1.0",
+    }
+    v1_1 = migrate(v1_0, from_version="1.0")
+
+    assert v1_1["schema_version"] == "1.1"
+    assert v1_1["instructor_contact"] is None
+    assert v1_1["textbooks"] == []
+    assert v1_1["meeting_schedule"] is None
+    assert v1_1["ai_policy"] is None
+    # Original keys preserved
+    assert v1_1["course_id"] == "u1"
+    assert v1_1["primary_code"] == "CS 5800"
+
+
+def test_migrate_1_0_does_not_clobber_existing_v1_1_keys() -> None:
+    """If a v1.0 row somehow already has v1.1 keys, migrate respects them."""
+    data = {
+        "course_id": "u1",
+        "schema_version": "1.0",
+        "textbooks": [{"title": "Existing", "authors": [], "is_required": True,
+                        "url": None, "isbn": None}],
+    }
+    migrated = migrate(data, from_version="1.0")
+    assert len(migrated["textbooks"]) == 1
+    assert migrated["textbooks"][0]["title"] == "Existing"
+
+
+def test_migrated_v1_0_data_validates_as_course() -> None:
+    """End-to-end: migrate v1.0 dict, then load into v1.1 Course."""
+    v1_0 = {
+        "course_id": "u1",
+        "primary_code": "CS 5800",
+        "primary_name": "Algorithms",
+        "schema_version": "1.0",
+        "professor": [], "term": None, "credits": 4,
+        "prereqs": [], "delivery_mode": None,
+        "workload_hours_per_week": None, "difficulty_score": None,
+        "grading_components": [], "topics_covered": [],
+        "skill_tags": [], "career_relevance": [], "controversial_signals": [],
+        "evidence_snippets": [], "extraction_confidence": None,
+        "source_review_ids": [],
+        "created_at": "2026-04-30T00:00:00Z",
+        "updated_at": "2026-04-30T00:00:00Z",
+    }
+    migrated = migrate(v1_0, from_version="1.0")
+    course = Course.model_validate(migrated)
+    assert course.schema_version == "1.1"
+    assert course.credits == 4

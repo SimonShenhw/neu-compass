@@ -1,40 +1,21 @@
 """Seed AAI 6600 (Applied Artificial Intelligence) — first ground truth course.
 
-Day 3 dry run: builds a realistic Course record from the Spring 2026 syllabus
-(Dr. Hema Seshadri), persists via repository, registers manual L2 aliases,
-verifies v_course_lookup, dumps to data/ground_truth/.
+Day 3 dry run, updated for schema v1.1: builds a realistic Course record from
+the Spring 2026 syllabus (Dr. Hema Seshadri), persists via repository,
+registers manual L2 aliases, verifies v_course_lookup, dumps to
+data/ground_truth/.
 
 Doubles as the reference example for Day 6-13 team double-blind annotation.
+
+v1.0 -> v1.1 migration upshot: 5 schema gaps the original Day 3 dry run
+surfaced (no grading weights / no instructor / no textbook / no meeting /
+no ai_policy) are now closed. AAI 6600 below populates all four new fields
+from the syllabus and uses GradingComponent.weight=None for discussion-board
++ project + assignments (weights truly unknown — syllabus does not publish).
 
 Usage:
     python scripts/seed_aai6600.py
     python scripts/seed_aai6600.py --db-path /tmp/test.db --output-dir /tmp/gt
-
-================================================================================
-Schema gaps surfaced (TODO for schema v1.1 — log against PLAN §2.4):
-================================================================================
-
-  1. grading_components: Spring 2026 syllabus has NO explicit weights for
-     discussion board / assignments / project / exams. Many CPS syllabi don't
-     publish weights. Schema requires `weight` on every GradingComponent →
-     we can't record "discussion board exists, weight unknown". Consider:
-       - making weight Optional[float], OR
-       - splitting components_with_weights vs components_observed.
-
-  2. instructor_contact: email + office hours pattern not in schema. Useful
-     for "is this prof responsive?" queries; lost today.
-
-  3. textbook: required + optional textbooks not captured. Many students
-     filter on "minimal-cost course?" — skipping field means we can't
-     answer.
-
-  4. meeting_schedule: "Tuesday 5:50-7:10 PM @ Snell 119" is structured
-     info but `term` + `delivery_mode` don't capture day-of-week / time /
-     room. Important for hybrid scheduling conflicts.
-
-  5. ai_policy: permitted tools (Copilot, claude.northeastern.edu) +
-     graduated penalty table is structured info every grad student wants
-     to know. Currently squeezed into controversial_signals as plain text.
 """
 
 from __future__ import annotations
@@ -52,9 +33,22 @@ sys.path.insert(0, str(PROJECT_ROOT))
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from datetime import date, time  # noqa: E402
+
 from db.connection import connect  # noqa: E402
 from db.repository import CourseRepository  # noqa: E402
-from schemas.course import Course, DeliveryMode, EvidenceSnippet  # noqa: E402
+from schemas.course import (  # noqa: E402
+    AIPolicy,
+    Course,
+    DayOfWeek,
+    DeliveryMode,
+    EvidenceSnippet,
+    GradingComponent,
+    InstructorContact,
+    MeetingSchedule,
+    MeetingSlot,
+    Textbook,
+)
 from scripts.init_db import init_database  # noqa: E402
 
 COURSE_ID = "neu-aai-6600"
@@ -104,12 +98,19 @@ on 1st offense, OSCCR report on 2nd.
 
 
 def build_course() -> Course:
-    """Build the AAI 6600 Course from real Spring 2026 syllabus content.
+    """Build the AAI 6600 Course from the real Spring 2026 syllabus (v1.1).
 
     Hard fields are syllabus-direct (high confidence). Soft fields synthesized
     from Course Description + CLOs (~0.85). Fields requiring student review
-    data (workload_hours, difficulty_score) are intentionally None — those
-    only become reliable after Reddit/RMP ingestion in Week 2-3.
+    data (workload_hours, difficulty_score) stay None — those only become
+    reliable after Reddit/RMP ingestion in Week 2-3.
+
+    v1.1 additions populated from syllabus:
+      - instructor_contact (Dr. Seshadri's NEU email + AAI lead backup)
+      - textbooks (1 required + 1 optional Russell & Norvig)
+      - meeting_schedule (Tuesday 17:50-19:10 @ Snell 119, Jan 7 - Apr 26)
+      - ai_policy (Copilot + Claude permitted, strict disclosure)
+      - grading_components with weight=None (syllabus does not publish weights)
     """
     return Course(
         # === Identity ===
@@ -123,6 +124,55 @@ def build_course() -> Course:
         credits=3,
         prereqs=[],  # syllabus: "Course prerequisites: None"
         delivery_mode=DeliveryMode.HYBRID,
+
+        # === L1.5 structured catalog details (v1.1) ===
+        instructor_contact=InstructorContact(
+            name="Dr. Hema Seshadri",
+            email="h.seshadri@northeastern.edu",
+            office_hours="By appointment via email; allow up to 48 hours for reply",
+            secondary_contact="John Wilder (AAI Academic Lead) <j.wilder@northeastern.edu>",
+        ),
+        textbooks=[
+            Textbook(
+                title="Analytics for Business Success",
+                authors=["Hema Seshadri"],
+                is_required=True,
+                url="https://a.co/d/07war9q",
+            ),
+            Textbook(
+                title="Artificial Intelligence: A Modern Approach (4th ed.)",
+                authors=["Stuart Russell", "Peter Norvig"],
+                is_required=False,
+            ),
+        ],
+        meeting_schedule=MeetingSchedule(
+            slots=[
+                MeetingSlot(
+                    day_of_week=DayOfWeek.TUESDAY,
+                    start_time=time(17, 50),
+                    end_time=time(19, 10),
+                    location="Snell Library 119",
+                ),
+            ],
+            timezone="America/New_York",
+            start_date=date(2026, 1, 7),
+            end_date=date(2026, 4, 26),
+        ),
+        ai_policy=AIPolicy(
+            permitted_tools=[
+                "Microsoft Copilot",
+                "Claude (claude.northeastern.edu)",
+            ],
+            disclosure_required=True,
+            notes=(
+                "Permitted uses: idea generation, process enhancement, learning "
+                "support. Submitting unmodified AI work is prohibited. Penalties: "
+                "1st offense undisclosed use = 50% grade reduction + mandatory "
+                "resubmission; 2nd offense = zero on assignment + OSCCR report; "
+                "AI-generated data falsification = zero on assignment + OSCCR "
+                "report on 1st offense."
+            ),
+        ),
 
         # === L2 soft fields ===
         topics_covered=[
@@ -140,8 +190,13 @@ def build_course() -> Course:
             "Statistical learning methods",
         ],
 
-        # NOTE: see schema gap #1 in module docstring
-        grading_components=[],
+        # v1.1: weight=None for components whose weights aren't published.
+        # Records existence + structure even when the rubric is opaque.
+        grading_components=[
+            GradingComponent(name="Discussion Board (weekly primary + 2 secondary)", weight=None),
+            GradingComponent(name="Assignments", weight=None),
+            GradingComponent(name="Integrative Project", weight=None),
+        ],
 
         skill_tags=[
             "python",
@@ -159,11 +214,10 @@ def build_course() -> Course:
             "AI Research Assistant",
         ],
 
-        # Not a course-quality issue — practical heads-up to students
-        # who lean heavily on AI tooling.
-        controversial_signals=[
-            "Strict AI disclosure policy: 50% penalty on 1st undisclosed use, OSCCR on 2nd",
-        ],
+        # AAI 6600 has no genuine course-quality red flags from syllabus alone.
+        # AI policy now lives in the structured ai_policy field, not as a free-form
+        # warning. Real controversial_signals would come from RMP/Reddit later.
+        controversial_signals=[],
 
         # === Provenance ===
         evidence_snippets=[
@@ -200,20 +254,11 @@ def build_course() -> Course:
                       "about the design and deployment of systems",
                 confidence=0.7,  # PLOs are aspirational; real placement data needs RMP/LinkedIn
             ),
-            EvidenceSnippet(
-                field="controversial_signals",
-                value=["Strict AI disclosure policy: 50% penalty on 1st undisclosed use, OSCCR on 2nd"],
-                source_id=SYLLABUS_SOURCE_ID,
-                quote="Undisclosed AI Use ... First Offense: Warning, 50% grade reduction, "
-                      "mandatory resubmission ... Second Offense: Zero on assignment, OSCCR report",
-                confidence=1.0,  # quoted verbatim
-            ),
         ],
 
-        # 0.9 reflects: hard fields syllabus-direct (1.0), soft fields
-        # synthesized without student feedback (0.7-0.95). Above 0.95
-        # would require RMP/Reddit corroboration.
-        extraction_confidence=0.9,
+        # v1.1: bumped from 0.9 to 0.92 — more catalog facts captured (instructor,
+        # textbooks, meeting, AI policy) without adding speculation.
+        extraction_confidence=0.92,
 
         source_review_ids=[SYLLABUS_SOURCE_ID],
     )

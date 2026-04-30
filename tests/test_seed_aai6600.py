@@ -47,7 +47,8 @@ def test_build_course_soft_fields_have_evidence() -> None:
     evidence_fields = {ev.field for ev in c.evidence_snippets}
     assert "skill_tags" in evidence_fields
     assert "career_relevance" in evidence_fields
-    assert "controversial_signals" in evidence_fields
+    # v1.1: AI policy moved to structured ai_policy field, controversial_signals
+    # is empty for AAI 6600 (no syllabus-derivable course-quality red flags).
 
 
 def test_build_course_workload_unset() -> None:
@@ -55,6 +56,72 @@ def test_build_course_workload_unset() -> None:
     c = build_course()
     assert c.workload_hours_per_week is None
     assert c.difficulty_score is None
+
+
+# === v1.1 fields populated from syllabus ===
+
+def test_build_course_instructor_contact() -> None:
+    c = build_course()
+    assert c.instructor_contact is not None
+    assert c.instructor_contact.name == "Dr. Hema Seshadri"
+    assert c.instructor_contact.email == "h.seshadri@northeastern.edu"
+    assert c.instructor_contact.secondary_contact is not None
+    assert "John Wilder" in c.instructor_contact.secondary_contact
+
+
+def test_build_course_textbooks() -> None:
+    c = build_course()
+    titles = [t.title for t in c.textbooks]
+    assert any("Analytics for Business Success" in t for t in titles)
+    # Required textbook should be marked as such
+    required = [t for t in c.textbooks if t.is_required]
+    assert len(required) >= 1
+    # Russell & Norvig is optional
+    rn = [t for t in c.textbooks if "Modern Approach" in t.title]
+    assert len(rn) == 1
+    assert rn[0].is_required is False
+
+
+def test_build_course_meeting_schedule() -> None:
+    from datetime import date as _date, time as _time
+    from schemas.course import DayOfWeek as _DOW
+
+    c = build_course()
+    assert c.meeting_schedule is not None
+    assert len(c.meeting_schedule.slots) == 1
+    slot = c.meeting_schedule.slots[0]
+    assert slot.day_of_week == _DOW.TUESDAY
+    assert slot.start_time == _time(17, 50)
+    assert slot.end_time == _time(19, 10)
+    assert slot.location == "Snell Library 119"
+    assert c.meeting_schedule.start_date == _date(2026, 1, 7)
+    assert c.meeting_schedule.end_date == _date(2026, 4, 26)
+
+
+def test_build_course_ai_policy() -> None:
+    c = build_course()
+    assert c.ai_policy is not None
+    permitted = c.ai_policy.permitted_tools
+    assert any("Copilot" in t for t in permitted)
+    assert any("Claude" in t for t in permitted)
+    assert c.ai_policy.disclosure_required is True
+    assert c.ai_policy.notes is not None
+    assert "OSCCR" in c.ai_policy.notes
+
+
+def test_build_course_grading_components_weight_optional() -> None:
+    """v1.1: weight=None is now valid — syllabus did not publish weights."""
+    c = build_course()
+    assert len(c.grading_components) >= 1
+    # All components in this seed have weight=None (intentional)
+    assert all(g.weight is None for g in c.grading_components)
+
+
+def test_build_course_schema_version_is_current() -> None:
+    from schemas.course import SCHEMA_VERSION
+
+    c = build_course()
+    assert c.schema_version == SCHEMA_VERSION  # i.e. "1.1"
 
 
 # === Integration: full main() against tmp DB ===
