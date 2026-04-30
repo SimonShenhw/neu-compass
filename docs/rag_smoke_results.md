@@ -80,16 +80,54 @@ real    1m17.923s
 **Latency**: 14-29ms 端到端。PLAN p50 < 1.5s 目标有 50x headroom。
 **排名**: 相对正确。强相关 (0.616) > 弱相关 (0.412)。差值 0.204。
 
-## 6. 局限 + 下一步
+## 6. Round 2: 7-course ranking discrimination (后续追加)
+
+第一轮只 1 课时排名没意义。补 6 个合成课
+(`scripts/seed_synthetic_courses.py`) 后真测一组 7 个 query,每个有
+明确期望命中:
+
+| Query | Expect | Got | Score | Top-3 |
+|---|---|---:|---:|---|
+| graph algorithms BFS DFS shortest paths | CS 5800 | CS 5800 ✓ | 0.463 | CS 5800 > DS 5230 > CS 6140 |
+| k-means clustering and dimensionality reduction | DS 5230 | DS 5230 ✓ | 0.583 | DS 5230 > CS 6140 > CS 5800 |
+| neural network training with backpropagation | DS 5220 | DS 5220 ✓ | 0.573 | DS 5220 > CS 6140 > MATH 7243 |
+| VC dimension PAC learning theory | CS 6140 | CS 6140 ✓ | 0.646 | CS 6140 > DS 5220 > DS 5230 |
+| Apache Spark ETL data pipelines | INFO 6105 | INFO 6105 ✓ | **0.702** | INFO 6105 > DS 5230 > MATH 7243 |
+| convex optimization Lagrangian duality | MATH 7243 | MATH 7243 ✓ | 0.521 | MATH 7243 > CS 5800 > DS 5220 |
+| AI fundamentals and search algorithms | AAI 6600 | AAI 6600 ✓ | 0.588 | AAI 6600 > CS 5800 > CS 6140 |
+| quantum cryptography seminar (adversarial) | None | DS 5230 | **0.485** | DS 5230 > CS 5800 > CS 6140 |
+
+**Top-1 accuracy: 7/7 = 100%** 在合理差异化的合成数据上。
+
+### 关键反直觉发现: 对抗 query 比真命中还高分
+
+- 对抗 "quantum cryptography seminar" → 顶端 score **0.485**
+- 真命中 "graph algorithms BFS DFS" → 顶端 score **0.463**
+
+**0.485 > 0.463** —— 一个无关 query 比一个正确命中分还高。
+**这意味着绝对阈值 (score < 0.5 reject) 完全不可用**。
+Week 5 上 BM25 hybrid + reranker 不是优化,是必需。
+
+### 第 1 轮和第 2 轮 score 对比
+
+第 1 轮 (1 课索引): 0.412 - 0.616, 区间 0.20  
+第 2 轮 (7 课索引): 0.463 - 0.702, 区间 0.24
+
+随课程数增加,score 上限上来一点,下限基本不动。这印证了:
+- 高分 = 真有匹配的高质量信号 (INFO 6105 vs Apache Spark = 高度匹配的术语集)
+- 低分 = 没什么相关的,FAISS 还是会返回最不差的那一个 (top-K 永远有 K 个结果)
+
+## 7. 总结: 局限 + 下一步
 
 ### 已知局限
 
-1. **只有 1 个课在索引里** — 任何 query 都会返回 AAI 6600（没别的可选）。
-   真正的 ranking 质量需要 ≥10 课才能测，最好 ≥50 课。
-2. **score 分布压缩** — bge-m3 在相关 STEM 文本上自然只有 0.4-0.7 区间，
-   绝对阈值 (e.g. score < 0.5 = no match) 不可靠。需要 hybrid + 相对阈值。
-3. **无 reranker** — Top-K 之后没有 cross-encoder 精排，第 1 名和第 5 名
-   差异可能很小。Week 5 v2 路线图里。
+1. ~~只有 1 个课在索引里~~ ✅ 已扩展到 7 课, ranking 质量已可验证
+2. **score 分布压缩** — bge-m3 在相关 STEM 文本上自然 0.4-0.7 区间,
+   绝对阈值不可靠 (实证: 对抗 0.485 > 真命中 0.463)。需 hybrid + 相对阈值
+3. **无 reranker** — Top-K 之后没有 cross-encoder 精排,第 1 名 vs 第 5 名
+   差异可能很小。v2 路线图
+4. **synthetic courses 是手写的差异化文本** — 真实 NEU syllabus 风格更
+   trim 一些, score 区间可能进一步压缩。等真课数据进来要重测
 
 ### 实测下来值得记录的工程教训
 
