@@ -1,0 +1,80 @@
+# Secrets - NEVER commit
+.env
+*.env
+!.env.example
+*.key
+*.pem
+credentials.json
+service_account*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+env/
+.python-version
+
+# uv
+uv.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Project data (NEVER commit raw scraped data or PII)
+data/raw/
+data/processed/
+data/coop_seed/*
+!data/coop_seed/.gitkeep
+data/ground_truth/*.json
+!data/ground_truth/.gitkeep
+
+# Databases & indexes
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.faiss
+*.idx
+faiss_index/
+
+# Logs
+*.log
+logs/
+
+# Backups
+backups/
+*.bak
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+*.tmp
+*~
