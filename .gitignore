@@ -25,8 +25,9 @@ venv/
 env/
 .python-version
 
-# uv
-uv.lock
+# uv: COMMIT uv.lock (reproducible builds across team / CI / WSL).
+# Ignore only the venv itself.
+# uv.lock is committed
 
 # IDE
 .vscode/
