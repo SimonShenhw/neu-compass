@@ -4,6 +4,11 @@ from schemas.alias import (
     AliasSource,
     AliasType,
 )
+from schemas.coop import (
+    CoopExperience,
+    Industry,
+    is_uniquely_identifying,
+)
 from schemas.course import (
     SCHEMA_VERSION,
     SOFT_FIELDS_REQUIRING_EVIDENCE,
@@ -29,15 +34,18 @@ __all__ = [
     "AliasReviewStatus",
     "AliasSource",
     "AliasType",
+    "CoopExperience",
     "Course",
     "DataSource",
     "DayOfWeek",
     "DeliveryMode",
     "EvidenceSnippet",
     "GradingComponent",
+    "Industry",
     "InstructorContact",
     "MeetingSchedule",
     "MeetingSlot",
     "Textbook",
+    "is_uniquely_identifying",
     "migrate",
 ]

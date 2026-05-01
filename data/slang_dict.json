@@ -1,0 +1,53 @@
+{
+  "_comment": "学生口语 -> 课程主代码映射. v0.1, ~40 条. PLAN §5 Week 5 deliverable.",
+  "_comment_2": "loader 通过 primary_course_code 查 course_id; 课程不在 DB 时该条会被 skip.",
+  "_comment_3": "扩展指南: 见 docs/annotation_guide.md §3.4 别名命名规范.",
+  "version": "0.1",
+  "entries": [
+    {"alias": "Algo",            "alias_type": "slang", "primary_course_code": "CS 5800", "confidence": 0.92},
+    {"alias": "Algos",           "alias_type": "slang", "primary_course_code": "CS 5800", "confidence": 0.92},
+    {"alias": "Algorithms",      "alias_type": "slang", "primary_course_code": "CS 5800", "confidence": 0.95},
+    {"alias": "5800",            "alias_type": "slang", "primary_course_code": "CS 5800", "confidence": 0.85},
+    {"alias": "算法课",          "alias_type": "slang", "primary_course_code": "CS 5800", "confidence": 0.95},
+    {"alias": "算法",            "alias_type": "slang", "primary_course_code": "CS 5800", "confidence": 0.80},
+    {"alias": "DS 5000",         "alias_type": "cross_listed", "primary_course_code": "CS 5800", "confidence": 1.00},
+
+    {"alias": "Sup ML",          "alias_type": "slang", "primary_course_code": "DS 5220", "confidence": 0.90},
+    {"alias": "Supervised ML",   "alias_type": "slang", "primary_course_code": "DS 5220", "confidence": 0.95},
+    {"alias": "5220",            "alias_type": "slang", "primary_course_code": "DS 5220", "confidence": 0.80},
+    {"alias": "ML A",            "alias_type": "slang", "primary_course_code": "DS 5220", "confidence": 0.70},
+    {"alias": "监督学习",        "alias_type": "slang", "primary_course_code": "DS 5220", "confidence": 0.95},
+    {"alias": "DS 监督",         "alias_type": "slang", "primary_course_code": "DS 5220", "confidence": 0.80},
+
+    {"alias": "Unsup ML",        "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.90},
+    {"alias": "Unsupervised ML", "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.95},
+    {"alias": "Clustering",      "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.75},
+    {"alias": "5230",            "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.85},
+    {"alias": "ML B",            "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.65},
+    {"alias": "无监督",          "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.95},
+    {"alias": "聚类课",          "alias_type": "slang", "primary_course_code": "DS 5230", "confidence": 0.85},
+
+    {"alias": "ML Theory",       "alias_type": "slang", "primary_course_code": "CS 6140", "confidence": 0.85},
+    {"alias": "Stat Learning",   "alias_type": "slang", "primary_course_code": "CS 6140", "confidence": 0.80},
+    {"alias": "6140",            "alias_type": "slang", "primary_course_code": "CS 6140", "confidence": 0.85},
+    {"alias": "统计学习",        "alias_type": "slang", "primary_course_code": "CS 6140", "confidence": 0.90},
+    {"alias": "理论 ML",         "alias_type": "slang", "primary_course_code": "CS 6140", "confidence": 0.80},
+
+    {"alias": "Big Data",        "alias_type": "slang", "primary_course_code": "INFO 6105", "confidence": 0.65},
+    {"alias": "Spark class",     "alias_type": "slang", "primary_course_code": "INFO 6105", "confidence": 0.85},
+    {"alias": "Data Eng",        "alias_type": "slang", "primary_course_code": "INFO 6105", "confidence": 0.85},
+    {"alias": "Data Engineering","alias_type": "slang", "primary_course_code": "INFO 6105", "confidence": 0.90},
+    {"alias": "6105",            "alias_type": "slang", "primary_course_code": "INFO 6105", "confidence": 0.85},
+    {"alias": "数据工程",        "alias_type": "slang", "primary_course_code": "INFO 6105", "confidence": 0.95},
+
+    {"alias": "Math 7243",       "alias_type": "slang", "primary_course_code": "MATH 7243", "confidence": 1.00},
+    {"alias": "Math of Data",    "alias_type": "slang", "primary_course_code": "MATH 7243", "confidence": 0.95},
+    {"alias": "7243",            "alias_type": "slang", "primary_course_code": "MATH 7243", "confidence": 0.85},
+    {"alias": "数学课",          "alias_type": "slang", "primary_course_code": "MATH 7243", "confidence": 0.55},
+    {"alias": "线代课",          "alias_type": "slang", "primary_course_code": "MATH 7243", "confidence": 0.70},
+    {"alias": "Quant Math",      "alias_type": "slang", "primary_course_code": "MATH 7243", "confidence": 0.65},
+
+    {"alias": "Intro AI",        "alias_type": "slang", "primary_course_code": "AAI 6600", "confidence": 0.85},
+    {"alias": "AI 入门",         "alias_type": "slang", "primary_course_code": "AAI 6600", "confidence": 0.85}
+  ]
+}

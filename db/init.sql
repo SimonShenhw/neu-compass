@@ -143,13 +143,19 @@ CREATE TABLE IF NOT EXISTS coop_experiences (
     coop_id              TEXT PRIMARY KEY,
     company              TEXT NOT NULL,
     role                 TEXT NOT NULL,
+    industry             TEXT,                            -- enum: quant_fintech / big_tech / biotech_health / startup / consulting / other
+    coop_term            TEXT,                            -- "Summer 2025" / "Spring 2026"
+    duration_months      INTEGER CHECK (duration_months IS NULL OR (duration_months >= 1 AND duration_months <= 8)),
     related_courses      JSON,                            -- ["AAI 6600", "DS 5220"]
     interview_summary    TEXT,                            -- 已脱敏 (PLAN §6.3 标准)
+    technical_questions  TEXT,                            -- 已脱敏的技术面真题
+    salary_range_usd     TEXT,                            -- 桶值: "$25-30/hr" 不存精确数字
     contributor_user_id  TEXT,                            -- NULL = seed data
     is_seed_data         INTEGER NOT NULL DEFAULT 0
                            CHECK (is_seed_data IN (0, 1)),  -- SQLite 没原生 BOOL
     visibility_level     INTEGER NOT NULL DEFAULT 0
                            CHECK (visibility_level IN (0, 1, 2)),
+    redaction_audit      TEXT,                            -- 审核记录: 谁审过 / 删了什么
     created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (contributor_user_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
@@ -160,6 +166,10 @@ CREATE INDEX IF NOT EXISTS idx_coop_visibility
     ON coop_experiences(visibility_level);
 CREATE INDEX IF NOT EXISTS idx_coop_is_seed
     ON coop_experiences(is_seed_data);
+CREATE INDEX IF NOT EXISTS idx_coop_industry
+    ON coop_experiences(industry);
+CREATE INDEX IF NOT EXISTS idx_coop_term
+    ON coop_experiences(coop_term);
 
 -- =============================================================================
 -- 6. v_course_lookup (统一查询入口, PLAN §1.4)

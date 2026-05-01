@@ -117,17 +117,58 @@ Week 5 上 BM25 hybrid + reranker 不是优化,是必需。
 - 高分 = 真有匹配的高质量信号 (INFO 6105 vs Apache Spark = 高度匹配的术语集)
 - 低分 = 没什么相关的,FAISS 还是会返回最不差的那一个 (top-K 永远有 K 个结果)
 
-## 7. 总结: 局限 + 下一步
+## 7. Round 3: hybrid (BM25 + vector RRF) 修反转 (Week 5 追加)
+
+`scripts/smoke_hybrid_compare.py` 对同一 7 课语料 + 10 query battery
+(7 真命中 + 3 对抗) 同时跑 vector-only 和 hybrid:
+
+```
+                        vector-only      hybrid (RRF, k=60)
+────────────────────────────────────────────────────────────
+Top-1 accuracy           7/7              7/7
+real-min - adv-max       -0.022   ❌      +0.001   ✓
+```
+
+### 反转修正成功 (但是擦边)
+
+vector-only 的反转: 对抗 "quantum cryptography" 拿到 0.485,
+高于真命中 "graph algorithms BFS DFS" 的 0.463。差值 -0.022。
+**任何绝对阈值都救不了**。
+
+hybrid 后: real-min (0.033) > adv-max (0.032),差值 +0.001 翻为正。
+绝对阈值理论上可用,但**实测只赢 0.001**,任何噪声都能盖过。
+
+### 为什么只赢 0.001 而不是大胜
+
+主要是 **BM25 没做 stopword 过滤**。对抗 "ancient roman history" 里的 "the"
++ "and" 出现在所有课程文本,BM25 给所有课分数,RRF 也跟着分数排。
+
+### 改进路径(优先级排好的)
+
+1. **BM25 stopword 过滤** (Week 5 残留, 简单,直接收益): 跳过 NLTK 标准
+   stopword 列表里的 token,IDF 噪声立刻减少
+2. **Cross-encoder reranker** (v2 路线图): 在 Top-K 后用 bge-reranker-v2-m3
+   重新打分。质量大幅提升,代价 ~50ms
+3. **相对阈值**: 不用绝对 score,看 #1 vs #2 的 gap。Gap 小于阈值时显示
+   "no clear match,要不要换个问法"
+4. **真 NEU syllabus 替换合成文本**: 合成文本是为差异化故意写得术语饱满。
+   真 syllabus 一般更 trim, score 区间会进一步压缩。最终验收要等真数据
+
+### 反例 3 hybrid 也没修的 case
+
+"woodworking and joinery" 在 hybrid 下还能拿到 0.032 (接近 real-min)。
+原因: "and" 这种 stopword 在所有课程文本里都有,BM25 把它当作"信号",
+RRF 跟着算。stopword 过滤后预期会降到 ~0.016。
+
+## 8. 总结: 局限 + 下一步
 
 ### 已知局限
 
-1. ~~只有 1 个课在索引里~~ ✅ 已扩展到 7 课, ranking 质量已可验证
-2. **score 分布压缩** — bge-m3 在相关 STEM 文本上自然 0.4-0.7 区间,
-   绝对阈值不可靠 (实证: 对抗 0.485 > 真命中 0.463)。需 hybrid + 相对阈值
-3. **无 reranker** — Top-K 之后没有 cross-encoder 精排,第 1 名 vs 第 5 名
-   差异可能很小。v2 路线图
-4. **synthetic courses 是手写的差异化文本** — 真实 NEU syllabus 风格更
-   trim 一些, score 区间可能进一步压缩。等真课数据进来要重测
+1. ~~只有 1 个课在索引里~~ ✅ 7 课 + ranking 质量已验证
+2. ~~score 阈值反转 (0.485 > 0.463)~~ ✅ hybrid 后 +0.001,**质量上修了**
+3. **BM25 stopword 没过滤** ⚠️ 实测发现的边界问题, Week 5 残留
+4. **无 reranker** — v2 路线图
+5. **synthetic 文本太差异化** — 真 NEU syllabus 进来要重测
 
 ### 实测下来值得记录的工程教训
 
