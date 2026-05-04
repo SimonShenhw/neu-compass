@@ -16,10 +16,14 @@ with default k=60 (standard RRF parameter from Cormack et al. 2009).
 This makes top-1 in each list contribute the most, with diminishing
 returns. Robust to scale differences.
 
-Tokenization: ASCII-only (whitespace + lowercase + alnum). Chinese
-queries will still get hit on co-occurring English terms (course codes,
-prof names) but pure-Chinese BM25 needs jieba-style segmentation —
-deferred to v2.
+Tokenization: ASCII-only (whitespace + lowercase + alnum), with English
+stopwords filtered. Stopword filter widens the inversion gap reported
+in docs/rag_smoke_results.md §7 (vector-only inversion was -0.022;
+hybrid without stopwords was +0.001 — borderline). Adversarial queries
+like "ancient roman history" otherwise gain BM25 mass from "and"/"of"
+appearing in every course's raw_text. Chinese queries still get hit on
+co-occurring English terms (course codes, prof names) but pure-Chinese
+BM25 needs jieba-style segmentation — deferred to v2.
 """
 
 from __future__ import annotations
@@ -40,10 +44,33 @@ DEFAULT_RRF_K = 60
 # docstring; pure-Chinese BM25 is a v2 problem.
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
+# English stopwords. Hardcoded (rather than nltk.download('stopwords')) so
+# `tokenize` works offline / in CI / on first checkout. Sourced from NLTK's
+# English list; words that could plausibly carry signal in a course-search
+# context (e.g. "again" → repeat-able? "before"/"after" → pre/co-req hints)
+# are kept conservatively. If you change this list, re-run
+# scripts/smoke_hybrid_compare.py to confirm the real-min vs adv-max gap.
+STOPWORDS: frozenset[str] = frozenset({
+    "a", "about", "all", "also", "am", "an", "and", "any", "are", "as",
+    "at", "be", "been", "being", "both", "but", "by", "can", "could",
+    "did", "do", "does", "doing", "down", "during", "each", "few", "for",
+    "from", "further", "had", "has", "have", "having", "he", "her",
+    "here", "hers", "herself", "him", "himself", "his", "how", "i", "if",
+    "in", "into", "is", "it", "its", "itself", "just", "me", "more",
+    "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on",
+    "once", "only", "or", "other", "our", "ours", "ourselves", "out",
+    "over", "own", "s", "same", "she", "should", "so", "some", "such",
+    "t", "than", "that", "the", "their", "theirs", "them", "themselves",
+    "then", "there", "these", "they", "this", "those", "through", "to",
+    "too", "under", "until", "up", "very", "was", "we", "were", "what",
+    "when", "where", "which", "while", "who", "whom", "why", "will",
+    "with", "would", "you", "your", "yours", "yourself", "yourselves",
+})
+
 
 def tokenize(text: str) -> list[str]:
-    """Default tokenizer for the BM25 layer."""
-    return _TOKEN_RE.findall(text.lower())
+    """Lowercase + ASCII-alnum-split + stopword filter for the BM25 layer."""
+    return [t for t in _TOKEN_RE.findall(text.lower()) if t not in STOPWORDS]
 
 
 class _RetrieverLike(Protocol):

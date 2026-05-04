@@ -1,0 +1,352 @@
+{
+  "data": {
+    "newSearch": {
+      "teachers": {
+        "edges": [
+          {
+            "node": {
+              "avgDifficulty": 2.4,
+              "avgRating": 2.8,
+              "department": "Health Science",
+              "firstName": "Louisa",
+              "id": "VGVhY2hlci0zMDUzNzg4",
+              "lastName": "Smith",
+              "legacyId": 3053788,
+              "numRatings": 5,
+              "ratings": {
+                "edges": [
+                  {
+                    "node": {
+                      "class": "PHTH2210",
+                      "comment": "terrible class, it's primarily based on R coding and the examples from the slides are NOTHING like the weekly assignments. They do provide a lot of office hours help and both the midterm and final were taken online. ",
+                      "date": "2025-04-24 16:44:51 +0000 UTC",
+                      "difficultyRatingRounded": 4,
+                      "id": "UmF0aW5nLTQxMDMxMjk4",
+                      "qualityRating": 1,
+                      "ratingTags": ""
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHTH2210",
+                      "comment": "I never really went to the lectures, it covers the basics of statistics and they take right off the slides that they post on Canvas. There are 1 weekly homework assignment each week along with 1 midterm and 1 final. Which the tests were online and they let us take them from wherever. All R code you can just look up how to do it. Easy A. ",
+                      "date": "2025-04-10 18:52:06 +0000 UTC",
+                      "difficultyRatingRounded": 1,
+                      "id": "UmF0aW5nLTQwOTEzODA2",
+                      "qualityRating": 4,
+                      "ratingTags": "Clear grading criteria"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHTH2210",
+                      "comment": "Smith is awesome but this class is dry if you already knows basic statistics. Some of the R information was useful. Even if you aren't code inclined, all the slides (posted on canvas) have examples of exactly what you need to do for the weekly assignments, and you can copy paste and edit them to answer the questions. Exams were take home",
+                      "date": "2025-04-06 18:30:33 +0000 UTC",
+                      "difficultyRatingRounded": 1,
+                      "id": "UmF0aW5nLTQwODc5NzY3",
+                      "qualityRating": 5,
+                      "ratingTags": "Clear grading criteria--Caring"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHTH2210",
+                      "comment": "be warned this is a CODING course for HEALTH science students... however midterm and final were both online and taken from home. besides that it was just weekly coding homework that we were allowed to use chatgpt to do. attendance isnt mandatory so most people didnt go to class tbh as exams were online. louisa was kind but lectures were confusing.",
+                      "date": "2024-12-05 01:11:42 +0000 UTC",
+                      "difficultyRatingRounded": 2,
+                      "id": "UmF0aW5nLTQwMTA4NzQy",
+                      "qualityRating": 2,
+                      "ratingTags": "Lecture heavy"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHTH2210",
+                      "comment": "Professor Smith is 1 of 2 professors for this course. The class was held in Blackman Auditorium, making it difficult for the professor to interact with students/teach effectively. The notes didn't make sense. She tried her best and was sometimes able to expand on the slides, but the concepts were difficult/hard to teach to such a large lecture. ",
+                      "date": "2024-12-04 20:27:27 +0000 UTC",
+                      "difficultyRatingRounded": 4,
+                      "id": "UmF0aW5nLTQwMTAyOTA4",
+                      "qualityRating": 2,
+                      "ratingTags": "Lecture heavy--Graded by few things--Online Savvy"
+                    }
+                  }
+                ]
+              },
+              "school": {
+                "name": "Northeastern University"
+              },
+              "wouldTakeAgainPercent": 60
+            }
+          },
+          {
+            "node": {
+              "avgDifficulty": 3,
+              "avgRating": 4.1,
+              "department": "Philosophy",
+              "firstName": "Matthew",
+              "id": "VGVhY2hlci0yMzQxNTUw",
+              "lastName": "Smith",
+              "legacyId": 2341550,
+              "numRatings": 23,
+              "ratings": {
+                "edges": [
+                  {
+                    "node": {
+                      "class": "PHIL1160",
+                      "comment": "No clear instructions for the midterm exam (worth 15% of grade). Attendance is basically mandatory. There are no announcements on Canvas and doesn't reply to his emails. Decent lectures but gets sidetracked easily. A lot of reading...",
+                      "date": "2026-02-25 17:42:34 +0000 UTC",
+                      "difficultyRatingRounded": 5,
+                      "id": "UmF0aW5nLTQyNjQzNjgy",
+                      "qualityRating": 2,
+                      "ratingTags": "Tough grader--Get ready to read--Lecture heavy"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHIL1101",
+                      "comment": "This rating pertains to PHIL 4535 (Philosophy of Mind). Professor Smith is the most dynamic lecturer and best professor I have had at Northeastern. The subject matter is extraordinarily interesting and challenging. This course is Smith's bread and butter. If you are looking for a course that will intellectually challenge you, look no further. ",
+                      "date": "2024-11-06 20:45:13 +0000 UTC",
+                      "difficultyRatingRounded": 4,
+                      "id": "UmF0aW5nLTM5OTAzNDkw",
+                      "qualityRating": 5,
+                      "ratingTags": "Get ready to read--Participation matters--Amazing lectures "
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHIL1160",
+                      "comment": "The professor basically loses it if you challenge him. The material is very shallow and he has attention deficit issues. There really seemed to be no point to this course or him being a professor...",
+                      "date": "2024-10-13 18:49:21 +0000 UTC",
+                      "difficultyRatingRounded": 2,
+                      "id": "UmF0aW5nLTM5ODA5NTA4",
+                      "qualityRating": 1,
+                      "ratingTags": ""
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "POLS2325",
+                      "comment": "very intense lecturer (in the best way), never a dull moment! near perfect syllabus",
+                      "date": "2024-04-20 13:44:56 +0000 UTC",
+                      "difficultyRatingRounded": 3,
+                      "id": "UmF0aW5nLTM5MTM3MTA2",
+                      "qualityRating": 5,
+                      "ratingTags": "Amazing lectures --Gives good feedback--Inspirational"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "PHIL1160",
+                      "comment": "Great lecturer, but sometimes gets off topic. We don't always go over all the material due to lack of time. It's easy to fall behind since you can get away not doing the reading. It's hard to follow every class because of heavy reading. A lot the grade is participation based, so it's not all too difficult until you have a paper or a presentation.",
+                      "date": "2023-11-01 16:35:41 +0000 UTC",
+                      "difficultyRatingRounded": 3,
+                      "id": "UmF0aW5nLTM4MzI4MzA1",
+                      "qualityRating": 4,
+                      "ratingTags": "Get ready to read--Hilarious--Accessible outside class"
+                    }
+                  }
+                ]
+              },
+              "school": {
+                "name": "Northeastern University"
+              },
+              "wouldTakeAgainPercent": 82.6087
+            }
+          },
+          {
+            "node": {
+              "avgDifficulty": 3.8,
+              "avgRating": 2.7,
+              "department": "Music",
+              "firstName": "Joel",
+              "id": "VGVhY2hlci0xMDczNDAz",
+              "lastName": "Smith",
+              "legacyId": 1073403,
+              "numRatings": 6,
+              "ratings": {
+                "edges": [
+                  {
+                    "node": {
+                      "class": "JAZZBAND",
+                      "comment": "(He's at Tufts) Really passive aggressive, not fun to have as the conductor. Often contradicts what he says and can be very much in your face if you mess up an important rhythm, but then explains the rhythms and melodies poorly. Directions and changes to score are often unclear. That said, he's nice outside of class and invites cool guest artists.",
+                      "date": "2024-12-15 01:18:23 +0000 UTC",
+                      "difficultyRatingRounded": 4,
+                      "id": "UmF0aW5nLTQwMzAyMTg4",
+                      "qualityRating": 2,
+                      "ratingTags": ""
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "JAZZ1",
+                      "comment": "MUSC2208 - definitely NOT recommended for students who have not learned Jazz Theory/Jazz Music",
+                      "date": "2022-05-05 04:31:42 +0000 UTC",
+                      "difficultyRatingRounded": 5,
+                      "id": "UmF0aW5nLTM2MjQ4OTY2",
+                      "qualityRating": 1,
+                      "ratingTags": "Tough grader--Participation matters--Hilarious"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "JAZZ1",
+                      "comment": "This class was really interesting but 9am so really hard to get there on time. Sometimes he gets mad if you dont do the reading. Overall easy class",
+                      "date": "2012-11-09 13:02:49 +0000 UTC",
+                      "difficultyRatingRounded": 5,
+                      "id": "UmF0aW5nLTIwODA2NTcw",
+                      "qualityRating": 5,
+                      "ratingTags": ""
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "JAZZBAND",
+                      "comment": "Dude's got this one dred that hangs kinda like a leach that suctioned to his forehead.... Distracting when conducting otherwise, well he's the Bill Lumberg of jazz.",
+                      "date": "2008-06-26 13:39:22 +0000 UTC",
+                      "difficultyRatingRounded": 2,
+                      "id": "UmF0aW5nLTE0NjE1NDc1",
+                      "qualityRating": 3,
+                      "ratingTags": ""
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "MUS231",
+                      "comment": "I really enjoyed Professor Smith's class. Sometimes he seemed a bit like he was showing off with the piano playing, but in general it was a good class, and he was a good teacher. Of course, I had music experience going in, but if you didn't, it might be hard...",
+                      "date": "2008-04-27 19:45:04 +0000 UTC",
+                      "difficultyRatingRounded": 3,
+                      "id": "UmF0aW5nLTE0MzU3MDM3",
+                      "qualityRating": 4,
+                      "ratingTags": ""
+                    }
+                  }
+                ]
+              },
+              "school": {
+                "name": "Northeastern University"
+              },
+              "wouldTakeAgainPercent": 0
+            }
+          },
+          {
+            "node": {
+              "avgDifficulty": 1.8,
+              "avgRating": 4.3,
+              "department": "Graphic Design",
+              "firstName": "Daryl",
+              "id": "VGVhY2hlci0yNjM5Nzk2",
+              "lastName": "Smith",
+              "legacyId": 2639796,
+              "numRatings": 4,
+              "ratings": {
+                "edges": [
+                  {
+                    "node": {
+                      "class": "ARTG2250",
+                      "comment": "He's a good professor overall but if you are an international  student I wouldn't recommend taking classes with him.\nHis instruction papers made no sense and he has a poorly English so he wouldn't be able to explain you the assignments in another context ",
+                      "date": "2024-09-16 19:22:10 +0000 UTC",
+                      "difficultyRatingRounded": 2,
+                      "id": "UmF0aW5nLTM5NzQ1NzMy",
+                      "qualityRating": 3,
+                      "ratingTags": "Respected"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "ARTG2250",
+                      "comment": "I truly loved Daryl so much. He inspired me so much when designing outside of class. The assignments he gives all build up and really help you to become a better designer. Daryl is the most positive and uplifting professor I've ever had. He is very helpful with critiques and overall was super fun to have.",
+                      "date": "2021-04-27 19:09:58 +0000 UTC",
+                      "difficultyRatingRounded": 1,
+                      "id": "UmF0aW5nLTM0NjM3NzI5",
+                      "qualityRating": 5,
+                      "ratingTags": "Gives good feedback--Respected--Inspirational"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "ARTG2250",
+                      "comment": "Daryl is a caring and easy-going professor. He knows a lot about design/type and is always excited to teach. Do some great work, put the time in, and he will praise you. Sometimes I felt like he didn't give enough critique or constructive criticism for designs, he will tend to focus on what is working rather than what isn't.",
+                      "date": "2020-11-19 08:15:18 +0000 UTC",
+                      "difficultyRatingRounded": 1,
+                      "id": "UmF0aW5nLTMzODQ4MDE2",
+                      "qualityRating": 4,
+                      "ratingTags": "Participation matters--Caring"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "ARTG2252",
+                      "comment": "Daryl is an awesome professor. He gives very helpful feedback and really helps you grow as a designer, no matter how much experience you have. He assigns unique but helpful projects and you never have to worry about busywork. I would highly suggest taking a class with him.",
+                      "date": "2020-11-18 16:07:20 +0000 UTC",
+                      "difficultyRatingRounded": 3,
+                      "id": "UmF0aW5nLTMzODQwMjQ0",
+                      "qualityRating": 5,
+                      "ratingTags": ""
+                    }
+                  }
+                ]
+              },
+              "school": {
+                "name": "Northeastern University"
+              },
+              "wouldTakeAgainPercent": 75
+            }
+          },
+          {
+            "node": {
+              "avgDifficulty": 3.7,
+              "avgRating": 5,
+              "department": "Computer Science",
+              "firstName": "David",
+              "id": "VGVhY2hlci0xODM5OTIy",
+              "lastName": "Smith",
+              "legacyId": 1839922,
+              "numRatings": 3,
+              "ratings": {
+                "edges": [
+                  {
+                    "node": {
+                      "class": "CS6120",
+                      "comment": "My favorite professor at Northeastern University. He developed my curiosity for SEO and NLP. I love the subject. The tests were challenging! But overall the professor is amazing. You should take the course.",
+                      "date": "2024-01-15 17:52:01 +0000 UTC",
+                      "difficultyRatingRounded": 4,
+                      "id": "UmF0aW5nLTM4ODgyNTQ5",
+                      "qualityRating": 5,
+                      "ratingTags": "Tough grader--Amazing lectures --Lecture heavy"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "cs4100",
+                      "comment": "Smith is an good lecturer, who's knowledge of philosophy makes the course even more engaging. He's clearly passionate and knows his stuff. He perhaps spends too much time drilling the same concepts over and over which can be boring, but that results in knowing most of the stuff really well.",
+                      "date": "2023-04-24 16:42:45 +0000 UTC",
+                      "difficultyRatingRounded": 3,
+                      "id": "UmF0aW5nLTM3NzAwMzg5",
+                      "qualityRating": 5,
+                      "ratingTags": "Amazing lectures --Lecture heavy"
+                    }
+                  },
+                  {
+                    "node": {
+                      "class": "CS6120",
+                      "comment": "I have worked on assignments for this course and it has really developed my programming practices for the good.",
+                      "date": "2016-07-19 16:22:06 +0000 UTC",
+                      "difficultyRatingRounded": 4,
+                      "id": "UmF0aW5nLTI2ODE2OTQ3",
+                      "qualityRating": 5,
+                      "ratingTags": ""
+                    }
+                  }
+                ]
+              },
+              "school": {
+                "name": "Northeastern University"
+              },
+              "wouldTakeAgainPercent": 100
+            }
+          }
+        ]
+      }
+    }
+  }
+}

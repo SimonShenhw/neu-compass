@@ -12,6 +12,7 @@ from rag.hybrid import (
     BM25Corpus,
     DEFAULT_RRF_K,
     HybridRetriever,
+    STOPWORDS,
     reciprocal_rank_fusion,
     tokenize,
 )
@@ -26,7 +27,9 @@ def test_tokenize_lowercase_and_alnum() -> None:
 
 
 def test_tokenize_handles_punctuation_aggressively() -> None:
-    assert tokenize("Dr. Zhang's class — A+") == ["dr", "zhang", "s", "class", "a"]
+    """Apostrophes / dashes split on alnum boundary; the 1-letter residues
+    'a' and 's' then drop out via STOPWORDS."""
+    assert tokenize("Dr. Zhang's class — A+") == ["dr", "zhang", "class"]
 
 
 def test_tokenize_drops_chinese_chars() -> None:
@@ -36,6 +39,30 @@ def test_tokenize_drops_chinese_chars() -> None:
 
 def test_tokenize_empty() -> None:
     assert tokenize("") == []
+
+
+def test_tokenize_filters_stopwords() -> None:
+    """Function words like 'and'/'the'/'of' must be dropped; without the
+    filter, adversarial queries inflate BM25 mass via shared stopwords
+    (docs/rag_smoke_results.md §7)."""
+    # Standard high-noise tokens
+    assert "the" not in tokenize("the algorithm")
+    assert "and" not in tokenize("graph and algorithms")
+    assert "of" not in tokenize("study of math")
+    # All-stopwords query collapses to empty, signalling "no lexical signal"
+    assert tokenize("the and of") == []
+
+
+def test_tokenize_keeps_content_terms() -> None:
+    """Domain terms (course codes, ML jargon) must survive the filter."""
+    out = tokenize("AI fundamentals and search algorithms")
+    # 'and' dropped; 'ai' / 'fundamentals' / 'search' / 'algorithms' kept
+    assert out == ["ai", "fundamentals", "search", "algorithms"]
+
+
+def test_stopwords_are_lowercase() -> None:
+    """Filter is applied AFTER lowercasing; STOPWORDS entries must be lower."""
+    assert all(s == s.lower() for s in STOPWORDS)
 
 
 # === reciprocal_rank_fusion ===

@@ -103,4 +103,9 @@ warn_unused_ignores = true
 testpaths = ["tests"]
 pythonpath = ["."]  # 让 `import schemas` 在未 pip install -e . 时也可工作
 asyncio_mode = "auto"
-addopts = "-ra --strict-markers"
+# `-m "not live"` skips network-touching tests by default. Opt in with
+# `pytest -m live` (e.g. for nightly real-traffic verification).
+addopts = "-ra --strict-markers -m 'not live'"
+markers = [
+    "live: hits real network (NEU catalog / RMP GraphQL / Reddit). Opt-in via `pytest -m live`.",
+]

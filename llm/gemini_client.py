@@ -15,6 +15,7 @@ Gemini quota retries cost real money. Caller logs + decides.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from functools import lru_cache
 from typing import Any, Protocol, TypeVar
 
@@ -38,7 +39,10 @@ class _ModelLike(Protocol):
     """
 
     def generate_content(
-        self, prompt: str, generation_config: Any | None = ...
+        self,
+        prompt: str,
+        generation_config: Any | None = ...,
+        stream: bool = ...,
     ) -> Any: ...
 
 
@@ -125,6 +129,60 @@ def generate_text(
     return _extract_text(response)
 
 
+def generate_text_stream(
+    prompt: str,
+    *,
+    model: _ModelLike | None = None,
+    model_name: str = DEFAULT_MODEL,
+    temperature: float = DEFAULT_TEMPERATURE,
+    max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+) -> Iterator[str]:
+    """Yield text chunks as Gemini produces them.
+
+    Used by /chat for token-by-token UI streaming (Streamlit st.write_stream).
+    Caller must consume the iterator promptly — Gemini disconnects idle
+    streams after a few seconds.
+
+    GeminiError surfaces if the SDK raises during stream init OR if the
+    response never produces text (safety block, empty completion). Per-chunk
+    errors mid-stream propagate as GeminiError too — the partial output up
+    to that point is what the caller already received.
+    """
+    if model is None:
+        model = _build_default_model(model_name)
+
+    try:
+        stream = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": temperature,
+                "max_output_tokens": max_output_tokens,
+            },
+            stream=True,
+        )
+    except Exception as e:
+        raise GeminiError(
+            f"Gemini stream init failed: {type(e).__name__}: {e}"
+        ) from e
+
+    saw_any_text = False
+    try:
+        for chunk in stream:
+            text = getattr(chunk, "text", None)
+            if text:
+                saw_any_text = True
+                yield str(text)
+    except Exception as e:
+        raise GeminiError(
+            f"Gemini stream interrupted: {type(e).__name__}: {e}"
+        ) from e
+
+    if not saw_any_text:
+        raise GeminiError(
+            "Gemini stream produced no text chunks (safety block or empty completion)"
+        )
+
+
 def _extract_text(response: Any) -> str:
     """Pull the text out of a Gemini response. Handles both .text and the
     longer .candidates path; raises GeminiError if neither yields content."""
@@ -154,4 +212,5 @@ __all__ = [
     "GeminiError",
     "generate_structured",
     "generate_text",
+    "generate_text_stream",
 ]

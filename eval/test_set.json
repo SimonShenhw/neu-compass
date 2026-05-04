@@ -1,41 +1,312 @@
 {
-  "_comment": "Eval set v0 — minimal skeleton. Real 100 queries are a Week 4 deliverable; this file is a structural placeholder + 5 examples exercising the existing AAI 6600 seed. PLAN §4.1 distribution target: 30 simple, 30 medium, 20 complex, 10 boundary, 10 adversarial.",
-  "version": "0.1",
+  "_comment": "Eval set v0.2 — calibrated against the real NEU catalog (6469 courses ingested 2026-05-03 via scripts/ingest_neu_catalog.py). PLAN §4.1 distribution target: 30 simple / 30 medium / 20 complex / 10 boundary / 10 adversarial = 100. This set is 42 covering the structural full sweep; the 100-query target depends on real query log data we don't have yet (Week 7 deliverable). expected_course_ids accepts ANY course_id in the list as a hit (recall@k semantics); empty list means 'no good match' (adversarial).",
+  "version": "0.2",
   "queries": [
     {
       "query_id": "q001",
       "category": "simple",
-      "query": "AAI 6600 怎么样",
-      "expected_course_ids": ["neu-aai-6600"],
-      "rationale": "Direct primary code lookup via v_course_lookup."
+      "query": "CS 5800",
+      "expected_course_ids": ["neu-cs-5800"],
+      "rationale": "Primary code lookup via v_course_lookup."
     },
     {
       "query_id": "q002",
       "category": "simple",
-      "query": "应用 AI",
+      "query": "AAI 6600",
       "expected_course_ids": ["neu-aai-6600"],
-      "rationale": "Chinese slang alias resolves via course_aliases."
+      "rationale": "Primary code lookup."
     },
     {
       "query_id": "q003",
       "category": "simple",
-      "query": "Hema's AI class",
-      "expected_course_ids": ["neu-aai-6600"],
-      "rationale": "Professor attribution alias."
+      "query": "DS 5220",
+      "expected_course_ids": ["neu-ds-5220"],
+      "rationale": "Primary code lookup."
     },
     {
       "query_id": "q004",
-      "category": "boundary",
-      "query": "6600",
-      "expected_course_ids": ["neu-aai-6600"],
-      "rationale": "Bare 4-digit number; alias system should still resolve."
+      "category": "simple",
+      "query": "CS 6140",
+      "expected_course_ids": ["neu-cs-6140"],
+      "rationale": "Primary code lookup — CS 6140 is the canonical Machine Learning course."
     },
     {
       "query_id": "q005",
+      "category": "simple",
+      "query": "MATH 7233",
+      "expected_course_ids": ["neu-math-7233"],
+      "rationale": "Primary code — Graph Theory."
+    },
+    {
+      "query_id": "q006",
+      "category": "simple",
+      "query": "INFO 6105",
+      "expected_course_ids": ["neu-info-6105"],
+      "rationale": "Primary code — Data Science Engineering Methods and Tools."
+    },
+    {
+      "query_id": "q007",
+      "category": "simple",
+      "query": "Algorithms",
+      "expected_course_ids": ["neu-cs-5800"],
+      "rationale": "Course-name match — primary algorithms course."
+    },
+    {
+      "query_id": "q008",
+      "category": "simple",
+      "query": "Machine Learning",
+      "expected_course_ids": [
+        "neu-cs-6140", "neu-ds-5220", "neu-ds-5230", "neu-math-7243"
+      ],
+      "rationale": "Multiple ML offerings; any in top-K counts."
+    },
+    {
+      "query_id": "q009",
+      "category": "simple",
+      "query": "Information Retrieval",
+      "expected_course_ids": ["neu-cs-6200"],
+      "rationale": "Course-name exact match."
+    },
+    {
+      "query_id": "q010",
+      "category": "simple",
+      "query": "Probability Theory",
+      "expected_course_ids": ["neu-aly-6010"],
+      "rationale": "Course-name match — ALY 6010 Probability Theory and Introductory Statistics."
+    },
+    {
+      "query_id": "q011",
+      "category": "simple",
+      "query": "Mobile Application Development",
+      "expected_course_ids": ["neu-cs-5520"],
+      "rationale": "Course-name match."
+    },
+    {
+      "query_id": "q012",
+      "category": "simple",
+      "query": "Web Design",
+      "expected_course_ids": ["neu-info-6150"],
+      "rationale": "Course-name match — INFO 6150 Web Design and UX Engineering."
+    },
+
+    {
+      "query_id": "q013",
+      "category": "medium",
+      "query": "graph algorithms BFS DFS shortest paths",
+      "expected_course_ids": ["neu-cs-5800", "neu-math-7233"],
+      "rationale": "Either Algorithms (CS 5800) or Graph Theory (MATH 7233) is a legitimate hit."
+    },
+    {
+      "query_id": "q014",
+      "category": "medium",
+      "query": "neural network training with backpropagation",
+      "expected_course_ids": [
+        "neu-cs-6140", "neu-ds-5220", "neu-math-7243"
+      ],
+      "rationale": "Backprop is core to all three ML offerings."
+    },
+    {
+      "query_id": "q015",
+      "category": "medium",
+      "query": "k-means clustering and dimensionality reduction",
+      "expected_course_ids": ["neu-ds-5230"],
+      "rationale": "DS 5230 is the canonical unsupervised + clustering course."
+    },
+    {
+      "query_id": "q016",
+      "category": "medium",
+      "query": "convex optimization Lagrangian duality",
+      "expected_course_ids": ["neu-math-7237"],
+      "rationale": "MATH 7237 Theory of Optimization."
+    },
+    {
+      "query_id": "q017",
+      "category": "medium",
+      "query": "Apache Spark distributed data processing",
+      "expected_course_ids": [
+        "neu-cs-6240", "neu-info-6105", "neu-eece-5645"
+      ],
+      "rationale": "Big-data parallel processing is split across CS / INFO / EECE depts."
+    },
+    {
+      "query_id": "q018",
+      "category": "medium",
+      "query": "VC dimension PAC learning theory",
+      "expected_course_ids": ["neu-cs-6140", "neu-math-7243"],
+      "rationale": "Statistical learning theory courses."
+    },
+    {
+      "query_id": "q019",
+      "category": "medium",
+      "query": "search algorithms heuristic A star",
+      "expected_course_ids": ["neu-aai-6600", "neu-cs-7180"],
+      "rationale": "AI search is covered in Applied AI + CS 7180 Special Topics."
+    },
+    {
+      "query_id": "q020",
+      "category": "medium",
+      "query": "data mining applications",
+      "expected_course_ids": ["neu-aly-6040", "neu-ds-5230"],
+      "rationale": "ALY 6040 explicitly + DS 5230 contains data mining."
+    },
+    {
+      "query_id": "q021",
+      "category": "medium",
+      "query": "Python programming for analytics",
+      "expected_course_ids": ["neu-aly-6140"],
+      "rationale": "ALY 6140 Python and Analytics Systems Technology."
+    },
+    {
+      "query_id": "q022",
+      "category": "medium",
+      "query": "parallel programming MPI distributed computing",
+      "expected_course_ids": ["neu-eece-5645"],
+      "rationale": "EECE 5645 Parallel Processing for Data Analytics."
+    },
+    {
+      "query_id": "q023",
+      "category": "medium",
+      "query": "data engineering pipelines ETL",
+      "expected_course_ids": ["neu-info-6105", "neu-cs-6240"],
+      "rationale": "INFO 6105 is Data Science Engineering; CS 6240 is Large-Scale Parallel Processing."
+    },
+    {
+      "query_id": "q024",
+      "category": "medium",
+      "query": "introduction to data science fundamentals",
+      "expected_course_ids": ["neu-ds-5110"],
+      "rationale": "DS 5110 Essentials of Data Science."
+    },
+
+    {
+      "query_id": "q025",
+      "category": "complex",
+      "query": "course covering deep learning project with Python",
+      "expected_course_ids": [
+        "neu-ds-5220", "neu-cs-6140", "neu-math-7243"
+      ],
+      "rationale": "Multi-aspect: deep learning + project + Python — any ML course satisfies."
+    },
+    {
+      "query_id": "q026",
+      "category": "complex",
+      "query": "graduate AI seminar with applied focus",
+      "expected_course_ids": ["neu-aai-6600", "neu-cs-7180"],
+      "rationale": "Either Applied AI or CS 7180 Special Topics in AI."
+    },
+    {
+      "query_id": "q027",
+      "category": "complex",
+      "query": "course on both clustering and dimensionality reduction techniques",
+      "expected_course_ids": ["neu-ds-5230"],
+      "rationale": "DS 5230 explicitly covers both."
+    },
+    {
+      "query_id": "q028",
+      "category": "complex",
+      "query": "probability and statistics for machine learning practitioners",
+      "expected_course_ids": ["neu-aly-6010", "neu-math-7243"],
+      "rationale": "ALY 6010 prob+stats foundation; MATH 7243 has the ML+stats angle."
+    },
+    {
+      "query_id": "q029",
+      "category": "complex",
+      "query": "Python and SQL together for data engineering",
+      "expected_course_ids": ["neu-aly-6140", "neu-info-6105"],
+      "rationale": "Spans analytics tools + DS engineering courses."
+    },
+    {
+      "query_id": "q030",
+      "category": "complex",
+      "query": "applied capstone project for data science master students",
+      "expected_course_ids": ["neu-ds-5500", "neu-aly-6080"],
+      "rationale": "DS 5500 Capstone or ALY 6080 Integrated Experiential Learning."
+    },
+    {
+      "query_id": "q031",
+      "category": "complex",
+      "query": "linear algebra essentials for AI students with no math background",
+      "expected_course_ids": ["neu-aai-5015"],
+      "rationale": "AAI 5015 Mathematical Concepts is exactly this remedial course."
+    },
+    {
+      "query_id": "q032",
+      "category": "complex",
+      "query": "supervised learning regression and classification with theory",
+      "expected_course_ids": ["neu-ds-5220", "neu-cs-6140"],
+      "rationale": "DS 5220 Supervised ML + CS 6140 Machine Learning."
+    },
+
+    {
+      "query_id": "q033",
+      "category": "boundary",
+      "query": "5800",
+      "expected_course_ids": ["neu-cs-5800"],
+      "rationale": "Bare 4-digit number; query_normalizer + slang_dict resolve."
+    },
+    {
+      "query_id": "q034",
+      "category": "boundary",
+      "query": "应用 AI",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "Chinese slang alias for Applied AI."
+    },
+    {
+      "query_id": "q035",
+      "category": "boundary",
+      "query": "Algo",
+      "expected_course_ids": ["neu-cs-5800"],
+      "rationale": "English short slang via course_aliases."
+    },
+    {
+      "query_id": "q036",
+      "category": "boundary",
+      "query": "AAI6600",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "No-space code variant; query_normalizer regex normalizes to 'AAI 6600'."
+    },
+    {
+      "query_id": "q037",
+      "category": "boundary",
+      "query": "ds 5220",
+      "expected_course_ids": ["neu-ds-5220"],
+      "rationale": "Lowercase + space; case-insensitive match via v_course_lookup."
+    },
+    {
+      "query_id": "q038",
+      "category": "boundary",
+      "query": "6600",
+      "expected_course_ids": ["neu-aai-6600"],
+      "rationale": "Bare 4-digit; alias-only entry — should hit AAI 6600 even with multiple X 6600 codes since alias is explicit."
+    },
+
+    {
+      "query_id": "q039",
       "category": "adversarial",
-      "query": "AAI 9999 怎么样",
+      "query": "AAI 9999",
       "expected_course_ids": [],
-      "rationale": "Non-existent code; retriever must return empty, not hallucinate."
+      "rationale": "Non-existent code — retriever must NOT return AAI 6600 just because dept matches."
+    },
+    {
+      "query_id": "q040",
+      "category": "adversarial",
+      "query": "CS 0001",
+      "expected_course_ids": [],
+      "rationale": "Non-existent code with valid dept prefix."
+    },
+    {
+      "query_id": "q041",
+      "category": "adversarial",
+      "query": "asdf qwerty zxcvbnm random keyboard mash",
+      "expected_course_ids": [],
+      "rationale": "Pure noise — no semantic match anywhere in the catalog."
+    },
+    {
+      "query_id": "q042",
+      "category": "adversarial",
+      "query": "homework due monday assignment 3 grading rubric",
+      "expected_course_ids": [],
+      "rationale": "Query is meta-task language, not a course topic — should not match a specific course."
     }
   ]
 }

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     sqlite_path: str = str(PROJECT_ROOT / "data" / "courses.db")
     faiss_index_path: str = str(PROJECT_ROOT / "data" / "faiss_index")
 
+    # === API base URL (Streamlit -> FastAPI hop, Week 6) ===
+    api_base_url: str = "http://localhost:8000"
+
     # === Embedding ===
     embedding_model: str = "BAAI/bge-m3"
     embedding_device: str = "cuda"

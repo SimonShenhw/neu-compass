@@ -172,38 +172,145 @@ def cli() -> int:
         help="Path to test_set.json",
     )
     parser.add_argument(
-        "--mode", choices=["alias_only"], default="alias_only",
-        help="Which retrieval path to evaluate. Currently only alias_only "
-             "(others added when they exist).",
+        "--mode",
+        choices=["alias_only", "vector_only", "hybrid", "hybrid_with_alias"],
+        default="alias_only",
+        help=(
+            "Which retrieval path to evaluate.\n"
+            "  alias_only:        query_normalizer → AliasRepository.resolve only\n"
+            "  vector_only:       FAISS + bge-m3 (no BM25)\n"
+            "  hybrid:            BM25 + vector via RRF\n"
+            "  hybrid_with_alias: alias-first, fall through to hybrid (production path)"
+        ),
     )
     parser.add_argument("--db-path", default=None)
     parser.add_argument("--out-json", default=None,
                         help="Optional path to write the per-query JSON breakdown")
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument(
+        "--rerank", action="store_true",
+        help="Apply bge-reranker-v2-m3 cross-encoder on top of vector / hybrid "
+             "candidates. No effect for alias_only mode. Adds ~30s model load "
+             "+ ~50ms/query latency.",
+    )
+    parser.add_argument(
+        "--rerank-pool", type=int, default=20,
+        help="Number of candidates to ask the upstream retriever for before "
+             "reranking. Larger = better recall, slower. Default: 20.",
+    )
     args = parser.parse_args()
 
     test_set = json.loads(Path(args.test_set).read_text(encoding="utf-8"))
 
-    if args.mode == "alias_only":
-        from db.alias_repository import AliasRepository  # noqa: PLC0415
-        from db.connection import connect  # noqa: PLC0415
-        from rag.query_normalizer import normalize_query_to_course_ids  # noqa: PLC0415
-
-        if args.db_path is None:
-            from config import settings  # noqa: PLC0415
-            db_path = settings.sqlite_path
-        else:
-            db_path = args.db_path
-
-        conn = connect(db_path)
-        try:
-            alias_repo = AliasRepository(conn)
-            search_fn = lambda q: normalize_query_to_course_ids(q, alias_repo=alias_repo)  # noqa: E731
-            report = run_eval(test_set, search_fn, k=args.k)
-        finally:
-            conn.close()
+    if args.db_path is None:
+        from config import settings  # noqa: PLC0415
+        db_path = settings.sqlite_path
+        faiss_path = settings.faiss_index_path
     else:
-        raise ValueError(f"Unknown mode: {args.mode}")
+        db_path = args.db_path
+        faiss_path = None  # require explicit when db is overridden
+
+    from db.alias_repository import AliasRepository  # noqa: PLC0415
+    from db.connection import connect  # noqa: PLC0415
+    from db.repository import CourseRepository  # noqa: PLC0415
+    from rag.query_normalizer import normalize_query_to_course_ids  # noqa: PLC0415
+
+    conn = connect(db_path)
+    try:
+        alias_repo = AliasRepository(conn)
+        course_repo = CourseRepository(conn)
+
+        if args.mode == "alias_only":
+            search_fn = lambda q: normalize_query_to_course_ids(  # noqa: E731
+                q, alias_repo=alias_repo,
+            )
+        elif args.mode in ("vector_only", "hybrid", "hybrid_with_alias"):
+            from rag.embedder import BGEM3Embedder  # noqa: PLC0415
+            from rag.hybrid import BM25Corpus, HybridRetriever  # noqa: PLC0415
+            from rag.index import FaissIndex  # noqa: PLC0415
+            from rag.retriever import Retriever, SearchHit  # noqa: PLC0415
+
+            if faiss_path is None:
+                from config import settings as _s  # noqa: PLC0415
+                faiss_path = _s.faiss_index_path
+
+            print(f"=> loading FAISS from {faiss_path}")
+            index = FaissIndex.load(faiss_path)
+            print(f"   index: {index.count} vectors")
+            print("=> warming bge-m3 (first encode triggers ~70s model load) ...")
+            embedder = BGEM3Embedder()
+            embedder.encode(["warmup"])
+            print("=> embedder ready")
+
+            reranker = None
+            fetch_text = None
+            if args.rerank:
+                from rag.reranker import (  # noqa: PLC0415
+                    CrossEncoderReranker,
+                    rerank_search_hits,
+                )
+
+                print("=> warming bge-reranker-v2-m3 (~30s) ...")
+                reranker = CrossEncoderReranker()
+                reranker.score("warmup", ["warmup"])
+                print("=> reranker ready")
+
+                def fetch_text(cid: str) -> str | None:  # type: ignore[no-redef]
+                    row = conn.execute(
+                        "SELECT raw_text FROM courses WHERE course_id = ?", (cid,)
+                    ).fetchone()
+                    return row["raw_text"] if row else None
+
+            vector = Retriever(
+                embedder=embedder, index=index,
+                course_repo=course_repo, sqlite_conn=conn,
+            )
+
+            def _maybe_rerank(query: str, hits: list[SearchHit]) -> list[SearchHit]:
+                if not args.rerank:
+                    return hits[: args.k]
+                from rag.reranker import rerank_search_hits  # noqa: PLC0415
+                return rerank_search_hits(
+                    query, hits, reranker, fetch_text=fetch_text, top_k=args.k,
+                )
+
+            pool = args.rerank_pool if args.rerank else args.k
+
+            if args.mode == "vector_only":
+                def _search_vector(q: str) -> list[str]:
+                    hits = vector.search(q, k=pool)
+                    return [h.course.course_id for h in _maybe_rerank(q, hits)]
+                search_fn = _search_vector
+            else:  # hybrid or hybrid_with_alias
+                bm25 = BM25Corpus.from_db(conn)
+                print(f"   bm25 corpus: {bm25.count} docs")
+                hybrid = HybridRetriever(
+                    vector_retriever=vector,
+                    bm25_corpus=bm25,
+                    course_repo=course_repo,
+                )
+
+                if args.mode == "hybrid":
+                    def _search_hybrid(q: str) -> list[str]:
+                        hits = hybrid.search(q, k=pool)
+                        return [h.course.course_id for h in _maybe_rerank(q, hits)]
+                    search_fn = _search_hybrid
+                else:  # hybrid_with_alias — production path
+                    def _search_alias_then_hybrid(q: str) -> list[str]:
+                        alias_ids = normalize_query_to_course_ids(
+                            q, alias_repo=alias_repo,
+                        )
+                        if alias_ids:
+                            return alias_ids
+                        hits = hybrid.search(q, k=pool)
+                        return [h.course.course_id for h in _maybe_rerank(q, hits)]
+                    search_fn = _search_alias_then_hybrid
+        else:
+            raise ValueError(f"Unknown mode: {args.mode}")
+
+        report = run_eval(test_set, search_fn, k=args.k)
+    finally:
+        conn.close()
 
     print(render_text(report))
 

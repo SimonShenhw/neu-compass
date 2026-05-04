@@ -1,0 +1,82 @@
+{
+  "data": {
+    "newSearch": {
+      "schools": {
+        "edges": [
+          {
+            "node": {
+              "city": "Boston",
+              "id": "U2Nob29sLTY5Ng==",
+              "legacyId": 696,
+              "name": "Northeastern University",
+              "state": "MA"
+            }
+          },
+          {
+            "node": {
+              "city": "Seattle",
+              "id": "U2Nob29sLTE3MDg5",
+              "legacyId": 17089,
+              "name": "Northeastern University - Seattle",
+              "state": "WA"
+            }
+          },
+          {
+            "node": {
+              "city": "St Katharine Docks.",
+              "id": "U2Nob29sLTE5MjM2",
+              "legacyId": 19236,
+              "name": "Northeastern University London",
+              "state": "LONDON"
+            }
+          },
+          {
+            "node": {
+              "city": "Toronto",
+              "id": "U2Nob29sLTE4MTEx",
+              "legacyId": 18111,
+              "name": "Northeastern University - Toronto",
+              "state": "ON"
+            }
+          },
+          {
+            "node": {
+              "city": "Muskogee",
+              "id": "U2Nob29sLTE0NDIx",
+              "legacyId": 14421,
+              "name": "Northeastern State University",
+              "state": "OK"
+            }
+          },
+          {
+            "node": {
+              "city": "San Jose",
+              "id": "U2Nob29sLTE3Mjc5",
+              "legacyId": 17279,
+              "name": "Northeastern University - Silicon Valley",
+              "state": "CA"
+            }
+          },
+          {
+            "node": {
+              "city": "Chicago",
+              "id": "U2Nob29sLTY5NA==",
+              "legacyId": 694,
+              "name": "Northeastern Illinois University",
+              "state": "IL"
+            }
+          },
+          {
+            "node": {
+              "city": "Tahlequah",
+              "id": "U2Nob29sLTY5NQ==",
+              "legacyId": 695,
+              "name": "Northeastern State University",
+              "state": "OK"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -16,8 +16,16 @@ from typing import Iterator
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
-    """Open a SQLite connection with project-standard pragmas + row factory."""
-    conn = sqlite3.connect(str(db_path))
+    """Open a SQLite connection with project-standard pragmas + row factory.
+
+    `check_same_thread=False` because FastAPI's TestClient and async route
+    handlers can move a connection across the event-loop thread and
+    threadpool workers. We still get exactly one user per connection (the
+    request lifetime), so we don't need additional locking — SQLite's
+    internal serialization (threadsafety=1 in CPython's sqlite3) handles
+    safe access from different threads as long as it's not concurrent.
+    """
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
