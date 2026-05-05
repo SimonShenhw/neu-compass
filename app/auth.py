@@ -69,10 +69,12 @@ def authorize_url(*, state_token: str = "") -> str:
         "scope": "openid email profile",
         "access_type": "online",
         "prompt": "select_account",
-        # `hd` is a hint to Google's UI to filter to NEU accounts; this is
-        # a UX nicety, NOT a security boundary. Real enforcement is below
-        # in validate_id_token_claims.
-        "hd": "husky.neu.edu",
+        # No `hd` parameter on purpose: Google only accepts ONE hosted-domain
+        # value, but settings.allowed_email_domains is the multi-domain list
+        # ({husky.neu.edu, northeastern.edu}). Hard-coding `hd=husky.neu.edu`
+        # locks the email input UI to that suffix and breaks northeastern.edu
+        # users — observed Week 7 sprint. Domain enforcement is server-side
+        # in validate_id_token_claims; no security boundary lost.
     }
     if state_token:
         params["state"] = state_token

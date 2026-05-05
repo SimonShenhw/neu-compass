@@ -146,3 +146,46 @@ def test_search_empty_when_no_match(api_client: TestClient) -> None:
     body = r.json()
     assert body["matched_via"] == "empty"
     assert body["results"] == []
+
+
+# === Adversarial rejection (PLAN v2.2 §3.4) ===
+
+
+def test_search_rejects_query_with_no_corpus_overlap(api_client: TestClient) -> None:
+    """An adversarial query whose tokens don't overlap any candidate text
+    has max(reranker_sigmoid) = 0 < threshold 0.4 → matched_via='rejected'
+    with empty results and a populated rejection_reason."""
+    r = api_client.post(
+        "/search",
+        json={"query": "ancient roman emperors and empires", "k": 5},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["matched_via"] == "rejected"
+    assert body["results"] == []
+    assert body["rejection_reason"] is not None
+    assert "max_reranker_sigmoid" in body["rejection_reason"]
+
+
+def test_search_legitimate_query_passes_rejection_gate(api_client: TestClient) -> None:
+    """A query with token overlap to one of the indexed courses has max
+    sigmoid above threshold → matched_via='hybrid', not 'rejected'."""
+    r = api_client.post(
+        "/search",
+        json={"query": "graph algorithms BFS shortest paths", "k": 3},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["matched_via"] == "hybrid"
+    assert body["rejection_reason"] is None
+    assert body["results"][0]["course_id"] == "c-cs-5800"
+
+
+def test_search_rejection_reason_omitted_on_alias_path(api_client: TestClient) -> None:
+    """Alias short-circuit doesn't go through the reranker; rejection_reason
+    must remain None on alias hits."""
+    r = api_client.post("/search", json={"query": "Algo", "k": 3})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["matched_via"] == "alias"
+    assert body["rejection_reason"] is None

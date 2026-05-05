@@ -49,7 +49,34 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 log = structlog.get_logger("neu_compass.chat")
 
 
-@router.post("")
+@router.post(
+    "",
+    summary="Streamed grounded course advisor (NDJSON)",
+    description=(
+        "Streams a Gemini-generated answer grounded in the retrieved courses.\n\n"
+        "**Wire format**: `application/x-ndjson` — one JSON object per "
+        "newline. Object types in order:\n\n"
+        "1. `{\"type\": \"meta\", \"matched_via\": \"alias|hybrid|empty\", "
+        "\"retrieval_ms\": float, \"results\": [{course_id, primary_code, "
+        "primary_name, score}, ...]}` — emitted first so the client can "
+        "render evidence bubbles before tokens land.\n"
+        "2. `{\"type\": \"token\", \"text\": \"...\"}` — zero or more, "
+        "Gemini stream chunks.\n"
+        "3. `{\"type\": \"error\", \"detail\": \"...\"}` — only on Gemini "
+        "stream failure.\n"
+        "4. `{\"type\": \"done\"}` — always last.\n\n"
+        "Retrieval mirrors `/search` step 1+2 (alias-first, then hybrid). "
+        "**No reranker on the chat path** in v0.1 — tokens stream while "
+        "rerank+blend cost would block the first-token latency."
+    ),
+    responses={
+        200: {
+            "description": "NDJSON event stream. See description for shape.",
+            "content": {"application/x-ndjson": {}},
+        },
+        422: {"description": "Invalid query / k / delivery_mode."},
+    },
+)
 async def chat(
     req: ChatRequest,
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],

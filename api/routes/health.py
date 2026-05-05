@@ -16,15 +16,34 @@ from api.models import HealthResponse, ReadyResponse
 router = APIRouter(tags=["ops"])
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Process liveness",
+    description=(
+        "Always 200 if the process responds — does **not** check whether the "
+        "embedder/reranker have warmed. Use `/ready` for that. Suitable for "
+        "Cloudflare Tunnel / docker / systemd healthcheck."
+    ),
+)
 async def health() -> HealthResponse:
-    """Always 200 if the process responds — no state checks."""
     return HealthResponse()
 
 
-@router.get("/ready", response_model=ReadyResponse)
+@router.get(
+    "/ready",
+    response_model=ReadyResponse,
+    summary="Lifespan readiness (models warmed, indexes loaded)",
+    description=(
+        "Returns `status='ready'` once the lifespan startup hook completed: "
+        "FAISS index loaded, BM25 corpus built, bge-m3 embedder warmed, "
+        "bge-reranker-v2-m3 warmed. Returns `status='warming'` for ~70-100 "
+        "seconds after process start (cold model load — see "
+        "[PLAN_v2.0 §2.5](docs/PLAN_v2.0.md)).\n\n"
+        "Orchestrators should wait for `ready` before routing user traffic."
+    ),
+)
 async def ready(request: Request) -> ReadyResponse:
-    """200 with status='ready' once lifespan finished; 'warming' before."""
     state = request.app.state
     is_ready = bool(getattr(state, "ready", False))
     faiss_index = getattr(state, "faiss_index", None)

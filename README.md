@@ -3,7 +3,7 @@
 > 用结构化检索 + LLM 抽取破除 Northeastern 研究生**选课信息黑箱**。
 > Course RAG 做流量入口,Co-op 数据做留存飞轮。
 
-**Status**: Weeks 1-6 工程交付完成 · **601 tests / 10s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed
+**Status**: Weeks 1-7 工程交付完成 · **631 tests / 12s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me`
 **Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu128 + torch 2.10
 **English**: [README.en.md](README.en.md)
 
@@ -13,26 +13,40 @@
 
 | 维度 | 实测数字 |
 |---|---:|
-| `/search` p50 latency (live FAISS+BM25,6469 课) | **40.1 ms** (target <300ms,8x 余量) |
-| `/search` p95 / p99 | 45.4 / 46.3 ms |
-| Eval Recall@5 (`hybrid_with_alias` on test_set v0.2) | 0.601 |
-| Eval Recall@5 + bge-reranker-v2-m3 | **0.636** (+0.035) |
+| `/search` p50 latency (live, hybrid+rerank+blend, 6469 课) | **~47 ms** (含 reranker;target <300ms,6x 余量) |
+| `/search` p95 / hybrid-only p50 | 51 ms / 40.1 ms |
+| Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
+| Eval R@5 / MRR — `+rerank` only (α=0.0) | **0.636** / 0.545 |
+| **Eval R@5 / MRR — Z-score blend α=0.4** (ADR-0015 locked) | 0.621 / 0.575 |
+| Adversarial rejection at T=0.05 sigmoid (ADR-0016) | **4/4** 命中,真 R@5 损失 -0.066 |
 | Boundary queries hit rate (alias / slang / no-space code) | **6/6 = 1.000** |
 | BM25 stopword-filter inversion gap | +0.001 → **+0.016** (16x) |
 | WSL home vs H 盘 (SQLite write) | **77x faster** (ADR-0014) |
 | bge-m3 cold start | ~70 s (lifespan 预热消化) |
-| 测试套件 | 601 tests / ~10 s |
+| Co-op seed records 入库 | **30 条 (12 quant / 8 big_tech / 5 biotech / 5 startup)** |
+| Schema 版本 | **1.1** (user_courses 表 v3.0 social 预留 DDL only) |
+| 测试套件 | **631 tests / ~12 s** |
 
-实测数字都在 [docs/PLAN_v2.1.md](docs/PLAN_v2.1.md) §2 + [docs/rag_smoke_results.md](docs/rag_smoke_results.md) + [docs/path_decision.md](docs/path_decision.md),不是营销数字。
+实测数字 + 决策依据:[docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) (Week 7 sprint) + [docs/adr/0015-z-score-blending.md](docs/adr/0015-z-score-blending.md) (α 决策) + [docs/adr/0016-reranker-reject-threshold.md](docs/adr/0016-reranker-reject-threshold.md) (T 校准) + [docs/rag_smoke_results.md](docs/rag_smoke_results.md) + [docs/path_decision.md](docs/path_decision.md)。
+
+## Week 7 ship 状态(KPI)
+
+| KPI | 状态 | 备注 |
+|---|---|---|
+| 1. 公网 URL serving FastAPI | ✅ | api.neu-compass.me 200 / 6469 indexed |
+| 2. ≥ 200 真 query | 🟡 | 等团队 traffic |
+| 3. ≥ 5 contributors OAuth | 🟡 1/5 | OAuth round-trip 已通过(域白名单 + JWT verify + upsert)|
+| 4. ADR-0015 α 决策 | ✅ | α=0.4 锁定 + ADR-0016 阈值 0.05 校准 |
 
 ---
 
 ## 架构
 
 ```
-HTTP API (FastAPI)
+HTTP API (FastAPI)  · Public:  https://api.neu-compass.me
 ─────────────────────────────────────────────────────
-  POST /search     alias-first → HybridRetriever
+  POST /search     alias-first → HybridRetriever → rerank+Z-blend+reject
+                   (ADR-0015 α=0.4, ADR-0016 T=0.05)
   GET  /course/{id}  Course Pydantic dump
   GET  /coop / POST /coop  k=2 anonymity gated, tier-aware
   POST /chat       NDJSON stream: meta → tokens → done
@@ -54,7 +68,7 @@ HTTP API (FastAPI)
     │   alias hit? → return Course directly (matched_via='alias')
     │     ↓ no
     │
-    └─→ HybridRetriever
+    └─→ HybridRetriever (pool size = 20)
           ├── vector leg: bge-m3 (warm) → FAISS IndexIDMap (6469 vectors)
           └── BM25 leg:   rank_bm25 + 110-word English stopwords filter
               ↓
@@ -62,9 +76,11 @@ HTTP API (FastAPI)
               ↓
             SQLite rehydrate (status='indexed' only)
               ↓
-            (optional) bge-reranker-v2-m3 cross-encoder (sigmoid [0,1])
-              ↓
-            list[SearchHit]
+            bge-reranker-v2-m3 cross-encoder (single pass)
+              ├─→ if max(sigmoid) < 0.05 (ADR-0016)
+              │     return matched_via='rejected' + reason
+              └─→ else: Z-score blend α=0.4·rrf_z + 0.6·rerank_z
+                  → sort desc → top-k SearchHit (matched_via='hybrid')
 
 
 数据路径 (ADR-0013: SQLite 是真相源)
@@ -120,13 +136,16 @@ cp .env.example .env
 mkdir -p ~/neu-compass-data
 ```
 
-### 端到端跑通整个 catalog (Week 6 后的标准路径)
+### 端到端跑通整个 catalog (Week 7 后的标准路径)
 
 ```bash
 cd /mnt/h/neu-compass
 
-# 跑测试 (~10s)
-uv run pytest tests/                         # 601 passed
+# 跑测试 (~12s)
+uv run pytest tests/                         # 631 passed
+
+# 旧 DB 升 schema 1.1 (一次性,新装跳过此步)
+uv run python scripts/migrate_db_to_v1_1.py --commit
 
 # 抓全 NEU catalog (~25 min, 1 req/sec polite, resumable)
 uv run python scripts/scrape_neu_catalog.py
@@ -134,31 +153,45 @@ uv run python scripts/scrape_neu_catalog.py
 # 入库 SQLite + 自动 cross-list aliases
 uv run python scripts/ingest_neu_catalog.py
 
-# 重建 FAISS (~25s on 5090) + 翻 status 'indexed'
+# 重建 FAISS (~25s 纯推理 / ~85s 含 bge-m3 冷启) + 翻 status 'indexed'
 uv run python scripts/rebuild_faiss.py --all
 uv run python scripts/mark_pending_indexed.py
 
 # 加载 slang 字典 (39 条对应 7 课)
 uv run python scripts/load_slang_dict.py
 
+# Co-op seed 30 条入库 (data/coop_seed/curated.json gitignored,见 template)
+uv run python scripts/ingest_coop_seed.py --file data/coop_seed/curated.json --commit
+
 # 验真实 query 跑通
-uv run python eval/run_eval.py --mode hybrid_with_alias        # baseline
-uv run python eval/run_eval.py --mode hybrid_with_alias --rerank  # +reranker
-uv run python scripts/probe_latency.py                          # p50 ~40ms
+uv run python eval/run_eval.py --mode hybrid_with_alias --rerank --with-rejection
+# → 公网生产路径:hybrid + rerank + Z-score blend α=0.4 + reject T=0.05
+
+uv run python eval/sweep_blend_alpha.py        # ADR-0015 9-α grid
+uv run python eval/sweep_reject_threshold.py   # ADR-0016 9-T ROC
+uv run python scripts/probe_latency.py         # p50 ~40ms hybrid-only
 ```
 
-### 起 API + UI
+### 起 API + UI(本地三窗口)
 
 ```bash
-# Terminal 1: FastAPI (lifespan 预热 ~70s,然后接流量)
+# Terminal 1: FastAPI (lifespan 预热 ~70s,加载 bge-m3 + bge-reranker)
 uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
 
-# Terminal 2: Streamlit chat UI (走 /chat NDJSON 流)
+# Terminal 2: Streamlit chat UI (走 /chat NDJSON 流;Week 7 后定位为 debug + OAuth landing)
 uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 
-# Terminal 3 (公网, 可选): Cloudflare Tunnel
-cloudflared tunnel run neu-compass   # 详见 docs/cloudflare_tunnel.md
+# Terminal 3 (公网): Cloudflare Tunnel — 详见 docs/cloudflare_tunnel.md §11
+#   实测部署:Windows 边 cloudflared,api.* + compass.* 双子域映射
+cloudflared tunnel run neu-compass
 ```
+
+### 公网入口
+
+| URL | 用途 |
+|---|---|
+| `https://api.neu-compass.me` | FastAPI canonical (Andy 前端 / curl 调) |
+| `https://compass.neu-compass.me` | Streamlit debug + OAuth callback landing |
 
 ---
 
@@ -187,6 +220,8 @@ neu-compass/
 - **[ADR-0001](docs/adr/0001-sqlite-faiss-vs-milvus.md)** SQLite + FAISS 而非 Milvus
 - **[ADR-0013](docs/adr/0013-sqlite-as-source-of-truth.md)** SQLite 是真相源, FAISS 可重建
 - **[ADR-0014](docs/adr/0014-h-drive-code-wsl-data.md)** 代码 H 盘 + 运行时数据 WSL home (77x 实测)
+- **[ADR-0015](docs/adr/0015-z-score-blending.md)** Z-score 混合 RRF + reranker (α=0.4) — Week 7
+- **[ADR-0016](docs/adr/0016-reranker-reject-threshold.md)** Reranker 拒绝阈值 0.05 (数据校准,从 spec 0.4 下调) — Week 7
 
 完整 ADR: [docs/adr/](docs/adr/)
 
@@ -196,10 +231,13 @@ neu-compass/
 
 | 文档 | 内容 |
 |---|---|
-| [docs/PLAN_v2.1.md](docs/PLAN_v2.1.md) | **当前 checkpoint** (Week 6 后状态 + Week 7-8 路线图) |
+| [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) | **当前 sprint** (Week 8 路线 + post-Week-7 ship 路径) |
+| [docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) | Week 7 sprint (shipped — 见 §9 closeout) |
+| [docs/PLAN_v2.1.md](docs/PLAN_v2.1.md) | Week 6 checkpoint (ship state) |
 | [docs/PLAN_v2.0.md](docs/PLAN_v2.0.md) | Week 5 checkpoint (历史) |
 | [docs/PLAN_v1.3.md](docs/PLAN_v1.3.md) | 8 周原始规划 |
-| [docs/cloudflare_tunnel.md](docs/cloudflare_tunnel.md) | Cloudflare Tunnel 部署 runbook |
+| [docs/api_contract.md](docs/api_contract.md) | **HTTP API 契约** (curl + 响应 shape, 前端使用) |
+| [docs/cloudflare_tunnel.md](docs/cloudflare_tunnel.md) | Cloudflare Tunnel 部署 runbook (含 Windows/WSL2 §11 实测路径) |
 | [docs/wsl2_setup.md](docs/wsl2_setup.md) | WSL2 + uv + GPU 配置实测路径 |
 | [docs/annotation_guide.md](docs/annotation_guide.md) | 双盲标注 SOP |
 | [docs/pii_redaction.md](docs/pii_redaction.md) | PII 脱敏 380 行操作指南 |

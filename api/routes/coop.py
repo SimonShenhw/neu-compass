@@ -55,7 +55,40 @@ def _derive_visibility(req: CoopUploadRequest) -> int:
     return 0
 
 
-@router.post("", response_model=CoopUploadResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CoopUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit Co-op experience (k=2 anonymity gated)",
+    description=(
+        "Upload a Co-op record. **Server-side enforcements** (clients cannot "
+        "bypass):\n\n"
+        "- **k=2 anonymity**: the (company, role, coop_term) triple must "
+        "appear ≥2 times across the corpus *after* insert. Violations "
+        "return 422 with a generalization hint.\n"
+        "- **visibility_level** is derived from content presence, NOT "
+        "client-chosen:\n"
+        "  - `2` (premium) when `salary_range_usd` present\n"
+        "  - `1` (detail) when `interview_summary` or `technical_questions` "
+        "present\n"
+        "  - `0` (preview) otherwise\n\n"
+        "User identity comes from the `X-User-Id` header (Week 6 OAuth "
+        "stub; Week 7 will replace with session cookie via "
+        "`POST /auth/callback`).\n\n"
+        "**F1 compliance** (PLAN §9): no payments, no commercialization. "
+        "PII redaction is the contributor's responsibility before submit."
+    ),
+    responses={
+        201: {"description": "Co-op accepted and persisted."},
+        401: {"description": "`X-User-Id` header missing."},
+        422: {
+            "description": (
+                "k=2 anonymity violation OR validation error (extra fields, "
+                "invalid industry, salary_range_usd > 10k chars, etc.)."
+            ),
+        },
+    },
+)
 async def upload_coop(
     req: CoopUploadRequest,
     conn: DbConn,
@@ -126,12 +159,27 @@ async def upload_coop(
     )
 
 
-@router.get("", response_model=list[CoopOut])
+@router.get(
+    "",
+    response_model=list[CoopOut],
+    summary="List Co-op records visible to user (give-to-get)",
+    description=(
+        "Returns rows visible to the caller per the give-to-get gate "
+        "(PLAN §6.4):\n\n"
+        "- Anonymous (no `X-User-Id`) → only `visibility_level=0` (preview) "
+        "rows.\n"
+        "- Authenticated → calls `CoopRepository.list_visible_to_user`, "
+        "which exposes higher-tier rows in proportion to the user's own "
+        "`contribution_count`.\n\n"
+        "Each row is sanitized: `contributor_user_id` and `redaction_audit` "
+        "are server-internal and NOT returned."
+    ),
+    responses={200: {"description": "List of visible Co-op records."}},
+)
 async def list_coop(
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
 ) -> list[CoopOut]:
-    """List Co-op records visible to the user. Anonymous → level-0 only."""
     if x_user_id:
         rows = coop_repo.list_visible_to_user(x_user_id)
     else:

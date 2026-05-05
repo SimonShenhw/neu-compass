@@ -30,6 +30,7 @@ from llm.gemini_client import generate_text_stream
 from rag.embedder import EmbedderProtocol
 from rag.hybrid import BM25Corpus, HybridRetriever
 from rag.index import FaissIndex
+from rag.reranker import CrossEncoderReranker
 from rag.retriever import Retriever
 
 
@@ -101,6 +102,14 @@ def get_bm25_corpus(request: Request) -> BM25Corpus:
     return bm25
 
 
+def get_reranker(request: Request) -> CrossEncoderReranker | None:
+    """Cross-encoder reranker. Returns None when not loaded — callers
+    (e.g. /search) treat None as "skip rerank+blend, keep hybrid path"
+    so the API still works in degraded environments where the reranker
+    weights aren't present (CI, integration without GPU)."""
+    return getattr(request.app.state, "reranker", None)
+
+
 # === Composed retrievers (per request — cheap glue) ===
 
 
@@ -137,6 +146,7 @@ __all__ = [
     "get_faiss_index",
     "get_hybrid_retriever",
     "get_oauth_exchange_fn",
+    "get_reranker",
     "get_retriever",
     "get_user_repo",
 ]

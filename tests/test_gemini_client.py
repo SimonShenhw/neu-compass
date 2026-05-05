@@ -51,12 +51,18 @@ def test_generate_structured_validates_against_schema() -> None:
 
 
 def test_generate_structured_passes_schema_in_config() -> None:
+    """The Pydantic class is converted to a Gemini-compatible JSON Schema dict
+    before reaching the SDK (otherwise the SDK chokes on minLength/pattern/etc
+    that Pydantic emits but Gemini's Schema proto rejects)."""
     fake = _FakeModel(_FakeResponse(text='{"name": "x", "count": 1}'))
     generate_structured("p", schema=_Sample, model=fake, temperature=0.5)
     _, config = fake.calls[0]
     assert config["response_mime_type"] == "application/json"
-    assert config["response_schema"] is _Sample
     assert config["temperature"] == 0.5
+    schema = config["response_schema"]
+    assert isinstance(schema, dict)
+    assert schema["type"] == "object"
+    assert set(schema["properties"].keys()) == {"name", "count"}
 
 
 def test_generate_structured_invalid_json_raises_gemini_error() -> None:

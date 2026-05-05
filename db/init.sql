@@ -172,6 +172,50 @@ CREATE INDEX IF NOT EXISTS idx_coop_term
     ON coop_experiences(coop_term);
 
 -- =============================================================================
+-- 5b. user_courses (PLAN v2.2 §3.6 — DDL only, no API surface yet)
+--     Lays the data layer for the "find course buddies" v3.0 social feature.
+--     Endpoints (/course/{id}/classmates, "add to my plan" UI) are
+--     deliberately deferred until real users exist AND k-anonymity rules for
+--     classmate visibility are designed (likely k=3, looser than k=2 Co-op).
+--
+--     status:     planning | enrolled | completed
+--     visibility: private  | classmates | public
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS user_courses (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      TEXT NOT NULL,
+    course_id    TEXT NOT NULL,
+    term         TEXT NOT NULL,                      -- e.g. 'fall_2026' / 'Spring 2026'
+    status       TEXT NOT NULL DEFAULT 'planning'
+                   CHECK (status IN ('planning', 'enrolled', 'completed')),
+    visibility   TEXT NOT NULL DEFAULT 'private'
+                   CHECK (visibility IN ('private', 'classmates', 'public')),
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    UNIQUE (user_id, course_id, term)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_courses_course
+    ON user_courses(course_id, term);
+CREATE INDEX IF NOT EXISTS idx_user_courses_user
+    ON user_courses(user_id);
+
+-- Mirrors trg_courses_updated_at — keeps updated_at fresh on UPDATE without
+-- recursing (PRAGMA recursive_triggers default OFF).
+DROP TRIGGER IF EXISTS trg_user_courses_updated_at;
+CREATE TRIGGER trg_user_courses_updated_at
+AFTER UPDATE ON user_courses
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE user_courses SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = NEW.id;
+END;
+
+-- =============================================================================
 -- 6. v_course_lookup (统一查询入口, PLAN §1.4)
 --    用法: SELECT course_id FROM v_course_lookup WHERE searchable_term = ?
 --    把 primary_code + 所有 approved 别名 union 成单一查询面
@@ -209,3 +253,5 @@ CREATE TABLE IF NOT EXISTS schema_versions (
 
 INSERT OR IGNORE INTO schema_versions (version, notes)
 VALUES ('1.0', 'Initial schema (Week 1 Day 2): courses + aliases + users + unlocks + coop');
+INSERT OR IGNORE INTO schema_versions (version, notes)
+VALUES ('1.1', 'PLAN v2.2 §3.6: user_courses table (DDL only, endpoints deferred to v3.0)');

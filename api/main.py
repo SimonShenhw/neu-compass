@@ -29,6 +29,7 @@ from db.connection import connect
 from rag.embedder import BGEM3Embedder
 from rag.hybrid import BM25Corpus
 from rag.index import FaissIndex
+from rag.reranker import CrossEncoderReranker
 
 
 @asynccontextmanager
@@ -59,9 +60,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     embedder.encode(["warmup"])
     log.info("api.startup.embedder_warm")
 
+    # 4) bge-reranker-v2-m3 cross-encoder — second model load, ~30s. Powers
+    # the rerank+blend+reject layer in /search (PLAN v2.2 §3.4 + §3.5).
+    reranker = CrossEncoderReranker()
+    reranker.score("warmup", ["warmup"])
+    log.info("api.startup.reranker_warm")
+
     app.state.embedder = embedder
     app.state.faiss_index = faiss_index
     app.state.bm25_corpus = bm25_corpus
+    app.state.reranker = reranker
     app.state.ready = True
     log.info("api.startup.ready")
 

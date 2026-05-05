@@ -208,3 +208,163 @@ curl -s https://compass.<your-zone>.com -o /dev/null -w "%{http_code}\n"  # 200
 - pre-warm hook 把 ready 时间从 70s 缩短 (改 BGEM3 模型放在共享 volume, 跨进程 mmap)
 - Cloudflare Access 加 SSO 网关, 限定 husky.neu.edu 才能访问页面 (双层防护: app/auth.py 的 OAuth + CF Access)
 - 真实 query log 收齐后做 PromQL/Grafana 看板
+
+---
+
+## 11. Windows + WSL2 部署变体 (PLAN v2.2 §3.1 实测)
+
+> 本项目代码 / 数据走 WSL (ADR-0014) 但开发主机是 Windows 11。
+> 把 cloudflared 装在 Windows 边、跨 WSL 边界连服务,比在 WSL 里再装一份
+> 简单 —— 单进程, 不需要 systemd, 重启 WSL 不影响 Tunnel 在线。
+
+### 11.0 实测 deploy 状态 (2026-05-04 落地)
+
+> **Tunnel UUID**: `ce52553f-7fc3-48dc-923d-3dd9ea772f06`
+> **Domain**: `neu-compass.me` (CF Registrar 外购 → NS 改为 bella+salvador.ns.cloudflare.com)
+> **公网映射**:
+> - `https://api.neu-compass.me` → `localhost:8000` (FastAPI canonical)
+> - `https://compass.neu-compass.me` → `localhost:8501` (Streamlit + OAuth callback)
+> **Apex `neu-compass.me`**: 留给 CF 自动页(zone 创建时已有 A/CNAME,Tunnel route 拒覆盖,改用子域更简单)
+>
+> 历史决策 (踩坑记录):
+> - 初版 config 用单域 + path 规则 (`/api/*` → 8000) — 失败,因为 cloudflared 没有 path-rewrite
+>   能力,uvicorn 收到 `/api/health` 找不到路由(它的路由在 `/health`)。
+> - 切到双子域 `api.* / compass.*`,FastAPI 不需任何 prefix 改动。
+
+### 11.1 已完成 (Week 7 sprint)
+
+```powershell
+# Windows PowerShell / cmd, winget 可用
+winget install --id Cloudflare.cloudflared --accept-source-agreements --accept-package-agreements
+# → C:\Users\<you>\AppData\Local\Microsoft\WinGet\Packages\Cloudflare.cloudflared_*\cloudflared.exe
+# 已自动加 PATH (新窗口生效);当前窗口先 refreshenv 或重开
+cloudflared --version
+```
+
+实测 2025.8.1 装好后,Windows cmd 任何新会话都能直接 `cloudflared`。
+
+### 11.2 Windows 边缘网络: WSL2 服务可达性
+
+WSL2 默认 `mirrored` 网络模式 (Win 11 22H2+) 把 WSL 内 0.0.0.0 端口
+**直接映射到 Windows localhost**, 所以 Windows 上的 cloudflared 跑
+`localhost:8000` / `localhost:8501` 是可以连到 WSL 内 uvicorn / streamlit 的。
+若使用旧的 NAT 模式, 改成连 `wsl hostname -I` 输出的 IP (172.x.x.x)。
+
+验证 (启 uvicorn 后, Windows PowerShell 里):
+
+```powershell
+Invoke-WebRequest -Uri http://localhost:8000/health -UseBasicParsing
+# StatusCode: 200, Content: {"status":"ok"}
+```
+
+### 11.3 Windows 端 config.yml
+
+文件位置: `%USERPROFILE%\.cloudflared\config.yml` (即 `C:\Users\<you>\.cloudflared\config.yml`)。
+登录证书 (`cert.pem`) 和 tunnel 凭证 JSON 也都落在该目录。
+
+模板 (登录 + create tunnel 后填空):
+
+```yaml
+tunnel: neu-compass
+credentials-file: C:\Users\<your-windows-user>\.cloudflared\<tunnel-uuid>.json
+
+ingress:
+  # 主入口 → Streamlit (debug-only;v2.2 §3.3 把它降级了)
+  - hostname: compass.<your-zone>.com
+    service: http://localhost:8501
+    originRequest:
+      noTLSVerify: false
+      connectTimeout: 30s
+      tcpKeepAlive: 30s
+
+  # /api/* → FastAPI (Andy 前端 + curl 调 API 走这条)
+  - hostname: compass.<your-zone>.com
+    path: ^/api/.*$
+    service: http://localhost:8000
+    originRequest:
+      connectTimeout: 30s
+
+  # 兜底
+  - service: http_status:404
+```
+
+### 11.4 你下一步要做的 (按顺序)
+
+1. **登录 Cloudflare** (浏览器交互):
+   ```powershell
+   cloudflared tunnel login
+   ```
+   选你的 zone, 完成后 cert.pem 落地。
+
+2. **创建 named tunnel**:
+   ```powershell
+   cloudflared tunnel create neu-compass
+   # 输出 UUID, 写入 ~/.cloudflared/<uuid>.json
+   ```
+
+3. **绑定子域** (zone 必须是你已经在 CF 托管的域):
+   ```powershell
+   cloudflared tunnel route dns neu-compass compass.<your-zone>.com
+   ```
+
+4. **填 config.yml** (用上面 §11.3 模板,把 `<your-windows-user>` /
+   `<tunnel-uuid>` / `<your-zone>` 替换)。
+
+5. **配 Google OAuth Console** (https://console.cloud.google.com/):
+   - OAuth 2.0 Client ID → Authorized redirect URI 加:
+     `https://compass.<your-zone>.com/oauth/callback`
+   - Client ID + Secret 复制到 `.env`:
+     ```
+     GOOGLE_OAUTH_CLIENT_ID=<...>
+     GOOGLE_OAUTH_CLIENT_SECRET=<...>
+     API_BASE_URL=https://compass.<your-zone>.com/api
+     ```
+
+6. **三窗口起服务** (前两在 WSL, 第三在 Windows):
+   ```bash
+   # WSL terminal 1
+   wsl -d Ubuntu-24.04
+   cd /mnt/h/neu-compass
+   uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+
+   # WSL terminal 2
+   wsl -d Ubuntu-24.04
+   cd /mnt/h/neu-compass
+   uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+   ```
+   ```powershell
+   # Windows terminal 3 (cmd 或 PowerShell)
+   cloudflared tunnel run neu-compass
+   ```
+
+7. **冒烟** (uvicorn 起来 ~70s 模型预热后):
+   ```powershell
+   curl https://compass.<your-zone>.com/api/health
+   # {"status":"ok"}
+   curl https://compass.<your-zone>.com/api/ready
+   # {"status":"ready","courses_indexed":6469,"bm25_corpus":6469}
+   ```
+
+8. **发给团队** (LYU / Andy / Yuang):
+   ```
+   公网 URL: https://compass.<your-zone>.com
+   API:     https://compass.<your-zone>.com/api
+   契约:    docs/api_contract.md (见 repo)
+   说明:    走 Google 登录, 必须 husky.neu.edu / northeastern.edu 邮箱
+   要求:    每人跑 ≥ 5 query (达 KPI ≥ 200 真 query)
+   ```
+
+KPI 满足条件 (PLAN §2.1):
+- 公网 URL 200 ✓
+- ≥ 5 contributors OAuth round-trip
+- ≥ 200 真 query (`grep request.handled api.log | wc -l`)
+
+### 11.5 Windows-端 故障速查
+
+| 症状 | 看哪儿 |
+|---|---|
+| `cloudflared` 命令不存在 | 重开 cmd / PowerShell;新窗口才有 PATH |
+| 公网 200 但本地访问也 200 一样的页面 | 路由配置反了:Streamlit 应在 hostname 兜底,FastAPI 在 `/api/*` |
+| 公网 502 | uvicorn 没启动 OR 仍在 70s 冷启动;`curl localhost:8000/ready` 看是否 `warming` |
+| 公网通 但 OAuth 拒绝 | Google Console redirect URI 没加 https:// 公网那条;或 .env 的 `GOOGLE_OAUTH_CLIENT_ID` 跟 console 不一致 |
+| WSL 服务 Windows 访问不到 | WSL 网络模式; `wsl --status` 看 `networkingMode`. 不是 `mirrored` 就改成 `localhost-forwarding=true` 或用 `wsl hostname -I` 的 IP |

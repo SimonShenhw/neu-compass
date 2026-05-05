@@ -49,6 +49,7 @@ data/raw/
 data/processed/
 data/coop_seed/*
 !data/coop_seed/.gitkeep
+!data/coop_seed/template.example.json
 data/ground_truth/*.json
 !data/ground_truth/.gitkeep
 

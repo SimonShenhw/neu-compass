@@ -58,6 +58,28 @@ class FixtureEmbedder:
         return _l2_normalize(out) if normalize else out
 
 
+class FixtureReranker:
+    """Stand-in for CrossEncoderReranker — word-overlap on lowercased token sets,
+    deterministic and zero-cost. Adversarial queries with no overlap to any
+    candidate get max sigmoid 0, so the §3.4 rejection gate (threshold 0.4)
+    correctly returns matched_via='rejected' in tests.
+
+    Quacks like CrossEncoderReranker for `rerank_blend_with_rejection`'s
+    purposes — only `.score(query, candidates)` is called from the route.
+    """
+
+    def score(self, query: str, candidates: list[str]) -> list[float]:
+        if not candidates:
+            return []
+        q_tokens = set(query.lower().split())
+        if not q_tokens:
+            return [0.0 for _ in candidates]
+        return [
+            len(q_tokens & set(c.lower().split())) / len(q_tokens)
+            for c in candidates
+        ]
+
+
 def seed_minimal_corpus(conn: sqlite3.Connection) -> None:
     """3 indexed courses + 1 slang alias. Enough to drive search/course tests.
 
@@ -155,6 +177,7 @@ def build_test_app(conn: sqlite3.Connection, *, seed: bool = True):
     app.state.embedder = embedder
     app.state.faiss_index = index
     app.state.bm25_corpus = bm25
+    app.state.reranker = FixtureReranker()
     app.state.ready = True
 
     app.dependency_overrides[get_db_conn] = lambda: conn

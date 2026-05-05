@@ -1,0 +1,85 @@
+{
+  "_comment": "Co-op Seed Data template (PLAN v2.2 §3.7 / PLAN v1.3 §6.5). 30-record target distribution: 12 quant_fintech / 8 big_tech / 5 biotech_health / 5 startup. Real curated file lives at data/coop_seed/curated.json (gitignored). Run: uv run python scripts/ingest_coop_seed.py --file data/coop_seed/curated.json --commit. Names in this template are PLACEHOLDERS — do NOT ingest as-is.",
+  "_schema_notes": {
+    "coop_id": "Stable string ID. Convention: 'seed-<industry>-<NN>'. Must be unique; ingest is idempotent on coop_id.",
+    "company": "Real company name OR generalized bucket if k=2 anonymity at risk (e.g. 'Boston-area quant fund' instead of single firm).",
+    "role": "Title as listed by the team. Bucketize if k=2 fails (e.g. 'Quant Research Intern' covers multiple desks).",
+    "industry": "Enum: quant_fintech / big_tech / biotech_health / startup / consulting / other.",
+    "coop_term": "'Summer 2025' / 'Spring 2026' / etc. Required for k-anon triple.",
+    "duration_months": "Integer 1-8. Co-op programs are typically 4 or 6 months.",
+    "related_courses": "List of course_id strings (e.g. 'neu-cs-5800') — NOT primary_codes. Use scripts/list_courses.py to resolve.",
+    "interview_summary": "PII-redacted free text. PLAN §6.3 redaction SOP. Max 10000 chars.",
+    "technical_questions": "PII-redacted technical content. Max 10000 chars.",
+    "salary_range_usd": "Bucket only — NEVER exact figure. Examples: '$25-30/hr', '$8k-12k/month', '$80-100k/yr'.",
+    "visibility_level": "Auto-derived by ingest script from content presence. Don't set manually:  salary→2, interview/tech→1, else→0.",
+    "redaction_audit": "Free text: 'Reviewed by <name> on <date>; redacted candidate name + interviewer last name; bucketed salary'."
+  },
+  "records": [
+    {
+      "coop_id": "seed-quant-01",
+      "company": "ExampleCorp Quant Trading",
+      "role": "Quantitative Research Intern",
+      "industry": "quant_fintech",
+      "coop_term": "Summer 2025",
+      "duration_months": 6,
+      "related_courses": ["neu-cs-5800", "neu-aai-6600", "neu-ds-5220"],
+      "interview_summary": "[PLACEHOLDER] 4 rounds: phone screen with HR (30 min), technical with senior researcher (60 min, probability puzzle + Python), modeling case (90 min, given a dataset asked to identify alpha signal), final loop (3x 45min: stats / behavioral / culture fit). Decisions usually within a week.",
+      "technical_questions": "[PLACEHOLDER] - Coin flip: expected number of flips to see HHT vs HTH? - Implement an order book in Python (priority queue + bisect). - Given returns of 5 strategies, how to combine into one portfolio? Discuss covariance estimation. - Code review of a vectorized pandas snippet, identify the lookahead bias.",
+      "salary_range_usd": "$45-55/hr",
+      "redaction_audit": "[PLACEHOLDER] Reviewed by <curator> on <YYYY-MM-DD>; redacted contributor name + 2 interviewer surnames; bucketed salary."
+    },
+    {
+      "coop_id": "seed-bigtech-01",
+      "company": "ExampleBigTech Cloud",
+      "role": "Software Engineer Intern",
+      "industry": "big_tech",
+      "coop_term": "Spring 2026",
+      "duration_months": 6,
+      "related_courses": ["neu-cs-5800", "neu-cs-5200"],
+      "interview_summary": "[PLACEHOLDER] 5 rounds total: 2 coding (LeetCode medium-hard, focus on graphs + DP), system design (45 min, designed a URL shortener), behavioral STAR-format, manager screen. Offer in 10 days.",
+      "technical_questions": "[PLACEHOLDER] - LRU cache implementation. - Find the kth largest in unsorted array (heap or quickselect tradeoff). - Design a rate limiter (token bucket vs sliding window). - SQL: top-3 customers by spend per region.",
+      "salary_range_usd": "$50-60/hr",
+      "redaction_audit": "[PLACEHOLDER] Reviewed by <curator> on <YYYY-MM-DD>; redacted team name + product codename."
+    },
+    {
+      "coop_id": "seed-biotech-01",
+      "company": "ExampleBio Therapeutics",
+      "role": "Computational Biology Intern",
+      "industry": "biotech_health",
+      "coop_term": "Summer 2025",
+      "duration_months": 4,
+      "related_courses": ["neu-ds-5220", "neu-cs-6140"],
+      "interview_summary": "[PLACEHOLDER] 3 rounds: phone screen, technical (statistics review + a small ML modeling exercise on protein expression data), team match. Slow process, ~3 weeks.",
+      "technical_questions": "[PLACEHOLDER] - Differential expression: t-test vs Wilcoxon, when to use which? - Multiple testing correction: Bonferroni vs FDR. - Why use cross-validation in small biology datasets vs holdout?",
+      "salary_range_usd": "$35-40/hr",
+      "redaction_audit": "[PLACEHOLDER] Reviewed by <curator>; bucketed salary, redacted PI name."
+    },
+    {
+      "coop_id": "seed-startup-01",
+      "company": "ExampleAI Startup",
+      "role": "ML Engineer Intern",
+      "industry": "startup",
+      "coop_term": "Fall 2025",
+      "duration_months": 4,
+      "related_courses": ["neu-cs-6140", "neu-aai-6600", "neu-info-6105"],
+      "interview_summary": "[PLACEHOLDER] 2 rounds, fast: founder chat (60 min, walked through resume + culture), live coding + design (90 min, built a small RAG pipeline on toy data). Offer in 4 days.",
+      "technical_questions": "[PLACEHOLDER] - Implement attention from scratch in numpy. - When does fine-tuning beat RAG and vice versa? - How would you evaluate a chatbot's hallucination rate without ground truth?",
+      "salary_range_usd": "$30-40/hr",
+      "redaction_audit": "[PLACEHOLDER] Reviewed by <curator>; redacted founder names + product description."
+    },
+    {
+      "coop_id": "seed-quant-02-bucket",
+      "_comment": "Example of bucket-style record when k=2 anonymity at risk: instead of naming a specific firm, use a regional+specialty bucket so multiple contributors land on the same (company, role, term) triple.",
+      "company": "Boston-area equity quant fund",
+      "role": "Quantitative Research Intern",
+      "industry": "quant_fintech",
+      "coop_term": "Summer 2025",
+      "duration_months": 6,
+      "related_courses": ["neu-aai-6600", "neu-ds-5220"],
+      "interview_summary": "[PLACEHOLDER] Bucketized record. See coop-seed-quant-01 for shape.",
+      "technical_questions": "[PLACEHOLDER]",
+      "salary_range_usd": "$40-50/hr",
+      "redaction_audit": "[PLACEHOLDER] Bucketized at curation."
+    }
+  ]
+}

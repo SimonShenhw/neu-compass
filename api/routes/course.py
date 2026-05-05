@@ -24,7 +24,24 @@ from schemas.course import Course
 router = APIRouter(prefix="/course", tags=["course"])
 
 
-@router.get("/{course_id}", response_model=Course)
+@router.get(
+    "/{course_id}",
+    response_model=Course,
+    summary="Get full Course detail",
+    description=(
+        "Returns the rehydrated Pydantic Course (schema v1.1, see "
+        "`schemas/course.py`). Includes soft fields (workload, difficulty, "
+        "skill_tags, career_relevance, controversial_signals) **with their "
+        "evidence_snippets** when present — the UI's evidence-bubble "
+        "component uses these for source-quote display.\n\n"
+        "Co-op data is **not** mixed in; call `GET /coop?course_id=...` "
+        "separately so visibility-tier authorization stays in one place."
+    ),
+    responses={
+        200: {"description": "Course found and returned."},
+        404: {"description": "course_id not in `courses` table."},
+    },
+)
 async def get_course(
     course_id: str,
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],

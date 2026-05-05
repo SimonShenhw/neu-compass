@@ -1,4 +1,11 @@
-"""Main Streamlit page: chat-style course search + course detail panel.
+"""**Internal debug harness — not the product UI** (PLAN v2.2 §3.3).
+
+The team frontend lives in Andy Dong's `compass-frontend` repo; this Streamlit
+page is kept only for local API smoke + evidence-bubble debugging during
+backend work. Do **not** point users at it. The canonical user surface is the
+FastAPI `/openapi.json` contract documented in `docs/api_contract.md`.
+
+Main Streamlit page: chat-style course search + course detail panel.
 
 Run:
     uv run streamlit run app/streamlit_app.py

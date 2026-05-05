@@ -34,7 +34,32 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 log = structlog.get_logger("neu_compass.auth")
 
 
-@router.post("/callback", response_model=OAuthCallbackResponse)
+@router.post(
+    "/callback",
+    response_model=OAuthCallbackResponse,
+    summary="Google OAuth code → JWT verify → user upsert",
+    description=(
+        "Exchanges the OAuth `code` (returned by Google's redirect) for an "
+        "ID token, verifies the JWT signature + claims, and upserts the "
+        "user row. Returns the sanitized identity for client-side session "
+        "state.\n\n"
+        "**Domain whitelist** is enforced inside JWT-claim validation — "
+        "non-NEU emails get 401 (PLAN §3.5: split-on-`@` exact match, NOT "
+        "substring; `attacker@husky.neu.edu.evil.com` is rejected).\n\n"
+        "**F1 compliance**: no payment surface, no commercialization. The "
+        "Google client must be set up under the developer's personal "
+        "Google Cloud project — credentials never enter version control."
+    ),
+    responses={
+        200: {"description": "OAuth round-trip succeeded; user persisted."},
+        401: {
+            "description": (
+                "Code exchange failed, JWT invalid, or email domain not in "
+                "whitelist (`husky.neu.edu` / `northeastern.edu`)."
+            ),
+        },
+    },
+)
 async def oauth_callback(
     req: OAuthCallbackRequest,
     conn: DbConn,

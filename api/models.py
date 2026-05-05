@@ -46,9 +46,10 @@ class SearchResponse(BaseModel):
 
     query: str
     k: int
-    matched_via: Literal["alias", "hybrid", "empty"]
+    matched_via: Literal["alias", "hybrid", "empty", "rejected"]
     results: list[SearchHitOut]
     latency_ms: float
+    rejection_reason: str | None = None
 
 
 # === /chat ===

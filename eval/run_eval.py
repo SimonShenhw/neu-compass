@@ -198,7 +198,23 @@ def cli() -> int:
         help="Number of candidates to ask the upstream retriever for before "
              "reranking. Larger = better recall, slower. Default: 20.",
     )
+    parser.add_argument(
+        "--with-rejection", action="store_true",
+        help="Apply rerank+blend+reject path matching api/routes/search.py. "
+             "blend_alpha=0.4 / reject_threshold=0.4 are locked by ADR-0015. "
+             "Implies --rerank.",
+    )
+    parser.add_argument(
+        "--blend-alpha", type=float, default=0.4,
+        help="Z-score blend weight on RRF leg. ADR-0015 locks 0.4.",
+    )
+    parser.add_argument(
+        "--reject-threshold", type=float, default=0.4,
+        help="Raw reranker sigmoid floor below which the query is rejected.",
+    )
     args = parser.parse_args()
+    if args.with_rejection:
+        args.rerank = True
 
     test_set = json.loads(Path(args.test_set).read_text(encoding="utf-8"))
 
@@ -269,6 +285,18 @@ def cli() -> int:
             def _maybe_rerank(query: str, hits: list[SearchHit]) -> list[SearchHit]:
                 if not args.rerank:
                     return hits[: args.k]
+                if args.with_rejection:
+                    from rag.reranker import (  # noqa: PLC0415
+                        rerank_blend_with_rejection,
+                    )
+                    out, meta = rerank_blend_with_rejection(
+                        query, hits, reranker,
+                        fetch_text=fetch_text,
+                        blend_alpha=args.blend_alpha,
+                        reject_threshold=args.reject_threshold,
+                        top_k=args.k,
+                    )
+                    return out  # [] when rejected — eval treats as correct on adversarial
                 from rag.reranker import rerank_search_hits  # noqa: PLC0415
                 return rerank_search_hits(
                     query, hits, reranker, fetch_text=fetch_text, top_k=args.k,

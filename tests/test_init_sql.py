@@ -41,7 +41,7 @@ def test_all_expected_tables_exist(db: sqlite3.Connection) -> None:
     ).fetchall()
     names = {r["name"] for r in rows}
     expected = {"courses", "course_aliases", "users", "user_unlocks",
-                "coop_experiences", "schema_versions"}
+                "coop_experiences", "user_courses", "schema_versions"}
     assert expected.issubset(names), f"Missing: {expected - names}"
 
 
@@ -53,6 +53,7 @@ def test_v_course_lookup_view_exists(db: sqlite3.Connection) -> None:
 def test_schema_version_seeded(db: sqlite3.Connection) -> None:
     versions = {r["version"] for r in db.execute("SELECT version FROM schema_versions")}
     assert "1.0" in versions
+    assert "1.1" in versions  # PLAN v2.2 §3.6 — user_courses added
 
 
 def test_idempotent_re_run(db: sqlite3.Connection) -> None:
@@ -87,22 +88,29 @@ def test_course_status_transitions(db: sqlite3.Connection) -> None:
 
 
 def test_course_updated_at_trigger(db: sqlite3.Connection) -> None:
-    """updated_at 应在 UPDATE 后被触发器自动刷新."""
-    _insert_course(db)
-    original = db.execute(
-        "SELECT updated_at FROM courses WHERE course_id='uuid-1'"
-    ).fetchone()["updated_at"]
+    """updated_at 应在 UPDATE 后被触发器自动刷新.
 
-    # SQLite CURRENT_TIMESTAMP has 1-second resolution; force a difference
-    import time
-    time.sleep(1.1)
+    Deterministic version: instead of sleeping 1.1s and hoping CURRENT_TIMESTAMP
+    crosses a second boundary (flaky under load), seed the row with an
+    obviously-stale timestamp, then mutate a different column. The trigger's
+    WHEN clause matches, fires CURRENT_TIMESTAMP, and the assertion is just
+    `new_value != '2020-01-01 00:00:00'` — independent of clock resolution.
+    """
+    _insert_course(db)
+    db.execute(
+        "UPDATE courses SET updated_at='2020-01-01 00:00:00' WHERE course_id='uuid-1'"
+    )
+    db.commit()
+
+    # Now mutate a different column. The trigger's WHEN clause fires because
+    # NEW.updated_at == OLD.updated_at (we didn't touch it).
     db.execute("UPDATE courses SET primary_name='New Name' WHERE course_id='uuid-1'")
     db.commit()
 
     new_value = db.execute(
         "SELECT updated_at FROM courses WHERE course_id='uuid-1'"
     ).fetchone()["updated_at"]
-    assert new_value != original
+    assert new_value != "2020-01-01 00:00:00"
 
 
 def test_credits_indexed_via_json_extract(db: sqlite3.Connection) -> None:
@@ -290,3 +298,121 @@ def test_coop_contributor_set_null_on_user_delete(db: sqlite3.Connection) -> Non
         "SELECT contributor_user_id FROM coop_experiences WHERE coop_id='c1'"
     ).fetchone()
     assert row["contributor_user_id"] is None
+
+
+# === user_courses (PLAN v2.2 §3.6) ===
+
+
+def _seed_user_and_course(db: sqlite3.Connection) -> None:
+    db.execute(
+        "INSERT INTO users (user_id, email, domain) "
+        "VALUES ('u1', 'a@husky.neu.edu', 'husky.neu.edu')"
+    )
+    _insert_course(db, "uuid-1", "CS 5800")
+
+
+def test_user_courses_status_default_planning(db: sqlite3.Connection) -> None:
+    _seed_user_and_course(db)
+    db.execute(
+        "INSERT INTO user_courses (user_id, course_id, term) "
+        "VALUES ('u1', 'uuid-1', 'fall_2026')"
+    )
+    db.commit()
+    row = db.execute(
+        "SELECT status, visibility FROM user_courses WHERE user_id='u1'"
+    ).fetchone()
+    assert row["status"] == "planning"
+    assert row["visibility"] == "private"
+
+
+def test_user_courses_status_check_constraint(db: sqlite3.Connection) -> None:
+    _seed_user_and_course(db)
+    with pytest.raises(sqlite3.IntegrityError):
+        db.execute(
+            "INSERT INTO user_courses (user_id, course_id, term, status) "
+            "VALUES ('u1', 'uuid-1', 'fall_2026', 'bogus')"
+        )
+
+
+def test_user_courses_visibility_check_constraint(db: sqlite3.Connection) -> None:
+    _seed_user_and_course(db)
+    with pytest.raises(sqlite3.IntegrityError):
+        db.execute(
+            "INSERT INTO user_courses (user_id, course_id, term, visibility) "
+            "VALUES ('u1', 'uuid-1', 'fall_2026', 'world_readable')"
+        )
+
+
+def test_user_courses_unique_per_user_course_term(db: sqlite3.Connection) -> None:
+    """A user can plan/enroll the same course in DIFFERENT terms (retake), but
+    not the same (user, course, term) twice."""
+    _seed_user_and_course(db)
+    db.execute(
+        "INSERT INTO user_courses (user_id, course_id, term) "
+        "VALUES ('u1', 'uuid-1', 'fall_2026')"
+    )
+    db.commit()
+
+    # Different term — allowed.
+    db.execute(
+        "INSERT INTO user_courses (user_id, course_id, term) "
+        "VALUES ('u1', 'uuid-1', 'spring_2027')"
+    )
+    db.commit()
+
+    # Same triple — rejected.
+    with pytest.raises(sqlite3.IntegrityError):
+        db.execute(
+            "INSERT INTO user_courses (user_id, course_id, term) "
+            "VALUES ('u1', 'uuid-1', 'fall_2026')"
+        )
+
+
+def test_user_courses_cascades_on_user_delete(db: sqlite3.Connection) -> None:
+    _seed_user_and_course(db)
+    db.execute(
+        "INSERT INTO user_courses (user_id, course_id, term) "
+        "VALUES ('u1', 'uuid-1', 'fall_2026')"
+    )
+    db.commit()
+
+    db.execute("DELETE FROM users WHERE user_id='u1'")
+    db.commit()
+    rows = db.execute("SELECT * FROM user_courses").fetchall()
+    assert len(rows) == 0
+
+
+def test_user_courses_cascades_on_course_delete(db: sqlite3.Connection) -> None:
+    _seed_user_and_course(db)
+    db.execute(
+        "INSERT INTO user_courses (user_id, course_id, term) "
+        "VALUES ('u1', 'uuid-1', 'fall_2026')"
+    )
+    db.commit()
+
+    db.execute("DELETE FROM courses WHERE course_id='uuid-1'")
+    db.commit()
+    rows = db.execute("SELECT * FROM user_courses").fetchall()
+    assert len(rows) == 0
+
+
+def test_user_courses_updated_at_trigger(db: sqlite3.Connection) -> None:
+    """Deterministic — see test_course_updated_at_trigger for rationale."""
+    _seed_user_and_course(db)
+    db.execute(
+        "INSERT INTO user_courses (user_id, course_id, term) "
+        "VALUES ('u1', 'uuid-1', 'fall_2026')"
+    )
+    db.execute(
+        "UPDATE user_courses SET updated_at='2020-01-01 00:00:00' WHERE user_id='u1'"
+    )
+    db.commit()
+
+    db.execute(
+        "UPDATE user_courses SET status='enrolled' WHERE user_id='u1'"
+    )
+    db.commit()
+    new_value = db.execute(
+        "SELECT updated_at FROM user_courses WHERE user_id='u1'"
+    ).fetchone()["updated_at"]
+    assert new_value != "2020-01-01 00:00:00"

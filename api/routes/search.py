@@ -1,17 +1,25 @@
-"""POST /search — alias-first then HybridRetriever fallback.
+"""POST /search — alias-first → HybridRetriever → rerank+blend+reject.
 
-Pipeline (PLAN §1.2 query path):
+Pipeline (PLAN v2.2 §1.2 query path + §3.4 rejection + §3.5 blending):
   1. query_normalizer: regex → AliasRepository.resolve via v_course_lookup
      (which excludes review_status='pending' aliases — ADR §3.2 boundary).
      If alias hit, return immediately (no LLM/vector cost).
   2. HybridRetriever: BM25 + vector via RRF. Hard filters apply at the
      SQLite layer (Retriever._sqlite_filter) so pending courses can't leak
      (ADR-0013).
+  3. Cross-encoder rerank + Z-score blend (ADR-0015) when reranker is loaded:
+     - Single bge-reranker-v2-m3 pass over the candidate pool.
+     - Reject if `max(raw_sigmoid) < RERANKER_REJECT_THRESHOLD`.
+     - Otherwise α-blend RRF + reranker, sort, truncate to req.k.
 
 The alias path is keyed by exact text after light regex extraction. The
 hybrid path handles natural-language and 中英 mix. Together they cover
 "5800" / "Algo" / "应用 AI" / "course on backprop" without per-query
 heuristics in the route.
+
+If `app.state.reranker` is None (e.g. degraded environment without the
+~600MB weights), the route falls back to bare hybrid output. Tests that
+exercise rejection inject a deterministic stub via conftest.
 """
 
 from __future__ import annotations
@@ -23,28 +31,85 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencies import (
+    DbConn,
     get_alias_repo,
     get_course_repo,
     get_hybrid_retriever,
+    get_reranker,
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import normalize_query_to_course_ids
+from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from schemas.course import DeliveryMode
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 log = structlog.get_logger("neu_compass.search")
 
+# PLAN v2.2 §3.4 + ADR-0015. Tunable; ADR-supplement if changed.
+RERANK_POOL_SIZE = 20
+"""Candidates HybridRetriever returns before rerank+blend narrows to req.k."""
 
-@router.post("", response_model=SearchResponse)
+RERANKER_REJECT_THRESHOLD = 0.05
+"""Raw bge-reranker sigmoid below which the query has no good match.
+Calibrated by ADR-0016 ROC sweep (was 0.4 in PLAN v2.2 §3.4 spec);
+empirical data on test_set v0.2 showed 0.4 false-rejected ~26% of real
+queries. T=0.05 catches all 4 adversarial AND keeps real R@5 baseline."""
+
+BLEND_ALPHA = 0.4
+"""Z-score blend weight on RRF leg. 0.0 = pure reranker, 1.0 = pure RRF.
+Locked by ADR-0015 sweep on test_set v0.2 (n=42); re-sweep on v0.3 mandatory."""
+
+
+@router.post(
+    "",
+    response_model=SearchResponse,
+    summary="Course search (alias → hybrid → rerank+blend+reject)",
+    description=(
+        "Production search path. Three-stage pipeline:\n\n"
+        "1. **Alias resolution** — `query_normalizer` strips/lowercases the "
+        "query and looks it up in `v_course_lookup` (which excludes "
+        "`review_status='pending'` aliases). On hit, returns immediately "
+        "with `matched_via='alias'`, score=1.0. Covers `'CS 5800'` / "
+        "`'cs5800'` / `'Algo'` / `'应用 AI'`.\n"
+        "2. **Hybrid retrieval** — BM25 (110 stopwords filtered) + bge-m3 "
+        "vector via Reciprocal Rank Fusion (RRF, k=60). Hard filters apply "
+        "at SQLite layer; only `status='indexed'` rows surface (ADR-0013).\n"
+        "3. **Rerank + Z-score blend + reject** (PLAN v2.2 §3.4 + §3.5) — "
+        "single bge-reranker-v2-m3 pass over the candidate pool. "
+        "If `max(raw_sigmoid) < 0.05` (ADR-0016): "
+        "`matched_via='rejected'`, empty results, populated "
+        "`rejection_reason`. Otherwise α=0.4 Z-score blend "
+        "(ADR-0015) reorders the top-5 and returns `matched_via='hybrid'`.\n\n"
+        "**Latency budget**: alias path ~3ms, hybrid+rerank ~50ms p50 "
+        "post-warmup."
+    ),
+    responses={
+        200: {
+            "description": (
+                "Search resolved. `matched_via` ∈ {alias, hybrid, empty, "
+                "rejected}. `results=[]` when matched_via is empty or "
+                "rejected; `rejection_reason` is non-null only when rejected."
+            ),
+        },
+        422: {
+            "description": (
+                "Invalid request (empty query, k out of range, unknown "
+                "delivery_mode, extra unknown fields)."
+            ),
+        },
+    },
+)
 async def search(
     req: SearchRequest,
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     hybrid: Annotated[HybridRetriever, Depends(get_hybrid_retriever)],
+    reranker: Annotated[CrossEncoderReranker | None, Depends(get_reranker)],
+    conn: DbConn,
 ) -> SearchResponse:
     started = time.perf_counter()
 
@@ -95,9 +160,62 @@ async def search(
             latency_ms=round(elapsed_ms, 2),
         )
 
-    # 2) Hybrid path — embedder + BM25 + RRF.
+    # 2) Hybrid path — embedder + BM25 + RRF over a wider candidate pool
+    #    so rerank has room to reorder.
     hard_filters = _build_hard_filters(req)
-    hits = hybrid.search(req.query, hard_filters=hard_filters or None, k=req.k)
+    pool_size = max(req.k, RERANK_POOL_SIZE) if reranker is not None else req.k
+    hybrid_hits = hybrid.search(
+        req.query, hard_filters=hard_filters or None, k=pool_size,
+    )
+
+    if not hybrid_hits:
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        log.info(
+            "search.hybrid_empty",
+            query=req.query,
+            duration_ms=round(elapsed_ms, 2),
+        )
+        return SearchResponse(
+            query=req.query, k=req.k, matched_via="empty",
+            results=[], latency_ms=round(elapsed_ms, 2),
+        )
+
+    # 3) Rerank + Z-score blend + reject (PLAN v2.2 §3.4 + §3.5).
+    #    If reranker isn't loaded, fall back to bare hybrid (degraded mode).
+    if reranker is None:
+        final_hits = hybrid_hits[: req.k]
+        rejection_reason: str | None = None
+    else:
+        def _fetch_text(cid: str) -> str | None:
+            row = conn.execute(
+                "SELECT raw_text FROM courses WHERE course_id = ?", (cid,)
+            ).fetchone()
+            return row["raw_text"] if row else None
+
+        blended_hits, meta = rerank_blend_with_rejection(
+            req.query, hybrid_hits, reranker,
+            fetch_text=_fetch_text,
+            blend_alpha=BLEND_ALPHA,
+            reject_threshold=RERANKER_REJECT_THRESHOLD,
+            top_k=req.k,
+        )
+        if meta["rejected"]:
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            log.info(
+                "search.rejected",
+                query=req.query,
+                max_sigmoid=meta["max_sigmoid"],
+                n_candidates=meta["n_candidates"],
+                duration_ms=round(elapsed_ms, 2),
+            )
+            return SearchResponse(
+                query=req.query, k=req.k, matched_via="rejected",
+                results=[], latency_ms=round(elapsed_ms, 2),
+                rejection_reason=str(meta["reason"]),
+            )
+        final_hits = blended_hits
+        rejection_reason = None
+
     results = [
         SearchHitOut(
             course_id=h.course.course_id,
@@ -106,13 +224,14 @@ async def search(
             score=float(h.score),
             matched_via="hybrid",
         )
-        for h in hits
+        for h in final_hits
     ]
     elapsed_ms = (time.perf_counter() - started) * 1000
     log.info(
         "search.hybrid",
         query=req.query,
         count=len(results),
+        rerank_applied=reranker is not None,
         duration_ms=round(elapsed_ms, 2),
     )
     return SearchResponse(
@@ -121,6 +240,7 @@ async def search(
         matched_via="hybrid" if results else "empty",
         results=results,
         latency_ms=round(elapsed_ms, 2),
+        rejection_reason=rejection_reason,
     )
 
 
