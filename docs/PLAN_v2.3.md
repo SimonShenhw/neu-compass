@@ -431,3 +431,15 @@ uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.
 
 **End of v2.3**. Open Week 8 session with this doc + v2.2 §9 closeout 作为 starter
 context。优先级:KPI 1 → KPI 2 → KPI 3 → KPI 4(P2 散件穿插不阻塞主线)。
+
+---
+
+## 10. Closeout (post-Week 8 + Week 9 perf, 2026-05-06)
+
+v2.3 sprint 全部 engineering 项目 ship 完毕。Week 9 加做了 perf 优化实测(详见 `docs/perf_week9_results.md`):
+- ONNX + CUDA EP backend ship-ready(startup 70s → 6s,p50 43.82 → 40.09 ms)
+- torch.compile 在 Blackwell sm_120 + FlagEmbedding 1.4 上 hang(已知 incompatibility,跳过)
+- TensorRT EP 在 user cu130 系统上 ABI 不兼容(等 ORT 1.26+ cu13 build)
+- 测试套件 661 → 679 passed(+18:13 ONNX backend + 5 compile_mode)
+
+**项目相位转移到 v3.0**:从 "engineering ship" 进入 "operational + signal collection"。继续读 [PLAN_v3.0.md](PLAN_v3.0.md)。

@@ -3,8 +3,8 @@
 > 用结构化检索 + LLM 抽取破除 Northeastern 研究生**选课信息黑箱**。
 > Course RAG 做流量入口,Co-op 数据做留存飞轮。
 
-**Status**: Weeks 1-8 工程交付完成 · **661 tests / 13s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me` · Week 8 sprint(PLAN v2.3 + v2.3.1 hardening)code/docs ship,等真 query log 触发 Ragas + ADR re-sweep
-**Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu128 + torch 2.10
+**Status**: Weeks 1-9 工程主线 ship 完毕 · **679 tests / 13s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me` · 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。
+**Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu130 + torch 2.11
 **English**: [README.en.md](README.en.md)
 
 ---
@@ -13,8 +13,10 @@
 
 | 维度 | 实测数字 |
 |---|---:|
-| `/search` p50 latency (live, hybrid+rerank+blend, 6469 课) | **~47 ms** PyTorch / **~17 ms** ONNX+TRT (台式机 RTX 5090) |
-| `/search` p95 / hybrid-only p50 | 51 ms / 40.1 ms |
+| `/search` p50 latency — PyTorch baseline (实测 RTX 5090) | **43.82 ms** |
+| `/search` p50 latency — ONNX + CUDA EP (实测 RTX 5090) ⭐ | **40.09 ms** (-8.5%) |
+| `/search` p99 latency PyTorch / ONNX | 117.97 / **54.74 ms** (-53.6%) |
+| Lifespan startup PyTorch / ONNX ⭐ | 70 s / **6 s** (-91%) |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
 | Eval R@5 / MRR — `+rerank` only (α=0.0) | **0.636** / 0.545 |
 | **Eval R@5 / MRR — Z-score blend α=0.4** (ADR-0015 locked) | 0.621 / 0.575 |
@@ -22,10 +24,9 @@
 | Boundary queries hit rate (alias / slang / no-space code) | **6/6 = 1.000** |
 | BM25 stopword-filter inversion gap | +0.001 → **+0.016** (16x) |
 | WSL home vs H 盘 (SQLite write) | **77x faster** (ADR-0014) |
-| bge-m3 cold start | ~70 s (lifespan 预热消化) |
 | Co-op seed records 入库 | **30 条 (12 quant / 8 big_tech / 5 biotech / 5 startup)** |
 | Schema 版本 | **1.1** (user_courses 表 v3.0 social 预留 DDL only) |
-| 测试套件 | **661 tests / ~13 s** |
+| 测试套件 | **679 tests / ~13 s** |
 
 实测数字 + 决策依据:[docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) (Week 7 sprint) + [docs/adr/0015-z-score-blending.md](docs/adr/0015-z-score-blending.md) (α 决策) + [docs/adr/0016-reranker-reject-threshold.md](docs/adr/0016-reranker-reject-threshold.md) (T 校准) + [docs/rag_smoke_results.md](docs/rag_smoke_results.md) + [docs/path_decision.md](docs/path_decision.md)。
 
@@ -51,6 +52,18 @@
 | 3.1 / 3.2 / 3.6 / 3.9 / 3.10 | 等真 query log 触发 / 浏览器 F12 复测 | ⬜ |
 
 详见 [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) + [docs/PLAN_v2_3_1.md](docs/PLAN_v2_3_1.md)(hardened review)。
+
+## Week 9 ship 状态(perf 实测)
+
+| § | 交付 | 状态 | 实测 |
+|---|---|---|---|
+| Day 1 | ONNX Runtime backend(rag/onnx_backend.py + export script + 13 测试 + runbook) | ✅ ship | startup 70s → 6s,p50 -8.5% (RTX 5090 + CUDA EP) |
+| Day 2 | torch.compile + latency benchmark script + 5 测试 | ✅ ship | torch.compile path **不可用**(Blackwell + FlagEmbedding hang) |
+| - | TensorRT EP 路径 | ⏭️ blocked | ORT 1.25 cu12 vs user cu130 ABI mismatch,等 ORT 1.26+ |
+
+详见 [docs/perf_week9_results.md](docs/perf_week9_results.md)(完整对比 + 4 类发现 + 部署建议)。
+
+**项目相位 → v3.0**:engineering 主线 ship 完毕,signal-driven 模式启动。Active sprint plan: [PLAN v3.0](docs/PLAN_v3.0.md)。
 
 ---
 
@@ -245,8 +258,10 @@ neu-compass/
 
 | 文档 | 内容 |
 |---|---|
-| [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) | **当前 sprint** (Week 8 路线 + post-Week-7 ship 路径) |
-| [docs/PLAN_v2_3_1.md](docs/PLAN_v2_3_1.md) | Week 8 sprint hardened review(KPI 5 outreach + bootstrap CI + hold-out regression)|
+| [docs/PLAN_v3.0.md](docs/PLAN_v3.0.md) | **当前 sprint** (Week 9+ operational + signal-driven phase) |
+| [docs/perf_week9_results.md](docs/perf_week9_results.md) | Week 9 perf 实测 report(ONNX/TRT/torch.compile 4 类路径实战) |
+| [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) | Week 8 sprint(shipped — 见 §10 closeout)|
+| [docs/PLAN_v2_3_1.md](docs/PLAN_v2_3_1.md) | Week 8 sprint hardened review(shipped partial — 见 §10 closeout)|
 | [docs/postmortem_week7.md](docs/postmortem_week7.md) | Week 7 部署 8 类踩坑 + 共同主题(portfolio 用)|
 | [docs/system_architecture.md](docs/system_architecture.md) | 系统架构 5 张 mermaid 图(topology · query · data · auth · modules)|
 | [docs/portfolio_metrics.md](docs/portfolio_metrics.md) | Canonical metrics cheatsheet(latency · quality · scale · cost)|

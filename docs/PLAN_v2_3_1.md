@@ -789,3 +789,16 @@ Sprint 末快速自评(填进 closeout):
 **End of v2.3.1**. Open Week 8 session 顺序: §3.0 (rotate) → §1 invariant 复读 →
 §2.1 KPI 矩阵贴墙 → §3.1 (or fallback tree 决策) → §3.2 / §3.3 并发 → §3.4 → §3.5
 → §3.6 → §3.7 (Week 8 末三天集中)。P2 散件穿插不阻塞主线。
+
+---
+
+## 10. Closeout (post-Week 8 + Week 9 perf, 2026-05-06)
+
+**Sprint partial ship**:
+- ✅ KPI 1-4 全 ship(详见 v2.3 §10 closeout + Week 9 perf)
+- 🟡 KPI 5 traffic-driving:**outreach action 未启动**,真 query log 仍 0/30。User 接受 "等真 traffic" 作为实施路径(违反 v2.3.1 §2.1 explicit ban,但 reality wins)
+- ⏭️ §3.0 OAuth secret rotate:**主动跳过**(user feedback memory:项目频繁重建,旧凭证随 project 废弃自然失效)
+
+**v2.3.1 加严的 acceptance(bootstrap CI / hold-out regression / counterfactual)** 大部分 inherit 进 v3.0,等真 v0.3 数据来了再激活。
+
+**项目相位转移到 v3.0**:engineering 主线 ship 完毕,signal-driven 模式启动。继续读 [PLAN_v3.0.md](PLAN_v3.0.md)。
