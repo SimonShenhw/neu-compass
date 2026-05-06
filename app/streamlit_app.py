@@ -1,22 +1,25 @@
-"""**Internal debug harness — not the product UI** (PLAN v2.2 §3.3).
+"""Streamlit user UI: course search + course detail (PLAN v2.3 §3.7).
 
-The team frontend lives in Andy Dong's `compass-frontend` repo; this Streamlit
-page is kept only for local API smoke + evidence-bubble debugging during
-backend work. Do **not** point users at it. The canonical user surface is the
-FastAPI `/openapi.json` contract documented in `docs/api_contract.md`.
+Production user-facing frontend until Andy Dong's `compass-frontend` (React)
+repo lands. Streamlit is the canonical user surface in v0.x; team docs +
+public URL `compass.neu-compass.me` point at it. The FastAPI backend (`api.*`)
+is what Andy's React will call once that repo exists.
 
-Main Streamlit page: chat-style course search + course detail panel.
+Main Streamlit page: chat-style course search + course detail panel +
+sample-query chips for first-time users + advanced-filter expander in
+the sidebar.
 
 Run:
     uv run streamlit run app/streamlit_app.py
 
 Layout:
-    [ left: chat history + input + streamed assistant response ]
+    [ left: hero (first visit only) + chat history + chat_input ]
     [ right: selected course detail ]
+    sidebar: OAuth login/logout + advanced filters expander
 
 Pipeline per user message:
   1. add_message(role='user', content=prompt)
-  2. ApiClient.chat_stream({"query": prompt, ...}) → NDJSON events
+  2. ApiClient.chat_stream({"query": prompt, ...filters}) → NDJSON events
   3. meta event captured to state (drives evidence bubble)
   4. token events stream into st.write_stream — assistant message renders
      incrementally
@@ -106,6 +109,75 @@ def stream_assistant(
             return
 
 
+SAMPLE_QUERIES: list[tuple[str, str]] = [
+    ("📘 CS 5800", "CS 5800"),
+    ("🤖 易学的 AI 选修课", "easy AI elective for ML beginner"),
+    ("📊 Database courses", "database management systems"),
+    ("⚖️ 课业最轻的 ML 课", "lightest workload ML class"),
+]
+"""Hero-block sample chips. Shown only on first visit (no chat history yet).
+Two languages because the audience is bilingual NEU graduate students;
+clicking a chip injects the query string verbatim into the chat pipeline."""
+
+
+def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
+    """Sidebar 'Advanced filters' expander. Returns the active filters dict
+    (already in session_state, returned for convenience). No-side-effect read.
+    """
+    with st.sidebar:
+        st.divider()
+        with st.expander("🎯 Advanced filters", expanded=False):
+            filters: dict[str, object] = state.get("filters", {}) or {}
+
+            term_v = st.text_input(
+                "Term", value=filters.get("term") or "",
+                placeholder="fall 2026", key="filter_term",
+            )
+            credits_str = st.text_input(
+                "Credits", value=str(filters.get("credits") or ""),
+                placeholder="3", key="filter_credits",
+            )
+            delivery_v = st.selectbox(
+                "Delivery mode",
+                ["", "in_person", "online", "hybrid", "async"],
+                index=0 if not filters.get("delivery_mode") else
+                ["", "in_person", "online", "hybrid", "async"].index(
+                    str(filters.get("delivery_mode"))
+                ),
+                key="filter_delivery",
+            )
+            prof_v = st.text_input(
+                "Professor", value=filters.get("professor") or "",
+                placeholder="e.g. Smith", key="filter_prof",
+            )
+
+            try:
+                credits_v = int(credits_str) if credits_str else None
+            except ValueError:
+                st.caption("⚠️ Credits must be a number 0-12")
+                credits_v = None
+
+            new_filters: dict[str, object] = {
+                "term": term_v or None,
+                "credits": credits_v,
+                "delivery_mode": delivery_v or None,
+                "professor": prof_v or None,
+            }
+            state["filters"] = new_filters
+
+            active = sum(1 for v in new_filters.values() if v not in (None, ""))
+            if active:
+                st.caption(f"✓ {active} filter{'s' if active > 1 else ''} active")
+                if st.button("Clear all", use_container_width=True, key="filter_clear"):
+                    state["filters"] = {}
+                    for k in ("filter_term", "filter_credits",
+                              "filter_delivery", "filter_prof"):
+                        if k in state:
+                            state[k] = "" if k != "filter_credits" else ""
+                    st.rerun()
+    return state.get("filters", {})
+
+
 def render() -> None:
     """Render the chat UI. Imported lazily so `import app.streamlit_app`
     in tests doesn't trigger Streamlit's session machinery."""
@@ -135,6 +207,7 @@ def render() -> None:
     handle_oauth_callback()
 
     render_auth_sidebar()
+    active_filters = _render_filters_sidebar(st, st.session_state)
 
     st.title("NEU-Compass · 选课助手")
     st.caption("F1 合规 MVP · 仅限 NEU 学生使用")
@@ -149,6 +222,28 @@ def render() -> None:
 
     with chat_col:
         st.subheader("💬 Chat")
+
+        # Hero block — only on first visit (no chat history yet). This is the
+        # main UX fix from Week 8 review: users were landing on an empty
+        # two-column layout and not realizing the chat_input below was the
+        # query entry point. Sample chips both signal "this is where you ask"
+        # AND give working examples for cold-start users.
+        if not get_messages(st.session_state):
+            st.markdown("**🔍 试试这些查询 / Try these queries:**")
+            sample_cols = st.columns(2)
+            for i, (label, query) in enumerate(SAMPLE_QUERIES):
+                col = sample_cols[i % 2]
+                if col.button(
+                    label, use_container_width=True, key=f"sample-{i}",
+                ):
+                    st.session_state["pending_query"] = query
+                    st.rerun()
+            st.caption(
+                "💡 You can also ask in natural language: "
+                "*\"easiest 3-credit ML class with low workload\"* / "
+                "*\"course on backprop\"*"
+            )
+            st.divider()
 
         # Render existing conversation history
         for msg in get_messages(st.session_state):
@@ -170,16 +265,29 @@ def render() -> None:
                                 select_course(st.session_state, ev["course_id"])
                                 st.rerun()
 
-        # New input → stream assistant response
-        if prompt := st.chat_input("Ask about a course (e.g. 'CS 5800', 'Algo')..."):
+        # New input → stream assistant response. Two paths: chat_input box
+        # OR a pending_query injected by a hero-block sample chip (above).
+        chat_input_value = st.chat_input(
+            "Ask about a course (e.g. 'CS 5800', '易学的 ML 课', 'algo')..."
+        )
+        pending_query = st.session_state.pop("pending_query", None)
+        prompt = chat_input_value or pending_query
+
+        if prompt:
             add_message(st.session_state, role="user", content=prompt)
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-            chat_body = {
+            chat_body: dict[str, object] = {
                 "query": prompt,
                 "k": min(st.session_state.get("search_k", 5), 10),
             }
+            # Propagate sidebar filters to the chat request — this is what
+            # surfaces the backend's term / credits / delivery_mode / professor
+            # filtering capability that was previously inaccessible from UI.
+            for fk, fv in (active_filters or {}).items():
+                if fv not in (None, "", 0):
+                    chat_body[fk] = fv
             with st.chat_message("assistant"):
                 final_text = ""
                 try:

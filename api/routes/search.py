@@ -64,6 +64,11 @@ BLEND_ALPHA = 0.4
 Locked by ADR-0015 sweep on test_set v0.2 (n=42); re-sweep on v0.3 mandatory."""
 
 
+def _elapsed_ms(started: float) -> float:
+    """Elapsed time since `started` (perf_counter) in milliseconds, rounded."""
+    return round((time.perf_counter() - started) * 1000, 2)
+
+
 @router.post(
     "",
     response_model=SearchResponse,
@@ -145,19 +150,19 @@ async def search(
                     matched_via="alias",
                 )
             )
-        elapsed_ms = (time.perf_counter() - started) * 1000
+        elapsed_ms = _elapsed_ms(started)
         log.info(
             "search.alias_hit",
             query=req.query,
             count=len(results),
-            duration_ms=round(elapsed_ms, 2),
+            duration_ms=elapsed_ms,
         )
         return SearchResponse(
             query=req.query,
             k=req.k,
             matched_via="alias",
             results=results,
-            latency_ms=round(elapsed_ms, 2),
+            latency_ms=elapsed_ms,
         )
 
     # 2) Hybrid path — embedder + BM25 + RRF over a wider candidate pool
@@ -169,11 +174,11 @@ async def search(
     )
 
     if not hybrid_hits:
-        elapsed_ms = (time.perf_counter() - started) * 1000
+        elapsed_ms = _elapsed_ms(started)
         log.info(
             "search.hybrid_empty",
             query=req.query,
-            duration_ms=round(elapsed_ms, 2),
+            duration_ms=elapsed_ms,
         )
         return SearchResponse(
             query=req.query, k=req.k, matched_via="empty",
@@ -200,13 +205,13 @@ async def search(
             top_k=req.k,
         )
         if meta["rejected"]:
-            elapsed_ms = (time.perf_counter() - started) * 1000
+            elapsed_ms = _elapsed_ms(started)
             log.info(
                 "search.rejected",
                 query=req.query,
                 max_sigmoid=meta["max_sigmoid"],
                 n_candidates=meta["n_candidates"],
-                duration_ms=round(elapsed_ms, 2),
+                duration_ms=elapsed_ms,
             )
             return SearchResponse(
                 query=req.query, k=req.k, matched_via="rejected",

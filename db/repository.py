@@ -105,6 +105,31 @@ class CourseRepository:
             raise CourseNotFound(course_id)
         return Course.model_validate_json(row["generated_json"])
 
+    def get_batch(self, course_ids: list[str]) -> dict[str, Course]:
+        """Fetch multiple courses in a single SQL round-trip.
+
+        Returns {course_id: Course} for IDs that exist; missing IDs are
+        silently omitted (callers decide whether to error or skip).
+        Used by HybridRetriever.search to avoid N+1 — fetching k=20 hits
+        as 20 individual SELECTs adds noticeable latency under load.
+
+        Empty input → empty dict (no SQL query).
+        """
+        if not course_ids:
+            return {}
+        # Placeholders are static `?` markers (one per id) — values bound via
+        # params, not interpolated. This is safe.
+        placeholders = ",".join("?" * len(course_ids))
+        rows = self._conn.execute(
+            f"SELECT generated_json FROM courses WHERE course_id IN ({placeholders})",
+            list(course_ids),
+        ).fetchall()
+        out: dict[str, Course] = {}
+        for row in rows:
+            course = Course.model_validate_json(row["generated_json"])
+            out[course.course_id] = course
+        return out
+
     def exists(self, course_id: str) -> bool:
         row = self._conn.execute(
             "SELECT 1 FROM courses WHERE course_id = ?", (course_id,)

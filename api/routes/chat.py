@@ -25,7 +25,7 @@ from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from api.dependencies import (
@@ -79,6 +79,7 @@ log = structlog.get_logger("neu_compass.chat")
 )
 async def chat(
     req: ChatRequest,
+    request: Request,
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     hybrid: Annotated[HybridRetriever, Depends(get_hybrid_retriever)],
@@ -88,6 +89,15 @@ async def chat(
     ],
 ) -> StreamingResponse:
     """Stream a Gemini-generated answer grounded in the retrieved courses."""
+    # Pre-ready gate: /chat invokes Gemini lazy-init via stream_fn. If hit
+    # during lifespan warmup (~70s bge-m3 cold start), the SDK lazy-import
+    # would block the request indefinitely. Refuse fast with 503 instead.
+    if not getattr(request.app.state, "ready", False):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service warming up. Check /ready and retry shortly.",
+        )
+
     if req.delivery_mode is not None:
         try:
             DeliveryMode(req.delivery_mode)

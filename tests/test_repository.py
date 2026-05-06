@@ -262,3 +262,40 @@ def test_count_by_status(repo: CourseRepository) -> None:
 
 def test_get_status_missing_returns_none(repo: CourseRepository) -> None:
     assert repo.get_status("nonexistent") is None
+
+
+# === get_batch ===
+
+def test_get_batch_returns_courses_keyed_by_id(repo: CourseRepository) -> None:
+    repo.insert(_course("uuid-1", primary_code="CS 5800", primary_name="Algorithms"))
+    repo.insert(_course("uuid-2", primary_code="CS 5200", primary_name="DB"))
+    repo.insert(_course("uuid-3", primary_code="AAI 6600", primary_name="AI Ethics"))
+
+    out = repo.get_batch(["uuid-1", "uuid-3"])
+    assert set(out.keys()) == {"uuid-1", "uuid-3"}
+    assert out["uuid-1"].primary_code == "CS 5800"
+    assert out["uuid-3"].primary_code == "AAI 6600"
+
+
+def test_get_batch_silently_omits_missing(repo: CourseRepository) -> None:
+    """Missing IDs aren't an error — caller decides handling. This matters
+    for HybridRetriever where alias points at vanished course_ids."""
+    repo.insert(_course("uuid-1"))
+    out = repo.get_batch(["uuid-1", "uuid-missing", "uuid-also-missing"])
+    assert set(out.keys()) == {"uuid-1"}
+
+
+def test_get_batch_empty_input_returns_empty_dict(repo: CourseRepository) -> None:
+    """No SQL roundtrip on empty input."""
+    assert repo.get_batch([]) == {}
+
+
+def test_get_batch_preserves_order_independence(repo: CourseRepository) -> None:
+    """Caller can rely on the dict for lookup; insertion order doesn't
+    matter. Defensive against SQLite returning rows in arbitrary order."""
+    repo.insert(_course("a"))
+    repo.insert(_course("b"))
+    repo.insert(_course("c"))
+    out_one = repo.get_batch(["c", "a", "b"])
+    out_two = repo.get_batch(["a", "b", "c"])
+    assert out_one.keys() == out_two.keys() == {"a", "b", "c"}

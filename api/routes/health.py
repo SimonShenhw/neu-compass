@@ -45,11 +45,29 @@ async def health() -> HealthResponse:
 )
 async def ready(request: Request) -> ReadyResponse:
     state = request.app.state
-    is_ready = bool(getattr(state, "ready", False))
+    is_ready_flag = bool(getattr(state, "ready", False))
     faiss_index = getattr(state, "faiss_index", None)
     bm25_corpus = getattr(state, "bm25_corpus", None)
+    embedder = getattr(state, "embedder", None)
+
+    # Real readiness invariant: the `ready` flag alone isn't enough — guard
+    # against a partially-initialized state where lifespan set `ready=True`
+    # but a critical component is still None (defense against future
+    # refactors that might split lifespan into smaller steps). Reranker is
+    # optional (degraded-mode is supported by /search), so it's NOT in the
+    # invariant — only embedder + FAISS + BM25 must all be live for
+    # orchestrators to route traffic.
+    is_actually_ready = (
+        is_ready_flag
+        and faiss_index is not None
+        and faiss_index.count > 0
+        and bm25_corpus is not None
+        and bm25_corpus.count > 0
+        and embedder is not None
+    )
+
     return ReadyResponse(
-        status="ready" if is_ready else "warming",
+        status="ready" if is_actually_ready else "warming",
         courses_indexed=faiss_index.count if faiss_index is not None else 0,
         bm25_corpus=bm25_corpus.count if bm25_corpus is not None else 0,
     )

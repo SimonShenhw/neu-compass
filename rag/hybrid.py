@@ -241,9 +241,14 @@ class HybridRetriever:
         )
 
         top_k = sorted(fused, key=lambda c: -fused[c])[:k]
+        if not top_k:
+            return []
+        # Batch fetch — avoids N+1 (was k SELECTs in a list comprehension).
+        courses = self._course_repo.get_batch(top_k)
         return [
-            SearchHit(course=self._course_repo.get(cid), score=fused[cid])
+            SearchHit(course=courses[cid], score=fused[cid])
             for cid in top_k
+            if cid in courses  # skip dangling refs (alias points at vanished course)
         ]
 
 
