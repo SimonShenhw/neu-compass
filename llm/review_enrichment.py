@@ -19,7 +19,7 @@ from typing import Callable
 
 from llm.formatter import SourceDocument, format_sources
 from llm.gemini_client import generate_structured
-from llm.prompts.extract_v1 import build_prompt
+from llm.prompts.extract_v1_1 import build_prompt
 from schemas.course import Course
 from scrapers.rmp import RmpProfessorSummary, RmpReview
 

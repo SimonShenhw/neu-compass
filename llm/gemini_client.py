@@ -1,16 +1,25 @@
-"""Gemini 2.5 Flash client wrapper.
+"""Gemini 2.5 Flash client wrapper (google.genai SDK).
 
-Wraps google.generativeai for structured JSON output validated by Pydantic.
-The SDK import is lazy (inside _build_default_model) so test imports of
-this module don't require GEMINI_API_KEY in the environment.
+Migrated from `google.generativeai` (deprecated) per PLAN v2.3 §3.5.
 
-Design choice: generate_structured() accepts an explicit `model` parameter,
-so tests can pass a fake without monkey-patching globals. The default
-factory _build_default_model() is what gets used in production.
+Schema-stripping is still required:
+The new SDK has its own bug — when you pass a Pydantic class as
+`response_schema`, the SDK serializes it to a protobuf payload that
+includes `additional_properties` (snake_case), and Gemini's API rejects
+that field with INVALID_ARGUMENT. We sidestep this by going through a
+dict path: `pydantic_to_gemini_schema(model)` returns a stripped dict
+that the SDK ships verbatim (no re-serialization), so we control the
+exact wire format. The strip list is the same as for the old SDK
+(both surfaces reject OpenAPI-3-incompatible JSON-Schema-2020 keywords),
+which is why the helper survives the migration.
 
-Cost discipline (PLAN §8 budget): caller is responsible for managing
-prompt length + retries. This wrapper does NOT auto-retry on quota errors —
-Gemini quota retries cost real money. Caller logs + decides.
+Design choice: generate_structured() accepts an explicit `client` parameter
+so tests can pass a fake without monkey-patching globals. The default factory
+_build_default_client() reads settings.gemini_api_key.
+
+Cost discipline (PLAN §8 budget): caller is responsible for managing prompt
+length + retries. This wrapper does NOT auto-retry on quota errors — Gemini
+quota retries cost real money. Caller logs + decides.
 """
 
 from __future__ import annotations
@@ -25,51 +34,59 @@ T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 DEFAULT_TEMPERATURE = 0.2  # low for extraction; high for creative tasks
-DEFAULT_MAX_OUTPUT_TOKENS = 16384  # Week 7 §3.2 finding: 8192 truncated CS 5800
-                                    # mid-JSON when controversial_signals + topics
-                                    # filled. Doubled to 16384; still well under
-                                    # Flash's 65536 ceiling.
+DEFAULT_MAX_OUTPUT_TOKENS = 16384  # Week 7 §3.2: 8192 truncated CS 5800 mid-JSON
 
 
 class GeminiError(Exception):
     """Wrapped error from Gemini API call or response parsing."""
 
 
-class _ModelLike(Protocol):
-    """Minimal interface we need from a Gemini GenerativeModel.
-
-    Lets tests pass a fake without depending on the SDK or having a real key.
-    """
+class _ModelsLike(Protocol):
+    """Subset of google.genai client.models we need."""
 
     def generate_content(
         self,
-        prompt: str,
-        generation_config: Any | None = ...,
-        stream: bool = ...,
+        *,
+        model: str,
+        contents: Any,
+        config: Any | None = ...,
+    ) -> Any: ...
+
+    def generate_content_stream(
+        self,
+        *,
+        model: str,
+        contents: Any,
+        config: Any | None = ...,
     ) -> Any: ...
 
 
-@lru_cache(maxsize=4)
-def _build_default_model(name: str = DEFAULT_MODEL) -> _ModelLike:
-    """Lazy: import SDK + configure on first use, cache by model name."""
-    import google.generativeai as genai  # noqa: PLC0415
+class _ClientLike(Protocol):
+    models: _ModelsLike
+
+
+@lru_cache(maxsize=1)
+def _build_default_client() -> _ClientLike:
+    """Lazy: import SDK + build Client on first use, cache process-wide."""
+    from google import genai  # noqa: PLC0415
 
     from config import settings  # noqa: PLC0415
 
-    genai.configure(api_key=settings.gemini_api_key)
-    return genai.GenerativeModel(name)  # type: ignore[return-value]
+    return genai.Client(api_key=settings.gemini_api_key)  # type: ignore[return-value]
 
 
-# Pydantic-generated JSON Schema keywords that the Gemini Schema proto doesn't
-# understand. Passing any of them through trips
-# `ValueError: Unknown field for Schema: <k>` inside _normalize_schema.
-# Pydantic v2 emits these from Field(min_length=...) / Field(pattern=...) etc.
+# Schema keywords Gemini's Schema proto doesn't accept. Pydantic v2's
+# model_json_schema() emits these for Field(min_length=...) / Field(pattern=...)
+# / nested-model $refs / etc — passing them through trips
+# `Unknown name "<key>": Cannot find field` from the API (or its protobuf layer).
+# Both google.generativeai (old) and google.genai (new) reject the same set
+# at the wire level, so the strip list survives the SDK migration.
 _GEMINI_UNSUPPORTED_SCHEMA_KEYS = frozenset({
     "minLength", "maxLength", "pattern",
     "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
     "additionalProperties", "propertyNames", "patternProperties",
     "uniqueItems", "contains", "minContains", "maxContains",
-    "$schema", "$id", "title",  # title is harmless but cleaner to drop
+    "$schema", "$id", "title",  # title harmless but cleaner to drop at top level
     "const", "default",  # Gemini Schema doesn't model these
 })
 
@@ -114,8 +131,8 @@ def _strip_unsupported(node: Any, *, in_properties_map: bool = False) -> Any:
     longer have a corresponding `properties` key (defense in depth).
     """
     if isinstance(node, dict):
-        # Collapse `anyOf` BEFORE generic recursion. The Gemini SDK proto we're
-        # bound to doesn't model `anyOf` and rejects it loudly.
+        # Collapse `anyOf` BEFORE generic recursion. Both old and new Gemini
+        # Schema surfaces reject `anyOf` outright.
         if "anyOf" in node and not in_properties_map:
             variants = node["anyOf"]
             non_null = [
@@ -168,15 +185,16 @@ def pydantic_to_gemini_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Convert a Pydantic model class into a dict the Gemini SDK accepts as
     `response_schema`.
 
-    Why we don't pass the Pydantic class directly: the SDK's
-    `_normalize_schema` calls `protos.Schema(**dict)` recursively and barfs on
-    Pydantic-only keywords (minLength, pattern, additionalProperties, …).
-    The reverse fix — telling Pydantic not to emit those — would weaken
-    server-side validation, which we want strict.
+    Why not pass the Pydantic class directly: both old and new SDKs
+    re-serialize Pydantic schemas in ways the API rejects (old SDK chokes
+    on `minLength`/`pattern`/etc inside its Schema proto; new SDK emits
+    `additional_properties` (snake_case) at the protobuf layer that the
+    API rejects with INVALID_ARGUMENT). Going through a stripped dict
+    bypasses both bugs.
 
     The returned dict still validates the LLM's reply via
-    `schema.model_validate_json` downstream, so the constraints we strip from
-    the prompt are still enforced when we PARSE the response.
+    `schema.model_validate_json` downstream, so the constraints we strip
+    here from the prompt schema are still enforced when we PARSE the response.
     """
     raw = model.model_json_schema()
     defs = raw.pop("$defs", {})
@@ -184,18 +202,42 @@ def pydantic_to_gemini_schema(model: type[BaseModel]) -> dict[str, Any]:
     return _strip_unsupported(inlined)
 
 
+def _build_config(
+    *,
+    temperature: float,
+    max_output_tokens: int,
+    response_schema: dict[str, Any] | None = None,
+) -> Any:
+    """Construct GenerateContentConfig with our defaults.
+
+    When response_schema is set, also forces JSON mime so Gemini emits
+    structured output validating the schema. Schema must be the
+    pre-stripped dict (cf. pydantic_to_gemini_schema), not a Pydantic class.
+    """
+    from google.genai import types  # noqa: PLC0415
+
+    kwargs: dict[str, Any] = {
+        "temperature": temperature,
+        "max_output_tokens": max_output_tokens,
+    }
+    if response_schema is not None:
+        kwargs["response_mime_type"] = "application/json"
+        kwargs["response_schema"] = response_schema
+    return types.GenerateContentConfig(**kwargs)
+
+
 def generate_structured(
     prompt: str,
     *,
     schema: type[T],
-    model: _ModelLike | None = None,
+    client: _ClientLike | None = None,
     model_name: str = DEFAULT_MODEL,
     temperature: float = DEFAULT_TEMPERATURE,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
 ) -> T:
     """Call Gemini, parse JSON response, validate against `schema`.
 
-    Caller may inject `model` for testing. Otherwise uses cached default
+    Caller may inject `client` for testing. Otherwise uses cached default
     (lazy SDK import + config from settings.gemini_api_key).
 
     Raises GeminiError on:
@@ -203,20 +245,21 @@ def generate_structured(
       - Response not valid JSON
       - JSON not matching `schema`
     """
-    if model is None:
-        model = _build_default_model(model_name)
+    if client is None:
+        client = _build_default_client()
 
     response_schema = pydantic_to_gemini_schema(schema)
+    config = _build_config(
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+        response_schema=response_schema,
+    )
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens,
-                "response_mime_type": "application/json",
-                "response_schema": response_schema,
-            },
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=config,
         )
     except Exception as e:
         raise GeminiError(f"Gemini API call failed: {type(e).__name__}: {e}") from e
@@ -234,23 +277,26 @@ def generate_structured(
 def generate_text(
     prompt: str,
     *,
-    model: _ModelLike | None = None,
+    client: _ClientLike | None = None,
     model_name: str = DEFAULT_MODEL,
     temperature: float = DEFAULT_TEMPERATURE,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
 ) -> str:
     """Plain text response (no JSON schema). Use for prompts that don't need
     structured output — e.g., quick summary or paraphrase tasks."""
-    if model is None:
-        model = _build_default_model(model_name)
+    if client is None:
+        client = _build_default_client()
+
+    config = _build_config(
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+    )
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens,
-            },
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=config,
         )
     except Exception as e:
         raise GeminiError(f"Gemini API call failed: {type(e).__name__}: {e}") from e
@@ -261,7 +307,7 @@ def generate_text(
 def generate_text_stream(
     prompt: str,
     *,
-    model: _ModelLike | None = None,
+    client: _ClientLike | None = None,
     model_name: str = DEFAULT_MODEL,
     temperature: float = DEFAULT_TEMPERATURE,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
@@ -277,17 +323,19 @@ def generate_text_stream(
     errors mid-stream propagate as GeminiError too — the partial output up
     to that point is what the caller already received.
     """
-    if model is None:
-        model = _build_default_model(model_name)
+    if client is None:
+        client = _build_default_client()
+
+    config = _build_config(
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+    )
 
     try:
-        stream = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens,
-            },
-            stream=True,
+        stream = client.models.generate_content_stream(
+            model=model_name,
+            contents=prompt,
+            config=config,
         )
     except Exception as e:
         raise GeminiError(
@@ -313,13 +361,14 @@ def generate_text_stream(
 
 
 def _extract_text(response: Any) -> str:
-    """Pull the text out of a Gemini response. Handles both .text and the
-    longer .candidates path; raises GeminiError if neither yields content."""
+    """Pull the text out of a Gemini response. response.text is a property
+    that auto-concatenates parts; falls back to candidates path if empty."""
     text = getattr(response, "text", None)
     if text:
         return str(text)
 
-    # Fall back to candidates path (newer SDK responses)
+    # Fallback: dig through candidates path (defensive — covers safety-blocked
+    # responses where .text returns None but parts may still have content).
     candidates = getattr(response, "candidates", None) or []
     for candidate in candidates:
         parts = getattr(getattr(candidate, "content", None), "parts", None) or []

@@ -212,11 +212,18 @@ def test_enrich_course_passes_assembled_prompt_to_llm() -> None:
 
 
 def test_enrich_course_works_with_no_rmp_summaries() -> None:
-    """Enrichment can run on syllabus alone (Gemini will get only catalog source)."""
+    """Enrichment can run on syllabus alone (Gemini will get only catalog source).
+
+    Verifies the assembled <source> XML excludes any rmp_review block when no
+    summaries are passed. Match against the source-tag attribute (not the bare
+    substring "rmp_review") because the prompt template itself can mention
+    "rmp_review_42" as a Good/Bad example (extract_v1_1.py few-shots).
+    """
     course = _course()
 
     def mock_llm(prompt: str, schema: type[Course]) -> Course:
-        assert "rmp_review" not in prompt
+        assert 'type="rmp_review"' not in prompt
+        assert 'id="rmp_review_' not in prompt
         return _enriched_course_factory("x", course.primary_code)
 
     enriched = enrich_course(course, "syllabus content", [], llm_fn=mock_llm)
