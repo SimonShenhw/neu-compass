@@ -170,10 +170,14 @@ def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
                 st.caption(f"✓ {active} filter{'s' if active > 1 else ''} active")
                 if st.button("Clear all", use_container_width=True, key="filter_clear"):
                     state["filters"] = {}
+                    # Reset all filter widget keys to empty string so the
+                    # next render shows blank inputs. text_input + selectbox
+                    # both treat "" as "no value" — we don't need to
+                    # distinguish per-widget here.
                     for k in ("filter_term", "filter_credits",
                               "filter_delivery", "filter_prof"):
                         if k in state:
-                            state[k] = "" if k != "filter_credits" else ""
+                            state[k] = ""
                     st.rerun()
     return state.get("filters", {})
 
