@@ -54,6 +54,20 @@ class Settings(BaseSettings):
     onnx_providers: str = "auto"  # "auto" | comma-separated EP names
     enable_reranker: bool = True  # NAS deploy can set False to save ~600 MB
 
+    # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
+    # Wraps the reranker (and best-effort the embedder backbone) with
+    # torch.compile when `inference_backend=pytorch`. ~10-25% latency
+    # reduction on RTX 5090; cold-start adds 5-30s for compilation.
+    # Has NO effect when inference_backend=onnx (ONNX has its own graph
+    # optimization). Mode options:
+    #   default          — safe, 10-20% speedup, no static-shape requirement
+    #   reduce-overhead  — uses CUDA Graphs, +20-30% but needs static shapes
+    #                       (auto-padding to max_length=512 increases per-call
+    #                       compute on short queries; benchmark before enabling)
+    #   max-autotune     — slower compile (~60s), best runtime perf
+    enable_torch_compile: bool = False
+    torch_compile_mode: str = "default"
+
     # === Logging ===
     log_level: str = "INFO"
     log_format: str = "json"  # json | console

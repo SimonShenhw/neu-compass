@@ -101,17 +101,43 @@ def _build_inference_stack(log: Any) -> tuple[Any, Any]:
 
 
 def _build_pytorch_stack(log: Any) -> tuple[Any, Any]:
-    embedder = BGEM3Embedder(device=settings.embedding_device)
+    """PyTorch inference path. Optionally wraps both models with
+    torch.compile (Week 9 Day 2) when settings.enable_torch_compile
+    is set. Compilation cost (~5-30s extra cold start) is paid in the
+    lifespan warmup loop below.
+    """
+    compile_mode = (
+        settings.torch_compile_mode if settings.enable_torch_compile else None
+    )
+
+    embedder = BGEM3Embedder(
+        device=settings.embedding_device,
+        compile_mode=compile_mode,
+    )
+    # Two warmup encodes when compiling: first triggers the JIT, second
+    # exercises the compiled path so subsequent /search requests are fast.
     embedder.encode(["warmup"])
-    log.info("api.startup.embedder_warm", backend="pytorch")
+    if compile_mode:
+        embedder.encode(["warmup pass two"])
+    log.info(
+        "api.startup.embedder_warm",
+        backend="pytorch",
+        torch_compile=compile_mode or "off",
+    )
 
     if not settings.enable_reranker:
         log.info("api.startup.reranker_disabled", backend="pytorch")
         return embedder, None
 
-    reranker = CrossEncoderReranker()
+    reranker = CrossEncoderReranker(compile_mode=compile_mode)
     reranker.score("warmup", ["warmup"])
-    log.info("api.startup.reranker_warm", backend="pytorch")
+    if compile_mode:
+        reranker.score("warmup", ["warmup pass two"])
+    log.info(
+        "api.startup.reranker_warm",
+        backend="pytorch",
+        torch_compile=compile_mode or "off",
+    )
     return embedder, reranker
 
 

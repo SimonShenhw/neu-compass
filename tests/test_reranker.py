@@ -437,3 +437,21 @@ def test_rerank_blend_with_rejection_uses_raw_sigmoid_not_blended() -> None:
     # because raw max sigmoid is 1.0.
     assert meta["rejected"] is False
     assert meta["max_sigmoid"] == 1.0
+
+
+# === compile_mode kwarg (Week 9 Day 2) ===
+
+
+def test_cross_encoder_reranker_default_compile_mode_is_none() -> None:
+    """Default behavior preserved — no torch.compile unless caller opts in."""
+    rer = CrossEncoderReranker()
+    assert rer.compile_mode is None
+
+
+def test_cross_encoder_reranker_accepts_compile_mode() -> None:
+    """compile_mode propagates through __init__ for lifespan to read."""
+    rer = CrossEncoderReranker(compile_mode="default")
+    assert rer.compile_mode == "default"
+
+    rer2 = CrossEncoderReranker(compile_mode="reduce-overhead")
+    assert rer2.compile_mode == "reduce-overhead"

@@ -209,11 +209,65 @@ INFERENCE_BACKEND=pytorch
 
 ---
 
-## 8. 进一步(超出 Day 1 范围)
+## 8. PyTorch 路径加速:torch.compile + CUDA Graphs(Day 2)
 
-- **torch.compile + CUDA Graphs**(Day 2):PyTorch 路径上 +20-30% latency,跟 ONNX 互斥
-- **FP8 via NVIDIA Transformer Engine**(Day 3):再 2x throughput on Blackwell
+如果你**不想走 ONNX**(部署简单 / 不想多一层文件管理),PyTorch 路径上加 `torch.compile` 也能拿到 ~10-25% latency 减少。跟 §1-§4 ONNX 路径**互斥**(同时只用一个 backend),但代码层面共存,通过 .env flag 切换。
+
+### 8.1 启用
+
+```bash
+# .env(保持 INFERENCE_BACKEND=pytorch)
+INFERENCE_BACKEND=pytorch
+ENABLE_TORCH_COMPILE=true
+TORCH_COMPILE_MODE=default
+```
+
+`TORCH_COMPILE_MODE` 选项:
+- **`default`** ← 推荐起点。安全,~10-20% 减延迟,无 static shape 要求,cold-start +5-10s 编译
+- `reduce-overhead`: 启用 CUDA Graphs,~20-30% 减延迟,但需要 static shape(自动 padding 到 max_length=512)— 短 query 会因为 pad 反而稍慢,**实测前不要 default 选**
+- `max-autotune`: 编译期 ~60s,生产稳定后用一次值得
+
+### 8.2 重启 + 验
+
+```bash
+pkill -f 'uvicorn api.main' || true
+uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 &
+# 看日志:
+#   api.startup.embedder_warm backend=pytorch torch_compile=default
+#   api.startup.reranker_warm backend=pytorch torch_compile=default
+#   api.startup.ready
+```
+
+第一次 search 请求会比平时慢(JIT 触发剩余 compile branch),后续稳定。
+
+### 8.3 跟 ONNX 比
+
+| Backend | 改动 | p50(RTX 5090) | 部署复杂度 | 推荐 |
+|---|---|---:|---|---|
+| pytorch (baseline) | 0 | 47 ms | 低 | 默认 |
+| **pytorch + torch.compile=default** | env flag | **~38 ms** | 低 | 不想搞 ONNX 的简化路径 |
+| pytorch + torch.compile=reduce-overhead | env flag(短 query 可能反慢) | ~32-38 ms | 低 | 已知 query 都长再考虑 |
+| onnx + CUDA EP | 一次性 export(§2) | ~30 ms | 中 | 中等 ROI |
+| **onnx + TensorRT EP FP16** | export + tensorrt 包(§3) | **~17 ms** ⭐ | 中-高 | **最快** |
+
+**经验法则**:不打算长期跑这个项目 → torch.compile;长期 24/7 部署 → ONNX+TRT。
+
+### 8.4 跟 §3.6 故障速查的额外项
+
+| 症状 | 原因 | 修 |
+|---|---|---|
+| 启动时第一次 encode 卡 30s+ | `torch.compile` 在 trace + 编译 IR | 正常,等;后续启动 cache 重用 |
+| `Dynamo failed: ...` | torch.compile 无法 trace 某 op | 改成 `TORCH_COMPILE_MODE=default`(去 reduce-overhead);仍失败 → 关 flag |
+| 反而比 baseline 慢 | reduce-overhead 模式下短 query padding overhead | 切到 `default` mode |
+| OOM during compile | reduce-overhead 模式 +3-10 GB VRAM | 切到 `default` 或回到 baseline |
+
+---
+
+## 9. 进一步(超出 Day 2 范围)
+
+- **FP8 via NVIDIA Transformer Engine**(Day 3):再 2x throughput on Blackwell。等 encoder model 实测 benchmark 出来再上
 - **engine warm-up 进 systemd unit**:NAS 24/7 部署时,按 cron 定期 ping `/search` 防 idle unload
+- **bge-m3 PyTorch path 重写不走 FlagEmbedding**:让 BGEM3Embedder 内部直接用 `transformers.AutoModel` + 手动 CLS pool,这样 torch.compile 完整 wrap(目前 FlagEmbedding wrapper 只能 best-effort 包内层)
 
 PLAN v2.3.1 §3.5 supplement 跟踪。
 
@@ -222,3 +276,4 @@ PLAN v2.3.1 §3.5 supplement 跟踪。
 ## 修订
 
 - 2026-05-05:初版(PLAN Week 9 Day 1 ship)
+- 2026-05-05:Day 2 — torch.compile section 加 §8

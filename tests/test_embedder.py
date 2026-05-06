@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from rag.embedder import EMBEDDING_DIM, BGEM3Embedder, _l2_normalize
 
@@ -72,3 +73,36 @@ def test_l2_normalize_batch() -> None:
     out = _l2_normalize(v)
     norms = np.linalg.norm(out, axis=1)
     assert np.allclose(norms, 1.0, atol=1e-5)
+
+
+# === compile_mode kwarg (Week 9 Day 2) ===
+
+
+def test_bgem3_embedder_default_compile_mode_is_none() -> None:
+    """Default behavior preserved — no torch.compile unless caller opts in."""
+    e = BGEM3Embedder()
+    assert e.compile_mode is None
+
+
+def test_bgem3_embedder_accepts_compile_mode() -> None:
+    """compile_mode propagates through __init__ for lifespan to read."""
+    e = BGEM3Embedder(compile_mode="default")
+    assert e.compile_mode == "default"
+
+    e2 = BGEM3Embedder(compile_mode="reduce-overhead")
+    assert e2.compile_mode == "reduce-overhead"
+
+
+def test_try_compile_inner_backbone_silent_when_structure_unexpected(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """If FlagEmbedding internal structure changes (no `.model.model`),
+    the wrap should warn + skip, not crash. Defends against version drift."""
+    from rag.embedder import _try_compile_inner_backbone
+
+    class _FakeFlagModel:
+        model = None  # missing the inner backbone
+
+    _try_compile_inner_backbone(_FakeFlagModel(), mode="default")
+    captured = capsys.readouterr()
+    assert "skipping compile" in captured.out
