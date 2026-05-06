@@ -3,7 +3,7 @@
 > 用结构化检索 + LLM 抽取破除 Northeastern 研究生**选课信息黑箱**。
 > Course RAG 做流量入口,Co-op 数据做留存飞轮。
 
-**Status**: Weeks 1-7 工程交付完成 · **631 tests / 12s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me`
+**Status**: Weeks 1-8 工程交付完成 · **661 tests / 13s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me` · Week 8 sprint(PLAN v2.3 + v2.3.1 hardening)code/docs ship,等真 query log 触发 Ragas + ADR re-sweep
 **Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu128 + torch 2.10
 **English**: [README.en.md](README.en.md)
 
@@ -25,7 +25,7 @@
 | bge-m3 cold start | ~70 s (lifespan 预热消化) |
 | Co-op seed records 入库 | **30 条 (12 quant / 8 big_tech / 5 biotech / 5 startup)** |
 | Schema 版本 | **1.1** (user_courses 表 v3.0 social 预留 DDL only) |
-| 测试套件 | **631 tests / ~12 s** |
+| 测试套件 | **661 tests / ~13 s** |
 
 实测数字 + 决策依据:[docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) (Week 7 sprint) + [docs/adr/0015-z-score-blending.md](docs/adr/0015-z-score-blending.md) (α 决策) + [docs/adr/0016-reranker-reject-threshold.md](docs/adr/0016-reranker-reject-threshold.md) (T 校准) + [docs/rag_smoke_results.md](docs/rag_smoke_results.md) + [docs/path_decision.md](docs/path_decision.md)。
 
@@ -37,6 +37,20 @@
 | 2. ≥ 200 真 query | 🟡 | 等团队 traffic |
 | 3. ≥ 5 contributors OAuth | 🟡 1/5 | OAuth round-trip 已通过(域白名单 + JWT verify + upsert)|
 | 4. ADR-0015 α 决策 | ✅ | α=0.4 锁定 + ADR-0016 阈值 0.05 校准 |
+
+## Week 8 ship 状态
+
+| § | 交付 | 状态 |
+|---|---|---|
+| 3.3 | CS 5200 prompt v1.1 强约束 evidence_snippets + 12 测试 + live smoke | ✅ |
+| 3.5 | google.genai SDK migrate(google.generativeai EOL 解除)+ dict-path schema bypass | ✅ |
+| 3.7 | Portfolio packaging:postmortem · system arch · metrics · roadmap v3 · runbooks | ✅ |
+| Path A | UX overhaul(hero / filters)+ 后端 reliability(N+1 / readiness / chat gate)+ structured error handler | ✅ |
+| 3.4 | 16 课 enrich(需主授名,scope 决策跳过)| ⏭️ |
+| 3.8 | OAuth secret rotate(项目寿命短,跳过)| ⏭️ |
+| 3.1 / 3.2 / 3.6 / 3.9 / 3.10 | 等真 query log 触发 / 浏览器 F12 复测 | ⬜ |
+
+详见 [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) + [docs/PLAN_v2_3_1.md](docs/PLAN_v2_3_1.md)(hardened review)。
 
 ---
 
@@ -178,7 +192,7 @@ uv run python scripts/probe_latency.py         # p50 ~40ms hybrid-only
 # Terminal 1: FastAPI (lifespan 预热 ~70s,加载 bge-m3 + bge-reranker)
 uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
 
-# Terminal 2: Streamlit chat UI (走 /chat NDJSON 流;Week 7 后定位为 debug + OAuth landing)
+# Terminal 2: Streamlit chat UI (course search + Co-op browse,Andy Dong React 前端落地前的 product UI)
 uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 
 # Terminal 3 (公网): Cloudflare Tunnel — 详见 docs/cloudflare_tunnel.md §11
@@ -191,7 +205,7 @@ cloudflared tunnel run neu-compass
 | URL | 用途 |
 |---|---|
 | `https://api.neu-compass.me` | FastAPI canonical (Andy 前端 / curl 调) |
-| `https://compass.neu-compass.me` | Streamlit debug + OAuth callback landing |
+| `https://compass.neu-compass.me` | Streamlit user UI(course search + chat,Andy React 前端落地前 canonical)|
 
 ---
 
@@ -232,6 +246,13 @@ neu-compass/
 | 文档 | 内容 |
 |---|---|
 | [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) | **当前 sprint** (Week 8 路线 + post-Week-7 ship 路径) |
+| [docs/PLAN_v2_3_1.md](docs/PLAN_v2_3_1.md) | Week 8 sprint hardened review(KPI 5 outreach + bootstrap CI + hold-out regression)|
+| [docs/postmortem_week7.md](docs/postmortem_week7.md) | Week 7 部署 8 类踩坑 + 共同主题(portfolio 用)|
+| [docs/system_architecture.md](docs/system_architecture.md) | 系统架构 5 张 mermaid 图(topology · query · data · auth · modules)|
+| [docs/portfolio_metrics.md](docs/portfolio_metrics.md) | Canonical metrics cheatsheet(latency · quality · scale · cost)|
+| [docs/roadmap_v3.md](docs/roadmap_v3.md) | v3.0+ roadmap(社交层 · learnable blending · ColBERT · 移动端)|
+| [docs/oauth_secret_rotation.md](docs/oauth_secret_rotation.md) | OAuth client_secret rotate runbook(5 min)|
+| [docs/streamlit_ws_troubleshooting.md](docs/streamlit_ws_troubleshooting.md) | Streamlit chat_input WebSocket 排查 SOP |
 | [docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) | Week 7 sprint (shipped — 见 §9 closeout) |
 | [docs/PLAN_v2.1.md](docs/PLAN_v2.1.md) | Week 6 checkpoint (ship state) |
 | [docs/PLAN_v2.0.md](docs/PLAN_v2.0.md) | Week 5 checkpoint (历史) |
