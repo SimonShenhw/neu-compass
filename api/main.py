@@ -22,6 +22,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
 from api.routes import auth, chat, coop, course, health, search
 from config import settings
@@ -90,6 +91,7 @@ def create_app(*, run_startup: bool = True) -> FastAPI:
     )
 
     app.add_middleware(RequestLogMiddleware)
+    register_exception_handlers(app)
 
     app.include_router(health.router)
     app.include_router(search.router)
