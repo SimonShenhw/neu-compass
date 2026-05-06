@@ -13,7 +13,7 @@
 
 | 维度 | 实测数字 |
 |---|---:|
-| `/search` p50 latency (live, hybrid+rerank+blend, 6469 课) | **~47 ms** (含 reranker;target <300ms,6x 余量) |
+| `/search` p50 latency (live, hybrid+rerank+blend, 6469 课) | **~47 ms** PyTorch / **~17 ms** ONNX+TRT (台式机 RTX 5090) |
 | `/search` p95 / hybrid-only p50 | 51 ms / 40.1 ms |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
 | Eval R@5 / MRR — `+rerank` only (α=0.0) | **0.636** / 0.545 |
@@ -253,6 +253,7 @@ neu-compass/
 | [docs/roadmap_v3.md](docs/roadmap_v3.md) | v3.0+ roadmap(社交层 · learnable blending · ColBERT · 移动端)|
 | [docs/oauth_secret_rotation.md](docs/oauth_secret_rotation.md) | OAuth client_secret rotate runbook(5 min)|
 | [docs/streamlit_ws_troubleshooting.md](docs/streamlit_ws_troubleshooting.md) | Streamlit chat_input WebSocket 排查 SOP |
+| [docs/tensorrt_runbook.md](docs/tensorrt_runbook.md) | ONNX Runtime / TensorRT 加速 runbook(47ms → ~17ms RTX 5090,350ms → ~80ms NAS Iris Xe)|
 | [docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) | Week 7 sprint (shipped — 见 §9 closeout) |
 | [docs/PLAN_v2.1.md](docs/PLAN_v2.1.md) | Week 6 checkpoint (ship state) |
 | [docs/PLAN_v2.0.md](docs/PLAN_v2.0.md) | Week 5 checkpoint (历史) |

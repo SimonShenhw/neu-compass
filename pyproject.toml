@@ -51,6 +51,17 @@ dev = [
     "pre-commit>=3.7",
     "types-requests",
 ]
+# ONNX Runtime acceleration (PLAN Week 9 §3.5 follow-up). Opt-in:
+# `uv sync --extra onnx`. Default install keeps PyTorch path only.
+# GPU users should additionally swap to onnxruntime-gpu (CUDA 12.6+ for
+# Blackwell), or onnxruntime-openvino for Intel iGPU NAS:
+#   uv pip install --upgrade onnxruntime-gpu      # NVIDIA RTX 50xx
+#   uv pip install --upgrade onnxruntime-openvino # Intel iGPU (e.g. NAS)
+# See docs/tensorrt_runbook.md.
+onnx = [
+    "optimum[exporters]>=1.20",
+    "onnxruntime>=1.20",
+]
 
 [build-system]
 requires = ["hatchling"]
