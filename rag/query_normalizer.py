@@ -18,8 +18,12 @@ import re
 from db.alias_repository import AliasRepository
 
 # Same as schemas.course COURSE_CODE_PATTERN but case-insensitive + free in text.
-_FULL_CODE_RE = re.compile(r"\b([A-Za-z]{2,4})\s?(\d{4}[A-Za-z]?)\b")
-_NUMERIC_CODE_RE = re.compile(r"\b(\d{4})\b")
+# `re.ASCII` makes \b respect ASCII word boundaries only — without it Python 3
+# treats CJK characters as word chars, so '那aai' has no boundary between '那'
+# and 'a' and the regex misses 'aai 6640' inside Chinese-mixed NL queries like
+# '那aai 6640这门课能给我说说吗'. (Bilingual NEU users hit this constantly.)
+_FULL_CODE_RE = re.compile(r"\b([A-Za-z]{2,4})\s?(\d{4}[A-Za-z]?)\b", re.ASCII)
+_NUMERIC_CODE_RE = re.compile(r"\b(\d{4})\b", re.ASCII)
 
 # Cap candidate-text length so we don't try to resolve "the entire essay" against aliases.
 MAX_WHOLE_QUERY_LEN = 30

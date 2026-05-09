@@ -255,3 +255,82 @@ INSERT OR IGNORE INTO schema_versions (version, notes)
 VALUES ('1.0', 'Initial schema (Week 1 Day 2): courses + aliases + users + unlocks + coop');
 INSERT OR IGNORE INTO schema_versions (version, notes)
 VALUES ('1.1', 'PLAN v2.2 §3.6: user_courses table (DDL only, endpoints deferred to v3.0)');
+INSERT OR IGNORE INTO schema_versions (version, notes)
+VALUES ('1.2', 'PLAN v3.0 Layer 3: programs + program_required_courses + course_prerequisites');
+
+-- =============================================================================
+-- 8. programs (PLAN v3.0 Layer 3)
+--    Master''s / Bachelor''s programs at NEU. The point of this table is to
+--    teach the chat route what "AAI 专业" / "DS major" / "EECE program" means
+--    in terms of a concrete course set — so the answer to "first-semester
+--    recommendation" can be computed deterministically from a small ontology
+--    instead of relying on hybrid retrieval to surface the right courses.
+--
+--    Scope (v3.0): seed only AAI (proof-of-concept). DS / CS / EECE etc.
+--    follow once the Layer 2+3 path is validated against real query logs.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS programs (
+    program_id   TEXT PRIMARY KEY,                          -- 'aai-ms', 'cs-align-ms', ...
+    full_name    TEXT NOT NULL,                             -- 'Master of Professional Studies in Applied AI'
+    prefix       TEXT NOT NULL COLLATE NOCASE,              -- 'AAI' — links to courses.primary_code prefix
+    department   TEXT,                                      -- 'Applied AI'
+    college      TEXT,                                      -- 'College of Professional Studies'
+    notes        TEXT,                                      -- "data sourced from <url> on YYYY-MM-DD" etc.
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_programs_prefix ON programs(prefix);
+
+-- =============================================================================
+-- 9. program_required_courses (program -> course recommended sequence)
+--    requirement_type:
+--      core              must take to graduate
+--      foundation        first-semester / pre-requisite tier (typically 5xxx)
+--      elective_pool     pick from this set
+--      capstone          final-semester project
+--    semester_recommended: 1 = first semester, 2 = second, ... NULL = anytime
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS program_required_courses (
+    program_id           TEXT NOT NULL,
+    course_id            TEXT NOT NULL,
+    requirement_type     TEXT NOT NULL
+                           CHECK (requirement_type IN ('core', 'foundation',
+                                                       'elective_pool', 'capstone')),
+    semester_recommended INTEGER
+                           CHECK (semester_recommended IS NULL OR
+                                  (semester_recommended >= 1 AND semester_recommended <= 8)),
+    notes                TEXT,
+    created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (program_id, course_id),
+    FOREIGN KEY (program_id) REFERENCES programs(program_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_program_courses_program
+    ON program_required_courses(program_id);
+CREATE INDEX IF NOT EXISTS idx_program_courses_semester
+    ON program_required_courses(program_id, semester_recommended);
+
+-- =============================================================================
+-- 10. course_prerequisites (course -> course "must take first")
+--     Layer 3 in-memory graph hydrates from this table at startup; query path
+--     for "what should I take before AAI 6640" walks the prereq edges.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS course_prerequisites (
+    course_id        TEXT NOT NULL,                         -- the course being taken
+    prereq_course_id TEXT NOT NULL,                         -- the course required first
+    requirement      TEXT NOT NULL DEFAULT 'required'
+                       CHECK (requirement IN ('required', 'recommended', 'concurrent')),
+    notes            TEXT,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (course_id, prereq_course_id),
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    FOREIGN KEY (prereq_course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    CHECK (course_id <> prereq_course_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_prereq_course ON course_prerequisites(course_id);
+CREATE INDEX IF NOT EXISTS idx_prereq_prereq ON course_prerequisites(prereq_course_id);

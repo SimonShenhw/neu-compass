@@ -103,6 +103,19 @@ class Retriever:
             clauses.append("json_extract(metadata, '$.professor') LIKE ?")
             params.append(f"%{filters['professor']}%")
 
+        if "primary_code_prefix" in filters:
+            # Layer 2 (PLAN v3.0+): when the query mentions a program / major
+            # prefix (AAI, CS, DS, EECE, INFO, ...), narrow the candidate pool
+            # at the SQLite layer BEFORE BM25/vector retrieval. Bilingual NEU
+            # students often phrase questions like "我是 AAI 专业 ..." — without
+            # this filter the hybrid leg pulls in cross-discipline noise (ALY /
+            # ARTG / BINF) that has lexical/semantic similarity but is wrong.
+            # Format: "AAI" matches "AAI 5015", "AAI 6640", etc. We append a
+            # space so 'CS' doesn't accidentally match 'CSYE'.
+            prefix = str(filters["primary_code_prefix"]).upper()
+            clauses.append("primary_code LIKE ?")
+            params.append(f"{prefix} %")
+
         sql = f"SELECT course_id FROM courses WHERE {' AND '.join(clauses)}"
         rows = self._conn.execute(sql, params).fetchall()
         return [r["course_id"] for r in rows]

@@ -40,6 +40,7 @@ from api.dependencies import (
 from api.models import SearchHitOut, SearchRequest, SearchResponse
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
+from llm.query_filter_extractor import extract_filters_adaptive
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import normalize_query_to_course_ids
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
@@ -168,9 +169,32 @@ async def search(
     # 2) Hybrid path — embedder + BM25 + RRF over a wider candidate pool
     #    so rerank has room to reorder.
     hard_filters = _build_hard_filters(req)
+
+    # Layer 2 (PLAN v3.0+): if the query mentions a program / major prefix,
+    # narrow the candidate pool at SQLite WHERE so vector + BM25 don't pull
+    # in cross-discipline noise. Cheap regex first; LLM fallback is wired
+    # through llm_fn (passing None here = regex-only — adding the LLM hop
+    # is a follow-up once we measure regex hit rate from real query logs).
+    extracted = extract_filters_adaptive(req.query, llm_fn=None)
+    if not extracted.is_empty():
+        hard_filters.update(extracted.to_hard_filter())
+        log.info(
+            "search.prefilter_applied",
+            program_prefix=extracted.program_prefix,
+            sanitized_query=extracted.sanitized_query[:80],
+        )
+
+    # The query passed to the embedder/BM25 is the sanitized form when
+    # filters were extracted — focuses similarity on semantic intent, not
+    # the program-name token (which has been moved into hard_filters).
+    retrieval_query = (
+        extracted.sanitized_query
+        if not extracted.is_empty() and extracted.sanitized_query
+        else req.query
+    )
     pool_size = max(req.k, RERANK_POOL_SIZE) if reranker is not None else req.k
     hybrid_hits = hybrid.search(
-        req.query, hard_filters=hard_filters or None, k=pool_size,
+        retrieval_query, hard_filters=hard_filters or None, k=pool_size,
     )
 
     if not hybrid_hits:

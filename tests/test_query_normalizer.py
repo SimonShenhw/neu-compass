@@ -85,6 +85,23 @@ def test_full_code_lowercase(alias_repo: AliasRepository) -> None:
     ) == ["neu-aai-6600"]
 
 
+def test_full_code_embedded_in_chinese_sentence(
+    alias_repo: AliasRepository,
+) -> None:
+    """Regression: bilingual NEU users type '那AAI 6600这门课能给我说说吗'.
+    Python 3 \\b is Unicode-aware by default — CJK chars count as word
+    chars, so '那A' has no boundary between '那' and 'A' and the regex
+    misses the embedded code. Fixed by re.ASCII flag in the patterns."""
+    for q in [
+        "那AAI 6600这门课的信息能给我说说吗",
+        "我想学AAI6600请问难吗",
+        "听说AAI 6600挺好的",
+    ]:
+        assert normalize_query_to_course_ids(
+            q, alias_repo=alias_repo,
+        ) == ["neu-aai-6600"], f"Failed for query: {q!r}"
+
+
 # === Bare 4-digit number ===
 
 def test_bare_number(alias_repo: AliasRepository) -> None:

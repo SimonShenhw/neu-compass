@@ -23,6 +23,7 @@ from config import settings
 from db.alias_repository import AliasRepository
 from db.connection import connect
 from db.coop_repository import CoopRepository
+from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
 from db.user_repository import UserRepository
 from app.auth import exchange_code_for_token
@@ -65,6 +66,10 @@ def get_coop_repo(conn: DbConn) -> CoopRepository:
 
 def get_user_repo(conn: DbConn) -> UserRepository:
     return UserRepository(conn)
+
+
+def get_program_repo(conn: DbConn) -> ProgramRepository:
+    return ProgramRepository(conn)
 
 
 # LLM streaming function. Override in tests via app.dependency_overrides
@@ -146,6 +151,7 @@ __all__ = [
     "get_faiss_index",
     "get_hybrid_retriever",
     "get_oauth_exchange_fn",
+    "get_program_repo",
     "get_reranker",
     "get_retriever",
     "get_user_repo",

@@ -1,0 +1,51 @@
+{
+  "program": {
+    "program_id": "aai-ms",
+    "full_name": "Master of Professional Studies in Applied Artificial Intelligence",
+    "prefix": "AAI",
+    "department": "Applied AI",
+    "college": "College of Professional Studies",
+    "notes": "PoC seed — Layer 3 v3.0. Sequence is best-guess from course numbering (5xxx foundational / 6xxx 60-69 core / 70+ specialized / 6980 capstone). User should verify against the official Plan of Study and revise."
+  },
+  "required_courses": [
+    {"course_id": "neu-aai-5015", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Math Concepts — required pre-req for AAI core"},
+    {"course_id": "neu-aai-5025", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Python — required pre-req for AAI core"},
+    {"course_id": "neu-aai-5035", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Research Methods + Scientific Writing"},
+    {"course_id": "neu-aai-6600", "requirement_type": "core",          "semester_recommended": 1, "notes": "Intro to AI — gateway to 6xxx tier"},
+
+    {"course_id": "neu-aai-6610", "requirement_type": "core",          "semester_recommended": 2, "notes": "Applied ML — typically taken second semester"},
+    {"course_id": "neu-aai-6620", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Applied NLP"},
+    {"course_id": "neu-aai-6630", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Applied Computer Vision"},
+    {"course_id": "neu-aai-6640", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Applied Deep Learning"},
+
+    {"course_id": "neu-aai-6650", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Recommender Systems"},
+    {"course_id": "neu-aai-6655", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Prompt Engineering"},
+    {"course_id": "neu-aai-6660", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Chatbot Architecture"},
+    {"course_id": "neu-aai-6665", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Generative AI"},
+    {"course_id": "neu-aai-6670", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Chatbot Application"},
+    {"course_id": "neu-aai-6680", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "AI for Cybersecurity"},
+    {"course_id": "neu-aai-6690", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "ML for Cyberdetection"},
+
+    {"course_id": "neu-aai-6710", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Graph Signal Processing — advanced"},
+    {"course_id": "neu-aai-6720", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Graph Neural Networks — advanced"},
+    {"course_id": "neu-aai-6730", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "3D Point Cloud — advanced"},
+    {"course_id": "neu-aai-6740", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Reinforcement Learning"},
+    {"course_id": "neu-aai-6790", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Quantum AI"},
+    {"course_id": "neu-aai-6850", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Blockchain AI"},
+    {"course_id": "neu-aai-6900", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "AI for Autonomous Systems"},
+
+    {"course_id": "neu-aai-6980", "requirement_type": "capstone",      "semester_recommended": 4, "notes": "Integrated Experiential Capstone"}
+  ],
+  "prerequisites": [
+    {"course_id": "neu-aai-6610", "prereq_course_id": "neu-aai-5015", "requirement": "required", "notes": "ML needs math foundation"},
+    {"course_id": "neu-aai-6610", "prereq_course_id": "neu-aai-5025", "requirement": "required", "notes": "ML needs Python"},
+    {"course_id": "neu-aai-6610", "prereq_course_id": "neu-aai-6600", "requirement": "required", "notes": "ML builds on AI intro"},
+    {"course_id": "neu-aai-6620", "prereq_course_id": "neu-aai-6610", "requirement": "recommended", "notes": "NLP assumes ML basics"},
+    {"course_id": "neu-aai-6630", "prereq_course_id": "neu-aai-6610", "requirement": "recommended", "notes": "CV assumes ML basics"},
+    {"course_id": "neu-aai-6640", "prereq_course_id": "neu-aai-6610", "requirement": "required", "notes": "DL builds on ML"},
+    {"course_id": "neu-aai-6720", "prereq_course_id": "neu-aai-6710", "requirement": "recommended", "notes": "GNN follows graph-signal"},
+    {"course_id": "neu-aai-6740", "prereq_course_id": "neu-aai-6610", "requirement": "required", "notes": "RL needs ML"},
+    {"course_id": "neu-aai-6980", "prereq_course_id": "neu-aai-6600", "requirement": "required", "notes": "Capstone after intro"},
+    {"course_id": "neu-aai-6980", "prereq_course_id": "neu-aai-6610", "requirement": "required", "notes": "Capstone after ML core"}
+  ]
+}

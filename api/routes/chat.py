@@ -28,21 +28,45 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
+import re
+
 from api.dependencies import (
+    DbConn,
     get_alias_repo,
     get_chat_stream_fn,
     get_course_repo,
     get_hybrid_retriever,
+    get_program_repo,
+    get_reranker,
 )
 from api.models import ChatRequest
+from api.routes.search import (
+    BLEND_ALPHA,
+    RERANK_POOL_SIZE,
+    RERANKER_REJECT_THRESHOLD,
+)
 from db.alias_repository import AliasRepository
+from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
 from llm.gemini_client import GeminiError
-from llm.prompts.chat_v1 import build_prompt
+from llm.prompts.chat_v2 import build_prompt
+from llm.query_filter_extractor import extract_filters_adaptive
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import normalize_query_to_course_ids
+from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from rag.retriever import SearchHit
 from schemas.course import DeliveryMode
+
+# Layer 3 (PLAN v3.0): regex detecting "first-semester / foundational" intent.
+# When this fires AND the user mentions a program prefix, we short-circuit
+# to the program ontology (programs + program_required_courses) instead of
+# guessing via hybrid retrieval. ASCII flag mirrors query_normalizer fix —
+# CJK chars don't act as word chars so '基础' boundary works correctly.
+_FOUNDATIONAL_INTENT_RE = re.compile(
+    r"(?:first[- ]?semester|foundational|core course|入门|基础|"
+    r"第一(?:个)?学期|第一年|first[- ]?year|recommended for new|刚入学)",
+    re.IGNORECASE,
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -83,6 +107,9 @@ async def chat(
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     hybrid: Annotated[HybridRetriever, Depends(get_hybrid_retriever)],
+    reranker: Annotated[CrossEncoderReranker | None, Depends(get_reranker)],
+    program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
+    conn: DbConn,
     stream_fn: Annotated[
         Callable[[str], _Iter[str]],
         Depends(get_chat_stream_fn),
@@ -108,14 +135,58 @@ async def chat(
             ) from e
 
     started = time.perf_counter()
-    hits, matched_via = _retrieve(req, alias_repo, course_repo, hybrid)
+    hits, matched_via, prefix_applied = _retrieve(
+        req, alias_repo, course_repo, hybrid, reranker, program_repo,
+    )
     retrieval_ms = (time.perf_counter() - started) * 1000
+
+    # v2: chat path now mirrors /search by running a reranker reject pass on the
+    # hybrid candidate pool. If raw sigmoid is below the calibrated threshold
+    # (ADR-0016), we hand the LLM an empty list — chat_v2 prompt then says "no
+    # match in catalog" instead of falling back to recommending whatever was
+    # closest. Cost: one extra reranker forward pass on ≤20 candidates (~50ms
+    # on RTX 5090 ONNX).
+    #
+    # Subtle but important: when Layer 2 prefix filter narrowed the pool (e.g.
+    # query mentioned "AAI 专业" so we only retrieved among 23 AAI courses),
+    # disable reject. Prefix filter already provides high-precision narrowing;
+    # reranker's job here is to ORDER the within-program candidates, not
+    # second-guess relevance. Otherwise cross-lingual edge cases like "强化学习"
+    # vs "Applied Reinforcement Learning" land just below the 0.05 sigmoid
+    # threshold (sigmoid 0.044, observed 2026-05-09) and the user gets a
+    # frustrating "no match" reply when AAI 6740 is exactly the answer.
+    rejection_reason: str | None = None
+    if matched_via == "hybrid" and reranker is not None and hits:
+        def _fetch_text(cid: str) -> str | None:
+            row = conn.execute(
+                "SELECT raw_text FROM courses WHERE course_id = ?", (cid,)
+            ).fetchone()
+            return row["raw_text"] if row else None
+
+        # Threshold=0.0 disables rejection while still computing blended scores
+        # for ordering. We could call a no-reject variant of the function but
+        # keeping a single call site is clearer.
+        effective_threshold = 0.0 if prefix_applied else RERANKER_REJECT_THRESHOLD
+        blended_hits, rerank_meta = rerank_blend_with_rejection(
+            req.query, hits, reranker,
+            fetch_text=_fetch_text,
+            blend_alpha=BLEND_ALPHA,
+            reject_threshold=effective_threshold,
+            top_k=req.k,
+        )
+        if rerank_meta["rejected"]:
+            hits = []
+            matched_via = "rejected"
+            rejection_reason = str(rerank_meta["reason"])
+        else:
+            hits = blended_hits
 
     log.info(
         "chat.retrieved",
         query=req.query,
         matched_via=matched_via,
         count=len(hits),
+        rejection_reason=rejection_reason,
         retrieval_ms=round(retrieval_ms, 2),
     )
 
@@ -138,6 +209,8 @@ async def chat(
                 for h in hits
             ],
         }
+        if rejection_reason is not None:
+            meta_payload["rejection_reason"] = rejection_reason
         yield (json.dumps(meta_payload) + "\n").encode("utf-8")
 
         try:
@@ -168,8 +241,33 @@ def _retrieve(
     alias_repo: AliasRepository,
     course_repo: CourseRepository,
     hybrid: HybridRetriever,
-) -> tuple[list[SearchHit], str]:
-    """Alias-first then HybridRetriever, returning (hits, matched_via)."""
+    reranker: CrossEncoderReranker | None,
+    program_repo: ProgramRepository,
+) -> tuple[list[SearchHit], str, bool]:
+    """Multi-tier retrieval, returning (hits, matched_via, prefix_applied).
+
+    Tier order (most-specific first; first hit wins):
+
+      1. **alias** — explicit course-code or slang resolution via
+         v_course_lookup. Cheapest path; bypasses hybrid + reranker.
+      2. **program** (Layer 3) — query mentions a program prefix AND a
+         "first-semester / foundational" intent → look up the program's
+         seeded curriculum and return semester=1 courses. Deterministic;
+         answers "AAI 专业第一学期选啥" without retrieval guesswork.
+      3. **hybrid** — BM25 + vector + RRF over the indexed corpus, with
+         Layer 2 program-prefix pre-filter applied at the SQLite layer.
+         Caller runs reranker reject on this output.
+      4. **empty** — nothing surfaced anywhere.
+
+    `prefix_applied` is True iff the hybrid path was taken with a Layer 2
+    program-prefix hard filter active. Caller uses it to scope the
+    reranker reject threshold (within-program candidates shouldn't be
+    rejected wholesale — see chat handler comment).
+
+    When a reranker is available the hybrid leg requests a wider pool
+    (RERANK_POOL_SIZE=20) so the reranker has room to reorder.
+    """
+    # Tier 1: alias
     alias_ids = normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
     if alias_ids:
         out: list[SearchHit] = []
@@ -180,11 +278,64 @@ def _retrieve(
                 continue
             out.append(SearchHit(course=course, score=1.0))
         if out:
-            return out, "alias"
+            return out, "alias", False
 
+    # Layer 2 + Layer 3: extract program prefix from query (regex first).
+    extracted = extract_filters_adaptive(req.query, llm_fn=None)
+
+    # Tier 2: program ontology shortcut. Only fires when (a) prefix detected,
+    # (b) the query expresses "first-semester / foundational" intent, and
+    # (c) a program is seeded for that prefix. Falls through to hybrid
+    # otherwise (e.g. AAI prefix but the user is asking about a specific
+    # advanced topic — let hybrid do its job).
+    if (
+        extracted.program_prefix is not None
+        and _FOUNDATIONAL_INTENT_RE.search(req.query)
+    ):
+        program = program_repo.find_by_prefix(extracted.program_prefix)
+        if program is not None:
+            edges = program_repo.list_required_courses(
+                program.program_id, semester=1,
+            )
+            program_hits: list[SearchHit] = []
+            for edge in edges[: req.k]:
+                try:
+                    course = course_repo.get(edge.course_id)
+                except LookupError:
+                    log.warning(
+                        "chat.program_dangling",
+                        program_id=program.program_id,
+                        course_id=edge.course_id,
+                    )
+                    continue
+                program_hits.append(SearchHit(course=course, score=1.0))
+            if program_hits:
+                log.info(
+                    "chat.program_path",
+                    program_id=program.program_id,
+                    prefix=program.prefix,
+                    count=len(program_hits),
+                )
+                return program_hits, "program", False
+
+    # Tier 3: hybrid with Layer 2 prefix pre-filter.
     filters = _hard_filters(req)
-    hits = hybrid.search(req.query, hard_filters=filters or None, k=req.k)
-    return hits, "hybrid" if hits else "empty"
+    prefix_applied = not extracted.is_empty()
+    if prefix_applied:
+        filters.update(extracted.to_hard_filter())
+        log.info(
+            "chat.prefilter_applied",
+            program_prefix=extracted.program_prefix,
+            sanitized_query=extracted.sanitized_query[:80],
+        )
+    retrieval_query = (
+        extracted.sanitized_query
+        if prefix_applied and extracted.sanitized_query
+        else req.query
+    )
+    pool_size = max(req.k, RERANK_POOL_SIZE) if reranker is not None else req.k
+    hits = hybrid.search(retrieval_query, hard_filters=filters or None, k=pool_size)
+    return hits, ("hybrid" if hits else "empty"), prefix_applied
 
 
 def _hard_filters(req: ChatRequest) -> dict[str, object]:

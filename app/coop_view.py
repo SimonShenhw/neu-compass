@@ -107,10 +107,17 @@ def render() -> None:
         company = st.text_input("Company *")
         role = st.text_input("Role *")
         coop_term = st.text_input("Co-op term (e.g. 'Summer 2025')")
+        # format_func renders None as a clear "(unspecified)" prompt instead
+        # of the literal string "None" — users were confused thinking they
+        # had to pick "None" as an explicit value.
         industry = st.selectbox(
             "Industry",
             options=[None, "quant_fintech", "big_tech", "biotech_health",
                      "startup", "consulting", "other"],
+            format_func=lambda x: (
+                "(unspecified)" if x is None
+                else x.replace("_", " ").title()
+            ),
         )
         duration_months = st.number_input(
             "Duration (months)", min_value=1, max_value=8, value=6, step=1,

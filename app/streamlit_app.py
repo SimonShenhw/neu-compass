@@ -168,18 +168,33 @@ def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
             active = sum(1 for v in new_filters.values() if v not in (None, ""))
             if active:
                 st.caption(f"✓ {active} filter{'s' if active > 1 else ''} active")
-                if st.button("Clear all", use_container_width=True, key="filter_clear"):
-                    state["filters"] = {}
-                    # Reset all filter widget keys to empty string so the
-                    # next render shows blank inputs. text_input + selectbox
-                    # both treat "" as "no value" — we don't need to
-                    # distinguish per-widget here.
-                    for k in ("filter_term", "filter_credits",
-                              "filter_delivery", "filter_prof"):
-                        if k in state:
-                            state[k] = ""
-                    st.rerun()
+                # Use on_click rather than mutating state inside the if-block.
+                # Streamlit raises StreamlitAPIException if you set
+                # st.session_state[<widget_key>] AFTER the widget has been
+                # instantiated this render — and the four filter widgets
+                # above this button were already created. on_click runs as
+                # a callback BEFORE the next rerun, while mutation is legal.
+                # `pop` (vs setting "") is what the docs recommend for
+                # clearing widget-bound state cleanly.
+                st.button(
+                    "Clear all",
+                    use_container_width=True,
+                    key="filter_clear",
+                    on_click=_clear_filters_callback,
+                )
     return state.get("filters", {})
+
+
+def _clear_filters_callback() -> None:
+    """on_click callback for the 'Clear all' filter button. Runs in the
+    callback phase, so mutating widget-bound session_state keys is allowed
+    (the alternative — setting state[k]="" inline after the widgets render
+    — raises StreamlitAPIException). Caller should not import streamlit
+    at module top to keep test imports cheap; lazy import here."""
+    import streamlit as st  # noqa: PLC0415
+    st.session_state["filters"] = {}
+    for k in ("filter_term", "filter_credits", "filter_delivery", "filter_prof"):
+        st.session_state.pop(k, None)
 
 
 def render() -> None:
@@ -249,8 +264,13 @@ def render() -> None:
             )
             st.divider()
 
-        # Render existing conversation history
-        for msg in get_messages(st.session_state):
+        # Render existing conversation history. enumerate(messages) so the
+        # "Open" button keys can include the message index — without that,
+        # the same course appearing in two different message evidence
+        # blocks (common when user asks repeatedly about a topic) collides
+        # on f"open-{role}-{course_id}" and Streamlit raises
+        # DuplicateWidgetID, blowing up the entire chat history.
+        for msg_idx, msg in enumerate(get_messages(st.session_state)):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 if msg.get("evidence"):
@@ -264,7 +284,7 @@ def render() -> None:
                             )
                             if cols[1].button(
                                 "Open",
-                                key=f"open-{msg['role']}-{ev['course_id']}",
+                                key=f"open-{msg_idx}-{msg['role']}-{ev['course_id']}",
                             ):
                                 select_course(st.session_state, ev["course_id"])
                                 st.rerun()
