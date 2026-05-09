@@ -1,7 +1,7 @@
 # NEU-Compass · PLAN v2.3.1 (Week 8 sprint plan, hardened)
 
 > **Updated**: 2026-05-05
-> **Previous**: [docs/PLAN_v2.3.md](PLAN_v2_3.md)
+> **Previous**: [docs/PLAN_v2.3.md](PLAN_v2.3.md)
 > **Purpose**: v2.3 review-driven hardening。同 sprint 范围,但 KPI / 顺序 /
 > statistical rigor / quant-readiness 几处补强。
 > **Read order if you're a fresh agent**: §0 → §1 → §2 → §3.0 → §3 → §6。

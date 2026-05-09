@@ -3,7 +3,7 @@
 > 用结构化检索 + LLM 抽取破除 Northeastern 研究生**选课信息黑箱**。
 > Course RAG 做流量入口,Co-op 数据做留存飞轮。
 
-**Status**: Weeks 1-9 工程主线 ship 完毕 · **679 tests / 13s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me` · 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。
+**Status**: Weeks 1-9 工程主线 ship 完毕 + v3.1 RAG quality 3-layer 上线 · **739 tests / 14s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me` · 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。v3.1 把 chat 路径从"hybrid 凑合"升级成 alias → program ontology → hybrid+reranker+reject 三层 + chat_v2 prompt(详见 [v3_1_rag_quality.md](docs/v3_1_rag_quality.md))。
 **Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu130 + torch 2.11
 **English**: [README.en.md](README.en.md)
 
@@ -13,6 +13,7 @@
 
 | 维度 | 实测数字 |
 |---|---:|
+| 测试套件 — v3.1 RAG quality 后 | **739 tests / ~14 s** |
 | `/search` p50 latency — PyTorch baseline (实测 RTX 5090) | **43.82 ms** |
 | `/search` p50 latency — ONNX + CUDA EP (实测 RTX 5090) ⭐ | **40.09 ms** (-8.5%) |
 | `/search` p99 latency PyTorch / ONNX | 117.97 / **54.74 ms** (-53.6%) |
@@ -26,7 +27,7 @@
 | WSL home vs H 盘 (SQLite write) | **77x faster** (ADR-0014) |
 | Co-op seed records 入库 | **30 条 (12 quant / 8 big_tech / 5 biotech / 5 startup)** |
 | Schema 版本 | **1.1** (user_courses 表 v3.0 social 预留 DDL only) |
-| 测试套件 | **679 tests / ~13 s** |
+| 测试套件 — Week 9 baseline | 679 tests / ~13 s |
 
 实测数字 + 决策依据:[docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) (Week 7 sprint) + [docs/adr/0015-z-score-blending.md](docs/adr/0015-z-score-blending.md) (α 决策) + [docs/adr/0016-reranker-reject-threshold.md](docs/adr/0016-reranker-reject-threshold.md) (T 校准) + [docs/rag_smoke_results.md](docs/rag_smoke_results.md) + [docs/path_decision.md](docs/path_decision.md)。
 
@@ -65,6 +66,17 @@
 
 **项目相位 → v3.0**:engineering 主线 ship 完毕,signal-driven 模式启动。Active sprint plan: [PLAN v3.0](docs/PLAN_v3.0.md)。
 
+## v3.1 ship 状态(RAG quality 3-layer)
+
+| Layer | 交付 | 状态 |
+|---|---|---|
+| Layer 1 | [chat_v2 prompt](llm/prompts/chat_v2.py)(program-prefix discipline + foundational level)+ chat 路径加 reranker reject | ✅ ship |
+| Layer 2 | [QueryFilters schema](schemas/query_filter.py) + [regex prefix extractor](llm/query_filter_extractor.py)(LLM hook ready)+ [retriever `primary_code_prefix` filter](rag/retriever.py)| ✅ ship |
+| Layer 3 | schema v1.2(`programs` / `program_required_courses` / `course_prerequisites`)+ [ProgramRepository](db/program_repository.py) + [AAI MS PoC seed](data/program_seed/aai_ms.json)(23 课 + 10 prereq)+ chat 路径 program-aware shortcut | ✅ ship |
+| 顺手 | `query_normalizer` re.ASCII(中文嵌入 NL 抓 course code)+ Streamlit 4 个 button bug + cross-lingual reject scoping | ✅ ship |
+
+实测:`POST /chat "AAI 专业第一学期推荐"` → matched_via=program · 1.28ms 直查 · LLM 答出 5xxx foundational 序列(替换之前 chat_v1 路径返回的 ALY/ARTG/BINF 跨学科 noise)。详见 [docs/v3_1_rag_quality.md](docs/v3_1_rag_quality.md)。
+
 ---
 
 ## 架构
@@ -86,16 +98,28 @@ HTTP API (FastAPI)  · Public:  https://api.neu-compass.me
   ↓  st.write_stream(stream_assistant) ↑
   ↓  + render_auth_sidebar             ↑
 
-查询路径 (alias-first → hybrid → optional rerank)
+查询路径 (alias-first → program ontology → hybrid + Layer 2 prefix filter → reranker reject)
 ─────────────────────────────────────────────────────
   user query
     │
-    ├─→ query_normalizer (regex → AliasRepository.resolve via v_course_lookup)
+    ├─→ query_normalizer (regex re.ASCII → AliasRepository.resolve via v_course_lookup)
     │     ↓
     │   alias hit? → return Course directly (matched_via='alias')
     │     ↓ no
     │
-    └─→ HybridRetriever (pool size = 20)
+    ├─→ Layer 3: program ontology shortcut (v3.1, /chat path only)
+    │     IF query has program prefix (AAI/CS/...) AND foundational intent (第一学期/...)
+    │     AND program is seeded in `programs` table
+    │     → return program_required_courses(program_id, semester=1)
+    │     (matched_via='program', deterministic SQL graph lookup)
+    │     ↓ miss
+    │
+    ├─→ Layer 2: regex prefix extractor (v3.1)
+    │     extracts {program_prefix: 'AAI'} → hard_filter primary_code LIKE 'AAI %'
+    │     sanitized_query strips prefix word → embedder sees pure intent
+    │     ↓
+    │
+    └─→ HybridRetriever (pool size = 20, prefix-narrowed when applicable)
           ├── vector leg: bge-m3 (warm) → FAISS IndexIDMap (6469 vectors)
           └── BM25 leg:   rank_bm25 + 110-word English stopwords filter
               ↓
@@ -103,8 +127,12 @@ HTTP API (FastAPI)  · Public:  https://api.neu-compass.me
               ↓
             SQLite rehydrate (status='indexed' only)
               ↓
-            bge-reranker-v2-m3 cross-encoder (single pass)
-              ├─→ if max(sigmoid) < 0.05 (ADR-0016)
+            bge-reranker-v2-m3 cross-encoder (single pass; v3.1 also gates /chat)
+              ├─→ if max(sigmoid) < threshold
+              │     /search:  threshold = 0.05 (ADR-0016)
+              │     /chat:    threshold = 0.05 generic OR 0.0 when Layer 2 prefix
+              │               filter narrowed candidates (within-prefix subset
+              │               doesn't need wholesale rejection)
               │     return matched_via='rejected' + reason
               └─→ else: Z-score blend α=0.4·rrf_z + 0.6·rerank_z
                   → sort desc → top-k SearchHit (matched_via='hybrid')
@@ -199,7 +227,22 @@ uv run python eval/sweep_reject_threshold.py   # ADR-0016 9-T ROC
 uv run python scripts/probe_latency.py         # p50 ~40ms hybrid-only
 ```
 
-### 起 API + UI(本地三窗口)
+### 起 API + UI
+
+**一键启动(推荐,Windows + WSL2 部署用,v3.1 加)**:
+
+```cmd
+scripts\start_stack.bat              # full stack: uvicorn + streamlit + cloudflared
+scripts\start_stack.bat -Local       # 本地 only(skip cloudflared)
+scripts\start_stack.bat -Pytorch     # 用 PyTorch backend(~70s 而非 ~6s)
+scripts\start_stack.bat -ApiOnly     # 只起 uvicorn
+
+scripts\stop_stack.bat               # 全停(含关 spawned -NoExit 窗口)
+```
+
+启动器会做 pre-flight check(.env / WSL distro / SQLite + FAISS / ONNX 模型 / cloudflared / 端口冲突 / Streamlit credentials.toml ensure),起三个新 PowerShell 窗口分别跑各 service,window title 用 `neu-compass : <service>` 一眼区分,uvicorn `/ready` 200 才起 cloudflared(避免 startup race 满屏红)。详见 [scripts/start_stack.ps1](scripts/start_stack.ps1) 注释。
+
+**手动三窗口**(老路径,debug 用):
 
 ```bash
 # Terminal 1: FastAPI (lifespan 预热 ~70s,加载 bge-m3 + bge-reranker)
@@ -226,10 +269,10 @@ cloudflared tunnel run neu-compass
 
 ```
 neu-compass/
-├── schemas/        Pydantic models (course v1.1, alias, coop, user)
-├── db/             SQLite repositories (course, alias, coop, user) + connection
+├── schemas/        Pydantic models (course v1.1, alias, coop, user, program v3.1, query_filter v3.1)
+├── db/             SQLite repositories (course, alias, coop, user, program v3.1) + connection
 ├── scrapers/       syllabus + neu_catalog (live) + rmp (live) + reddit (PRAW, mock-tested)
-├── llm/            Gemini client (+ stream) + formatter + extract_v1 + chat_v1 + alias_detector + review_enrichment
+├── llm/            Gemini client (+ stream) + formatter + extract_v1 + chat_v1 + chat_v2 (v3.1) + query_filter_extractor (v3.1) + alias_detector + review_enrichment
 ├── rag/            embedder (bge-m3) + FAISS index + retriever + hybrid (BM25+RRF + stopwords) + hyde + reranker (bge-reranker-v2-m3)
 ├── eval/           test_set v0.2 (42 q) + run_eval (4 modes) + Ragas + compare_prompts
 ├── app/            Streamlit pages (eval_dashboard / streamlit_app / coop_view) + state_manager + auth + api_client + streamlit_auth_ui
@@ -259,6 +302,7 @@ neu-compass/
 | 文档 | 内容 |
 |---|---|
 | [docs/PLAN_v3.0.md](docs/PLAN_v3.0.md) | **当前 sprint** (Week 9+ operational + signal-driven phase) |
+| [docs/v3_1_rag_quality.md](docs/v3_1_rag_quality.md) | **v3.1 closeout**:chat 路径 3-layer (alias → program ontology → hybrid) 重构 + 4 个 frontend bugfix |
 | [docs/perf_week9_results.md](docs/perf_week9_results.md) | Week 9 perf 实测 report(ONNX/TRT/torch.compile 4 类路径实战) |
 | [docs/PLAN_v2.3.md](docs/PLAN_v2.3.md) | Week 8 sprint(shipped — 见 §10 closeout)|
 | [docs/PLAN_v2_3_1.md](docs/PLAN_v2_3_1.md) | Week 8 sprint hardened review(shipped partial — 见 §10 closeout)|
