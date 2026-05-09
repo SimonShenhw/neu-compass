@@ -73,6 +73,10 @@ backups/
 # Streamlit
 .streamlit/secrets.toml
 
+# v3.1 stack launcher: transient PID file written by scripts/start_stack.ps1
+# and consumed by scripts/stop_stack.ps1 — never commit (PIDs are per-session).
+scripts/.stack_pids
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
