@@ -3,7 +3,7 @@
 > 用结构化检索 + LLM 抽取破除 Northeastern 研究生**选课信息黑箱**。
 > Course RAG 做流量入口,Co-op 数据做留存飞轮。
 
-**Status**: Weeks 1-9 工程主线 ship 完毕 + v3.1 RAG quality 3-layer 上线 · **739 tests / 14s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me` · 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。v3.1 把 chat 路径从"hybrid 凑合"升级成 alias → program ontology → hybrid+reranker+reject 三层 + chat_v2 prompt(详见 [v3_1_rag_quality.md](docs/v3_1_rag_quality.md))。
+**Status**: Weeks 1-10 工程主线 ship 完毕 + v3.1 RAG quality 3-layer 上线 · **739 tests / 14s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me`(origin 已搬到 UGREEN DXP 6800 Pro NAS,PC 可关机)· 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。v3.1 把 chat 路径从"hybrid 凑合"升级成 alias → program ontology → hybrid+reranker+reject 三层 + chat_v2 prompt(详见 [v3_1_rag_quality.md](docs/v3_1_rag_quality.md))。Week 10 把整套 stack 容器化迁到 NAS + 接通 Iris Xe iGPU(`optimum-intel` 直接 OpenVINO IR 路径,NAS 上 /search p50 **8s → 2.3s**,api RAM **17GB → 4.9GB**)。
 **Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu130 + torch 2.11
 **English**: [README.en.md](README.en.md)
 
@@ -18,6 +18,9 @@
 | `/search` p50 latency — ONNX + CUDA EP (实测 RTX 5090) ⭐ | **40.09 ms** (-8.5%) |
 | `/search` p99 latency PyTorch / ONNX | 117.97 / **54.74 ms** (-53.6%) |
 | Lifespan startup PyTorch / ONNX ⭐ | 70 s / **6 s** (-91%) |
+| **`/search` p50 — NAS Iris Xe + optimum-intel OpenVINO IR** ⭐ | **~2310 ms** (10 query smoke,reranker on) |
+| **api 容器 RSS — NAS (reranker on + Iris Xe)** | **4.9 GB** (vs ONNX+CPU 17 GB) |
+| **NAS 冷启 lifespan(OpenVINO compile cache 持久化)** | **13 s** (首次 ~50 s,缓存命中后 5 s) |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
 | Eval R@5 / MRR — `+rerank` only (α=0.0) | **0.636** / 0.545 |
 | **Eval R@5 / MRR — Z-score blend α=0.4** (ADR-0015 locked) | 0.621 / 0.575 |
@@ -76,6 +79,24 @@
 | 顺手 | `query_normalizer` re.ASCII(中文嵌入 NL 抓 course code)+ Streamlit 4 个 button bug + cross-lingual reject scoping | ✅ ship |
 
 实测:`POST /chat "AAI 专业第一学期推荐"` → matched_via=program · 1.28ms 直查 · LLM 答出 5xxx foundational 序列(替换之前 chat_v1 路径返回的 ALY/ARTG/BINF 跨学科 noise)。详见 [docs/v3_1_rag_quality.md](docs/v3_1_rag_quality.md)。
+
+## Week 10 ship 状态(NAS 生产部署 + Iris Xe GPU offload)
+
+把整套 stack 从 PC(本来要 24/7 开机给域名站台)迁到 UGREEN DXP 6800 Pro NAS。**PC 终于可以关机**,公网走 Tailscale + NAS-local cloudflared,不再有"开发机当服务器"的拉扯。
+
+| § | 交付 | 状态 | 实测 |
+|---|---|---|---|
+| 部署形态 | docker compose 三服务(api + ui + cloudflared)+ Cloudflare Tunnel connector 搬家到 NAS;PC 端 cloudflared 退役 | ✅ ship | 三容器 healthy, restart=0 |
+| 硬件 | NAS 升 2×16GB DDR5 SODIMM 双通道(从笔记本拆装,边际成本接近零)| ✅ ship | 7.5GB → 32GB,reranker 可常驻 |
+| 推理 backend | 第三条 inference path:`optimum-intel` 直接 OpenVINO IR + `OVModelForFeatureExtraction` / `OVModelForSequenceClassification`,target Iris Xe iGPU | ✅ ship | /search p50 **8s → 2.3s** (-71%) |
+| 内存占用 | api 容器 RSS(OpenVINO CPU buffer → GPU)| ✅ ship | 17GB → **4.9GB** (-71%) |
+| 启动 | OpenVINO GPU 编译缓存持久化 (`CACHE_DIR=/data/openvino_cache`)| ✅ ship | 冷启 70s → 13s |
+| 自动化 | `scripts\deploy.ps1` 一键部署(tar-pipe 代码 + scp .env + 远程 `docker compose up -d --build` + Tailscale 健康探测)| ✅ ship | 增量 deploy ~30s |
+| 拒绝层回归 | ADR-0016 (T=0.05) 在新 backend 上回归测试 | ✅ ship | gibberish query → matched_via=`rejected`, max_sigmoid 0.000 < 0.05 |
+
+**踩坑链(完整 postmortem)**: 第一条尝试路径是 `ONNX → onnxruntime-openvino → Intel GPU plugin`,bge-m3 ONNX 里的 u8 `GatherND` 算子 Intel GPU 编译失败(`No layout format available for gathernd:bfyx, u8`)。HETERO 模式 plugin 谎报支持然后 runtime 炸;AUTO 模式启动 OK 但 reranker `score()` 命中 OpenVINO CPU plugin 的 shape-cache bug 返 500。**真正的解是绕开 ONNX 中间层** — 直接 `optimum-cli export openvino` 生成 OpenVINO IR(u8 索引在这条路径里以 int64 落地),用 optimum-intel 的 `OVModel*` 类加载,`device="GPU"` 一次过。新 backend 代码 [rag/openvino_backend.py](rag/openvino_backend.py) + 导出脚本 [scripts/export_openvino.py](scripts/export_openvino.py) + lifespan 分支 [api/main.py:`_build_openvino_stack`](api/main.py)。运行时部署 [Dockerfile](Dockerfile) + [docker-compose.yml](docker-compose.yml)。
+
+**还能再压**(留作 signal-driven 触发):reranker 跑 20 个 query-doc pair × seq_len=512 是 p50 的 bottleneck — 三个 lever 都没拉:(a) hybrid pool 20→10 砍 ~50% 延迟,代价 recall 略降;(b) `OvReranker.reshape()` 静态 shape 编译;(c) `--weight-format int8` 量化 reranker。
 
 ---
 
@@ -263,6 +284,8 @@ cloudflared tunnel run neu-compass
 | `https://api.neu-compass.me` | FastAPI canonical (Andy 前端 / curl 调) |
 | `https://compass.neu-compass.me` | Streamlit user UI(course search + chat,Andy React 前端落地前 canonical)|
 
+Origin 自 Week 10 起跑在 NAS(Tailscale 内网 + cloudflared 容器),PC 不需要常开。NAS-side stack 在 [docker-compose.yml](docker-compose.yml),改完代码 `scripts\deploy.ps1` 一键推送 + 重建 + 健康探测。
+
 ---
 
 ## 项目结构
@@ -273,14 +296,17 @@ neu-compass/
 ├── db/             SQLite repositories (course, alias, coop, user, program v3.1) + connection
 ├── scrapers/       syllabus + neu_catalog (live) + rmp (live) + reddit (PRAW, mock-tested)
 ├── llm/            Gemini client (+ stream) + formatter + extract_v1 + chat_v1 + chat_v2 (v3.1) + query_filter_extractor (v3.1) + alias_detector + review_enrichment
-├── rag/            embedder (bge-m3) + FAISS index + retriever + hybrid (BM25+RRF + stopwords) + hyde + reranker (bge-reranker-v2-m3)
+├── rag/            embedder (bge-m3) + FAISS index + retriever + hybrid (BM25+RRF + stopwords) + hyde + reranker (bge-reranker-v2-m3) + onnx_backend (ORT EP) + openvino_backend (optimum-intel direct IR, Week 10)
 ├── eval/           test_set v0.2 (42 q) + run_eval (4 modes) + Ragas + compare_prompts
 ├── app/            Streamlit pages (eval_dashboard / streamlit_app / coop_view) + state_manager + auth + api_client + streamlit_auth_ui
 ├── api/            FastAPI: main + dependencies + models + logging + routes/{health,search,course,coop,chat,auth}
-├── scripts/        init_db / seed / load_slang / scrape / ingest / rebuild_faiss / mark_indexed / probe_rmp / probe_latency / enrich_course_via_rmp / validate_test_set
+├── scripts/        init_db / seed / load_slang / scrape / ingest / rebuild_faiss / mark_indexed / probe_rmp / probe_latency / enrich_course_via_rmp / validate_test_set / export_models_onnx / export_openvino (Week 10) / start_stack / stop_stack / deploy (Week 10)
 ├── data/           slang_dict.json + ground_truth/ (gitignored)
 ├── docs/           PLAN_v1.3 / v2.0 / v2.1 + ADRs + annotation_guide + pii_redaction + cloudflare_tunnel
-└── tests/          601 tests / fixtures/ (real NEU + RMP HTML/JSON snapshots)
+├── tests/          601 tests / fixtures/ (real NEU + RMP HTML/JSON snapshots)
+├── Dockerfile      Week 10 — multi-stage prod image, base bookworm + intel-opencl-icd for Iris Xe
+├── docker-compose.yml  Week 10 — api + ui + cloudflared 三服务, /dev/dri 直通 + render/video group_add
+└── .dockerignore   Week 10 — build context exclusions
 ```
 
 ---

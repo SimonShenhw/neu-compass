@@ -44,14 +44,23 @@ class Settings(BaseSettings):
     embedding_device: str = "cuda"
     embedding_dim: int = 1024  # bge-m3 维度
 
-    # === Inference backend (Week 9 Day 1: ONNX/TRT acceleration) ===
-    # `pytorch` (default, FlagEmbedding/transformers direct) or `onnx`
-    # (ORT runtime, optionally with TensorrtExecutionProvider for ~3x speedup
-    # on RTX 5090 or OpenVINOExecutionProvider for Intel iGPU on NAS).
-    # See docs/tensorrt_runbook.md for setup.
+    # === Inference backend ===
+    # `pytorch` (default, FlagEmbedding/transformers direct)
+    # `onnx`    (ORT runtime + onnxruntime-gpu / -openvino EPs — Week 9 Day 1)
+    # `openvino` (optimum-intel direct-to-IR — sidesteps ONNX u8 GatherND
+    #            issue that blocks Intel GPU compile; see rag/openvino_backend.py)
     inference_backend: str = "pytorch"
+
+    # ONNX path config (only used when inference_backend == "onnx")
     onnx_model_dir: str | None = None  # e.g. ~/neu-compass-data/onnx
     onnx_providers: str = "auto"  # "auto" | comma-separated EP names
+
+    # OpenVINO path config (only used when inference_backend == "openvino")
+    # See docs/tensorrt_runbook.md and rag/openvino_backend.py.
+    openvino_model_dir: str | None = None  # e.g. /data/openvino (NAS) or ~/neu-compass-data/openvino
+    openvino_device: str = "GPU"  # "GPU" | "CPU" | "AUTO:GPU,CPU" | "MULTI:GPU,CPU"
+    openvino_cache_dir: str | None = None  # persistent dir for compiled GPU kernel cache
+
     enable_reranker: bool = True  # NAS deploy can set False to save ~600 MB
 
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===

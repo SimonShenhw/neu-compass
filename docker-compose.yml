@@ -1,0 +1,102 @@
+# NEU-Compass production stack — NAS deploy target.
+#
+# Layout (relative to this file's directory on the NAS):
+#   ./runtime-data/        bind-mounted to /data inside api + ui
+#     ├── courses.db        SQLite (source of truth, ADR-0013)
+#     ├── faiss_index/      FAISS IndexIDMap (rebuildable from SQLite)
+#     └── onnx/
+#         ├── embedder/     bge-m3 FP16 ONNX (~1.1GB)
+#         └── reranker/     bge-reranker-v2-m3 FP16 ONNX (~570MB)
+#   ./cloudflared/         bind-mounted to /etc/cloudflared (config + creds)
+#   .env                   loaded by api + ui for GEMINI_API_KEY, OAuth, etc.
+#
+# Cloudflared config.yml on the NAS should route to compose service names:
+#   ingress:
+#     - hostname: api.neu-compass.me
+#       service: http://api:8000
+#     - hostname: compass.neu-compass.me
+#       service: http://ui:8501
+#       originRequest:
+#         connectTimeout: 30s
+#         noTLSVerify: false
+#     - service: http_status:404
+
+services:
+  api:
+    build: .
+    image: neu-compass:latest
+    container_name: neu-compass-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # === Inference: optimum-intel direct OpenVINO IR (Iris Xe iGPU on i5-1235U) ===
+      # Replaces the onnxruntime-openvino path. Direct OpenVINO IR export
+      # via `optimum-cli export openvino` sidesteps the u8 GatherND issue
+      # that blocked Intel GPU compile on the ONNX route. See
+      # rag/openvino_backend.py + scripts/export_openvino.py.
+      INFERENCE_BACKEND: openvino
+      OPENVINO_MODEL_DIR: /data/openvino
+      OPENVINO_DEVICE: GPU                       # Iris Xe; fallback CPU if iGPU absent
+      OPENVINO_CACHE_DIR: /data/openvino_cache   # persists compiled GPU kernels (first boot ~60s → subsequent ~5s)
+      ENABLE_RERANKER: "true"                    # NAS has 32GB dual-channel
+      # === Storage paths (bind-mounted volume) ===
+      SQLITE_PATH: /data/courses.db
+      FAISS_INDEX_PATH: /data/faiss_index
+      # === Logging ===
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+      # === OAuth callback must be the public URL, not localhost ===
+      # Override the .env value (which points at localhost for PC dev).
+      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/oauth/callback
+    volumes:
+      - ./runtime-data:/data
+    devices:
+      - /dev/dri:/dev/dri          # expose Iris Xe iGPU to OpenVINO EP
+    group_add:
+      - "44"                       # video (host GID on UGOS)
+      - "105"                      # render (host GID on UGOS)
+    ports:
+      - "8000:8000"                # exposed on NAS LAN/Tailscale for debug
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s           # ONNX warm + first OpenVINO compile
+
+  ui:
+    build: .
+    image: neu-compass:latest
+    container_name: neu-compass-ui
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Streamlit reaches FastAPI by compose service name, not localhost.
+      API_BASE_URL: http://api:8000
+      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/oauth/callback
+    command:
+      - streamlit
+      - run
+      - app/streamlit_app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: neu-compass-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run neu-compass
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      ui:
+        condition: service_started

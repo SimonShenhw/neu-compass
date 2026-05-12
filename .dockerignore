@@ -1,0 +1,80 @@
+# Keep build context small + never bake secrets into the image.
+
+# Secrets
+.env
+*.env
+!.env.example
+*.key
+*.pem
+credentials.json
+service_account*.json
+
+# Virtual envs (rebuilt inside the image by uv sync)
+.venv/
+venv/
+env/
+.python-version
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tests + eval + scrapers fixtures — not needed at runtime
+tests/
+eval/
+scrapers/__tests__/
+
+# Dev tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Runtime data — bind-mounted at /data, not baked into image
+data/raw/
+data/processed/
+data/coop_seed/curated.json
+data/ground_truth/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.faiss
+faiss_index/
+runtime-data/
+backups/
+
+# Docs aren't needed at runtime (image stays smaller)
+docs/
+
+# Logs
+*.log
+logs/
+
+# Stack launcher transient state
+scripts/.stack_pids
+
+# Git metadata
+.git/
+.gitignore
+.gitattributes
+
+# Notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Compose / Docker files themselves
+docker-compose*.yml
+Dockerfile
+.dockerignore

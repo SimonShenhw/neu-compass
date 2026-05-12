@@ -97,6 +97,8 @@ def _build_inference_stack(log: Any) -> tuple[Any, Any]:
     """
     if settings.inference_backend == "onnx":
         return _build_onnx_stack(log)
+    if settings.inference_backend == "openvino":
+        return _build_openvino_stack(log)
     return _build_pytorch_stack(log)
 
 
@@ -205,6 +207,76 @@ def _build_onnx_stack(log: Any) -> tuple[Any, Any]:
     )
     reranker.score("warmup", ["warmup"])
     log.info("api.startup.reranker_warm", backend="onnx")
+    return embedder, reranker
+
+
+def _build_openvino_stack(log: Any) -> tuple[Any, Any]:
+    """OpenVINO IR backend via optimum-intel — Intel iGPU friendly path.
+
+    Loads models exported by `scripts/export_openvino.py` (`optimum-cli
+    export openvino`) and runs them through `OVModelForFeatureExtraction`
+    / `OVModelForSequenceClassification`. Targets Intel iGPU by default
+    (Iris Xe on NAS); override via OPENVINO_DEVICE env var.
+
+    Why a separate backend from ONNX:
+      bge-m3's ONNX export has u8 GatherND that Intel GPU plugin can't
+      compile (`No layout format available`). The optimum-intel direct
+      export uses int64 indices and compiles cleanly. See
+      rag/openvino_backend.py docstring + ravi9's BGE recipe gist.
+    """
+    from pathlib import Path  # noqa: PLC0415
+
+    from rag.openvino_backend import OvEmbedder, OvReranker  # noqa: PLC0415
+
+    if not settings.openvino_model_dir:
+        raise RuntimeError(
+            "INFERENCE_BACKEND=openvino but OPENVINO_MODEL_DIR not set. "
+            "Run `uv run python scripts/export_openvino.py` and set "
+            "OPENVINO_MODEL_DIR=<output path> in .env."
+        )
+
+    ov_dir = Path(settings.openvino_model_dir).expanduser()
+    embedder_dir = ov_dir / "embedder"
+    reranker_dir = ov_dir / "reranker"
+
+    if not (embedder_dir / "openvino_model.xml").exists():
+        raise RuntimeError(
+            f"OpenVINO embedder IR not found at {embedder_dir}/openvino_model.xml. "
+            "Run `uv run python scripts/export_openvino.py` first."
+        )
+
+    log.info(
+        "api.startup.openvino_config",
+        device=settings.openvino_device,
+        cache_dir=settings.openvino_cache_dir or "(none)",
+    )
+
+    embedder = OvEmbedder.from_path(
+        str(embedder_dir),
+        tokenizer_id=settings.embedding_model,
+        device=settings.openvino_device,
+        cache_dir=settings.openvino_cache_dir,
+    )
+    embedder.encode(["warmup"])
+    log.info("api.startup.embedder_warm", backend="openvino", device=settings.openvino_device)
+
+    if not settings.enable_reranker:
+        log.info("api.startup.reranker_disabled", backend="openvino")
+        return embedder, None
+
+    if not (reranker_dir / "openvino_model.xml").exists():
+        raise RuntimeError(
+            f"OpenVINO reranker IR not found at {reranker_dir}/openvino_model.xml. "
+            "Either run the exporter again or set ENABLE_RERANKER=false."
+        )
+
+    reranker = OvReranker.from_path(
+        str(reranker_dir),
+        device=settings.openvino_device,
+        cache_dir=settings.openvino_cache_dir,
+    )
+    reranker.score("warmup", ["warmup"])
+    log.info("api.startup.reranker_warm", backend="openvino", device=settings.openvino_device)
     return embedder, reranker
 
 

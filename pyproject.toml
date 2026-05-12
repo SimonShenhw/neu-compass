@@ -62,6 +62,14 @@ onnx = [
     "optimum[exporters]>=1.20",
     "onnxruntime>=1.20",
 ]
+# OpenVINO direct-to-IR path. Sister to `onnx` — used for NAS deploy where
+# Intel iGPU (Iris Xe) needs `optimum.intel.OVModel*` classes instead of
+# onnxruntime-openvino. PC users opt in with `uv sync --extra openvino` to
+# get the export CLI; runtime is auto-installed in the NAS Docker image.
+# See rag/openvino_backend.py + scripts/export_openvino.py.
+openvino = [
+    "optimum-intel[openvino]>=1.21",
+]
 
 [build-system]
 requires = ["hatchling"]

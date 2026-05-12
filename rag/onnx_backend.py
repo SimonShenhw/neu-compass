@@ -61,6 +61,32 @@ def default_providers() -> list[str]:
     return ["CPUExecutionProvider"]
 
 
+def _expand_provider_options(providers: list[str]) -> list[Any]:
+    """Promote known provider names to (name, options) tuples.
+
+    Currently only OpenVINOExecutionProvider gets options: it defaults to
+    `device_type=CPU` if no option is passed, which leaves a ~5-10x perf
+    hit on the table for Intel iGPU systems (Iris Xe / UHD). We pin to
+    `device_type=GPU` so OpenVINO targets the iGPU directly via Level Zero
+    or OpenCL (whichever the container has). Override at runtime with the
+    `OPENVINO_DEVICE` env var — useful values:
+        GPU            — Intel iGPU (default; what we want on NAS)
+        CPU            — force CPU (debugging / iGPU-less hosts)
+        AUTO:GPU,CPU   — OpenVINO picks at runtime, falls back to CPU
+        HETERO:GPU,CPU — split graph across both
+    """
+    import os  # noqa: PLC0415
+
+    ov_device = os.environ.get("OPENVINO_DEVICE", "GPU")
+    expanded: list[Any] = []
+    for p in providers:
+        if isinstance(p, str) and p == "OpenVINOExecutionProvider":
+            expanded.append((p, {"device_type": ov_device}))
+        else:
+            expanded.append(p)
+    return expanded
+
+
 def _build_session(onnx_path: str, providers: list[str]) -> Any:
     """Build an ort.InferenceSession with graph optimization enabled."""
     import onnxruntime as ort  # noqa: PLC0415
@@ -70,7 +96,7 @@ def _build_session(onnx_path: str, providers: list[str]) -> Any:
     return ort.InferenceSession(
         onnx_path,
         sess_options=sess_options,
-        providers=providers,
+        providers=_expand_provider_options(providers),
     )
 
 
