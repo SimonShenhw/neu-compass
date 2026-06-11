@@ -135,4 +135,33 @@ def attempt_hyde_rescue(
     return blended
 
 
-__all__ = ["attempt_hyde_rescue", "build_hard_filters", "fetch_texts"]
+def log_query(
+    conn: sqlite3.Connection,
+    *,
+    route: str,
+    query: str,
+    matched_via: str | None,
+    k: int | None,
+    latency_ms: float | None,
+    result_course_ids: list[str] | None = None,
+    rejection_reason: str | None = None,
+    user_id: str | None = None,
+) -> None:
+    """Telemetry write that must NEVER break a request — swallows every
+    failure (including 'no such table: query_log' on a not-yet-migrated
+    DB) with a structlog warning. One INSERT + commit on the request's
+    own connection; negligible next to retrieval cost."""
+    try:
+        from db.query_log_repository import QueryLogRepository  # noqa: PLC0415
+
+        QueryLogRepository(conn).add(
+            route=route, query=query, matched_via=matched_via, k=k,
+            latency_ms=latency_ms, result_course_ids=result_course_ids,
+            rejection_reason=rejection_reason, user_id=user_id,
+        )
+        conn.commit()
+    except Exception as e:  # noqa: BLE001 — telemetry is best-effort
+        log.warning("query_log.write_failed", error=str(e)[:120])
+
+
+__all__ = ["attempt_hyde_rescue", "build_hard_filters", "fetch_texts", "log_query"]

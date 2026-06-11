@@ -144,8 +144,16 @@ def get_hybrid_retriever(
     bm25: Annotated[BM25Corpus, Depends(get_bm25_corpus)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
 ) -> HybridRetriever:
+    # ADR-0020: acronym expansion feeds the retrieval legs only; it's a
+    # no-op (returns the query untouched) when the glossary file is absent.
+    expander = None
+    if settings.acronym_expansion:
+        from rag.acronyms import expand_query  # noqa: PLC0415
+
+        expander = expand_query
     return HybridRetriever(
-        vector_retriever=vector, bm25_corpus=bm25, course_repo=course_repo
+        vector_retriever=vector, bm25_corpus=bm25, course_repo=course_repo,
+        query_expander=expander,
     )
 
 

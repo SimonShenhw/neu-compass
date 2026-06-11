@@ -40,7 +40,12 @@ from api.dependencies import (
     get_reranker,
 )
 from api.models import ChatRequest
-from api.routes.common import attempt_hyde_rescue, build_hard_filters, fetch_texts
+from api.routes.common import (
+    attempt_hyde_rescue,
+    build_hard_filters,
+    fetch_texts,
+    log_query,
+)
 from api.routes.search import (
     BLEND_ALPHA,
     RERANK_POOL_SIZE,
@@ -222,6 +227,12 @@ def chat(
         count=len(hits),
         rejection_reason=rejection_reason,
         retrieval_ms=round(retrieval_ms, 2),
+    )
+    log_query(
+        conn, route="chat", query=req.query, matched_via=matched_via,
+        k=req.k, latency_ms=round(retrieval_ms, 2),
+        result_course_ids=[h.course.course_id for h in hits],
+        rejection_reason=rejection_reason,
     )
 
     prompt = build_prompt(req.query, hits)

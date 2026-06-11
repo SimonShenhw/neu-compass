@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     # (~12% of traffic measured on test_set v0.3). Opt-in: HYDE_RESCUE=true.
     hyde_rescue: bool = False
 
+    # ADR-0020: query-time acronym expansion from the corpus-mined glossary
+    # (data/acronym_glossary.json). Zero-cost no-op when the file is absent,
+    # so True is a safe default everywhere.
+    acronym_expansion: bool = True
+
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
     # Wraps the reranker (and best-effort the embedder backbone) with
     # torch.compile when `inference_backend=pytorch`. ~10-25% latency

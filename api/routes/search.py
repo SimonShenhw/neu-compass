@@ -39,7 +39,12 @@ from api.dependencies import (
     get_reranker,
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
-from api.routes.common import attempt_hyde_rescue, build_hard_filters, fetch_texts
+from api.routes.common import (
+    attempt_hyde_rescue,
+    build_hard_filters,
+    fetch_texts,
+    log_query,
+)
 from config import settings
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
@@ -173,6 +178,11 @@ def search(
             count=len(results),
             duration_ms=elapsed_ms,
         )
+        log_query(
+            conn, route="search", query=req.query, matched_via="alias",
+            k=req.k, latency_ms=elapsed_ms,
+            result_course_ids=[r.course_id for r in results],
+        )
         return SearchResponse(
             query=req.query,
             k=req.k,
@@ -218,6 +228,10 @@ def search(
             "search.hybrid_empty",
             query=req.query,
             duration_ms=elapsed_ms,
+        )
+        log_query(
+            conn, route="search", query=req.query, matched_via="empty",
+            k=req.k, latency_ms=elapsed_ms,
         )
         return SearchResponse(
             query=req.query, k=req.k, matched_via="empty",
@@ -273,6 +287,11 @@ def search(
                     n_candidates=meta["n_candidates"],
                     duration_ms=elapsed_ms,
                 )
+                log_query(
+                    conn, route="search", query=req.query,
+                    matched_via="rejected", k=req.k, latency_ms=elapsed_ms,
+                    rejection_reason=str(meta["reason"]),
+                )
                 return SearchResponse(
                     query=req.query, k=req.k, matched_via="rejected",
                     results=[], latency_ms=round(elapsed_ms, 2),
@@ -302,6 +321,12 @@ def search(
         count=len(results),
         rerank_applied=reranker is not None,
         duration_ms=round(elapsed_ms, 2),
+    )
+    log_query(
+        conn, route="search", query=req.query,
+        matched_via="hybrid" if results else "empty",
+        k=req.k, latency_ms=round(elapsed_ms, 2),
+        result_course_ids=[r.course_id for r in results],
     )
     return SearchResponse(
         query=req.query,

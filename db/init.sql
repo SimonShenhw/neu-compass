@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS courses (
     primary_name     TEXT NOT NULL,
     metadata         JSON NOT NULL,                       -- {term, credits, professor, prereqs, delivery_mode}
     raw_text         TEXT,                                -- 拼接源文本 (catalog + syllabus + reviews)
+    search_expansion TEXT,                                -- ADR-0020: doc2query 查询变体 + 中文关键词 (仅入 BM25, 不参与 embedding)
     generated_json   JSON NOT NULL,                       -- 完整 Course Pydantic dump
     schema_version   TEXT NOT NULL DEFAULT '1.0',
     status           TEXT NOT NULL DEFAULT 'pending'
@@ -334,3 +335,25 @@ CREATE TABLE IF NOT EXISTS course_prerequisites (
 
 CREATE INDEX IF NOT EXISTS idx_prereq_course ON course_prerequisites(course_id);
 CREATE INDEX IF NOT EXISTS idx_prereq_prereq ON course_prerequisites(prereq_course_id);
+
+-- =============================================================================
+-- 12. query_log (ADR-0020 配套 / signal-driven 阶段的信号源)
+--     每条 /search /chat 请求一行。后续 eval set 挖掘、门控重校准、
+--     "等真实 query 触发"的全部事项都以这张表为数据源。
+--     PII 注意: query 是用户原文,保留期由运维负责 (docs/pii_redaction.md 红线)。
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS query_log (
+    log_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    route             TEXT NOT NULL CHECK (route IN ('search', 'chat')),
+    query             TEXT NOT NULL,
+    matched_via       TEXT,
+    k                 INTEGER,
+    latency_ms        REAL,
+    result_course_ids TEXT,            -- JSON array of course_id strings
+    rejection_reason  TEXT,
+    user_id           TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_query_log_created ON query_log(created_at);

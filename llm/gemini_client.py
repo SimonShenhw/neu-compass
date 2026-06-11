@@ -218,12 +218,18 @@ def _build_config(
     temperature: float,
     max_output_tokens: int,
     response_schema: dict[str, Any] | None = None,
+    thinking_budget: int | None = None,
 ) -> Any:
     """Construct GenerateContentConfig with our defaults.
 
     When response_schema is set, also forces JSON mime so Gemini emits
     structured output validating the schema. Schema must be the
     pre-stripped dict (cf. pydantic_to_gemini_schema), not a Pydantic class.
+
+    thinking_budget: gemini-2.5-flash "thinks" by default, which multiplies
+    latency+cost. Mechanical tasks (batch extraction/expansion) set 0;
+    None keeps the model default (good for judgment calls like the
+    ADR-0019 rescue verdict).
     """
     from google.genai import types  # noqa: PLC0415
 
@@ -234,6 +240,10 @@ def _build_config(
     if response_schema is not None:
         kwargs["response_mime_type"] = "application/json"
         kwargs["response_schema"] = response_schema
+    if thinking_budget is not None:
+        kwargs["thinking_config"] = types.ThinkingConfig(
+            thinking_budget=thinking_budget
+        )
     return types.GenerateContentConfig(**kwargs)
 
 
@@ -245,6 +255,7 @@ def generate_structured(
     model_name: str = DEFAULT_MODEL,
     temperature: float = DEFAULT_TEMPERATURE,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    thinking_budget: int | None = None,
 ) -> T:
     """Call Gemini, parse JSON response, validate against `schema`.
 
@@ -264,6 +275,7 @@ def generate_structured(
         temperature=temperature,
         max_output_tokens=max_output_tokens,
         response_schema=response_schema,
+        thinking_budget=thinking_budget,
     )
 
     try:

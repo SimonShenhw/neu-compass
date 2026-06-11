@@ -16,14 +16,19 @@ with default k=60 (standard RRF parameter from Cormack et al. 2009).
 This makes top-1 in each list contribute the most, with diminishing
 returns. Robust to scale differences.
 
-Tokenization: ASCII-only (whitespace + lowercase + alnum), with English
-stopwords filtered. Stopword filter widens the inversion gap reported
-in docs/rag_smoke_results.md §7 (vector-only inversion was -0.022;
-hybrid without stopwords was +0.001 — borderline). Adversarial queries
-like "ancient roman history" otherwise gain BM25 mass from "and"/"of"
-appearing in every course's raw_text. Chinese queries still get hit on
-co-occurring English terms (course codes, prof names) but pure-Chinese
-BM25 needs jieba-style segmentation — deferred to v2.
+Tokenization: ASCII alnum tokens (whitespace + lowercase) with English
+stopwords filtered, PLUS CJK character bigrams (ADR-0020). Stopword
+filter widens the inversion gap reported in docs/rag_smoke_results.md §7
+(vector-only inversion was -0.022; hybrid without stopwords was +0.001 —
+borderline). Adversarial queries like "ancient roman history" otherwise
+gain BM25 mass from "and"/"of" appearing in every course's raw_text.
+
+CJK bigrams (no jieba dependency — char bigrams are the standard
+segmentation-free CJK indexing trick): Chinese queries previously got
+ZERO lexical signal against the English corpus. With the doc-expansion
+field adding 中文 keywords per course (scripts/generate_doc_expansion.py),
+bigrams give both sides a shared vocabulary, opening the BM25 leg for
+the bilingual half of the user base.
 """
 
 from __future__ import annotations
@@ -39,9 +44,9 @@ from rag.retriever import ELIGIBLE_STATUS, SearchHit
 
 DEFAULT_RRF_K = 60
 
-# ASCII alnum tokens (lowercased). Chinese chars get filtered out — see module
-# docstring; pure-Chinese BM25 is a v2 problem.
+# ASCII alnum tokens (lowercased) + CJK runs handled separately as bigrams.
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+_CJK_RUN_RE = re.compile(r"[一-鿿]+")
 
 # English stopwords. Hardcoded (rather than nltk.download('stopwords')) so
 # `tokenize` works offline / in CI / on first checkout. Sourced from NLTK's
@@ -68,8 +73,19 @@ STOPWORDS: frozenset[str] = frozenset({
 
 
 def tokenize(text: str) -> list[str]:
-    """Lowercase + ASCII-alnum-split + stopword filter for the BM25 layer."""
-    return [t for t in _TOKEN_RE.findall(text.lower()) if t not in STOPWORDS]
+    """Lowercase ASCII-alnum tokens (stopword-filtered) + CJK char bigrams.
+
+    Bigrams over each contiguous CJK run ("机器学习" → 机器/器学/学习);
+    a lone CJK char is kept as-is. Bag-of-words downstream, so ordering
+    between the ASCII and CJK groups is irrelevant.
+    """
+    out = [t for t in _TOKEN_RE.findall(text.lower()) if t not in STOPWORDS]
+    for run in _CJK_RUN_RE.findall(text):
+        if len(run) == 1:
+            out.append(run)
+        else:
+            out.extend(run[i : i + 2] for i in range(len(run) - 1))
+    return out
 
 
 class _RetrieverLike(Protocol):
@@ -120,13 +136,22 @@ class BM25Corpus:
         *,
         status_filter: str | None = ELIGIBLE_STATUS,
     ) -> BM25Corpus:
-        """Build a BM25 corpus from courses.raw_text.
+        """Build a BM25 corpus from courses.raw_text + search_expansion.
 
         Default status_filter='indexed' matches what the retriever returns —
         BM25 + vector see the same eligible row set, otherwise rankings
         could diverge.
+
+        search_expansion (ADR-0020, doc2query + zh keywords) joins the BM25
+        document ONLY — dense embeddings stay computed from raw_text, so
+        expansion can widen lexical recall but never perturbs the vector
+        leg. Column may be absent on pre-migration DBs → plain raw_text.
         """
-        sql = "SELECT course_id, COALESCE(raw_text, '') AS raw_text FROM courses"
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(courses)")}
+        text_expr = "COALESCE(raw_text, '')"
+        if "search_expansion" in cols:
+            text_expr += " || ' ' || COALESCE(search_expansion, '')"
+        sql = f"SELECT course_id, {text_expr} AS raw_text FROM courses"
         params: list[Any] = []
         if status_filter is not None:
             sql += " WHERE status = ?"
@@ -220,12 +245,18 @@ class HybridRetriever:
         course_repo: CourseRepository,
         rrf_k: int = DEFAULT_RRF_K,
         candidate_multiplier: int = 3,
+        query_expander: Any | None = None,
     ) -> None:
         self._vector = vector_retriever
         self._bm25 = bm25_corpus
         self._course_repo = course_repo
         self._rrf_k = rrf_k
         self._candidate_multiplier = candidate_multiplier
+        # ADR-0020: optional Callable[[str], str] applied to the query for
+        # the RETRIEVAL legs only (e.g. rag.acronyms.expand_query). Caller's
+        # reranker + rejection gate keep seeing the original query, so the
+        # expander can only add recall, never shift relevance judgment.
+        self._query_expander = query_expander
         # Per-leg top scores from the LAST search() call. The calibrated
         # rejection gate (rag/rejection.py, ADR-0018) reads these — the
         # fused RRF score deliberately erases score magnitudes, but the
@@ -242,6 +273,8 @@ class HybridRetriever:
         k: int = 10,
     ) -> list[SearchHit]:
         candidate_k = k * self._candidate_multiplier
+        if self._query_expander is not None:
+            query = self._query_expander(query)
 
         # Leg 1: vector. Prefer the ID-only path (no per-candidate SQLite
         # rehydration — fusion only needs IDs; hydration happens once on the

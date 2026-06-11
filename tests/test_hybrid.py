@@ -32,9 +32,12 @@ def test_tokenize_handles_punctuation_aggressively() -> None:
     assert tokenize("Dr. Zhang's class — A+") == ["dr", "zhang", "class"]
 
 
-def test_tokenize_drops_chinese_chars() -> None:
-    """Documented limitation: Chinese chars filtered out by ASCII alnum regex."""
-    assert tokenize("应用 AI fundamentals") == ["ai", "fundamentals"]
+def test_tokenize_emits_cjk_bigrams() -> None:
+    """ADR-0020: CJK runs become char bigrams (segmentation-free indexing);
+    formerly Chinese chars were silently dropped."""
+    assert tokenize("应用 AI fundamentals") == ["ai", "fundamentals", "应用"]
+    assert tokenize("机器学习") == ["机器", "器学", "学习"]
+    assert tokenize("学 AI") == ["ai", "学"]  # lone CJK char kept as-is
 
 
 def test_tokenize_empty() -> None:
