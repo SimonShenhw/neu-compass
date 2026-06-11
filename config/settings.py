@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     # (~12% of traffic measured on test_set v0.3). Opt-in: HYDE_RESCUE=true.
     hyde_rescue: bool = False
 
+    # Rescue only fires for BORDERLINE rejections (calibrated gate's
+    # p_answerable in [this, REJECT_BELOW)). High-confidence garbage
+    # (p≈0.02 gibberish) gets no LLM second opinion — Gemini's verdict
+    # proved flaky exactly there, and the gate was never in doubt.
+    rescue_min_probability: float = 0.08
+
     # ADR-0020: query-time acronym expansion from the corpus-mined glossary
     # (data/acronym_glossary.json). Zero-cost no-op when the file is absent,
     # so True is a safe default everywhere.

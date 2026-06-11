@@ -269,8 +269,14 @@ def search(
             # ADR-0019: one LLM second-opinion + HyDE retrieval retry for
             # would-be-rejected queries. Garbage stays rejected (REJECT
             # verdict); evidence-poor real queries get a second chance.
+            # Borderline-only: a high-confidence gate rejection skips the
+            # LLM entirely (its verdict is flaky exactly on gibberish).
             rescued = None
-            if rescue_fn is not None:
+            if rescue_fn is not None and (
+                gate_fn is None
+                or getattr(gate_fn, "last_p", 1.0)
+                >= settings.rescue_min_probability
+            ):
                 rescued = attempt_hyde_rescue(
                     query=req.query, conn=conn, hybrid=hybrid,
                     reranker=reranker, rescue_fn=rescue_fn,

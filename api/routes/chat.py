@@ -200,9 +200,14 @@ def chat(
             gate_fn=gate_fn,
         )
         if rerank_meta["rejected"]:
-            # ADR-0019 rescue — same semantics as /search.
+            # ADR-0019 rescue — same semantics as /search (incl. the
+            # borderline-only scope: high-confidence rejections skip the LLM).
             rescued = None
-            if rescue_fn is not None:
+            if rescue_fn is not None and (
+                gate_fn is None
+                or getattr(gate_fn, "last_p", 1.0)
+                >= settings.rescue_min_probability
+            ):
                 rescued = attempt_hyde_rescue(
                     query=req.query, conn=conn, hybrid=hybrid,
                     reranker=reranker, rescue_fn=rescue_fn,

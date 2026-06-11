@@ -220,6 +220,15 @@ def test_no_gate_fn_keeps_adr_0016_threshold_behavior() -> None:
     assert "max_reranker_sigmoid" in str(meta["reason"])
 
 
+def test_gate_fn_exposes_last_probability() -> None:
+    """Routes scope the ADR-0019 rescue on this attribute: defaults to 1.0
+    (permissive) before any call, then tracks the latest decision's p."""
+    fn = build_gate_fn(query="some query", bm25_top=0.0, vec_top=0.1)
+    assert fn.last_p == 1.0
+    fn([0.001])
+    assert 0.0 < fn.last_p < 0.5  # weak-evidence query → low p recorded
+
+
 def test_build_gate_fn_uses_leg_evidence() -> None:
     """Same low sigmoid: strong BM25+vector evidence accepts, zero
     evidence + code-pattern miss rejects — the exact q018-vs-q040 split

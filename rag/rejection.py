@@ -61,22 +61,24 @@ _NOT_DEPT_WORDS = frozenset({
 # Chinese calibration samples compensates.
 _CJK_RE = re.compile(r"[一-鿿㐀-䶿]")
 
-# Fitted on the NAS 2026-06-11 (v4 run) by scripts/calibrate_rejection.py
-# against the production stack (openvino int8, pool=10): n=130 gate-path
-# queries — 50 easy answerable + 15 hard jargon answerable (max-IDF tokens;
-# without these the LR collapses vector-dominant and regresses the
-# BM25-rescued queries) + 15 Gemini zh answerable + 50 unanswerable
-# (8 EN + 6 ZH categories). Grid at p<0.4: 0/80 answerable false-rejects,
-# 39/50 unanswerable caught. Run report: NAS /data/rejection_calibration.json
-# (copy: eval/rejection_calibration.json) + ADR-0018. Do not hand-edit —
-# re-run the script if the embedder/reranker/corpus changes.
+# Fitted on the NAS 2026-06-11 (v5 run, post-ADR-0020 corpus) by
+# scripts/calibrate_rejection.py against the production stack (openvino
+# int8, pool=10, search_expansion live, acronym expander on). The ADR-0020
+# doc-expansion field shifted the BM25 score distribution (gibberish like
+# "keyboard mash" suddenly matched piano-course expansions and leaked
+# through the v4 fit) — exactly the "corpus 大改" re-fit trigger. Note the
+# fit's own response: w_log1p_bm25 dropped 0.96 → 0.78, the model learned
+# lexical evidence is now mildly inflated. Calibration set: 50 easy + 15
+# hard-jargon + 15 zh answerable / 50 unanswerable. Grid at p<0.4: 0/79
+# false-rejects, 39/50 caught. Do not hand-edit — re-run the script if the
+# embedder/reranker/quantization/corpus changes.
 DEFAULT_COEFFICIENTS: dict[str, float] = {
-    "bias": -1.9905,
-    "w_logit_sigmoid": 0.5766,
-    "w_log1p_bm25": 0.9609,
-    "w_vec_top": 2.9285,
-    "w_code_miss": -3.602,
-    "w_cjk": 1.8005,
+    "bias": -1.6277,
+    "w_logit_sigmoid": 0.5944,
+    "w_log1p_bm25": 0.7822,
+    "w_vec_top": 2.9949,
+    "w_code_miss": -3.4026,
+    "w_cjk": 1.7244,
 }
 
 REJECT_BELOW = 0.4
@@ -210,9 +212,15 @@ def build_gate_fn(
             code_pattern_miss=code_miss,
             cjk_dominant=cjk,
         )
-        reject, _, reason = g.decide(f)
+        reject, p, reason = g.decide(f)
+        # Routes read this to scope the ADR-0019 rescue: a HIGH-CONFIDENCE
+        # rejection (p far below the line) gets no LLM second opinion —
+        # observed leak: Gemini's verdict flips run-to-run on borderline
+        # gibberish, but the gate's p≈0.02 was never in doubt.
+        gate_fn.last_p = p  # type: ignore[attr-defined]
         return reject, reason
 
+    gate_fn.last_p = 1.0  # type: ignore[attr-defined]
     return gate_fn
 
 
