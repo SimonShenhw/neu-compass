@@ -46,6 +46,13 @@ KNOWN_PROGRAM_PREFIXES: frozenset[str] = frozenset({
     "IE",    # Industrial Engineering
 })
 
+# Prefixes that double as ordinary English words. Case-insensitive matching
+# turned "any info on machine learning courses" into program_prefix='INFO'
+# (→ hard filter primary_code LIKE 'INFO %', silently hiding everything
+# else). For these we only accept the ALL-CAPS spelling — a user naming the
+# Information Systems program writes "INFO", prose writes "info".
+AMBIGUOUS_PREFIXES: frozenset[str] = frozenset({"INFO", "IE"})
+
 # `re.ASCII` so CJK chars don't act as word chars (same fix we made in
 # query_normalizer for the '那aai' case). The {2,5} bound covers the
 # longest known prefix (CSYE, BINF, MGSC = 4 chars; STAT = 4; we leave 5
@@ -76,7 +83,14 @@ def extract_filters_regex(query: str) -> QueryFilters:
     if not query or not query.strip():
         return QueryFilters(sanitized_query="")
 
-    match = _PREFIX_RE.search(query)
+    match = next(
+        (
+            m
+            for m in _PREFIX_RE.finditer(query)
+            if m.group(1).upper() not in AMBIGUOUS_PREFIXES or m.group(1).isupper()
+        ),
+        None,
+    )
     if not match:
         return QueryFilters(sanitized_query=query)
 
@@ -129,6 +143,7 @@ def extract_filters_adaptive(
 
 
 __all__ = [
+    "AMBIGUOUS_PREFIXES",
     "KNOWN_PROGRAM_PREFIXES",
     "extract_filters_adaptive",
     "extract_filters_regex",

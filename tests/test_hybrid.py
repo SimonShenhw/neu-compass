@@ -303,3 +303,79 @@ def test_hybrid_widens_candidate_pool(hybrid_setup) -> None:
     )
     hybrid.search("graph", k=2)
     assert fake_vec.last_k == 8  # 2 * 4
+
+
+# === BM25 zero-overlap filtering + allowed_ids scoping ===
+
+
+def test_bm25_excludes_zero_overlap_docs() -> None:
+    """argsort used to pad results to k with docs sharing NO query token —
+    those then siphoned RRF mass from genuine hits during fusion. Only
+    docs containing ≥1 query token may be returned."""
+    corpus = BM25Corpus({
+        "c1": "graph algorithms BFS DFS shortest paths",
+        "c2": "k-means clustering dimensionality reduction",
+        "c3": "neural network training backpropagation",
+        "c4": "convex optimization Lagrangian duality",
+    })
+    hits = corpus.search("BFS DFS", k=5)
+    assert [cid for cid, _ in hits] == ["c1"]  # no zero-overlap padding
+
+
+def test_bm25_keeps_token_match_despite_degenerate_idf() -> None:
+    """At N=2 with the term in 1 doc, BM25 IDF degenerates to 0 — the match
+    scores 0.0 but IS a genuine token hit and must not be filtered."""
+    corpus = BM25Corpus({
+        "c1": "graph algorithms",
+        "c2": "neural networks",
+    })
+    hits = corpus.search("graph", k=5)
+    assert [cid for cid, _ in hits] == ["c1"]
+
+
+def test_bm25_allowed_ids_restricts_before_topk() -> None:
+    """A doc that passes the hard filter must make the within-filter top-k
+    even when it would miss the global top-k."""
+    corpus = BM25Corpus({
+        "c1": "graph algorithms graph theory graph traversal",
+        "c2": "graph algorithms graph theory",
+        "c3": "graph algorithms",
+        "c4": "neural networks",
+    })
+    hits = corpus.search("graph", k=1, allowed_ids={"c3"})
+    assert [cid for cid, _ in hits] == ["c3"]
+
+
+@dataclass
+class _FakeVecRetrieverWithIds(_FakeVecRetriever):
+    """Fake exposing the Retriever fast paths (search_ids + filter_ids) so
+    the hybrid leg exercises them instead of the SearchHit fallback."""
+
+    allowed: list[str] | None = None
+
+    def search_ids(self, query, *, hard_filters=None, k=10):
+        return [
+            (h.course.course_id, h.score)
+            for h in self.search(query, hard_filters=hard_filters, k=k)
+        ]
+
+    def filter_ids(self, filters):
+        return list(self.allowed or [])
+
+
+def test_hybrid_bm25_leg_uses_filter_ids_not_vector_topk(hybrid_setup) -> None:
+    """With hard filters active, the BM25 leg is scoped to the SQLite-filtered
+    id set — NOT intersected with the vector top-k. A course the vector leg
+    missed entirely must still surface via BM25 if it passes the filter."""
+    course_repo, bm25, _ = hybrid_setup
+    # Vector leg returns nothing relevant; filter allows c-algo.
+    fake_vec = _FakeVecRetrieverWithIds(
+        course_repo, ranking=["c-ml"], allowed=["c-algo", "c-ml"],
+    )
+    hybrid = HybridRetriever(
+        vector_retriever=fake_vec, bm25_corpus=bm25, course_repo=course_repo,
+    )
+    hits = hybrid.search(
+        "graph algorithms BFS DFS", hard_filters={"term": "Spring 2026"}, k=3,
+    )
+    assert "c-algo" in [h.course.course_id for h in hits]

@@ -38,6 +38,7 @@ from api.dependencies import (
     get_reranker,
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
+from api.routes.common import build_hard_filters, fetch_texts
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
 from llm.query_filter_extractor import extract_filters_adaptive
@@ -109,7 +110,7 @@ def _elapsed_ms(started: float) -> float:
         },
     },
 )
-async def search(
+def search(
     req: SearchRequest,
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
@@ -117,6 +118,11 @@ async def search(
     reranker: Annotated[CrossEncoderReranker | None, Depends(get_reranker)],
     conn: DbConn,
 ) -> SearchResponse:
+    # Sync `def` on purpose: FastAPI runs it in the threadpool. The embedder +
+    # reranker forward passes here take 100ms (RTX 5090) to seconds (NAS Iris
+    # Xe) — as `async def` they ran ON the event loop, starving every other
+    # request including /health and /ready (whose failures can trigger Docker
+    # healthcheck restarts). Model singletons hold their own locks.
     started = time.perf_counter()
 
     # Validate enum-typed filter early (FastAPI Pydantic accepts the str via
@@ -168,7 +174,7 @@ async def search(
 
     # 2) Hybrid path — embedder + BM25 + RRF over a wider candidate pool
     #    so rerank has room to reorder.
-    hard_filters = _build_hard_filters(req)
+    hard_filters = build_hard_filters(req)
 
     # Layer 2 (PLAN v3.0+): if the query mentions a program / major prefix,
     # narrow the candidate pool at SQLite WHERE so vector + BM25 don't pull
@@ -215,15 +221,11 @@ async def search(
         final_hits = hybrid_hits[: req.k]
         rejection_reason: str | None = None
     else:
-        def _fetch_text(cid: str) -> str | None:
-            row = conn.execute(
-                "SELECT raw_text FROM courses WHERE course_id = ?", (cid,)
-            ).fetchone()
-            return row["raw_text"] if row else None
-
+        # One batched SELECT for all candidate texts (was ≤20 per-row queries).
+        texts = fetch_texts(conn, [h.course.course_id for h in hybrid_hits])
         blended_hits, meta = rerank_blend_with_rejection(
             req.query, hybrid_hits, reranker,
-            fetch_text=_fetch_text,
+            fetch_text=texts.get,
             blend_alpha=BLEND_ALPHA,
             reject_threshold=RERANKER_REJECT_THRESHOLD,
             top_k=req.k,
@@ -273,17 +275,3 @@ async def search(
     )
 
 
-def _build_hard_filters(req: SearchRequest) -> dict[str, object]:
-    """Pull the optional filter fields off the request into the dict shape
-    Retriever._sqlite_filter expects. Skips None — `hard_filters={}` would
-    still go through the WHERE-status branch with no narrowing."""
-    filters: dict[str, object] = {}
-    if req.term is not None:
-        filters["term"] = req.term
-    if req.credits is not None:
-        filters["credits"] = req.credits
-    if req.delivery_mode is not None:
-        filters["delivery_mode"] = req.delivery_mode
-    if req.professor is not None:
-        filters["professor"] = req.professor
-    return filters

@@ -59,6 +59,47 @@ def test_regex_strips_matched_prefix_from_sanitized_query() -> None:
     assert result.sanitized_query == "专业第一学期推荐"
 
 
+# === Ambiguous prefixes (English-word collisions) ===
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "any info on machine learning courses",  # 'info' = English word, not INFO dept
+        "more info about deep learning please",
+        "courses about distributed systems, ie spark and kafka",
+    ],
+)
+def test_regex_ignores_lowercase_ambiguous_prefixes(query: str) -> None:
+    """'info'/'ie' in prose must NOT become a primary_code hard filter —
+    case-insensitive matching used to turn 'any info on ML' into
+    program_prefix='INFO', silently hiding every non-INFO course."""
+    result = extract_filters_regex(query)
+    assert result.program_prefix is None
+
+
+@pytest.mark.parametrize(
+    "query,expected_prefix",
+    [
+        ("INFO 系学生方向", "INFO"),
+        ("IE major first semester", "IE"),
+    ],
+)
+def test_regex_accepts_uppercase_ambiguous_prefixes(
+    query: str, expected_prefix: str
+) -> None:
+    """ALL-CAPS spelling is the program-name signal — keep matching it."""
+    result = extract_filters_regex(query)
+    assert result.program_prefix == expected_prefix
+
+
+def test_regex_skips_ambiguous_match_but_takes_later_unambiguous_one() -> None:
+    """A lowercase ambiguous token earlier in the query must not mask a
+    genuine prefix later in the query."""
+    result = extract_filters_regex("any info on AAI courses")
+    assert result.program_prefix == "AAI"
+
+
 def test_regex_collapses_whitespace_after_strip() -> None:
     """When the prefix sits between spaces, removing it should not leave
     a double-space."""

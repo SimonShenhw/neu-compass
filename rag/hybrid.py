@@ -32,7 +32,6 @@ import re
 import sqlite3
 from typing import Any, Protocol
 
-import numpy as np
 from rank_bm25 import BM25Okapi
 
 from db.repository import CourseRepository
@@ -98,6 +97,7 @@ class BM25Corpus:
         self._vocab: set[str] = set()
         if not self._course_ids:
             self._bm25: BM25Okapi | None = None
+            self._doc_tokens: list[frozenset[str]] = []
             return
 
         tokenized = [tokenize(course_texts[cid]) for cid in self._course_ids]
@@ -105,6 +105,11 @@ class BM25Corpus:
         # doesn't crash on empty docs (e.g. raw_text=null edge case).
         tokenized = [toks if toks else ["__empty__"] for toks in tokenized]
         self._bm25 = BM25Okapi(tokenized)
+        # Per-doc token sets: search() needs "does this doc contain ANY query
+        # token" as a membership test. Score>0 can't serve that — BM25 IDF
+        # degenerates to 0 for terms in half the corpus (e.g. N=2, n=1), so a
+        # genuine token match can legitimately score 0.0.
+        self._doc_tokens = [frozenset(toks) for toks in tokenized]
         for toks in tokenized:
             self._vocab.update(toks)
 
@@ -134,12 +139,22 @@ class BM25Corpus:
         query: str,
         *,
         k: int = 10,
+        allowed_ids: set[str] | None = None,
     ) -> list[tuple[str, float]]:
         """Top-k BM25 hits as [(course_id, score), ...] sorted desc.
 
         Returns [] if NO query token appears in the corpus vocab. This is
         a stronger "no match" signal than score==0, which can also occur
         for tiny corpora where BM25 IDF degenerates (N=2, n=1 → log(1)=0).
+
+        Only docs sharing ≥1 token with the query are returned — argsort
+        alone would pad the result with zero-overlap docs up to k, and those
+        then siphon RRF mass from genuine hits during fusion.
+
+        `allowed_ids` (optional) restricts the ranking to that course-id set
+        BEFORE the top-k cut — used when hard filters narrowed the corpus,
+        so a doc that passes the filter but ranks #61 globally still makes
+        the within-filter top-k.
         """
         if self._bm25 is None or not self._course_ids:
             return []
@@ -153,11 +168,18 @@ class BM25Corpus:
         if not any(t in self._vocab for t in tokens):
             return []
 
+        token_set = set(tokens)
         scores = self._bm25.get_scores(tokens)
-        sorted_idx = np.argsort(-scores)[: k]
+        eligible = [
+            i
+            for i in range(len(self._course_ids))
+            if self._doc_tokens[i] & token_set
+            and (allowed_ids is None or self._course_ids[i] in allowed_ids)
+        ]
+        eligible.sort(key=lambda i: -scores[i])
         return [
             (self._course_ids[i], float(scores[i]))
-            for i in sorted_idx
+            for i in eligible[:k]
         ]
 
     @property
@@ -185,9 +207,9 @@ class HybridRetriever:
     Mirrors Retriever.search interface (returns list[SearchHit]) so it's a
     drop-in replacement. hard_filters apply to both legs:
       - vector leg: pushed through to underlying retriever's SQLite filter
-      - BM25 leg: post-filter via intersection with vector candidate set
-        (BM25 doesn't know about SQLite metadata; vector retriever already
-         applied the filter, so reusing its candidate set is the cheap path)
+      - BM25 leg: scoped to the same SQLite-filtered id set (via the
+        retriever's filter_ids when available; intersection with the vector
+        candidate set as fallback for fakes)
     """
 
     def __init__(
@@ -214,23 +236,36 @@ class HybridRetriever:
     ) -> list[SearchHit]:
         candidate_k = k * self._candidate_multiplier
 
-        # Leg 1: vector
-        vec_hits = self._vector.search(
-            query, hard_filters=hard_filters, k=candidate_k,
-        )
-        vec_ids = [h.course.course_id for h in vec_hits]
+        # Leg 1: vector. Prefer the ID-only path (no per-candidate SQLite
+        # rehydration — fusion only needs IDs; hydration happens once on the
+        # fused top-k below). Fall back to .search() for retriever fakes
+        # that only implement the SearchHit interface.
+        search_ids = getattr(self._vector, "search_ids", None)
+        if callable(search_ids):
+            vec_ids = [
+                cid for cid, _ in search_ids(
+                    query, hard_filters=hard_filters, k=candidate_k,
+                )
+            ]
+        else:
+            vec_hits = self._vector.search(
+                query, hard_filters=hard_filters, k=candidate_k,
+            )
+            vec_ids = [h.course.course_id for h in vec_hits]
 
-        # Leg 2: BM25
-        bm25_hits = self._bm25.search(query, k=candidate_k)
-        bm25_ids = [cid for cid, _ in bm25_hits]
-
-        # Filter BM25 if hard_filters narrowed vec_hits.
-        # Logic: vec_hits already has the filter applied. If hard_filters
-        # is set, BM25 candidates must come from the same allowed set,
-        # otherwise BM25 could surface filtered-out courses.
+        # Leg 2: BM25, scoped to the SAME filtered set as the vector leg when
+        # hard_filters are active. The old approach intersected BM25 output
+        # with the vector top-(k*3) — which silently dropped a course that
+        # passes the filter and ranks #1 on BM25 but #61 on vector. Fakes
+        # without filter_ids keep the old (lossier) intersection behavior.
+        allowed: set[str] | None = None
         if hard_filters:
-            allowed = set(vec_ids)
-            bm25_ids = [cid for cid in bm25_ids if cid in allowed]
+            filter_ids = getattr(self._vector, "filter_ids", None)
+            allowed = (
+                set(filter_ids(hard_filters)) if callable(filter_ids) else set(vec_ids)
+            )
+        bm25_hits = self._bm25.search(query, k=candidate_k, allowed_ids=allowed)
+        bm25_ids = [cid for cid, _ in bm25_hits]
 
         if not vec_ids and not bm25_ids:
             return []

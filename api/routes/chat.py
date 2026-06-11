@@ -20,6 +20,7 @@ Streamlit consumes via httpx.stream + iter_lines + st.write_stream.
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
@@ -27,8 +28,6 @@ from typing import Annotated, Any, Callable, Iterator
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-
-import re
 
 from api.dependencies import (
     DbConn,
@@ -40,6 +39,7 @@ from api.dependencies import (
     get_reranker,
 )
 from api.models import ChatRequest
+from api.routes.common import build_hard_filters, fetch_texts
 from api.routes.search import (
     BLEND_ALPHA,
     RERANK_POOL_SIZE,
@@ -101,7 +101,7 @@ log = structlog.get_logger("neu_compass.chat")
         422: {"description": "Invalid query / k / delivery_mode."},
     },
 )
-async def chat(
+def chat(
     req: ChatRequest,
     request: Request,
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
@@ -115,7 +115,13 @@ async def chat(
         Depends(get_chat_stream_fn),
     ],
 ) -> StreamingResponse:
-    """Stream a Gemini-generated answer grounded in the retrieved courses."""
+    """Stream a Gemini-generated answer grounded in the retrieved courses.
+
+    Sync `def` on purpose (mirrors /search): retrieval + rerank run for
+    100ms-to-seconds and would otherwise block the event loop. The NDJSON
+    generator below stays a sync generator — Starlette already iterates
+    those in the threadpool.
+    """
     # Pre-ready gate: /chat invokes Gemini lazy-init via stream_fn. If hit
     # during lifespan warmup (~70s bge-m3 cold start), the SDK lazy-import
     # would block the request indefinitely. Refuse fast with 503 instead.
@@ -157,11 +163,8 @@ async def chat(
     # frustrating "no match" reply when AAI 6740 is exactly the answer.
     rejection_reason: str | None = None
     if matched_via == "hybrid" and reranker is not None and hits:
-        def _fetch_text(cid: str) -> str | None:
-            row = conn.execute(
-                "SELECT raw_text FROM courses WHERE course_id = ?", (cid,)
-            ).fetchone()
-            return row["raw_text"] if row else None
+        # One batched SELECT for all candidate texts (was ≤20 per-row queries).
+        texts = fetch_texts(conn, [h.course.course_id for h in hits])
 
         # Threshold=0.0 disables rejection while still computing blended scores
         # for ordering. We could call a no-reject variant of the function but
@@ -169,7 +172,7 @@ async def chat(
         effective_threshold = 0.0 if prefix_applied else RERANKER_REJECT_THRESHOLD
         blended_hits, rerank_meta = rerank_blend_with_rejection(
             req.query, hits, reranker,
-            fetch_text=_fetch_text,
+            fetch_text=texts.get,
             blend_alpha=BLEND_ALPHA,
             reject_threshold=effective_threshold,
             top_k=req.k,
@@ -319,7 +322,7 @@ def _retrieve(
                 return program_hits, "program", False
 
     # Tier 3: hybrid with Layer 2 prefix pre-filter.
-    filters = _hard_filters(req)
+    filters = build_hard_filters(req)
     prefix_applied = not extracted.is_empty()
     if prefix_applied:
         filters.update(extracted.to_hard_filter())
@@ -336,16 +339,3 @@ def _retrieve(
     pool_size = max(req.k, RERANK_POOL_SIZE) if reranker is not None else req.k
     hits = hybrid.search(retrieval_query, hard_filters=filters or None, k=pool_size)
     return hits, ("hybrid" if hits else "empty"), prefix_applied
-
-
-def _hard_filters(req: ChatRequest) -> dict[str, object]:
-    out: dict[str, object] = {}
-    if req.term is not None:
-        out["term"] = req.term
-    if req.credits is not None:
-        out["credits"] = req.credits
-    if req.delivery_mode is not None:
-        out["delivery_mode"] = req.delivery_mode
-    if req.professor is not None:
-        out["professor"] = req.professor
-    return out

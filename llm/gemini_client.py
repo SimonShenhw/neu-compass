@@ -65,14 +65,25 @@ class _ClientLike(Protocol):
     models: _ModelsLike
 
 
+# Hard ceiling on any single Gemini HTTP round-trip (milliseconds — the SDK's
+# HttpOptions unit). Without it a hung call holds the request slot forever;
+# /chat streams stay well under this, and extraction calls that exceed it are
+# better surfaced as GeminiError than waited on.
+DEFAULT_HTTP_TIMEOUT_MS = 120_000
+
+
 @lru_cache(maxsize=1)
 def _build_default_client() -> _ClientLike:
     """Lazy: import SDK + build Client on first use, cache process-wide."""
     from google import genai  # noqa: PLC0415
+    from google.genai import types  # noqa: PLC0415
 
     from config import settings  # noqa: PLC0415
 
-    return genai.Client(api_key=settings.gemini_api_key)  # type: ignore[return-value]
+    return genai.Client(  # type: ignore[return-value]
+        api_key=settings.gemini_api_key,
+        http_options=types.HttpOptions(timeout=DEFAULT_HTTP_TIMEOUT_MS),
+    )
 
 
 # Schema keywords Gemini's Schema proto doesn't accept. Pydantic v2's

@@ -26,6 +26,7 @@ Design:
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from typing import Any
 
@@ -131,6 +132,10 @@ class OnnxEmbedder:
         self._session = session
         self._tokenizer = tokenizer
         self.max_length = max_length
+        # ORT sessions are documented thread-safe for run(), but sync routes in
+        # FastAPI's threadpool mean concurrent encode() calls; serialize to keep
+        # per-request latency predictable on single-device backends.
+        self._lock = threading.Lock()
 
     @classmethod
     def from_path(
@@ -161,13 +166,14 @@ class OnnxEmbedder:
             max_length=self.max_length,
             return_tensors="np",
         )
-        outputs = self._session.run(
-            None,
-            {
-                "input_ids": np.asarray(encoded["input_ids"], dtype=np.int64),
-                "attention_mask": np.asarray(encoded["attention_mask"], dtype=np.int64),
-            },
-        )
+        with self._lock:
+            outputs = self._session.run(
+                None,
+                {
+                    "input_ids": np.asarray(encoded["input_ids"], dtype=np.int64),
+                    "attention_mask": np.asarray(encoded["attention_mask"], dtype=np.int64),
+                },
+            )
         # outputs[0] is last_hidden_state with shape (batch, seq_len, hidden_dim)
         last_hidden = outputs[0]
         cls_emb = last_hidden[:, 0, :].astype(np.float32)
@@ -196,6 +202,7 @@ class OnnxReranker:
         self._session = session
         self._tokenizer = tokenizer
         self.max_length = max_length
+        self._lock = threading.Lock()  # see OnnxEmbedder.__init__
 
     @classmethod
     def from_path(
@@ -226,13 +233,14 @@ class OnnxReranker:
             max_length=self.max_length,
             return_tensors="np",
         )
-        outputs = self._session.run(
-            None,
-            {
-                "input_ids": np.asarray(encoded["input_ids"], dtype=np.int64),
-                "attention_mask": np.asarray(encoded["attention_mask"], dtype=np.int64),
-            },
-        )
+        with self._lock:
+            outputs = self._session.run(
+                None,
+                {
+                    "input_ids": np.asarray(encoded["input_ids"], dtype=np.int64),
+                    "attention_mask": np.asarray(encoded["attention_mask"], dtype=np.int64),
+                },
+            )
         # outputs[0] is logits (batch, 1)
         logits = outputs[0].squeeze(-1).astype(np.float32)
         # sigmoid (numerically-stable form not needed at this magnitude)

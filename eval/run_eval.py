@@ -201,16 +201,19 @@ def cli() -> int:
     parser.add_argument(
         "--with-rejection", action="store_true",
         help="Apply rerank+blend+reject path matching api/routes/search.py. "
-             "blend_alpha=0.4 / reject_threshold=0.4 are locked by ADR-0015. "
-             "Implies --rerank.",
+             "Defaults mirror production: blend_alpha=0.4 (ADR-0015) / "
+             "reject_threshold=0.05 (ADR-0016). Implies --rerank.",
     )
     parser.add_argument(
         "--blend-alpha", type=float, default=0.4,
         help="Z-score blend weight on RRF leg. ADR-0015 locks 0.4.",
     )
     parser.add_argument(
-        "--reject-threshold", type=float, default=0.4,
-        help="Raw reranker sigmoid floor below which the query is rejected.",
+        "--reject-threshold", type=float, default=0.05,
+        help="Raw reranker sigmoid floor below which the query is rejected. "
+             "ADR-0016 locks 0.05 (production value in api/routes/search.py); "
+             "the old 0.4 default here silently measured the wrong operating "
+             "point.",
     )
     args = parser.parse_args()
     if args.with_rejection:

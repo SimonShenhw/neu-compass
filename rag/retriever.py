@@ -59,7 +59,30 @@ class Retriever:
         k: int = 10,
     ) -> list[SearchHit]:
         """Run the three-step pipeline. Returns top-k hits sorted by score."""
-        candidate_ids = self._sqlite_filter(hard_filters or {})
+        top = self.search_ids(query, hard_filters=hard_filters, k=k)
+        if not top:
+            return []
+        # Batch hydrate — one SELECT + one Pydantic parse per hit, instead of
+        # the N+1 per-row get() this used to do (k*3=60 SELECTs per /search
+        # via HybridRetriever's candidate pool).
+        courses = self._course_repo.get_batch([cid for cid, _ in top])
+        return [
+            SearchHit(course=courses[cid], score=score)
+            for cid, score in top
+            if cid in courses
+        ]
+
+    def search_ids(
+        self,
+        query: str,
+        *,
+        hard_filters: dict[str, Any] | None = None,
+        k: int = 10,
+    ) -> list[tuple[str, float]]:
+        """ID-only variant of search(): (course_id, score) pairs, no SQLite
+        rehydration. HybridRetriever uses this for its vector leg — it only
+        needs IDs for RRF fusion and hydrates once on the fused top-k."""
+        candidate_ids = self.filter_ids(hard_filters or {})
 
         # Empty candidate set after filter -> no results possible
         if hard_filters and not candidate_ids:
@@ -71,13 +94,16 @@ class Retriever:
         # "search the whole index" which is the default (and cheaper) path.
         candidates = candidate_ids if hard_filters else None
 
-        top = self._index.search(query_vec, k=k, candidate_course_ids=candidates)
-        return [
-            SearchHit(course=self._course_repo.get(cid), score=score)
-            for cid, score in top
-        ]
+        return self._index.search(query_vec, k=k, candidate_course_ids=candidates)
 
     # === Hard filter ===
+
+    def filter_ids(self, filters: dict[str, Any]) -> list[str]:
+        """Public access to the SQLite hard-filter step. HybridRetriever uses
+        this to scope its BM25 leg to the same allowed set as the vector leg
+        (instead of intersecting with the vector top-k, which silently
+        dropped BM25-only hits that passed the filter)."""
+        return self._sqlite_filter(filters)
 
     def _sqlite_filter(self, filters: dict[str, Any]) -> list[str]:
         """Apply WHERE on courses table; only return status='indexed' rows."""

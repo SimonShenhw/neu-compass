@@ -121,9 +121,10 @@ def validate_id_token_claims(claims: dict[str, Any]) -> dict[str, Any]:
 def _fetch_google_jwks() -> dict[str, Any]:
     """Fetch Google's public JWKS for ID-token signature verification.
 
-    Cached process-wide via lru_cache; the keys rotate roughly daily but
-    Google honors old kid values long enough that one fetch per process is
-    fine for MVP. Production should refresh on signature failure.
+    Cached process-wide via lru_cache. Google rotates keys roughly daily;
+    _verify_google_id_token clears this cache and retries once when a token
+    doesn't verify against the cached set (kid miss after rotation), so a
+    long-lived process doesn't lock every login out until restart.
     """
     with httpx.Client(timeout=10.0) as client:
         resp = client.get(GOOGLE_JWKS_URL)
@@ -136,24 +137,34 @@ def _verify_google_id_token(id_token: str) -> dict[str, Any]:
 
     Validates: signature, issuer, audience (our client_id), expiry. Returns
     a plain dict of claims for downstream domain/email checks.
+
+    On first failure, refetches the JWKS once and retries — covers the
+    "Google rotated keys since we cached them" case. A failure against
+    FRESH keys is a genuinely bad token and propagates.
     """
     from authlib.jose import JsonWebKey, jwt  # noqa: PLC0415
 
-    jwks = _fetch_google_jwks()
-    key_set = JsonWebKey.import_key_set(jwks)
-    claims = jwt.decode(
-        id_token,
-        key_set,
-        claims_options={
-            "iss": {"essential": True, "values": list(GOOGLE_ISSUERS)},
-            "aud": {
-                "essential": True,
-                "value": settings.google_oauth_client_id,
+    def _decode(jwks: dict[str, Any]) -> dict[str, Any]:
+        key_set = JsonWebKey.import_key_set(jwks)
+        claims = jwt.decode(
+            id_token,
+            key_set,
+            claims_options={
+                "iss": {"essential": True, "values": list(GOOGLE_ISSUERS)},
+                "aud": {
+                    "essential": True,
+                    "value": settings.google_oauth_client_id,
+                },
             },
-        },
-    )
-    claims.validate()
-    return dict(claims)
+        )
+        claims.validate()
+        return dict(claims)
+
+    try:
+        return _decode(_fetch_google_jwks())
+    except Exception:
+        _fetch_google_jwks.cache_clear()
+        return _decode(_fetch_google_jwks())
 
 
 def exchange_code_for_token(

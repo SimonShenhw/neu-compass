@@ -12,6 +12,7 @@ module is cheap.
 
 from __future__ import annotations
 
+import threading
 from typing import Protocol
 
 import numpy as np
@@ -57,6 +58,9 @@ class BGEM3Embedder:
         self.max_length = max_length
         self.compile_mode = compile_mode
         self._model: object | None = None
+        # Sync routes run in FastAPI's threadpool; serialize lazy load +
+        # forward pass (FlagEmbedding makes no thread-safety promise).
+        self._lock = threading.Lock()
 
     def _load(self) -> object:
         """First-call model download + load. Triggers ~2.3GB download."""
@@ -82,16 +86,17 @@ class BGEM3Embedder:
         if not texts:
             return np.zeros((0, EMBEDDING_DIM), dtype=np.float32)
 
-        model = self._load()
-        # FlagEmbedding's BGEM3FlagModel.encode returns dict; we want dense.
-        out = model.encode(  # type: ignore[attr-defined]
-            texts,
-            batch_size=self.batch_size,
-            max_length=self.max_length,
-            return_dense=True,
-            return_sparse=False,
-            return_colbert_vecs=False,
-        )
+        with self._lock:
+            model = self._load()
+            # FlagEmbedding's BGEM3FlagModel.encode returns dict; we want dense.
+            out = model.encode(  # type: ignore[attr-defined]
+                texts,
+                batch_size=self.batch_size,
+                max_length=self.max_length,
+                return_dense=True,
+                return_sparse=False,
+                return_colbert_vecs=False,
+            )
         vecs = np.asarray(out["dense_vecs"], dtype=np.float32)
 
         if normalize:

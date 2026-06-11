@@ -26,13 +26,14 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
-from api.dependencies import DbConn, get_coop_repo
+from api.dependencies import DbConn, get_coop_repo, get_user_repo
 from api.models import (
     CoopOut,
     CoopUploadRequest,
     CoopUploadResponse,
 )
 from db.coop_repository import CoopRepository
+from db.user_repository import UserRepository
 from schemas.coop import CoopExperience, is_uniquely_identifying
 
 router = APIRouter(prefix="/coop", tags=["coop"])
@@ -89,10 +90,11 @@ def _derive_visibility(req: CoopUploadRequest) -> int:
         },
     },
 )
-async def upload_coop(
+def upload_coop(
     req: CoopUploadRequest,
     conn: DbConn,
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
+    user_repo: Annotated[UserRepository, Depends(get_user_repo)],
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
 ) -> CoopUploadResponse:
     if not x_user_id:
@@ -145,6 +147,11 @@ async def upload_coop(
         )
 
     coop_repo.add(new_coop)
+    # Give-to-get gate (PLAN §6.4): credit the contributor so higher
+    # visibility tiers actually unlock. Same transaction as the insert; the
+    # contributor_user_id FK guarantees the users row exists once add()
+    # succeeded, so this cannot UserNotFound on any path add() survives.
+    user_repo.increment_contribution_count(x_user_id)
     conn.commit()  # route owns the transaction; repos don't auto-commit
     log.info(
         "coop.accepted",
@@ -176,7 +183,7 @@ async def upload_coop(
     ),
     responses={200: {"description": "List of visible Co-op records."}},
 )
-async def list_coop(
+def list_coop(
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
 ) -> list[CoopOut]:

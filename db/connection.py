@@ -27,6 +27,15 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     """
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON")
+    # busy_timeout is per-connection (unlike WAL, which persists in the db
+    # file). Without it a write that collides with another writer raises
+    # "database is locked" IMMEDIATELY instead of waiting its turn — easy to
+    # hit once API routes run in the threadpool alongside ingest scripts.
+    conn.execute("PRAGMA busy_timeout = 5000")
+    # NORMAL is the standard pairing with WAL (set persistently in init.sql):
+    # fsync on checkpoint rather than every commit. Durability loss is limited
+    # to power-loss-after-commit, acceptable for rebuildable data (ADR-0013).
+    conn.execute("PRAGMA synchronous = NORMAL")
     conn.row_factory = sqlite3.Row
     return conn
 

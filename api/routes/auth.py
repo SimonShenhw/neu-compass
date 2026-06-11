@@ -60,7 +60,7 @@ log = structlog.get_logger("neu_compass.auth")
         },
     },
 )
-async def oauth_callback(
+def oauth_callback(
     req: OAuthCallbackRequest,
     conn: DbConn,
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
@@ -69,6 +69,9 @@ async def oauth_callback(
         Depends(get_oauth_exchange_fn),
     ],
 ) -> OAuthCallbackResponse:
+    # Sync `def`: exchange_fn does a blocking httpx POST to Google (up to 10s
+    # timeout). As `async def` that held the event loop hostage; threadpool
+    # execution keeps the API responsive during a slow Google round-trip.
     try:
         identity = exchange_fn(
             req.code,

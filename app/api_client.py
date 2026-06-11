@@ -39,8 +39,11 @@ class ApiClient:
         base_url: str | None = None,
         user_id: str | None = None,
         transport: httpx.BaseTransport | None = None,
-        timeout: float = 10.0,
+        timeout: float = 30.0,
     ) -> None:
+        # 30s default: the NAS OpenVINO path runs /search at p50 ~2.3s but the
+        # ONNX-CPU fallback is 7-10s — the old 10s default turned a degraded
+        # backend into raw ReadTimeout tracebacks in the Streamlit UI.
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
         headers: dict[str, str] = {}
         if user_id:
@@ -156,10 +159,16 @@ class ApiClient:
     # === Internal ===
 
     def _get(self, path: str) -> Any:
-        return self._unwrap(self._client.get(path))
+        try:
+            return self._unwrap(self._client.get(path))
+        except httpx.TimeoutException as e:
+            raise ApiError(504, f"API timed out: {type(e).__name__}") from e
 
     def _post(self, path: str, body: dict[str, Any]) -> Any:
-        return self._unwrap(self._client.post(path, json=body))
+        try:
+            return self._unwrap(self._client.post(path, json=body))
+        except httpx.TimeoutException as e:
+            raise ApiError(504, f"API timed out: {type(e).__name__}") from e
 
     @staticmethod
     def _unwrap(r: httpx.Response) -> Any:

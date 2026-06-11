@@ -4,6 +4,13 @@ Sweeps `blend_alpha` over a grid, runs the same eval as run_eval.py
 (mode=hybrid_with_alias + rerank), and writes per-α R@5, MRR, per-category
 recall, and p50/p95 latency to JSON. Output feeds ADR-0015's α decision.
 
+One-pass design (mirrors sweep_reject_threshold.py): retrieval + reranker
+sigmoids don't depend on α — only the blend does. Each query pays the
+embedder + reranker cost ONCE; per-α evaluation just re-blends the cached
+scores. A 9-α sweep therefore costs ~1/9 of the old per-α reruns. The
+reported p50/p95 latency is the α-invariant retrieval+rerank cost (identical
+across α rows by construction).
+
 Decision rule (v2.2 §3.5):
   1. Prefer Pareto-improving α: R@5 ≥ 0.636 AND MRR ≥ 0.603 (best-of-both
      baselines from rerank.json and hybrid_with_alias.json respectively).
@@ -91,7 +98,7 @@ def cli() -> int:
     from rag.hybrid import BM25Corpus, HybridRetriever  # noqa: PLC0415
     from rag.index import FaissIndex  # noqa: PLC0415
     from rag.query_normalizer import normalize_query_to_course_ids  # noqa: PLC0415
-    from rag.reranker import CrossEncoderReranker, rerank_blend_hits  # noqa: PLC0415
+    from rag.reranker import CrossEncoderReranker, zscore_blend  # noqa: PLC0415
     from rag.retriever import Retriever  # noqa: PLC0415
 
     print(f"=> loading FAISS from {faiss_path}")
@@ -136,27 +143,52 @@ def cli() -> int:
             ).fetchone()
             return row["raw_text"] if row else None
 
+        # α-invariant per-query cache: either the alias short-circuit or
+        # (course_ids, rrf_scores, rerank_sigmoids) from ONE retrieval +
+        # reranker pass. Latency is recorded here — pass 1 only — because
+        # re-blending cached scores is microseconds.
+        query_cache: dict[str, dict] = {}
+        latencies_ms: list[float] = []
+
+        def expensive_pass(q: str) -> dict:
+            cached = query_cache.get(q)
+            if cached is not None:
+                return cached
+            t0 = time.perf_counter()
+            alias_ids = normalize_query_to_course_ids(q, alias_repo=alias_repo)
+            if alias_ids:
+                entry: dict = {"alias_ids": alias_ids}
+            else:
+                hits = hybrid.search(q, k=args.rerank_pool)
+                texts = [
+                    fetch_text(h.course.course_id) or h.course.primary_name
+                    for h in hits
+                ]
+                entry = {
+                    "course_ids": [h.course.course_id for h in hits],
+                    "rrf_scores": [h.score for h in hits],
+                    "rerank_scores": reranker.score(q, texts) if hits else [],
+                }
+            latencies_ms.append((time.perf_counter() - t0) * 1000)
+            query_cache[q] = entry
+            return entry
+
         results_by_alpha: list[dict] = []
 
         for alpha in alphas:
             print(f"\n=> α = {alpha}")
-            latencies_ms: list[float] = []
 
             def search_fn(q: str, _alpha: float = alpha) -> list[str]:
-                t0 = time.perf_counter()
-                alias_ids = normalize_query_to_course_ids(q, alias_repo=alias_repo)
-                if alias_ids:
-                    latencies_ms.append((time.perf_counter() - t0) * 1000)
-                    return alias_ids
-                hits = hybrid.search(q, k=args.rerank_pool)
-                blended = rerank_blend_hits(
-                    q, hits, reranker,
-                    fetch_text=fetch_text,
-                    blend_alpha=_alpha,
-                    top_k=5,
+                entry = expensive_pass(q)
+                if "alias_ids" in entry:
+                    return entry["alias_ids"]
+                if not entry["course_ids"]:
+                    return []
+                blended = zscore_blend(
+                    entry["rrf_scores"], entry["rerank_scores"], alpha=_alpha,
                 )
-                latencies_ms.append((time.perf_counter() - t0) * 1000)
-                return [h.course.course_id for h in blended]
+                order = sorted(range(len(blended)), key=lambda i: -blended[i])[:5]
+                return [entry["course_ids"][i] for i in order]
 
             report = run_eval(test_set, search_fn, k=5)
 

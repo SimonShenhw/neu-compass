@@ -31,6 +31,7 @@ Z-score blending (PLAN v2.2 §3.5):
 
 from __future__ import annotations
 
+import threading
 from typing import Callable, TypeVar
 
 from rag.retriever import SearchHit
@@ -64,6 +65,10 @@ class CrossEncoderReranker:
         self.use_fp16 = use_fp16
         self.compile_mode = compile_mode
         self._model: object | None = None
+        # Routes run in FastAPI's threadpool (sync def) — concurrent requests
+        # may call score() in parallel. One inference at a time per model:
+        # protects lazy _load() and the forward pass itself.
+        self._lock = threading.Lock()
 
     def _load(self) -> tuple[object, object]:
         """Load tokenizer + model via raw transformers (HuggingFace).
@@ -109,24 +114,25 @@ class CrossEncoderReranker:
         """
         if not candidates:
             return []
-        tokenizer, model = self._load()
-        torch = self._torch  # type: ignore[attr-defined]
+        with self._lock:
+            tokenizer, model = self._load()
+            torch = self._torch  # type: ignore[attr-defined]
 
-        inputs = tokenizer(
-            [query] * len(candidates),
-            candidates,
-            padding=True,
-            truncation=True,
-            return_tensors="pt",
-            max_length=512,
-        )
-        if self.device == "cuda" and torch.cuda.is_available():
-            inputs = {k: v.to("cuda") for k, v in inputs.items()}
+            inputs = tokenizer(
+                [query] * len(candidates),
+                candidates,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+                max_length=512,
+            )
+            if self.device == "cuda" and torch.cuda.is_available():
+                inputs = {k: v.to("cuda") for k, v in inputs.items()}
 
-        with torch.no_grad():
-            logits = model(**inputs).logits.view(-1).float()
-            probs = torch.sigmoid(logits)
-        return [float(p) for p in probs.cpu().tolist()]
+            with torch.no_grad():
+                logits = model(**inputs).logits.view(-1).float()
+                probs = torch.sigmoid(logits)
+            return [float(p) for p in probs.cpu().tolist()]
 
 
 def rerank_pairs(

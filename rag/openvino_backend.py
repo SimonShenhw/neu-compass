@@ -35,6 +35,7 @@ Design:
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from typing import Any
 
@@ -80,6 +81,10 @@ class OvEmbedder:
         self._model = model
         self._tokenizer = tokenizer
         self.max_length = max_length
+        # optimum-intel OVModel* hold ONE OpenVINO InferRequest — concurrent
+        # forward passes on the same instance are NOT safe. Sync routes run
+        # in FastAPI's threadpool, so serialize inference here.
+        self._lock = threading.Lock()
 
     @classmethod
     def from_path(
@@ -119,7 +124,8 @@ class OvEmbedder:
             max_length=self.max_length,
             return_tensors="pt",
         )
-        outputs = self._model(**encoded)
+        with self._lock:
+            outputs = self._model(**encoded)
         # last_hidden_state shape: (batch, seq_len, hidden_dim). CLS-pool [:, 0, :].
         cls_emb = outputs.last_hidden_state[:, 0, :].numpy().astype(np.float32)
         if normalize:
@@ -144,6 +150,7 @@ class OvReranker:
         self._model = model
         self._tokenizer = tokenizer
         self.max_length = max_length
+        self._lock = threading.Lock()  # see OvEmbedder.__init__
 
     @classmethod
     def from_path(
@@ -178,7 +185,8 @@ class OvReranker:
             max_length=self.max_length,
             return_tensors="pt",
         )
-        outputs = self._model(**encoded)
+        with self._lock:
+            outputs = self._model(**encoded)
         # logits shape (batch, 1) for cross-encoder binary head.
         logits = outputs.logits.squeeze(-1).numpy().astype(np.float32)
         sigmoid = 1.0 / (1.0 + np.exp(-logits))
