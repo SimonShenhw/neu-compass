@@ -39,6 +39,7 @@ from api.dependencies import (
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
 from api.routes.common import build_hard_filters, fetch_texts
+from config import settings
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
 from llm.query_filter_extractor import extract_filters_adaptive
@@ -52,8 +53,11 @@ router = APIRouter(prefix="/search", tags=["search"])
 log = structlog.get_logger("neu_compass.search")
 
 # PLAN v2.2 §3.4 + ADR-0015. Tunable; ADR-supplement if changed.
-RERANK_POOL_SIZE = 20
-"""Candidates HybridRetriever returns before rerank+blend narrows to req.k."""
+RERANK_POOL_SIZE = settings.rerank_pool_size
+"""Candidates HybridRetriever returns before rerank+blend narrows to req.k.
+Env-overridable (RERANK_POOL_SIZE, default 20) so the NAS can A/B pool sizes
+without a redeploy — the cross-encoder pass over this pool is the /search
+p50 bottleneck there."""
 
 RERANKER_REJECT_THRESHOLD = 0.05
 """Raw bge-reranker sigmoid below which the query has no good match.

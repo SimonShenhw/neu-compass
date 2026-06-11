@@ -63,6 +63,13 @@ class Settings(BaseSettings):
 
     enable_reranker: bool = True  # NAS deploy can set False to save ~600 MB
 
+    # Candidate pool the hybrid retriever hands to the reranker. The 20-pair
+    # cross-encoder pass IS the /search p50 on the NAS, and reranker quality
+    # does not improve monotonically with pool size (arXiv:2411.11767) — env
+    # RERANK_POOL_SIZE lets the NAS A/B 20 vs 10 without a code redeploy.
+    # ADR-locked default stays 20 until the eval says otherwise.
+    rerank_pool_size: int = 20
+
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
     # Wraps the reranker (and best-effort the embedder backbone) with
     # torch.compile when `inference_backend=pytorch`. ~10-25% latency
