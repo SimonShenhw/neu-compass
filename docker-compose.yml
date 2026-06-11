@@ -4,6 +4,9 @@
 #   ./runtime-data/        bind-mounted to /data inside api + ui
 #     ├── courses.db        SQLite (source of truth, ADR-0013)
 #     ├── faiss_index/      FAISS IndexIDMap (rebuildable from SQLite)
+#     ├── openvino/         fp16 OpenVINO IR (embedder + reranker)
+#     ├── openvino_int8/    ADR-0017 production set: int8 reranker +
+#     │                     embedder symlink → ../openvino/embedder
 #     └── onnx/
 #         ├── embedder/     bge-m3 FP16 ONNX (~1.1GB)
 #         └── reranker/     bge-reranker-v2-m3 FP16 ONNX (~570MB)
@@ -35,10 +38,17 @@ services:
       # that blocked Intel GPU compile on the ONNX route. See
       # rag/openvino_backend.py + scripts/export_openvino.py.
       INFERENCE_BACKEND: openvino
-      OPENVINO_MODEL_DIR: /data/openvino
+      # /data/openvino_int8: int8 reranker (NNCF, 570MB) + symlinked fp16
+      # embedder. ADR-0017: pool 10 + int8 → p50 2019→849ms, R@5 unchanged.
+      # Export ran in-container: docker run --rm -v .../runtime-data:/data
+      #   -e HF_HOME=/data/.hf_cache neu-compass:latest optimum-cli export
+      #   openvino --model BAAI/bge-reranker-v2-m3 --weight-format int8
+      #   --trust-remote-code /data/openvino_int8/reranker
+      OPENVINO_MODEL_DIR: /data/openvino_int8
       OPENVINO_DEVICE: GPU                       # Iris Xe; fallback CPU if iGPU absent
       OPENVINO_CACHE_DIR: /data/openvino_cache   # persists compiled GPU kernels (first boot ~60s → subsequent ~5s)
       ENABLE_RERANKER: "true"                    # NAS has 32GB dual-channel
+      RERANK_POOL_SIZE: "10"                     # ADR-0017: 20→10, quality-neutral, halves rerank latency
       # === Storage paths (bind-mounted volume) ===
       SQLITE_PATH: /data/courses.db
       FAISS_INDEX_PATH: /data/faiss_index

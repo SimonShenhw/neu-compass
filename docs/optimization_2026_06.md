@@ -65,3 +65,25 @@ NAS p50 2.3s 的瓶颈 100% 在 reranker(20 pair × seq 512 cross-encoder)。fla
 | [beir-cellar/beir](https://github.com/beir-cellar/beir) | 自有 corpus 的 nDCG/R@k 标准化 eval,把检索层和生成层的度量分开 |
 
 域内结论:开源世界没有"catalog RAG + hybrid 检索 + 先修图"三件套都做好的项目;本项目在该 niche 已处于公开 frontier。
+
+## 五、§三的 #1/#2 当天落地实测(→ ADR-0017)
+
+部署本批代码后,用新工具 `scripts/eval_via_api.py` 直接打 NAS 生产 API
+(测真实生产路径:alias tier + Layer 2 + 拒绝层 + OpenVINO backend):
+
+| 配置 | R@5 | MRR | p50 | p95 | api RSS |
+|---|---:|---:|---:|---:|---:|
+| pool 20 + fp16(部署前现状) | 0.5285 | 0.5175 | 2019 ms | 2860 ms | ~4.9 GB |
+| pool 10 + fp16 | 0.5285 | 0.5219 | 948 ms | 1356 ms | ~4.9 GB |
+| **pool 10 + int8(锁定)** | **0.5285** | 0.5175 | **849 ms** | **1167 ms** | **3.5 GB** |
+
+**p50 -58% / p95 -59% / RAM -1.4GB,R@5 完全无损** — 论文预测
+([arXiv:2411.11767](https://arxiv.org/abs/2411.11767))全中。两个附带发现:
+
+1. **生产路径 R@5 0.529 vs in-process eval 0.62 的差距有了着落**:live 路径
+   8 个 rejected 中 4 个误拒(q013/q018/q022/q029)正是 ADR-0016 校准时
+   已知并接受的 4/38 trade-off — 非回归,但说明这 4 类 query(理论术语类:
+   "VC dimension PAC learning")是拒绝层校准(§三 #7)的最高优先级样本。
+2. int8 拒绝层零漂移:gibberish max_sigmoid 0.000,阈值 0.05 不需要动。
+
+决策细节 + 复测条件:[ADR-0017](adr/0017-nas-rerank-pool-int8.md)。

@@ -19,6 +19,7 @@
 | `/search` p99 latency PyTorch / ONNX | 117.97 / **54.74 ms** (-53.6%) |
 | Lifespan startup PyTorch / ONNX ⭐ | 70 s / **6 s** (-91%) |
 | **`/search` p50 — NAS Iris Xe + optimum-intel OpenVINO IR** ⭐ | **~2310 ms** (10 query smoke,reranker on) |
+| **`/search` p50 — NAS pool=10 + int8 reranker (ADR-0017, live-API n=42)** ⭐ | **849 ms** (p95 1167,R@5 无损,api RSS 4.9→3.5GB) |
 | **api 容器 RSS — NAS (reranker on + Iris Xe)** | **4.9 GB** (vs ONNX+CPU 17 GB) |
 | **NAS 冷启 lifespan(OpenVINO compile cache 持久化)** | **13 s** (首次 ~50 s,缓存命中后 5 s) |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
@@ -97,6 +98,7 @@
 **踩坑链(完整 postmortem)**: 第一条尝试路径是 `ONNX → onnxruntime-openvino → Intel GPU plugin`,bge-m3 ONNX 里的 u8 `GatherND` 算子 Intel GPU 编译失败(`No layout format available for gathernd:bfyx, u8`)。HETERO 模式 plugin 谎报支持然后 runtime 炸;AUTO 模式启动 OK 但 reranker `score()` 命中 OpenVINO CPU plugin 的 shape-cache bug 返 500。**真正的解是绕开 ONNX 中间层** — 直接 `optimum-cli export openvino` 生成 OpenVINO IR(u8 索引在这条路径里以 int64 落地),用 optimum-intel 的 `OVModel*` 类加载,`device="GPU"` 一次过。新 backend 代码 [rag/openvino_backend.py](rag/openvino_backend.py) + 导出脚本 [scripts/export_openvino.py](scripts/export_openvino.py) + lifespan 分支 [api/main.py:`_build_openvino_stack`](api/main.py)。运行时部署 [Dockerfile](Dockerfile) + [docker-compose.yml](docker-compose.yml)。
 
 **还能再压**(留作 signal-driven 触发):reranker 跑 20 个 query-doc pair × seq_len=512 是 p50 的 bottleneck — 三个 lever 都没拉:(a) hybrid pool 20→10 砍 ~50% 延迟,代价 recall 略降;(b) `OvReranker.reshape()` 静态 shape 编译;(c) `--weight-format int8` 量化 reranker。
+**2026-06-11 更新**:lever (a) + (c) 已拉(ADR-0017)— live-API eval 实测 recall **零损失**(论文 arXiv:2411.11767 预测成立),p50 2019→**849ms**。lever (b) 仍未动;下一量级要换 late-interaction 架构,见 [docs/optimization_2026_06.md](docs/optimization_2026_06.md)。
 
 ---
 
@@ -318,6 +320,7 @@ neu-compass/
 - **[ADR-0014](docs/adr/0014-h-drive-code-wsl-data.md)** 代码 H 盘 + 运行时数据 WSL home (77x 实测)
 - **[ADR-0015](docs/adr/0015-z-score-blending.md)** Z-score 混合 RRF + reranker (α=0.4) — Week 7
 - **[ADR-0016](docs/adr/0016-reranker-reject-threshold.md)** Reranker 拒绝阈值 0.05 (数据校准,从 spec 0.4 下调) — Week 7
+- **[ADR-0017](docs/adr/0017-nas-rerank-pool-int8.md)** NAS rerank pool 20→10 + int8 reranker (live-API 实测 p50 -58% 质量无损) — 2026-06
 
 完整 ADR: [docs/adr/](docs/adr/)
 

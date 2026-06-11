@@ -1,0 +1,610 @@
+{
+  "summary": {
+    "label": "pool20_fp16",
+    "base_url": "http://100.72.36.13:8000",
+    "test_set_version": "0.2",
+    "k": 5,
+    "recall_at_5": 0.5285,
+    "mrr": 0.5175,
+    "queries_with_expected": 38,
+    "matched_via": {
+      "alias": 13,
+      "hybrid": 21,
+      "rejected": 8
+    },
+    "server_latency_ms": {
+      "p50": 2019.1,
+      "p95": 2860.2,
+      "mean": 1529.6
+    },
+    "wall_latency_ms": {
+      "p50": 2024.6,
+      "p95": 2866.5
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "q001",
+      "query": "CS 5800",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q002",
+      "query": "AAI 6600",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q003",
+      "query": "DS 5220",
+      "expected": [
+        "neu-ds-5220"
+      ],
+      "retrieved": [
+        "neu-ds-5220"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q004",
+      "query": "CS 6140",
+      "expected": [
+        "neu-cs-6140"
+      ],
+      "retrieved": [
+        "neu-cs-6140"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q005",
+      "query": "MATH 7233",
+      "expected": [
+        "neu-math-7233"
+      ],
+      "retrieved": [
+        "neu-math-7233"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q006",
+      "query": "INFO 6105",
+      "expected": [
+        "neu-info-6105"
+      ],
+      "retrieved": [
+        "neu-info-6105"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q007",
+      "query": "Algorithms",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q008",
+      "query": "Machine Learning",
+      "expected": [
+        "neu-cs-6140",
+        "neu-ds-5220",
+        "neu-ds-5230",
+        "neu-math-7243"
+      ],
+      "retrieved": [
+        "neu-aai-6690",
+        "neu-eece-5644",
+        "neu-math-7243",
+        "neu-aai-6610",
+        "neu-cs-7140"
+      ],
+      "recall_at_5": 0.25,
+      "reciprocal_rank": 0.3333
+    },
+    {
+      "query_id": "q009",
+      "query": "Information Retrieval",
+      "expected": [
+        "neu-cs-6200"
+      ],
+      "retrieved": [
+        "neu-cs-6200",
+        "neu-cs-4220",
+        "neu-cs-7840",
+        "neu-da-5020",
+        "neu-ds-4300"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q010",
+      "query": "Probability Theory",
+      "expected": [
+        "neu-aly-6010"
+      ],
+      "retrieved": [
+        "neu-math-7241",
+        "neu-math-3081",
+        "neu-math-7341",
+        "neu-ie-3412",
+        "neu-math-3181"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q011",
+      "query": "Mobile Application Development",
+      "expected": [
+        "neu-cs-5520"
+      ],
+      "retrieved": [
+        "neu-cs-5520",
+        "neu-info-6350",
+        "neu-cs-4520",
+        "neu-ge-4100",
+        "neu-csye-5280"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q012",
+      "query": "Web Design",
+      "expected": [
+        "neu-info-6150"
+      ],
+      "retrieved": [
+        "neu-dgm-6501",
+        "neu-artg-2401",
+        "neu-mism-3460",
+        "neu-itc-5355",
+        "neu-itc-6355"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q013",
+      "query": "graph algorithms BFS DFS shortest paths",
+      "expected": [
+        "neu-cs-5800",
+        "neu-math-7233"
+      ],
+      "retrieved": [],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q014",
+      "query": "neural network training with backpropagation",
+      "expected": [
+        "neu-cs-6140",
+        "neu-ds-5220",
+        "neu-math-7243"
+      ],
+      "retrieved": [
+        "neu-ds-4440",
+        "neu-cs-7150",
+        "neu-ie-7615",
+        "neu-math-7339",
+        "neu-cs-7268"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q015",
+      "query": "k-means clustering and dimensionality reduction",
+      "expected": [
+        "neu-ds-5230"
+      ],
+      "retrieved": [
+        "neu-math-7243",
+        "neu-cive-7150",
+        "neu-info-6105",
+        "neu-ds-4400",
+        "neu-ie-5640"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q016",
+      "query": "convex optimization Lagrangian duality",
+      "expected": [
+        "neu-math-7237"
+      ],
+      "retrieved": [
+        "neu-or-7270",
+        "neu-math-7237",
+        "neu-math-7207",
+        "neu-math-7234",
+        "neu-or-7245"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q017",
+      "query": "Apache Spark distributed data processing",
+      "expected": [
+        "neu-cs-6240",
+        "neu-info-6105",
+        "neu-eece-5645"
+      ],
+      "retrieved": [
+        "neu-eece-5645",
+        "neu-ds-3500",
+        "neu-ds-4300",
+        "neu-aly-4000",
+        "neu-cs-4730"
+      ],
+      "recall_at_5": 0.3333,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q018",
+      "query": "VC dimension PAC learning theory",
+      "expected": [
+        "neu-cs-6140",
+        "neu-math-7243"
+      ],
+      "retrieved": [],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q019",
+      "query": "search algorithms heuristic A star",
+      "expected": [
+        "neu-aai-6600",
+        "neu-cs-7180"
+      ],
+      "retrieved": [
+        "neu-cs-4100",
+        "neu-cs-5100",
+        "neu-eai-5000",
+        "neu-eai-6000",
+        "neu-or-6500"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q020",
+      "query": "data mining applications",
+      "expected": [
+        "neu-aly-6040",
+        "neu-ds-5230"
+      ],
+      "retrieved": [
+        "neu-ie-7275",
+        "neu-mism-6212",
+        "neu-mism-6412",
+        "neu-aly-3040",
+        "neu-ie-5640"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q021",
+      "query": "Python programming for analytics",
+      "expected": [
+        "neu-aly-6140"
+      ],
+      "retrieved": [
+        "neu-fina-6333",
+        "neu-aly-6140",
+        "neu-aly-2100",
+        "neu-damg-6105",
+        "neu-fina-4350"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q022",
+      "query": "parallel programming MPI distributed computing",
+      "expected": [
+        "neu-eece-5645"
+      ],
+      "retrieved": [],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q023",
+      "query": "data engineering pipelines ETL",
+      "expected": [
+        "neu-info-6105",
+        "neu-cs-6240"
+      ],
+      "retrieved": [
+        "neu-ie-6750",
+        "neu-info-6105",
+        "neu-hsci-5160",
+        "neu-dads-6400",
+        "neu-aly-6020"
+      ],
+      "recall_at_5": 0.5,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q024",
+      "query": "introduction to data science fundamentals",
+      "expected": [
+        "neu-ds-5110"
+      ],
+      "retrieved": [
+        "neu-ds-5110",
+        "neu-ds-5010",
+        "neu-cs-2000",
+        "neu-damg-7245",
+        "neu-cs-7290"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q025",
+      "query": "course covering deep learning project with Python",
+      "expected": [
+        "neu-ds-5220",
+        "neu-cs-6140",
+        "neu-math-7243"
+      ],
+      "retrieved": [
+        "neu-math-4570",
+        "neu-ds-3000",
+        "neu-ds-2500",
+        "neu-info-5002",
+        "neu-cs-4180"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q026",
+      "query": "graduate AI seminar with applied focus",
+      "expected": [
+        "neu-aai-6600",
+        "neu-cs-7180"
+      ],
+      "retrieved": [
+        "neu-aai-6620",
+        "neu-inpr-5201",
+        "neu-aai-6665",
+        "neu-ensy-5800",
+        "neu-chme-7392"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q027",
+      "query": "course on both clustering and dimensionality reduction techniques",
+      "expected": [
+        "neu-ds-5230"
+      ],
+      "retrieved": [
+        "neu-cive-7150",
+        "neu-math-7243",
+        "neu-info-6105",
+        "neu-ds-4400",
+        "neu-eece-7345"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q028",
+      "query": "probability and statistics for machine learning practitioners",
+      "expected": [
+        "neu-aly-6010",
+        "neu-math-7243"
+      ],
+      "retrieved": [
+        "neu-math-5003",
+        "neu-math-7340",
+        "neu-aai-5015",
+        "neu-math-4681",
+        "neu-math-6241"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q029",
+      "query": "Python and SQL together for data engineering",
+      "expected": [
+        "neu-aly-6140",
+        "neu-info-6105"
+      ],
+      "retrieved": [],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q030",
+      "query": "applied capstone project for data science master students",
+      "expected": [
+        "neu-ds-5500",
+        "neu-aly-6080"
+      ],
+      "retrieved": [
+        "neu-hsci-6980",
+        "neu-ds-5500",
+        "neu-mism-6414",
+        "neu-hrm-6980",
+        "neu-aly-4850"
+      ],
+      "recall_at_5": 0.5,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q031",
+      "query": "linear algebra essentials for AI students with no math background",
+      "expected": [
+        "neu-aai-5015"
+      ],
+      "retrieved": [
+        "neu-math-4570",
+        "neu-math-5001",
+        "neu-math-5110",
+        "neu-math-5352",
+        "neu-math-4577"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q032",
+      "query": "supervised learning regression and classification with theory",
+      "expected": [
+        "neu-ds-5220",
+        "neu-cs-6140"
+      ],
+      "retrieved": [
+        "neu-math-7339",
+        "neu-math-6243",
+        "neu-cs-6140",
+        "neu-ie-7300",
+        "neu-hlth-7999"
+      ],
+      "recall_at_5": 0.5,
+      "reciprocal_rank": 0.3333
+    },
+    {
+      "query_id": "q033",
+      "query": "5800",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q034",
+      "query": "应用 AI",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q035",
+      "query": "Algo",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q036",
+      "query": "AAI6600",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q037",
+      "query": "ds 5220",
+      "expected": [
+        "neu-ds-5220"
+      ],
+      "retrieved": [
+        "neu-ds-5220"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q038",
+      "query": "6600",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q039",
+      "query": "AAI 9999",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q040",
+      "query": "CS 0001",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q041",
+      "query": "asdf qwerty zxcvbnm random keyboard mash",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q042",
+      "query": "homework due monday assignment 3 grading rubric",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    }
+  ]
+}
