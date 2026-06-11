@@ -1,4 +1,4 @@
-# NEU-Compass API contract (v0.1)
+﻿# NEU-Compass API contract (v0.1)
 
 > **Audience**: frontend developers (Andy Dong's `compass-frontend`) and
 > integration smoke testers. Backend-as-a-Service contract per PLAN v2.2 §3.3.
@@ -19,7 +19,7 @@
 >
 > **Tech**: FastAPI + Pydantic v2 (`extra='forbid'` on every input model — typo'd
 > fields fail loud with HTTP 422, never silently). Auth in Week 6 is the
-> `X-User-Id` header stub; Week 7 will replace via `POST /auth/callback`.
+> `Authorization: Bearer <session_token>` (ADR-0021) — token issued by `POST /auth/callback`.
 
 ---
 
@@ -37,7 +37,7 @@
 | POST   | `/auth/callback`      | OAuth code exchange                    |
 
 Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}`,
-`/chat`, and `GET /coop` (degraded view). `POST /coop` requires `X-User-Id`.
+`/chat`, and `GET /coop` (degraded view). `POST /coop` requires `Authorization: Bearer <session_token>`.
 `POST /auth/callback` issues identity but takes no header itself.
 
 ---
@@ -268,7 +268,7 @@ visibility tier.
 ```bash
 curl -s -X POST https://compass.<zone>.com/api/coop \
   -H "Content-Type: application/json" \
-  -H "X-User-Id: u-husky-12345" \
+  -H "Authorization: Bearer <session_token>" \
   -d '{
     "company": "Two Sigma",
     "role": "Quant Research Intern",
@@ -294,7 +294,7 @@ curl -s -X POST https://compass.<zone>.com/api/coop \
 | `technical_questions`| string   | no       | ≤10000 chars                       |
 | `salary_range_usd`   | string   | no       | free-form ("$8k/mo")               |
 
-`X-User-Id` header is required (Week 6 stub; Week 7 → session cookie).
+`Authorization: Bearer <session_token>` is required (ADR-0021; minted by `POST /auth/callback`).
 
 ### Server-side derivations (NOT client-controllable)
 
@@ -303,7 +303,7 @@ curl -s -X POST https://compass.<zone>.com/api/coop \
   - `1` if `interview_summary` or `technical_questions` present
   - `0` otherwise
 - `coop_id`: server-generated UUID (`coop-<12 hex>`)
-- `contributor_user_id`: pulled from `X-User-Id`
+- `contributor_user_id`: resolved server-side from the verified session token
 - `is_seed_data`: always `false` for client uploads (true only for the
   curated Co-op Seed Data, see PLAN §6.5)
 
@@ -319,7 +319,7 @@ curl -s -X POST https://compass.<zone>.com/api/coop \
 
 ### Error responses
 
-- **401** when `X-User-Id` header is missing.
+- **401** when the session token is missing, invalid, or expired.
 - **422** when:
   - the (company, role, coop_term) triple is uniquely identifying (k<2
     after insert) — response detail includes a generalization hint.
@@ -338,7 +338,7 @@ curl -s https://compass.<zone>.com/api/coop
 
 # Authenticated — tier proportional to user's contribution_count
 curl -s https://compass.<zone>.com/api/coop \
-  -H "X-User-Id: u-husky-12345"
+  -H "Authorization: Bearer <session_token>"
 ```
 
 Response is a list of `CoopOut`:
@@ -489,7 +489,7 @@ When the contract above is unambiguous, here are the recommended bindings:
 | Course detail panel        | `GET /course/{id}`      | navigation from any hit              |
 | Evidence bubble click      | (read from `/course`)   | source quote + field is in `evidence_snippets` |
 | Co-op tab on course page   | `GET /coop?…`           | tier-aware; degraded for anonymous   |
-| Submit Co-op modal         | `POST /coop`            | requires X-User-Id (Week 7 cookie)   |
+| Submit Co-op modal         | `POST /coop`            | requires Bearer session token (ADR-0021)   |
 | "Ask the advisor" chat     | `POST /chat`            | NDJSON; render meta first, then stream tokens |
 | Login button               | redirect → Google OAuth | callback → `POST /auth/callback`     |
 | Rejected search affordance | `matched_via='rejected'`| show `rejection_reason` + reword CTA |

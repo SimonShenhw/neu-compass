@@ -1,0 +1,1633 @@
+{
+  "AAA": [
+    "triple-a (referring to high-budget, high-profile games)"
+  ],
+  "AAC": [
+    "augmentative and alternative communication"
+  ],
+  "ABA": [
+    "applied behavior analysis",
+    "american bar association"
+  ],
+  "ABC": [
+    "all-but-car"
+  ],
+  "AC": [
+    "alternating current"
+  ],
+  "ACA": [
+    "affordable care act",
+    "american counseling association"
+  ],
+  "ACE": [
+    "adverse childhood experiences"
+  ],
+  "ACI": [
+    "american concrete institute"
+  ],
+  "ACLS": [
+    "advanced cardiovascular life support"
+  ],
+  "ACO": [
+    "accountable care organization"
+  ],
+  "ADA": [
+    "americans with disabilities act"
+  ],
+  "ADC": [
+    "antibody-drug conjugate"
+  ],
+  "ADME": [
+    "absorption, distribution, metabolism, and excretion"
+  ],
+  "ADR": [
+    "alternative dispute resolution"
+  ],
+  "AES": [
+    "advanced encryption standard"
+  ],
+  "AFE": [
+    "automated feature extraction"
+  ],
+  "AFM": [
+    "atomic force microscopy",
+    "african american studies"
+  ],
+  "AI": [
+    "artificial intelligence"
+  ],
+  "AICPA": [
+    "american institute of certified public accountants"
+  ],
+  "AIDS": [
+    "acquired immunodeficiency syndrome"
+  ],
+  "AJAX": [
+    "asynchronous javascript and xml"
+  ],
+  "ALU": [
+    "arithmetic logic unit"
+  ],
+  "ANOVA": [
+    "analysis of variance"
+  ],
+  "AP": [
+    "advanced placement"
+  ],
+  "APA": [
+    "american psychological association",
+    "administrative procedure act"
+  ],
+  "APEC": [
+    "asia-pacific economic cooperation"
+  ],
+  "API": [
+    "application programming interface"
+  ],
+  "APIS": [
+    "application programming interfaces"
+  ],
+  "APPE": [
+    "advanced pharmacy practice experiences"
+  ],
+  "APRN": [
+    "advanced practice registered nurse"
+  ],
+  "APT": [
+    "arbitrage pricing theory"
+  ],
+  "AR": [
+    "augmented reality"
+  ],
+  "ARCSDE": [
+    "arc spatial database engine"
+  ],
+  "ASCAP": [
+    "american society of composers, authors and publishers",
+    "american society of composers, authors, and publishers"
+  ],
+  "ASD": [
+    "autism spectrum disorders"
+  ],
+  "ASEAN": [
+    "association of southeast asian nations"
+  ],
+  "ASK": [
+    "amplitude-shift keying"
+  ],
+  "ASL": [
+    "american sign language"
+  ],
+  "AUV": [
+    "autonomous underwater vehicles"
+  ],
+  "AVID": [
+    "avid media composer"
+  ],
+  "AWD": [
+    "advanced writing in the disciplines"
+  ],
+  "AWS": [
+    "amazon web service",
+    "amazon web services"
+  ],
+  "BACB": [
+    "behavior analyst certification board"
+  ],
+  "BCBA": [
+    "board-certified behavior analyst"
+  ],
+  "BGP": [
+    "border gateway protocol"
+  ],
+  "BICMOS": [
+    "bipolar-cmos"
+  ],
+  "BIM": [
+    "building information modeling"
+  ],
+  "BJT": [
+    "bipolar junction transistors"
+  ],
+  "BLS": [
+    "basic life support"
+  ],
+  "BMI": [
+    "broadcast music, inc."
+  ],
+  "BRIC": [
+    "brazil, russia, india, and china"
+  ],
+  "BS": [
+    "bachelor of science"
+  ],
+  "BSIB": [
+    "bachelor of science in international business"
+  ],
+  "BSN": [
+    "bachelor of science in nursing"
+  ],
+  "BSO": [
+    "boston symphony orchestra"
+  ],
+  "CAD": [
+    "computer-aided design",
+    "computer-aided drafting",
+    "computer aided design"
+  ],
+  "CALAPA": [
+    "california administrator performance assessment"
+  ],
+  "CAM": [
+    "computer aided manufacturing"
+  ],
+  "CAMD": [
+    "college of arts, media and design"
+  ],
+  "CAPD": [
+    "central auditory processing disorders"
+  ],
+  "CAPM": [
+    "capital asset pricing model"
+  ],
+  "CAR": [
+    "computer-assisted reporting"
+  ],
+  "CBD": [
+    "cannabidiol"
+  ],
+  "CBER": [
+    "center for biologic evaluation and research",
+    "center for biologics evaluation and research"
+  ],
+  "CCD": [
+    "charge-coupled device"
+  ],
+  "CCIS": [
+    "college of computer and information science"
+  ],
+  "CCU": [
+    "critical-care unit"
+  ],
+  "CCUS": [
+    "carbon capture, utilization, and storage"
+  ],
+  "CD": [
+    "continuous delivery"
+  ],
+  "CDER": [
+    "center for drug evaluation and research"
+  ],
+  "CDNS": [
+    "content delivery networks"
+  ],
+  "CDRH": [
+    "center for devices and radiological health"
+  ],
+  "CDS": [
+    "credit default swaps"
+  ],
+  "CFA": [
+    "chartered financial analyst"
+  ],
+  "CFD": [
+    "computational fluid dynamics"
+  ],
+  "CFR": [
+    "code of federal regulations"
+  ],
+  "CGI": [
+    "computer-generated imagery"
+  ],
+  "CGMP": [
+    "current good manufacturing practices"
+  ],
+  "CGMPS": [
+    "current good manufacturing practices"
+  ],
+  "CI": [
+    "continuous integration",
+    "counterintelligence"
+  ],
+  "CIO": [
+    "chief information officer"
+  ],
+  "CISG": [
+    "united nations convention on contracts for the international sale of goods"
+  ],
+  "CISSP": [
+    "certified information systems security professional"
+  ],
+  "CMC": [
+    "chemistry, manufacturing, and controls"
+  ],
+  "CMM": [
+    "capability maturity model"
+  ],
+  "CMOS": [
+    "complementary metal-oxide-semiconductor"
+  ],
+  "CNC": [
+    "computer numerical control"
+  ],
+  "CNN": [
+    "convolutional neural networks",
+    "convolutional neural network"
+  ],
+  "CNS": [
+    "central nervous system"
+  ],
+  "COOP": [
+    "continuity of operations"
+  ],
+  "COPD": [
+    "chronic obstructive pulmonary disease"
+  ],
+  "CPM": [
+    "critical path method"
+  ],
+  "CPOE": [
+    "computerized provider order entry"
+  ],
+  "CPU": [
+    "central processing unit"
+  ],
+  "CQ": [
+    "cultural intelligence"
+  ],
+  "CRISPR": [
+    "clustered regularly interspaced short palindromic repeats"
+  ],
+  "CRM": [
+    "customer relationship management",
+    "crisis resource management"
+  ],
+  "CRRJ": [
+    "civil rights and restorative justice"
+  ],
+  "CRT": [
+    "chinese remainder theorem"
+  ],
+  "CS": [
+    "computer science"
+  ],
+  "CSP": [
+    "concentrating solar power"
+  ],
+  "CSR": [
+    "corporate social responsibility"
+  ],
+  "CSS": [
+    "cascading style sheets"
+  ],
+  "CSSH": [
+    "college of social sciences and humanities"
+  ],
+  "CT": [
+    "computed tomography",
+    "computerized tomography"
+  ],
+  "CTD": [
+    "common technical document"
+  ],
+  "CTZ": [
+    "coastal transition zone"
+  ],
+  "CUSUM": [
+    "cumulative sum"
+  ],
+  "CV": [
+    "curriculum vitae"
+  ],
+  "DAO": [
+    "decentralized autonomous organization"
+  ],
+  "DAR": [
+    "drug adverse reaction"
+  ],
+  "DATA": [
+    "digital, analytics, technology, and automation"
+  ],
+  "DAW": [
+    "digital audio workstation"
+  ],
+  "DBMS": [
+    "database management systems"
+  ],
+  "DC": [
+    "direct current",
+    "washington, d.c."
+  ],
+  "DEFI": [
+    "decentralized finance"
+  ],
+  "DEI": [
+    "diversity, equity, and inclusion"
+  ],
+  "DES": [
+    "data encryption standard"
+  ],
+  "DFT": [
+    "density functional theory",
+    "discrete fourier transform"
+  ],
+  "DH": [
+    "digital humanities"
+  ],
+  "DHCP": [
+    "dynamic host configuration protocol"
+  ],
+  "DLS": [
+    "distinguished lecture series"
+  ],
+  "DLT": [
+    "distributed ledger technology"
+  ],
+  "DMCA": [
+    "digital millennium copyright act"
+  ],
+  "DMPK": [
+    "drug metabolism and pharmacokinetics"
+  ],
+  "DMSB": [
+    "d'amore-mckim school of business"
+  ],
+  "DNA": [
+    "deoxyribonucleic acid"
+  ],
+  "DNP": [
+    "doctor of nursing practice",
+    "doctorate of nursing practice"
+  ],
+  "DNS": [
+    "domain name system"
+  ],
+  "DOE": [
+    "design of experiments"
+  ],
+  "DOS": [
+    "disk operating system"
+  ],
+  "DPCM": [
+    "differential pulse-code modulation"
+  ],
+  "DPLL": [
+    "davis-putnam-logemann-loveland"
+  ],
+  "DPT": [
+    "doctor of physical therapy"
+  ],
+  "DSM": [
+    "diagnostic and statistical manual of mental disorders"
+  ],
+  "EAP": [
+    "extensible authentication protocol"
+  ],
+  "EC": [
+    "european commission"
+  ],
+  "ECN": [
+    "explicit congestion notification"
+  ],
+  "ECS": [
+    "endocannabinoid system"
+  ],
+  "ECTD": [
+    "electronic common technical document"
+  ],
+  "EDI": [
+    "electronic data interchange"
+  ],
+  "EDTPA": [
+    "educator teacher performance assessment"
+  ],
+  "EEG": [
+    "electroencephalography"
+  ],
+  "EHR": [
+    "electronic health record",
+    "electronic health records"
+  ],
+  "EKG": [
+    "electrocardiogram"
+  ],
+  "ELL": [
+    "english language learners"
+  ],
+  "EM": [
+    "electromagnetic wave"
+  ],
+  "EMG": [
+    "electromyography"
+  ],
+  "EMS": [
+    "emergency medical service"
+  ],
+  "EMT": [
+    "emergency medical technician"
+  ],
+  "ENSO": [
+    "el nino/southern oscillation"
+  ],
+  "EPC": [
+    "evolved packet core"
+  ],
+  "ERGM": [
+    "exponential random graph model"
+  ],
+  "ERISA": [
+    "employee retirement income security act"
+  ],
+  "ERP": [
+    "enterprise resource planning"
+  ],
+  "ESG": [
+    "environmental, social, and governance",
+    "environmental, social, governance"
+  ],
+  "ESR": [
+    "electron spin resonance"
+  ],
+  "ETL": [
+    "extract, transform, load",
+    "extract, transform, and load",
+    "extract-transform-load"
+  ],
+  "EU": [
+    "european union"
+  ],
+  "EV": [
+    "electric vehicle"
+  ],
+  "EVM": [
+    "earned value management"
+  ],
+  "EWMA": [
+    "exponentially weighted moving average"
+  ],
+  "EWOM": [
+    "electronic word of mouth"
+  ],
+  "FAO": [
+    "food and agriculture organization"
+  ],
+  "FASB": [
+    "financial accounting standards board"
+  ],
+  "FCP": [
+    "final cut pro"
+  ],
+  "FCPA": [
+    "foreign corrupt practices act"
+  ],
+  "FDA": [
+    "food and drug administration",
+    "federal food, drug, and cosmetic act",
+    "food drug administration"
+  ],
+  "FDAMA": [
+    "food and drug modernization act"
+  ],
+  "FDCA": [
+    "federal food, drug, and cosmetic act"
+  ],
+  "FDI": [
+    "foreign direct investment"
+  ],
+  "FEA": [
+    "finite element analysis"
+  ],
+  "FEM": [
+    "finite element method"
+  ],
+  "FEMA": [
+    "federal emergency management agency"
+  ],
+  "FFT": [
+    "fast fourier transform"
+  ],
+  "FIR": [
+    "finite impulse response"
+  ],
+  "FLSA": [
+    "fair labor standards act"
+  ],
+  "FM": [
+    "frequency modulation"
+  ],
+  "FMLA": [
+    "family medical leave act"
+  ],
+  "FMRI": [
+    "functional magnetic resonance imaging"
+  ],
+  "FOSS": [
+    "free and open source software"
+  ],
+  "FPGA": [
+    "field-programmable gate array",
+    "field programmable gate array"
+  ],
+  "FRE": [
+    "federal rules of evidence"
+  ],
+  "FSK": [
+    "frequency-shift keying"
+  ],
+  "FTC": [
+    "federal trade commission"
+  ],
+  "FTI": [
+    "family therapy institute"
+  ],
+  "FTP": [
+    "file transfer protocol"
+  ],
+  "GA": [
+    "genetic algorithms"
+  ],
+  "GAN": [
+    "generative adversarial network"
+  ],
+  "GANS": [
+    "generative adversarial networks"
+  ],
+  "GANTT": [
+    "gantt chart"
+  ],
+  "GATT": [
+    "general agreement on tariffs and trade"
+  ],
+  "GCP": [
+    "good clinical practices"
+  ],
+  "GDP": [
+    "gross domestic product"
+  ],
+  "GDPR": [
+    "general data protection regulation"
+  ],
+  "GHTF": [
+    "global harmonization task force"
+  ],
+  "GINA": [
+    "genetic information nondiscrimination act"
+  ],
+  "GIS": [
+    "geographic information system",
+    "geographic information systems",
+    "geographical information systems"
+  ],
+  "GIT": [
+    "geographic information technologies"
+  ],
+  "GLM": [
+    "generalized linear model",
+    "general linear model"
+  ],
+  "GLP": [
+    "good laboratory practices"
+  ],
+  "GMP": [
+    "good manufacturing practice",
+    "good manufacturing practices"
+  ],
+  "GNN": [
+    "graph neural networks"
+  ],
+  "GNSS": [
+    "global navigation satellite systems"
+  ],
+  "GPS": [
+    "global positioning system"
+  ],
+  "GPU": [
+    "graphical processing unit",
+    "graphics processing unit"
+  ],
+  "GUI": [
+    "graphical user interface",
+    "graphical user interfaces"
+  ],
+  "HBCU": [
+    "historically black colleges and universities"
+  ],
+  "HCI": [
+    "human-computer interaction",
+    "human computer interaction"
+  ],
+  "HFS": [
+    "hierarchical file system"
+  ],
+  "HIE": [
+    "health information exchange"
+  ],
+  "HINF": [
+    "h-infinity control"
+  ],
+  "HIPAA": [
+    "health insurance portability and accountability act"
+  ],
+  "HITECH": [
+    "health information technology for economic and clinical health act"
+  ],
+  "HIV": [
+    "human immunodeficiency virus"
+  ],
+  "HOS": [
+    "higher-order structure"
+  ],
+  "HPLC": [
+    "high-performance liquid chromatography"
+  ],
+  "HR": [
+    "human resources"
+  ],
+  "HRM": [
+    "human resources management",
+    "human resource management"
+  ],
+  "HSO": [
+    "health services organization"
+  ],
+  "HTML": [
+    "hypertext markup language"
+  ],
+  "HTTP": [
+    "hypertext transfer protocol"
+  ],
+  "HUMINT": [
+    "human intelligence"
+  ],
+  "HVAC": [
+    "heating, ventilation, and air conditioning"
+  ],
+  "IAAS": [
+    "infrastructure as a service"
+  ],
+  "IAC": [
+    "infrastructure as code"
+  ],
+  "IAF": [
+    "international affairs"
+  ],
+  "IATL": [
+    "integrated and applied technology leadership"
+  ],
+  "IC": [
+    "integrated circuit"
+  ],
+  "ICE": [
+    "individual conditional expectation"
+  ],
+  "ICF": [
+    "international coaching federation"
+  ],
+  "ICH": [
+    "international council for harmonisation of technical requirements for pharmaceuticals for human use",
+    "international conference on harmonization"
+  ],
+  "ICS": [
+    "integrated circuits"
+  ],
+  "ICU": [
+    "intensive-care unit"
+  ],
+  "IDEA": [
+    "individuals with disabilities education act"
+  ],
+  "IE": [
+    "industrial engineering"
+  ],
+  "IEC": [
+    "international electrotechnical commission"
+  ],
+  "IEP": [
+    "individual education plan",
+    "individualized education program"
+  ],
+  "IFSP": [
+    "individualized family service plan"
+  ],
+  "IGO": [
+    "intergovernmental organization"
+  ],
+  "IIR": [
+    "infinite impulse response"
+  ],
+  "IKE": [
+    "internet key exchange"
+  ],
+  "IM": [
+    "information management"
+  ],
+  "IMDRF": [
+    "international medical device regulatory forum"
+  ],
+  "IMF": [
+    "international monetary fund"
+  ],
+  "IMU": [
+    "inertial measurement units",
+    "inertial measurement unit"
+  ],
+  "IND": [
+    "investigational new drug"
+  ],
+  "IO": [
+    "input/output"
+  ],
+  "IOT": [
+    "internet of things",
+    "internet-of-things"
+  ],
+  "IP": [
+    "internet protocol",
+    "intellectual property",
+    "pure integer programming problems"
+  ],
+  "IPA": [
+    "international phonetic alphabet"
+  ],
+  "IPO": [
+    "initial public offering",
+    "initial public offerings"
+  ],
+  "IPPE": [
+    "introductory pharmacy practice experience"
+  ],
+  "IPSEC": [
+    "internet protocol security"
+  ],
+  "IR": [
+    "infrared spectroscopy",
+    "information retrieval",
+    "infrared"
+  ],
+  "IRB": [
+    "institutional review board",
+    "investigative review board"
+  ],
+  "IRR": [
+    "internal rate of return"
+  ],
+  "IRS": [
+    "internal revenue service"
+  ],
+  "ISO": [
+    "international organization for standardization"
+  ],
+  "ISP": [
+    "individualized service plan"
+  ],
+  "ITCP": [
+    "information technology and creative practices"
+  ],
+  "ITIL": [
+    "it infrastructure library"
+  ],
+  "ITSM": [
+    "it service management"
+  ],
+  "IVD": [
+    "in vitro diagnostic medical devices"
+  ],
+  "JD": [
+    "juris doctor"
+  ],
+  "JSON": [
+    "javascript object notation"
+  ],
+  "JVM": [
+    "java virtual machine"
+  ],
+  "KPI": [
+    "key performance indicators"
+  ],
+  "LACS": [
+    "latin american and caribbean studies"
+  ],
+  "LAN": [
+    "local area networks"
+  ],
+  "LARC": [
+    "landscape architecture"
+  ],
+  "LCA": [
+    "life cycle assessment"
+  ],
+  "LED": [
+    "light-emitting diode"
+  ],
+  "LEED": [
+    "leadership in energy and environmental design"
+  ],
+  "LES": [
+    "large eddy simulation"
+  ],
+  "LGBT": [
+    "lesbian, gay, bisexual, and transgender"
+  ],
+  "LGBTQ": [
+    "lesbian, gay, bisexual, transgender, queer"
+  ],
+  "LIBOR": [
+    "london interbank offered rate"
+  ],
+  "LIDAR": [
+    "light detection and ranging"
+  ],
+  "LING": [
+    "linguistics"
+  ],
+  "LLC": [
+    "limited liability company"
+  ],
+  "LLM": [
+    "large language model",
+    "master of laws"
+  ],
+  "LLMS": [
+    "large language models"
+  ],
+  "LP": [
+    "linear programming problems"
+  ],
+  "LR": [
+    "inductor-resistor"
+  ],
+  "LRC": [
+    "inductor-resistor-capacitor"
+  ],
+  "LSSC": [
+    "legal skills in social context"
+  ],
+  "LTAM": [
+    "long-term actuarial mathematics"
+  ],
+  "LU": [
+    "lower-upper"
+  ],
+  "LXD": [
+    "learning experience design"
+  ],
+  "MA": [
+    "mergers and acquisitions"
+  ],
+  "MAN": [
+    "metropolitan area networks"
+  ],
+  "MANOVA": [
+    "multivariate analysis of variance"
+  ],
+  "MAP": [
+    "measure, analyze, and evaluate the profit impact of marketing actions",
+    "measure, analyze, profit"
+  ],
+  "MAXMSP": [
+    "max/miroslav spolny programming"
+  ],
+  "MBA": [
+    "master of business administration"
+  ],
+  "MBE": [
+    "mind, brain, and education"
+  ],
+  "MCSP": [
+    "marine and coastal spatial planning"
+  ],
+  "MDES": [
+    "master of design"
+  ],
+  "MDG": [
+    "millennium development goals"
+  ],
+  "MDP": [
+    "markov decision process"
+  ],
+  "MEMS": [
+    "microelectromechanical systems"
+  ],
+  "MENA": [
+    "middle east and north africa"
+  ],
+  "MEP": [
+    "mechanical/electrical/plumbing"
+  ],
+  "MFE": [
+    "models for financial economics"
+  ],
+  "MIDI": [
+    "musical instrument digital interface"
+  ],
+  "MIE": [
+    "mechanical and industrial engineering"
+  ],
+  "MIP": [
+    "mixed integer programming problems"
+  ],
+  "MISM": [
+    "management information systems"
+  ],
+  "ML": [
+    "machine learning"
+  ],
+  "MLE": [
+    "maximum likelihood estimation",
+    "maximum likelihood estimator"
+  ],
+  "MLOPS": [
+    "machine learning operations"
+  ],
+  "MMICS": [
+    "monolithic microwave integrated circuits"
+  ],
+  "MOOC": [
+    "massive open online course"
+  ],
+  "MOS": [
+    "metal-oxide-semiconductor"
+  ],
+  "MOSFET": [
+    "metal-oxide-semiconductor field-effect transistor"
+  ],
+  "MPC": [
+    "model penal code"
+  ],
+  "MPH": [
+    "master of public health"
+  ],
+  "MPLS": [
+    "multiprotocol label switching"
+  ],
+  "MPSK": [
+    "m-ary phase-shift keying"
+  ],
+  "MR": [
+    "mixed reality",
+    "mixed-reality"
+  ],
+  "MRI": [
+    "magnetic resonance imaging",
+    "magnetic resonance (imaging)",
+    "magnetic resonance images"
+  ],
+  "MS": [
+    "mass spectrometry",
+    "microsoft"
+  ],
+  "MSA": [
+    "measurement system analysis"
+  ],
+  "MSCR": [
+    "media and screen studies"
+  ],
+  "MSF": [
+    "master of science in finance"
+  ],
+  "MTEL": [
+    "massachusetts tests for educator licensure"
+  ],
+  "MTSS": [
+    "multi-tiered system of support"
+  ],
+  "MVC": [
+    "model-view-controller"
+  ],
+  "MVP": [
+    "minimal viable product"
+  ],
+  "NATO": [
+    "north atlantic treaty organization"
+  ],
+  "NCAA": [
+    "national collegiate athletic association"
+  ],
+  "NDT": [
+    "nondestructive testing"
+  ],
+  "NEMS": [
+    "nanoelectromechanical system"
+  ],
+  "NFT": [
+    "nonfungible tokens"
+  ],
+  "NFV": [
+    "network function virtualization"
+  ],
+  "NGO": [
+    "nongovernmental organization",
+    "non-governmental organization",
+    "nongovernment organization"
+  ],
+  "NGS": [
+    "next-generation sequencing"
+  ],
+  "NICU": [
+    "neonatal intensive care unit"
+  ],
+  "NIEHS": [
+    "national institute of environmental health sciences"
+  ],
+  "NIH": [
+    "national institutes of health"
+  ],
+  "NIMS": [
+    "national incident management system"
+  ],
+  "NLP": [
+    "natural language processing"
+  ],
+  "NLRA": [
+    "national labor relations act"
+  ],
+  "NMR": [
+    "nuclear magnetic resonance"
+  ],
+  "NNP": [
+    "neonatal nurse practitioner"
+  ],
+  "NOSQL": [
+    "not only sql"
+  ],
+  "NP": [
+    "nondeterministic polynomial time",
+    "nurse practitioner"
+  ],
+  "NPC": [
+    "nonplayer characters"
+  ],
+  "NPS": [
+    "national preparedness system"
+  ],
+  "NPV": [
+    "net present value"
+  ],
+  "NSF": [
+    "national science foundation"
+  ],
+  "NSSE": [
+    "national survey of student engagement"
+  ],
+  "NU": [
+    "northeastern university"
+  ],
+  "NULAB": [
+    "northeastern university digital humanities lab"
+  ],
+  "OBM": [
+    "organizational behavior management"
+  ],
+  "ODE": [
+    "ordinary differential equation"
+  ],
+  "OECD": [
+    "organisation for economic co-operation and development"
+  ],
+  "OHDSI": [
+    "observational health data sciences and informatics"
+  ],
+  "OIF": [
+    "operation iraqi freedom"
+  ],
+  "OLAP": [
+    "online analytical processing"
+  ],
+  "OLS": [
+    "ordinary least squares"
+  ],
+  "OMG": [
+    "object management group"
+  ],
+  "OQPSK": [
+    "offset quadrature phase-shift keying"
+  ],
+  "OS": [
+    "operating system"
+  ],
+  "OSI": [
+    "open systems interconnection",
+    "open system interconnection"
+  ],
+  "OTC": [
+    "over-the-counter"
+  ],
+  "PAM": [
+    "pulse amplitude modulation",
+    "pulse-amplitude modulation"
+  ],
+  "PBW": [
+    "poincaré-birkhoff-witt"
+  ],
+  "PCA": [
+    "principal component analysis"
+  ],
+  "PCAOB": [
+    "public company accounting oversight board"
+  ],
+  "PCAS": [
+    "principal component analyses"
+  ],
+  "PCR": [
+    "polymerase chain reaction"
+  ],
+  "PDE": [
+    "partial differential equation",
+    "partial differential equations"
+  ],
+  "PDF": [
+    "portable document format"
+  ],
+  "PDM": [
+    "product management"
+  ],
+  "PERT": [
+    "program evaluation and review technique"
+  ],
+  "PET": [
+    "positron emission tomography"
+  ],
+  "PFA": [
+    "psychological first aid"
+  ],
+  "PGP": [
+    "pretty good privacy"
+  ],
+  "PHD": [
+    "doctor of philosophy"
+  ],
+  "PHP": [
+    "php: hypertext preprocessor"
+  ],
+  "PI": [
+    "principal investigator"
+  ],
+  "PID": [
+    "proportional-integral-derivative"
+  ],
+  "PLC": [
+    "programmable logic controller",
+    "programmable logic circuit",
+    "programmable logic controllers"
+  ],
+  "PMBOK": [
+    "project management body of knowledge"
+  ],
+  "PMI": [
+    "project management institute"
+  ],
+  "PNP": [
+    "pediatric nurse practitioner"
+  ],
+  "PPACA": [
+    "patient protection and affordable care act"
+  ],
+  "PPE": [
+    "politics, philosophy, and economics"
+  ],
+  "PPSA": [
+    "physicians payment sunshine act"
+  ],
+  "PQM": [
+    "project quality management"
+  ],
+  "PR": [
+    "public relations"
+  ],
+  "PRC": [
+    "people's republic of china"
+  ],
+  "PROTAC": [
+    "proteolysis targeting chimera"
+  ],
+  "PSK": [
+    "phase-shift keying"
+  ],
+  "PSO": [
+    "particle swarm optimization"
+  ],
+  "PSPACE": [
+    "polynomial space"
+  ],
+  "PT": [
+    "physical therapy",
+    "physical therapist"
+  ],
+  "PTSD": [
+    "post-traumatic stress disorder"
+  ],
+  "PV": [
+    "photovoltaic"
+  ],
+  "QAM": [
+    "quadrature amplitude modulation"
+  ],
+  "QBD": [
+    "quality-by-design"
+  ],
+  "QM": [
+    "quantum mechanical"
+  ],
+  "QOS": [
+    "quality of service"
+  ],
+  "QPCR": [
+    "quantitative polymerase chain reaction"
+  ],
+  "QR": [
+    "qr decomposition"
+  ],
+  "QSR": [
+    "quality system regulation"
+  ],
+  "RAM": [
+    "random-access memory"
+  ],
+  "RC": [
+    "resistor-capacitor"
+  ],
+  "RCM": [
+    "responsibility center management"
+  ],
+  "REIT": [
+    "real estate investment trust"
+  ],
+  "REST": [
+    "representational state transfer"
+  ],
+  "RF": [
+    "radio frequency"
+  ],
+  "RFP": [
+    "request for proposals"
+  ],
+  "RFQ": [
+    "request for qualifications"
+  ],
+  "RID": [
+    "registry of interpreters for the deaf"
+  ],
+  "RISC": [
+    "reduced instruction set computing"
+  ],
+  "RL": [
+    "reinforcement learning",
+    "resistor-inductor"
+  ],
+  "RLC": [
+    "resistor-inductor-capacitor"
+  ],
+  "RML": [
+    "requirements modeling language"
+  ],
+  "RN": [
+    "registered nurse"
+  ],
+  "RNA": [
+    "ribonucleic acid"
+  ],
+  "RNN": [
+    "recurrent neural networks"
+  ],
+  "ROM": [
+    "read-only memory"
+  ],
+  "ROTC": [
+    "reserve officers’ training corps"
+  ],
+  "RRNA": [
+    "ribosomal rna"
+  ],
+  "RSA": [
+    "rivest-shamir-adleman",
+    "rivest–shamir–adleman encryption system"
+  ],
+  "RSS": [
+    "really simple syndication"
+  ],
+  "RSVP": [
+    "resource reservation protocol"
+  ],
+  "RTL": [
+    "resistor-transistor logic"
+  ],
+  "RWD": [
+    "real-world data"
+  ],
+  "RWE": [
+    "real-world evidence"
+  ],
+  "SA": [
+    "simulated annealing"
+  ],
+  "SAR": [
+    "synthetic aperture radar"
+  ],
+  "SAS": [
+    "statistical analysis system",
+    "statement on auditing standards"
+  ],
+  "SBM": [
+    "stochastic block model"
+  ],
+  "SCIML": [
+    "scientific machine learning"
+  ],
+  "SDLC": [
+    "system development life cycle",
+    "software development life cycle"
+  ],
+  "SDN": [
+    "software-defined networking"
+  ],
+  "SDOF": [
+    "single degree of freedom"
+  ],
+  "SEA": [
+    "sea education association"
+  ],
+  "SEC": [
+    "securities and exchange commission",
+    "u.s. securities and exchange commission"
+  ],
+  "SECOPS": [
+    "security operations"
+  ],
+  "SEI": [
+    "sheltered english immersion"
+  ],
+  "SEM": [
+    "scanning electron microscopy"
+  ],
+  "SEO": [
+    "search engine optimization"
+  ],
+  "SES": [
+    "social-ecological systems"
+  ],
+  "SH": [
+    "semester hours"
+  ],
+  "SHA": [
+    "secure hash algorithm"
+  ],
+  "SI": [
+    "silicon"
+  ],
+  "SIJS": [
+    "special immigrant juvenile status"
+  ],
+  "SIOP": [
+    "sheltered instruction observation protocol"
+  ],
+  "SIRNA": [
+    "small interfering rna"
+  ],
+  "SLAM": [
+    "simultaneous localization and mapping"
+  ],
+  "SLP": [
+    "speech-language pathology",
+    "speech-language pathologist"
+  ],
+  "SME": [
+    "small and medium-sized enterprise"
+  ],
+  "SMT": [
+    "satisfiability modulo theories"
+  ],
+  "SMTP": [
+    "simple mail transfer protocol"
+  ],
+  "SNMP": [
+    "simple network management protocol"
+  ],
+  "SOC": [
+    "system on a chip"
+  ],
+  "SPECT": [
+    "single-photon emission tomography"
+  ],
+  "SPICE": [
+    "simulation program with integrated circuit emphasis"
+  ],
+  "SPSS": [
+    "statistical package for the social sciences"
+  ],
+  "SQL": [
+    "structured query language"
+  ],
+  "SRH": [
+    "sexual and reproductive health"
+  ],
+  "SRNA": [
+    "student registered nurse anesthetist"
+  ],
+  "SSH": [
+    "secure shell"
+  ],
+  "SSL": [
+    "secure sockets layer"
+  ],
+  "STD": [
+    "sexually transmitted disease"
+  ],
+  "STEM": [
+    "science, technology, engineering, and mathematics"
+  ],
+  "STIS": [
+    "sexually transmitted infections"
+  ],
+  "STM": [
+    "scanning tunneling microscopy"
+  ],
+  "STS": [
+    "science and technology studies"
+  ],
+  "SVD": [
+    "singular value decomposition",
+    "singular value decompositions"
+  ],
+  "SVM": [
+    "support vector machine"
+  ],
+  "SWOT": [
+    "strengths, weaknesses, opportunities, threats",
+    "strengths, weaknesses, opportunities, and threats"
+  ],
+  "TA": [
+    "teaching assistant"
+  ],
+  "TANMS": [
+    "translational applications of nanoscale multiferroic systems"
+  ],
+  "TBL": [
+    "team-based learning"
+  ],
+  "TCP": [
+    "transmission control protocol"
+  ],
+  "TEM": [
+    "transmission electron microscopy"
+  ],
+  "THC": [
+    "tetrahydrocannabinol"
+  ],
+  "THZ": [
+    "terahertz"
+  ],
+  "TLP": [
+    "troop leading procedures"
+  ],
+  "TLS": [
+    "transport layer security"
+  ],
+  "TS": [
+    "tabu search"
+  ],
+  "TTL": [
+    "transistor-transistor logic"
+  ],
+  "TV": [
+    "television"
+  ],
+  "UAS": [
+    "unmanned aerial systems"
+  ],
+  "UBD": [
+    "understanding by design"
+  ],
+  "UCC": [
+    "uniform commercial code",
+    "unified communications and collaboration"
+  ],
+  "UDP": [
+    "user datagram protocol"
+  ],
+  "UI": [
+    "user interface"
+  ],
+  "UML": [
+    "unified modeling language"
+  ],
+  "UN": [
+    "united nations"
+  ],
+  "UNCAC": [
+    "u.n. convention against corruption"
+  ],
+  "UNESCO": [
+    "united nations educational, scientific and cultural organization"
+  ],
+  "UNIX": [
+    "unix operating system"
+  ],
+  "US": [
+    "united states"
+  ],
+  "UX": [
+    "user experience",
+    "user-centered design",
+    "user experience design"
+  ],
+  "VAWA": [
+    "violence against women act"
+  ],
+  "VBA": [
+    "visual basic for applications"
+  ],
+  "VFX": [
+    "visual effects"
+  ],
+  "VLSI": [
+    "very large scale integration"
+  ],
+  "VOC": [
+    "voice of the customer"
+  ],
+  "VPN": [
+    "virtual private network"
+  ],
+  "VR": [
+    "virtual reality"
+  ],
+  "VUI": [
+    "voice user interfaces"
+  ],
+  "WACC": [
+    "weighted average cost of capital"
+  ],
+  "WAN": [
+    "wide area networks",
+    "wide area network"
+  ],
+  "WEIRD": [
+    "western, educated, industrialized, rich, democratic"
+  ],
+  "WIDA": [
+    "world-class instructional design and assessment"
+  ],
+  "WMD": [
+    "weapons of mass destruction"
+  ],
+  "WTO": [
+    "world trade organization"
+  ],
+  "WWII": [
+    "world war ii"
+  ],
+  "WWW": [
+    "world wide web"
+  ],
+  "XML": [
+    "extensible markup language"
+  ],
+  "XR": [
+    "extended reality",
+    "extended realities",
+    "mixed reality"
+  ],
+  "XSLT": [
+    "extensible stylesheet language transformations"
+  ]
+}

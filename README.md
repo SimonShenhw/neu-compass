@@ -325,6 +325,7 @@ neu-compass/
 - **[ADR-0017](docs/adr/0017-nas-rerank-pool-int8.md)** NAS rerank pool 20→10 + int8 reranker (live-API 实测 p50 -58% 质量无损) — 2026-06
 - **[ADR-0018](docs/adr/0018-calibrated-rejection-gate.md)** 校准拒绝门控 (sigmoid+BM25+vec+code-miss 逻辑回归,R@5 +7.5%,误拒 -75%) — 2026-06
 - **[ADR-0019](docs/adr/0019-hyde-rescue-pass.md)** HyDE rescue pass (拒绝后 LLM 二审 + 检索重试,误拒归零,主路径零开销) — 2026-06
+- **[ADR-0021](docs/adr/0021-session-token-auth.md)** 签名 session token 鉴权 (itsdangerous Bearer + OAuth state CSRF,X-User-Id stub 退役) — 2026-06
 
 完整 ADR: [docs/adr/](docs/adr/)
 
@@ -367,6 +368,7 @@ neu-compass/
 - **pre-commit detect-secrets 严格模式**: 任何 secret 入 commit 直接 fail
 - **PII k-anonymity 强制**: 三元组 (company, role, term) 必须 ≥ 2 次出现才发布,server-side 在 `POST /coop` 强制
 - **OAuth 域名白名单**: `is_email_allowed` 走 split-on-`@` 精确匹配,**禁止子串攻击** (`attacker@husky.neu.edu.evil.com` 必拒)
+- **API 鉴权 (ADR-0021)**: `POST /coop` 等写路径要求 `Authorization: Bearer <session_token>`(itsdangerous 签名,仅 `POST /auth/callback` 经 Google OAuth 后签发);OAuth 回调带 `state` CSRF 一次性核销
 
 详见 [docs/pii_redaction.md](docs/pii_redaction.md) + [PLAN v2.1 §3](docs/PLAN_v2.1.md)
 
