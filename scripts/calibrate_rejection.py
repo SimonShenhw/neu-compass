@@ -100,6 +100,20 @@ UNANSWERABLE_QUERIES: list[tuple[str, str]] = [
     ("impossible", "free course with no tuition and no prerequisites ever"),
     ("impossible", "undergraduate kindergarten math"),
     ("impossible", "PhD defense scheduling for chemistry"),
+    # Chinese unanswerable — the ASCII-only BM25 leg yields bm25_top=0 for
+    # these, same as for answerable Chinese queries; the cjk_dominant
+    # feature + these samples teach the gate to separate the two regimes
+    # on vec/sigmoid evidence instead of missing lexical evidence.
+    ("zh_campus_admin", "停车证多少钱一个学期"),
+    ("zh_campus_admin", "学费什么时候交截止日期"),
+    ("zh_campus_admin", "宿舍洗衣机几点开门"),
+    ("zh_chitchat", "今天天气怎么样啊"),
+    ("zh_chitchat", "给我讲个笑话吧"),
+    ("zh_off_domain", "波士顿哪家火锅最好吃"),
+    ("zh_off_domain", "怎么续签护照最快"),
+    ("zh_homework", "第三次作业的答案给我看看"),
+    ("zh_fake_code", "CS 八千八百八十八 这门课"),
+    ("zh_impossible", "保证毕业就进谷歌的课程"),
 ]
 
 
@@ -117,6 +131,63 @@ def _informative_tokens(raw_text: str, *, n: int = 3) -> list[str]:
     body = toks[3:] or toks
     stride = max(1, len(body) // n)
     return [body[min(i * stride, len(body) - 1)] for i in range(n)]
+
+
+def build_answerable_zh_queries(conn, *, limit: int = 15) -> list[tuple[str, str]]:
+    """Gemini-generated Chinese answerable queries from sampled courses.
+    Best-effort: any LLM failure just yields fewer samples (the script
+    prints the final count; aim for ≥10 so w_cjk has signal)."""
+    from llm.gemini_client import GeminiError, generate_text  # noqa: PLC0415
+
+    rows = conn.execute(
+        "SELECT primary_name, raw_text FROM courses "
+        "WHERE status='indexed' AND length(COALESCE(raw_text,'')) > 200 "
+        "ORDER BY course_id"
+    ).fetchall()
+    stride = max(1, len(rows) // limit)
+    out: list[tuple[str, str]] = []
+    for r in rows[::stride][:limit]:
+        prompt = (
+            "你在模拟一个中国研究生用中文搜索大学选课系统。根据下面的课程"
+            "描述,写一条自然的中文搜索 query(8-20 个字,可夹杂英文术语,"
+            "不要出现课程编号和完整课程名)。只输出 query 本身。\n\n"
+            f"课程名: {r['primary_name']}\n描述: {r['raw_text'][:500]}"
+        )
+        try:
+            q = generate_text(prompt, temperature=0.8, max_output_tokens=2048)
+        except GeminiError as e:
+            print(f"   ! zh-query LLM failed: {e}")
+            continue
+        line = q.strip().splitlines()[0].strip().strip('"').strip()
+        if 4 <= len(line) <= 60:
+            out.append(("zh_answerable", line))
+    return out
+
+
+def build_hard_answerable_queries(conn, bm25, *, limit: int = 15) -> list[tuple[str, str]]:
+    """Rare-jargon answerable queries — the q013/q018 evidence profile the
+    easy synthesized set lacks (low cross-encoder sigmoid, mid vector
+    cosine, HIGH lexical evidence). Without these the LR collapses onto a
+    vector-dominant solution and regresses exactly the queries BM25 was
+    rescuing. Tokens are picked by max IDF from each course's own raw_text
+    (answerable by construction)."""
+    from rag.hybrid import tokenize  # noqa: PLC0415
+
+    idf = getattr(getattr(bm25, "_bm25", None), "idf", {}) or {}
+    rows = conn.execute(
+        "SELECT primary_name, raw_text FROM courses "
+        "WHERE status='indexed' AND length(COALESCE(raw_text,'')) > 150 "
+        "ORDER BY course_id"
+    ).fetchall()
+    stride = max(1, len(rows) // limit)
+    out: list[tuple[str, str]] = []
+    for r in rows[::stride][:limit]:
+        toks = [t for t in set(tokenize(r["raw_text"])) if len(t) > 3]
+        if len(toks) < 3:
+            continue
+        rare = sorted(toks, key=lambda t: -idf.get(t, 0.0))[:3]
+        out.append(("jargon_style", " ".join(rare)))
+    return out
 
 
 def build_answerable_queries(conn, *, limit: int = 50) -> list[tuple[str, str]]:
@@ -154,7 +225,10 @@ def collect_features(args) -> list[dict]:
     from rag.hybrid import BM25Corpus, HybridRetriever  # noqa: PLC0415
     from rag.index import FaissIndex  # noqa: PLC0415
     from rag.query_normalizer import normalize_query_to_course_ids  # noqa: PLC0415
-    from rag.rejection import query_has_code_pattern  # noqa: PLC0415
+    from rag.rejection import (  # noqa: PLC0415
+        query_has_code_pattern,
+        query_is_cjk_dominant,
+    )
     from rag.retriever import Retriever  # noqa: PLC0415
 
     log = structlog.get_logger("calibrate_rejection")
@@ -180,9 +254,17 @@ def collect_features(args) -> list[dict]:
             vector_retriever=vector, bm25_corpus=bm25, course_repo=course_repo,
         )
 
+        zh_answerable = build_answerable_zh_queries(conn, limit=15)
+        print(f"=> zh answerable generated: {len(zh_answerable)}")
+        hard_answerable = build_hard_answerable_queries(conn, bm25, limit=15)
+        print(f"=> hard (jargon) answerable: {len(hard_answerable)}")
         queries = [
             {"label": 1, "category": cat, "query": q}
-            for cat, q in build_answerable_queries(conn, limit=args.n_answerable)
+            for cat, q in (
+                build_answerable_queries(conn, limit=args.n_answerable)
+                + hard_answerable
+                + zh_answerable
+            )
         ] + [
             {"label": 0, "category": cat, "query": q}
             for cat, q in UNANSWERABLE_QUERIES
@@ -218,6 +300,7 @@ def collect_features(args) -> list[dict]:
                 "bm25_top": float(diag.get("bm25_top", 0.0)),
                 "vec_top": float(diag.get("vec_top", 0.0)),
                 "code_miss": bool(query_has_code_pattern(q)),
+                "cjk": bool(query_is_cjk_dominant(q)),
             })
             if (i + 1) % 10 == 0:
                 print(f"   {i + 1}/{len(queries)} queries scored")
@@ -234,11 +317,15 @@ def _design(rows: list[dict]) -> tuple[np.ndarray, np.ndarray]:
     feats, labels = [], []
     for r in rows:
         s = min(max(r["max_sigmoid"], eps), 1 - eps)
+        cjk = 1.0 if r.get("cjk") else 0.0
         feats.append([
             math.log(s / (1 - s)),
-            math.log1p(max(r["bm25_top"], 0.0)),
+            # Interaction: lexical evidence only counts when the ASCII
+            # tokenizer actually saw the query (mirrors gate.probability).
+            math.log1p(max(r["bm25_top"], 0.0)) * (1.0 - cjk),
             r["vec_top"],
             1.0 if r["code_miss"] else 0.0,
+            cjk,
         ])
         labels.append(r["label"])
     return np.asarray(feats, dtype=np.float64), np.asarray(labels, dtype=np.float64)
@@ -304,6 +391,7 @@ def cli() -> int:
         "w_log1p_bm25": round(float(w[1]), 4),
         "w_vec_top": round(float(w[2]), 4),
         "w_code_miss": round(float(w[3]), 4),
+        "w_cjk": round(float(w[4]), 4),
     }
 
     grid = []

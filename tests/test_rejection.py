@@ -7,6 +7,7 @@ from rag.rejection import (
     RejectionFeatures,
     build_gate_fn,
     query_has_code_pattern,
+    query_is_cjk_dominant,
 )
 from rag.reranker import rerank_blend_with_rejection
 from rag.retriever import SearchHit
@@ -43,6 +44,51 @@ def test_code_pattern_cjk_does_not_extend_word_boundary() -> None:
     # ASCII flag: CJK chars must not block the match (same fix family as
     # query_normalizer's '那aai' case)
     assert query_has_code_pattern("请问AAI 9999这门课怎么样")
+
+
+# === query_is_cjk_dominant ===
+
+
+def test_cjk_dominant_pure_chinese() -> None:
+    assert query_is_cjk_dominant("金融财报分析入门选课")
+
+
+def test_cjk_dominant_mixed_with_english_terms() -> None:
+    # CJK majority with embedded English jargon still counts — BM25 only
+    # sees the few ASCII tokens, lexical evidence stays unreliable.
+    assert query_is_cjk_dominant("CRM 认知偏差 团队决策 选课")
+
+
+def test_cjk_dominant_english_query_false() -> None:
+    assert not query_is_cjk_dominant("graph algorithms BFS DFS")
+    assert not query_is_cjk_dominant("")
+
+
+def test_cjk_feature_shifts_probability_when_weighted() -> None:
+    coef = {
+        "bias": 0.0, "w_logit_sigmoid": 0.0, "w_log1p_bm25": 0.0,
+        "w_vec_top": 0.0, "w_code_miss": 0.0, "w_cjk": 2.0,
+    }
+    g = CalibratedRejectionGate(coef)
+    p_zh = g.probability(_features(cjk_dominant=True))
+    p_en = g.probability(_features(cjk_dominant=False))
+    assert p_zh > p_en
+
+
+def test_missing_w_cjk_coefficient_still_works() -> None:
+    """Old 4-coefficient dicts (pre-v0.3 fit) must not crash. The CJK flag
+    still zeroes the BM25 term STRUCTURALLY (interaction by design):
+    lexical evidence only counts when the ASCII tokenizer saw the query."""
+    coef = {
+        "bias": 0.0, "w_logit_sigmoid": 0.0, "w_log1p_bm25": 1.0,
+        "w_vec_top": 0.0, "w_code_miss": 0.0,
+    }
+    g = CalibratedRejectionGate(coef)
+    p_en = g.probability(_features(bm25_top=5.0, cjk_dominant=False))
+    p_zh = g.probability(_features(bm25_top=5.0, cjk_dominant=True))
+    assert p_en > p_zh
+    # For a CJK query, bm25_top's value is irrelevant — term is zeroed.
+    assert p_zh == g.probability(_features(bm25_top=0.0, cjk_dominant=True))
 
 
 # === CalibratedRejectionGate.probability — directional sanity ===

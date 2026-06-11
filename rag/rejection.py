@@ -53,31 +53,43 @@ _NOT_DEPT_WORDS = frozenset({
     "fall", "spring", "summer", "winter", "autumn", "term", "year", "since",
 })
 
-# Fitted on the NAS 2026-06-11 by scripts/calibrate_rejection.py against
-# the production stack (openvino int8, pool=10): n=90 gate-path queries
-# (50 answerable synthesized from catalog / 40 unanswerable, 8 categories),
-# AUC 0.9795 vs 0.9605 for max-sigmoid alone. Run report:
-# NAS /data/rejection_calibration.json + ADR-0018. Do not hand-edit —
+# CJK detection for the cjk_dominant feature. The BM25 leg is ASCII-only
+# (rag/hybrid.py documented limitation), so bm25_top is STRUCTURALLY zero
+# for Chinese queries — without this feature the gate reads missing lexical
+# evidence as negative evidence and false-rejects answerable 中文 queries
+# (v0.3 eval first surfaced this: q091/q093). The coefficient learned from
+# Chinese calibration samples compensates.
+_CJK_RE = re.compile(r"[一-鿿㐀-䶿]")
+
+# Fitted on the NAS 2026-06-11 (v4 run) by scripts/calibrate_rejection.py
+# against the production stack (openvino int8, pool=10): n=130 gate-path
+# queries — 50 easy answerable + 15 hard jargon answerable (max-IDF tokens;
+# without these the LR collapses vector-dominant and regresses the
+# BM25-rescued queries) + 15 Gemini zh answerable + 50 unanswerable
+# (8 EN + 6 ZH categories). Grid at p<0.4: 0/80 answerable false-rejects,
+# 39/50 unanswerable caught. Run report: NAS /data/rejection_calibration.json
+# (copy: eval/rejection_calibration.json) + ADR-0018. Do not hand-edit —
 # re-run the script if the embedder/reranker/corpus changes.
 DEFAULT_COEFFICIENTS: dict[str, float] = {
-    "bias": -4.4408,
-    "w_logit_sigmoid": 0.5844,
-    "w_log1p_bm25": 1.5115,
-    "w_vec_top": 4.3305,
-    "w_code_miss": -4.5121,
+    "bias": -1.9905,
+    "w_logit_sigmoid": 0.5766,
+    "w_log1p_bm25": 0.9609,
+    "w_vec_top": 2.9285,
+    "w_code_miss": -3.602,
+    "w_cjk": 1.8005,
 }
 
-REJECT_BELOW = 0.3
+REJECT_BELOW = 0.4
 """Reject when P(answerable) < this. NOT the LR midpoint (0.5) on purpose:
 the operating rule is "maximize unanswerable catch subject to ZERO
-false-rejects on the calibration answerable set", which the calibration
-grid resolves to 0.3 (false-rej 0/50, caught 31/40; at 0.5 it's 1/50 and
-36/40). Product asymmetry: refusing a real student query is worse than
-returning weak results for an unanswerable one — /chat's grounded prompt
-still answers "not in catalog" for the latter. Live feature probes show
-the residual irreducible overlap is q042-style homework-admin (p≈0.25,
-reject) vs q018-style theory jargon (p≈0.20, sadly also rejected) — see
-ADR-0018 for the measured distribution. Adjust only with a re-fit."""
+false-rejects on the calibration answerable set", which the v4 grid
+resolves to 0.4 (false-rej 0/80, caught 39/50; 0.5 trades a false-reject
+for 2 more catches). Product asymmetry: refusing a real student query is
+worse than returning weak results for an unanswerable one — /chat's
+grounded prompt still answers "not in catalog" for the latter. Measured
+residual on the held-out set: q018-style pure theory jargon (p≈0.26)
+remains below the line; q042 homework-admin (p≈0.28) stays correctly
+rejected. Adjust only together with a re-fit (ADR-0018)."""
 
 _LOGIT_EPS = 1e-6  # max_sigmoid=0.0 → logit ≈ -13.8 instead of -inf
 
@@ -91,6 +103,7 @@ class RejectionFeatures:
     bm25_top: float
     vec_top: float
     code_pattern_miss: bool
+    cjk_dominant: bool = False
 
 
 def query_has_code_pattern(query: str) -> bool:
@@ -102,6 +115,17 @@ def query_has_code_pattern(query: str) -> bool:
         m.group(1).lower() not in _NOT_DEPT_WORDS
         for m in _COURSE_CODE_RE.finditer(query)
     )
+
+
+def query_is_cjk_dominant(query: str, *, threshold: float = 0.3) -> bool:
+    """True iff CJK characters make up more than `threshold` of the query's
+    non-space characters — the regime where the ASCII-only BM25 leg goes
+    structurally silent and bm25_top=0 carries no signal."""
+    chars = [c for c in query if not c.isspace()]
+    if not chars:
+        return False
+    cjk = sum(1 for c in chars if _CJK_RE.match(c))
+    return cjk / len(chars) > threshold
 
 
 def _logit(p: float) -> float:
@@ -122,13 +146,26 @@ class CalibratedRejectionGate:
         self.reject_below = reject_below
 
     def probability(self, f: RejectionFeatures) -> float:
-        """P(answerable) ∈ (0, 1)."""
+        """P(answerable) ∈ (0, 1).
+
+        The BM25 term is an INTERACTION with (not cjk): lexical evidence
+        only counts for non-CJK queries. Plain additive cjk couldn't
+        express "BM25 is trustworthy only when the ASCII tokenizer saw the
+        query" — fitting Chinese samples additively collapsed the BM25
+        weight globally (1.51→0.07) and regressed the English queries BM25
+        was rescuing. With the interaction, w_log1p_bm25 is learned on
+        English-only variation and w_cjk absorbs the missing-evidence
+        regime's baseline shift.
+        """
+        is_cjk = 1.0 if f.cjk_dominant else 0.0
         z = (
             self._c["bias"]
             + self._c["w_logit_sigmoid"] * _logit(f.max_sigmoid)
-            + self._c["w_log1p_bm25"] * math.log1p(max(f.bm25_top, 0.0))
+            + self._c["w_log1p_bm25"]
+            * math.log1p(max(f.bm25_top, 0.0)) * (1.0 - is_cjk)
             + self._c["w_vec_top"] * f.vec_top
             + self._c["w_code_miss"] * (1.0 if f.code_pattern_miss else 0.0)
+            + self._c.get("w_cjk", 0.0) * is_cjk
         )
         return 1.0 / (1.0 + math.exp(-z))
 
@@ -140,7 +177,8 @@ class CalibratedRejectionGate:
             f"calibrated_gate p_answerable={p:.3f} "
             f"{'<' if reject else '>='} {self.reject_below} "
             f"(max_sigmoid={f.max_sigmoid:.4f}, bm25_top={f.bm25_top:.2f}, "
-            f"vec_top={f.vec_top:.3f}, code_miss={f.code_pattern_miss})"
+            f"vec_top={f.vec_top:.3f}, code_miss={f.code_pattern_miss}, "
+            f"cjk={f.cjk_dominant})"
         )
         return reject, p, reason
 
@@ -162,6 +200,7 @@ def build_gate_fn(
     """
     g = gate or CalibratedRejectionGate()
     code_miss = query_has_code_pattern(query)
+    cjk = query_is_cjk_dominant(query)
 
     def gate_fn(sigmoids: list[float]) -> tuple[bool, str]:
         f = RejectionFeatures(
@@ -169,6 +208,7 @@ def build_gate_fn(
             bm25_top=bm25_top,
             vec_top=vec_top,
             code_pattern_miss=code_miss,
+            cjk_dominant=cjk,
         )
         reject, _, reason = g.decide(f)
         return reject, reason
@@ -183,4 +223,5 @@ __all__ = [
     "RejectionFeatures",
     "build_gate_fn",
     "query_has_code_pattern",
+    "query_is_cjk_dominant",
 ]

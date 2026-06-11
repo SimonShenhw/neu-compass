@@ -1,39 +1,40 @@
 {
-  "n_fit": 90,
-  "auc_max_sigmoid_only": 0.9605,
-  "auc_full_gate": 0.9795,
+  "n_fit": 130,
+  "auc_max_sigmoid_only": 0.9585,
+  "auc_full_gate": 0.9782,
   "coefficients": {
-    "bias": -4.4408,
-    "w_logit_sigmoid": 0.5844,
-    "w_log1p_bm25": 1.5115,
-    "w_vec_top": 4.3305,
-    "w_code_miss": -4.5121
+    "bias": -1.9905,
+    "w_logit_sigmoid": 0.5766,
+    "w_log1p_bm25": 0.9609,
+    "w_vec_top": 2.9285,
+    "w_code_miss": -3.602,
+    "w_cjk": 1.8005
   },
   "threshold_grid": [
     {
       "threshold": 0.3,
-      "false_reject_answerable": "0/50",
-      "caught_unanswerable": "31/40"
+      "false_reject_answerable": "0/80",
+      "caught_unanswerable": "37/50"
     },
     {
       "threshold": 0.4,
-      "false_reject_answerable": "0/50",
-      "caught_unanswerable": "32/40"
+      "false_reject_answerable": "0/80",
+      "caught_unanswerable": "39/50"
     },
     {
       "threshold": 0.5,
-      "false_reject_answerable": "1/50",
-      "caught_unanswerable": "36/40"
+      "false_reject_answerable": "1/80",
+      "caught_unanswerable": "41/50"
     },
     {
       "threshold": 0.6,
-      "false_reject_answerable": "3/50",
-      "caught_unanswerable": "37/40"
+      "false_reject_answerable": "4/80",
+      "caught_unanswerable": "45/50"
     },
     {
       "threshold": 0.7,
-      "false_reject_answerable": "6/50",
-      "caught_unanswerable": "38/40"
+      "false_reject_answerable": "8/80",
+      "caught_unanswerable": "46/50"
     }
   ],
   "rows": [
@@ -43,10 +44,11 @@
       "query": "Arts and Culture Organizational Leadership",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9880388379096985,
+      "max_sigmoid": 0.9878996014595032,
       "bm25_top": 19.24165053679654,
       "vec_top": 0.6605380177497864,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -54,10 +56,11 @@
       "query": "leadership culture people",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.22051022946834564,
+      "max_sigmoid": 0.21272224187850952,
       "bm25_top": 12.358365597087262,
       "vec_top": 0.5795432329177856,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -65,10 +68,11 @@
       "query": "Contemporary Architecture",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.6124835014343262,
+      "max_sigmoid": 0.5982535481452942,
       "bm25_top": 9.846556315664289,
       "vec_top": 0.5331692099571228,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -76,10 +80,11 @@
       "query": "critical context context",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.21850258111953735,
+      "max_sigmoid": 0.2078571617603302,
       "bm25_top": 12.326141632929595,
       "vec_top": 0.5127708315849304,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -87,10 +92,11 @@
       "query": "Principles of Biology 1",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.42895087599754333,
+      "max_sigmoid": 0.4267396032810211,
       "bm25_top": 9.924061475366221,
       "vec_top": 0.5623370409011841,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -98,10 +104,11 @@
       "query": "concepts examines topics",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.8243205547332764,
+      "max_sigmoid": 0.8305941224098206,
       "bm25_top": 5.95227641161488,
       "vec_top": 0.6730799674987793,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -109,10 +116,11 @@
       "query": "Current Developments in the ESG Landscape",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9791954755783081,
+      "max_sigmoid": 0.9792749285697937,
       "bm25_top": 23.1511713065044,
       "vec_top": 0.6514233946800232,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -120,10 +128,11 @@
       "query": "developments related investor",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.12241825461387634,
+      "max_sigmoid": 0.12463856488466263,
       "bm25_top": 14.902459530902433,
       "vec_top": 0.5332829356193542,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -131,10 +140,11 @@
       "query": "Electrochemistry of Renewable Energy Devices",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9877113699913025,
+      "max_sigmoid": 0.9874721169471741,
       "bm25_top": 27.244692809640426,
       "vec_top": 0.7047795057296753,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -142,10 +152,11 @@
       "query": "energy materials offers",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.3515336513519287,
+      "max_sigmoid": 0.3592517077922821,
       "bm25_top": 12.606210324889265,
       "vec_top": 0.6166892051696777,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -153,10 +164,11 @@
       "query": "Introduction to Construction Management",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.7849790453910828,
+      "max_sigmoid": 0.7813306450843811,
       "bm25_top": 10.408888804875428,
       "vec_top": 0.6605888605117798,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -164,10 +176,11 @@
       "query": "technical necessary including",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.14211279153823853,
+      "max_sigmoid": 0.14139994978904724,
       "bm25_top": 8.618141702935088,
       "vec_top": 0.5722342729568481,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -178,7 +191,8 @@
       "max_sigmoid": 0.38844403624534607,
       "bm25_top": 18.462127940610277,
       "vec_top": 0.7200760841369629,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -189,7 +203,8 @@
       "max_sigmoid": 0.5980187654495239,
       "bm25_top": 17.480086435319947,
       "vec_top": 0.5981849431991577,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -200,7 +215,8 @@
       "max_sigmoid": 0.05429893732070923,
       "bm25_top": 11.140460567821108,
       "vec_top": 0.5627894997596741,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -208,10 +224,11 @@
       "query": "necessary include entrepreneurs",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.7636600732803345,
+      "max_sigmoid": 0.7696001529693604,
       "bm25_top": 12.200197769610636,
       "vec_top": 0.5852125883102417,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -222,7 +239,8 @@
       "max_sigmoid": 0.8217604756355286,
       "bm25_top": 12.140493557069437,
       "vec_top": 0.6273086071014404,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -230,10 +248,11 @@
       "query": "learning assessments solutions",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.4951707124710083,
+      "max_sigmoid": 0.49283647537231445,
       "bm25_top": 12.822035950388841,
       "vec_top": 0.5940062999725342,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -241,10 +260,11 @@
       "query": "System Identification and Adaptive Control",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9723097085952759,
+      "max_sigmoid": 0.9710193276405334,
       "bm25_top": 24.910036428638698,
       "vec_top": 0.6753811836242676,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -252,10 +272,11 @@
       "query": "adaptive means estimates",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.10123348236083984,
+      "max_sigmoid": 0.10248421877622604,
       "bm25_top": 19.78502639166529,
       "vec_top": 0.5505804419517517,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -263,10 +284,11 @@
       "query": "Topics in Writing",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9668514132499695,
+      "max_sigmoid": 0.9654463529586792,
       "bm25_top": 6.91049061497724,
       "vec_top": 0.6743373274803162,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -277,7 +299,8 @@
       "max_sigmoid": 0.6701767444610596,
       "bm25_top": 17.550202142065338,
       "vec_top": 0.6134776473045349,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -285,10 +308,11 @@
       "query": "Fintech, Financial Innovation, and Blockchain",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.8929365277290344,
+      "max_sigmoid": 0.8873999118804932,
       "bm25_top": 28.35094267012022,
       "vec_top": 0.7112199068069458,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -296,10 +320,11 @@
       "query": "world innovation focuses",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.7212526202201843,
+      "max_sigmoid": 0.7205649614334106,
       "bm25_top": 11.726201002482233,
       "vec_top": 0.5763211250305176,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -307,10 +332,11 @@
       "query": "Natural Disasters in World History",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.7405498027801514,
+      "max_sigmoid": 0.7252596020698547,
       "bm25_top": 14.970473674801733,
       "vec_top": 0.45317408442497253,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -318,10 +344,11 @@
       "query": "disasters history management",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.7981867790222168,
+      "max_sigmoid": 0.7964508533477783,
       "bm25_top": 12.93588892274895,
       "vec_top": 0.5968971252441406,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -332,7 +359,8 @@
       "max_sigmoid": 0.20370754599571228,
       "bm25_top": 10.61318732831431,
       "vec_top": 0.5189235210418701,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -343,7 +371,8 @@
       "max_sigmoid": 0.2356356382369995,
       "bm25_top": 15.673058369970217,
       "vec_top": 0.5831162333488464,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -351,10 +380,11 @@
       "query": "Introduction to Computational Statistics",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.4762294888496399,
+      "max_sigmoid": 0.4520218074321747,
       "bm25_top": 9.908391182252215,
       "vec_top": 0.6486166715621948,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -362,10 +392,11 @@
       "query": "quantitative using science",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.2221934050321579,
+      "max_sigmoid": 0.22286926209926605,
       "bm25_top": 8.685861413343035,
       "vec_top": 0.6351313591003418,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -373,10 +404,11 @@
       "query": "Enterprise Reporting 1",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.28120818734169006,
+      "max_sigmoid": 0.27542194724082947,
       "bm25_top": 10.559607035342509,
       "vec_top": 0.5558757781982422,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -384,10 +416,11 @@
       "query": "interviewing ideas developed",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.7550956010818481,
+      "max_sigmoid": 0.7478001117706299,
       "bm25_top": 15.180816668835636,
       "vec_top": 0.5955818891525269,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -398,7 +431,8 @@
       "max_sigmoid": 0.9715099930763245,
       "bm25_top": 12.15931003014771,
       "vec_top": 0.5929901003837585,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -406,10 +440,11 @@
       "query": "society violence topics",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9882221817970276,
+      "max_sigmoid": 0.9883578419685364,
       "bm25_top": 13.929101298331762,
       "vec_top": 0.6979221105575562,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -417,10 +452,11 @@
       "query": "Functional Analysis",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.3546565771102905,
+      "max_sigmoid": 0.35521551966667175,
       "bm25_top": 7.795338559659453,
       "vec_top": 0.5994325876235962,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -428,10 +464,11 @@
       "query": "results banach groups",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.03289904072880745,
+      "max_sigmoid": 0.029201289638876915,
       "bm25_top": 17.701619227846784,
       "vec_top": 0.4127686619758606,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -439,10 +476,11 @@
       "query": "International Marketing",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.854763388633728,
+      "max_sigmoid": 0.8587185740470886,
       "bm25_top": 13.914659832066185,
       "vec_top": 0.6002264022827148,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -450,10 +488,11 @@
       "query": "challenges process cultural",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.46566084027290344,
+      "max_sigmoid": 0.4662076234817505,
       "bm25_top": 11.277764947798346,
       "vec_top": 0.570469856262207,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -461,10 +500,11 @@
       "query": "Financial Management for Nonprofit Organizations",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.9970878958702087,
+      "max_sigmoid": 0.9970991611480713,
       "bm25_top": 20.83024595702848,
       "vec_top": 0.7131247520446777,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -472,10 +512,11 @@
       "query": "financial mission financial",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.045183755457401276,
+      "max_sigmoid": 0.048136770725250244,
       "bm25_top": 17.3203905080046,
       "vec_top": 0.5532745122909546,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -483,10 +524,11 @@
       "query": "Public Relations Strategy and Planning",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.929568350315094,
+      "max_sigmoid": 0.9284088015556335,
       "bm25_top": 15.950915940559996,
       "vec_top": 0.6052365303039551,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -494,10 +536,11 @@
       "query": "relations explores global",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.5107862949371338,
+      "max_sigmoid": 0.4965648949146271,
       "bm25_top": 10.7848749343433,
       "vec_top": 0.6642642021179199,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -508,7 +551,8 @@
       "max_sigmoid": 0.9912885427474976,
       "bm25_top": 18.09951590886364,
       "vec_top": 0.5709609389305115,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -519,7 +563,8 @@
       "max_sigmoid": 0.8410438895225525,
       "bm25_top": 14.362718959069564,
       "vec_top": 0.5985642075538635,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -530,7 +575,8 @@
       "max_sigmoid": 0.9235922694206238,
       "bm25_top": 12.976282011811122,
       "vec_top": 0.6092425584793091,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -538,10 +584,11 @@
       "query": "politics states policies",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.17596247792243958,
+      "max_sigmoid": 0.16762703657150269,
       "bm25_top": 14.296449395469464,
       "vec_top": 0.5767710208892822,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -549,10 +596,11 @@
       "query": "Internship in Psychology",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.8712559342384338,
+      "max_sigmoid": 0.8724561333656311,
       "bm25_top": 8.423352403453324,
       "vec_top": 0.641268253326416,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -560,10 +608,11 @@
       "query": "application clinical repeated",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.8856314420700073,
+      "max_sigmoid": 0.8872045874595642,
       "bm25_top": 11.905615406008419,
       "vec_top": 0.739336371421814,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -574,7 +623,8 @@
       "max_sigmoid": 0.06119922548532486,
       "bm25_top": 9.691655751746644,
       "vec_top": 0.5852961540222168,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 1,
@@ -585,7 +635,368 @@
       "max_sigmoid": 0.7373473048210144,
       "bm25_top": 16.5377257801711,
       "vec_top": 0.5714223384857178,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "priorities realize balancing",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.44903019070625305,
+      "bm25_top": 17.345942320426683,
+      "vec_top": 0.554654598236084,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "5150 artg guests",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.7455836534500122,
+      "bm25_top": 24.33833238229302,
+      "vec_top": 0.5453472137451172,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "contributing psychologists legislation",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.6139890551567078,
+      "bm25_top": 25.32644120472601,
+      "vec_top": 0.542226254940033,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "communicator plain polish",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.30012983083724976,
+      "bm25_top": 19.18972763306416,
+      "vec_top": 0.4357013702392578,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "millenium decency forgery",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.010986942797899246,
+      "bm25_top": 21.7929431371237,
+      "vec_top": 0.46277564764022827,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "schoolwide considerate comprehensively",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.700894832611084,
+      "bm25_top": 26.930179117964865,
+      "vec_top": 0.5769187211990356,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "angels goes rounds",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.12023206055164337,
+      "bm25_top": 24.22321718767622,
+      "vec_top": 0.49548137187957764,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "versions memorials displays",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.023509452119469643,
+      "bm25_top": 19.562976172484085,
+      "vec_top": 0.5052853226661682,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "systematics inmi botany",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9566342234611511,
+      "bm25_top": 28.385526215912343,
+      "vec_top": 0.6260091066360474,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "wrongs legislatures fight",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.5729020237922668,
+      "bm25_top": 23.983471968623682,
+      "vec_top": 0.46601393818855286,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "homeomorphisms hausdorff axioms",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.2496301382780075,
+      "bm25_top": 23.98921811448509,
+      "vec_top": 0.49498873949050903,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "chorales tonal 1201",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9455001950263977,
+      "bm25_top": 27.951289473139028,
+      "vec_top": 0.6009561419487,
+      "code_miss": true,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "ampliative boolean propositional",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.25590112805366516,
+      "bm25_top": 23.36849266769213,
+      "vec_top": 0.509657621383667,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "demanding lack motivating",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.21403354406356812,
+      "bm25_top": 18.80950380527338,
+      "vec_top": 0.4864976406097412,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "jargon_style",
+      "query": "lumbar sacroiliac spine",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.47897055745124817,
+      "bm25_top": 37.78485151761491,
+      "vec_top": 0.6514747738838196,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "艺术文化领导力、管理及运营课程",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9805806875228882,
+      "bm25_top": 0.0,
+      "vec_top": 0.6358420848846436,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "系统设计理论与实践",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9690910577774048,
+      "bm25_top": 0.0,
+      "vec_top": 0.6441693902015686,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "高阶临床干预 系统视角 团体家庭咨询",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.8528130054473877,
+      "bm25_top": 0.0,
+      "vec_top": 0.6347150802612305,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "进阶复杂网络分析与模型",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.8554893136024475,
+      "bm25_top": 0.0,
+      "vec_top": 0.6284229159355164,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "数据库设计 SQL 数据建模 选课系统",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.36161550879478455,
+      "bm25_top": 10.273704860188118,
+      "vec_top": 0.6814882755279541,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "家校社协作与学生支持课程",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.47919902205467224,
+      "bm25_top": 0.0,
+      "vec_top": 0.611621618270874,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "科技型企业管理 运营 SCM",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.11182181537151337,
+      "bm25_top": 0.0,
+      "vec_top": 0.537704586982727,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "二战太平洋 亚洲影响 历史 文学",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.8964328765869141,
+      "bm25_top": 0.0,
+      "vec_top": 0.6564158797264099,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "气候变化 健康 韧性 课程",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9417614340782166,
+      "bm25_top": 0.0,
+      "vec_top": 0.659544050693512,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "创业与雇佣中的IP问题",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9647224545478821,
+      "bm25_top": 8.255957638876213,
+      "vec_top": 0.6402992010116577,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "应用数学 建模项目 金融 选课",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.25888770818710327,
+      "bm25_top": 0.0,
+      "vec_top": 0.6040925979614258,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "Jazz音乐历史与文化",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.7602949142456055,
+      "bm25_top": 11.71386534979642,
+      "vec_top": 0.6541218161582947,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "博士实践项目 组织挑战 进阶",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.8608377575874329,
+      "bm25_top": 0.0,
+      "vec_top": 0.6463279128074646,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "Project Portfolio Management与战略管理课程",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.9779256582260132,
+      "bm25_top": 14.541031150580803,
+      "vec_top": 0.6736021041870117,
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 1,
+      "category": "zh_answerable",
+      "query": "PT Pharmacology 临床应用课程",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.959307074546814,
+      "bm25_top": 9.735720562170433,
+      "vec_top": 0.6616394519805908,
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -593,10 +1004,11 @@
       "query": "CS 9999",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.012383784167468548,
+      "max_sigmoid": 0.012053778395056725,
       "bm25_top": 11.159155945903944,
       "vec_top": 0.5586854815483093,
-      "code_miss": true
+      "code_miss": true,
+      "cjk": false
     },
     {
       "label": 0,
@@ -604,10 +1016,11 @@
       "query": "AAI 0000",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.013121269643306732,
+      "max_sigmoid": 0.012147169560194016,
       "bm25_top": 0.0,
       "vec_top": 0.5364100337028503,
-      "code_miss": true
+      "code_miss": true,
+      "cjk": false
     },
     {
       "label": 0,
@@ -615,10 +1028,11 @@
       "query": "CSYE 12345",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.0020587535109370947,
+      "max_sigmoid": 0.0020667945500463247,
       "bm25_top": 0.0,
       "vec_top": 0.46566346287727356,
-      "code_miss": true
+      "code_miss": true,
+      "cjk": false
     },
     {
       "label": 0,
@@ -626,10 +1040,11 @@
       "query": "DS 0001 advanced topics",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.8303191661834717,
+      "max_sigmoid": 0.8312800526618958,
       "bm25_top": 13.228539041289062,
       "vec_top": 0.6000495553016663,
-      "code_miss": true
+      "code_miss": true,
+      "cjk": false
     },
     {
       "label": 0,
@@ -637,10 +1052,11 @@
       "query": "INFO 9876 capstone",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.04611974582076073,
+      "max_sigmoid": 0.0443485863506794,
       "bm25_top": 11.888798385729576,
       "vec_top": 0.571681797504425,
-      "code_miss": true
+      "code_miss": true,
+      "cjk": false
     },
     {
       "label": 0,
@@ -651,7 +1067,8 @@
       "max_sigmoid": 0.3912314772605896,
       "bm25_top": 12.999949971518513,
       "vec_top": 0.5750300884246826,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -659,10 +1076,11 @@
       "query": "Stanford CS231n convolutional networks",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.03481519594788551,
+      "max_sigmoid": 0.034358687698841095,
       "bm25_top": 13.139636287838833,
       "vec_top": 0.5184729099273682,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -670,10 +1088,11 @@
       "query": "CMU 15-445 database systems",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.07017629593610764,
+      "max_sigmoid": 0.06717857718467712,
       "bm25_top": 12.38171207442408,
       "vec_top": 0.5594298839569092,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -681,10 +1100,11 @@
       "query": "Berkeley CS162 operating systems",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.051082734018564224,
+      "max_sigmoid": 0.051941558718681335,
       "bm25_top": 10.67200033745898,
       "vec_top": 0.5055422782897949,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -692,10 +1112,11 @@
       "query": "Harvard CS50 introduction",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.02409944497048855,
+      "max_sigmoid": 0.026255300268530846,
       "bm25_top": 6.079418092722924,
       "vec_top": 0.5899884700775146,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -703,10 +1124,11 @@
       "query": "how much is a parking permit at northeastern",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 7.311254012165591e-05,
+      "max_sigmoid": 7.368593651335686e-05,
       "bm25_top": 9.137568978569815,
       "vec_top": 0.47269177436828613,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -714,10 +1136,11 @@
       "query": "OPT visa application timeline",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.0002531563804950565,
+      "max_sigmoid": 0.0002673826238606125,
       "bm25_top": 10.947256924465817,
       "vec_top": 0.47082504630088806,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -728,7 +1151,8 @@
       "max_sigmoid": 0.00023782203788869083,
       "bm25_top": 7.177109129979536,
       "vec_top": 0.47702834010124207,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -736,10 +1160,11 @@
       "query": "tuition payment deadline fall semester",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.00023050670279189944,
+      "max_sigmoid": 0.0002359717182116583,
       "bm25_top": 10.45509138979171,
       "vec_top": 0.5049498081207275,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -750,7 +1175,8 @@
       "max_sigmoid": 1.683241134742275e-05,
       "bm25_top": 11.333479242796301,
       "vec_top": 0.40984779596328735,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -758,10 +1184,11 @@
       "query": "asdf jkl qwerty uiop",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.00014539113908540457,
+      "max_sigmoid": 0.00013982209202367812,
       "bm25_top": 0.0,
       "vec_top": 0.4390113353729248,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -772,7 +1199,8 @@
       "max_sigmoid": 0.0003697388747241348,
       "bm25_top": 0.0,
       "vec_top": 0.4638344645500183,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -780,10 +1208,11 @@
       "query": "blorptang frumious vorpal snicker",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 7.311254012165591e-05,
+      "max_sigmoid": 7.254361844388768e-05,
       "bm25_top": 0.0,
       "vec_top": 0.40531450510025024,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -794,7 +1223,8 @@
       "max_sigmoid": 6.302758265519515e-05,
       "bm25_top": 0.0,
       "vec_top": 0.42720645666122437,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -802,10 +1232,11 @@
       "query": "mxyzptlk gzornenplat fhqwhgads",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 4.757645365316421e-05,
+      "max_sigmoid": 4.832564081880264e-05,
       "bm25_top": 0.0,
       "vec_top": 0.4181765913963318,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -816,7 +1247,8 @@
       "max_sigmoid": 0.0036499870475381613,
       "bm25_top": 4.6912390514869315,
       "vec_top": 0.4785989224910736,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -824,10 +1256,11 @@
       "query": "tell me a joke about cats",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.00029365462251007557,
+      "max_sigmoid": 0.0002913700882345438,
       "bm25_top": 8.595657618576263,
       "vec_top": 0.4220840036869049,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -838,7 +1271,8 @@
       "max_sigmoid": 0.0006851713405922055,
       "bm25_top": 8.74426235078429,
       "vec_top": 0.43562886118888855,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -846,10 +1280,11 @@
       "query": "who won the world cup",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.0007350447704084218,
+      "max_sigmoid": 0.0007264874875545502,
       "bm25_top": 6.316475247524059,
       "vec_top": 0.42787742614746094,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -857,10 +1292,11 @@
       "query": "what time is it right now",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.0014895172789692879,
+      "max_sigmoid": 0.0016166499117389321,
       "bm25_top": 8.053839373830957,
       "vec_top": 0.47513097524642944,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -868,10 +1304,11 @@
       "query": "homework 3 solutions please",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.003854363691061735,
+      "max_sigmoid": 0.003991728648543358,
       "bm25_top": 9.676474154784472,
       "vec_top": 0.5394272804260254,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -879,10 +1316,11 @@
       "query": "when is assignment 2 due",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.000491681566927582,
+      "max_sigmoid": 0.0005254230345599353,
       "bm25_top": 7.854858048091946,
       "vec_top": 0.4602448344230652,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -893,7 +1331,8 @@
       "max_sigmoid": 0.005865338258445263,
       "bm25_top": 9.532405256990986,
       "vec_top": 0.5576371550559998,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -904,7 +1343,8 @@
       "max_sigmoid": 0.003429603995755315,
       "bm25_top": 12.738563336424708,
       "vec_top": 0.5380035638809204,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -915,7 +1355,8 @@
       "max_sigmoid": 0.16451646387577057,
       "bm25_top": 7.746549370190666,
       "vec_top": 0.6392091512680054,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -926,7 +1367,8 @@
       "max_sigmoid": 1.9373937902855687e-05,
       "bm25_top": 6.850742687251018,
       "vec_top": 0.33320605754852295,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -937,7 +1379,8 @@
       "max_sigmoid": 2.2125668692751788e-05,
       "bm25_top": 7.888611346939783,
       "vec_top": 0.3368806838989258,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -948,7 +1391,8 @@
       "max_sigmoid": 1.6571451851632446e-05,
       "bm25_top": 8.454284977451245,
       "vec_top": 0.4717852771282196,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -959,7 +1403,8 @@
       "max_sigmoid": 0.001151399570517242,
       "bm25_top": 13.323565168798165,
       "vec_top": 0.42793506383895874,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -970,7 +1415,8 @@
       "max_sigmoid": 2.6274772608303465e-05,
       "bm25_top": 8.895513797421465,
       "vec_top": 0.47397446632385254,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -978,10 +1424,11 @@
       "query": "course taught by Albert Einstein",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.019493870437145233,
+      "max_sigmoid": 0.019643761217594147,
       "bm25_top": 9.261306241737918,
       "vec_top": 0.5276354551315308,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -992,7 +1439,8 @@
       "max_sigmoid": 0.03521113842725754,
       "bm25_top": 9.940529476895954,
       "vec_top": 0.5754024982452393,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -1003,7 +1451,8 @@
       "max_sigmoid": 0.03481519594788551,
       "bm25_top": 10.45509138979171,
       "vec_top": 0.5266226530075073,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -1014,7 +1463,8 @@
       "max_sigmoid": 0.04698663949966431,
       "bm25_top": 9.146424510664176,
       "vec_top": 0.5521751046180725,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
     },
     {
       "label": 0,
@@ -1022,10 +1472,131 @@
       "query": "PhD defense scheduling for chemistry",
       "path": "gate",
       "skipped": false,
-      "max_sigmoid": 0.19790911674499512,
+      "max_sigmoid": 0.1994638741016388,
       "bm25_top": 13.394959198918638,
       "vec_top": 0.5864039063453674,
-      "code_miss": false
+      "code_miss": false,
+      "cjk": false
+    },
+    {
+      "label": 0,
+      "category": "zh_campus_admin",
+      "query": "停车证多少钱一个学期",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 2.392351052549202e-05,
+      "bm25_top": 0.0,
+      "vec_top": 0.5008306503295898,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_campus_admin",
+      "query": "学费什么时候交截止日期",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.0002269338583573699,
+      "bm25_top": 0.0,
+      "vec_top": 0.5225034356117249,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_campus_admin",
+      "query": "宿舍洗衣机几点开门",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 1.6187581422855146e-05,
+      "bm25_top": 0.0,
+      "vec_top": 0.4827442169189453,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_chitchat",
+      "query": "今天天气怎么样啊",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 8.614651596872136e-05,
+      "bm25_top": 0.0,
+      "vec_top": 0.48542678356170654,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_chitchat",
+      "query": "给我讲个笑话吧",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 3.852893496514298e-05,
+      "bm25_top": 0.0,
+      "vec_top": 0.48737698793411255,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_off_domain",
+      "query": "波士顿哪家火锅最好吃",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 3.9135655242716894e-05,
+      "bm25_top": 0.0,
+      "vec_top": 0.3301626741886139,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_off_domain",
+      "query": "怎么续签护照最快",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 3.194181772414595e-05,
+      "bm25_top": 0.0,
+      "vec_top": 0.4856778085231781,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_homework",
+      "query": "第三次作业的答案给我看看",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.006718870252370834,
+      "bm25_top": 0.0,
+      "vec_top": 0.5161731243133545,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_fake_code",
+      "query": "CS 八千八百八十八 这门课",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.4958573281764984,
+      "bm25_top": 11.159155945903944,
+      "vec_top": 0.5426612496376038,
+      "code_miss": false,
+      "cjk": true
+    },
+    {
+      "label": 0,
+      "category": "zh_impossible",
+      "query": "保证毕业就进谷歌的课程",
+      "path": "gate",
+      "skipped": false,
+      "max_sigmoid": 0.0024630071129649878,
+      "bm25_top": 0.0,
+      "vec_top": 0.5454190373420715,
+      "code_miss": false,
+      "cjk": true
     }
   ]
 }

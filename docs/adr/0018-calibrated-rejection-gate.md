@@ -90,3 +90,45 @@ q042 与 q013 的间隙中。q018 是已知残留误拒,记录在案。
   test_set v0.3 落地。跑 `scripts/calibrate_rejection.py` 一条命令
 - threshold 模式保留为后备:`REJECTION_MODE=threshold` 一键回滚到
   ADR-0016 行为
+
+---
+
+## 补遗:test_set v0.3 重拟合(同日,v4 系数上线)
+
+v0.3(n=104,`eval/test_set_v03.json`,scripts/generate_test_set_v03.py
+生成:v0.2 全量 42 条 + Gemini 辅助扩展 62 条,30/30/20/12/12 分布)
+首跑即暴露 n=42 看不见的盲点:**纯中文可答 query 被系统性误拒**
+(q091/q093)— BM25 leg 是 ASCII-only,中文查询 bm25_top 结构性为 0,
+门控把"证据缺失"读成了"负证据",而初版校准集恰好全英文。
+
+三轮拟合迭代(全程 NAS 生产栈实测,中间版本未上线):
+
+| 版本 | 改动 | 结果 | 诊断 |
+|---|---|---|---|
+| v2 | 校准集 +15 zh 可答(Gemini)+10 zh 不可答,加性 cjk 特征 | BM25 权重 1.51→0.07 全局塌缩 | 加性模型表达不了"BM25 仅在非 CJK 时可信";手算确认 q013 会回退误拒,弃用 |
+| v3 | **交互项** `log1p(bm25)·(1−cjk)` | BM25 回到 0.55,但 vec 权重涨到 6.9 | 合成可答样本全是"高向量"易例,缺 q013/q018 类难正例,LR 学出向量主导解;手算 q013 仍回退,弃用 |
+| v4 | 校准集 +15 **难正例**(每课 raw_text 取 max-IDF 稀有术语 token,天然高 BM25/中低向量/低 sigmoid) | 平衡解:bm25 0.96 / vec 2.93 / cjk +1.80;网格 p<0.4 = **0/80 零误拒 + 39/50 捕获** | 上线 |
+
+REJECT_BELOW 按既有规则(校准集零误拒下最大捕获)从 0.3 → **0.4**。
+
+**v0.3 held-out 实测**(live API,eval/api_eval_v03_gate_v4.json):
+
+| 指标 | v1 门控 | v4 门控 |
+|---|---:|---:|
+| R@5 (n=104) | 0.7455 | **0.7563** |
+| MRR | 0.7078 | **0.7105** |
+| 误拒(92 可答) | 3 (q018/q091/q093) | **2** (q018/q093) |
+| adversarial 捕获 (12) | 11/12 | 11/12 |
+| p50 | 890 ms | 847 ms(同水位) |
+
+残留记录:q018(纯理论术语,p≈0.26)与 q093("CRM" 在该课指
+Crisis Resource Management,embedding 读成 Customer Relationship
+Management — 缩写歧义,vec 低)需要 HyDE 扩写或更强 embedder,
+不是门控能解的。q100 "UCLA CS 188 reinforcement learning" 持续
+"泄漏"——但它返回的是 NEU 自己的 RL 课,对问外校课的用户这是
+**合理产品行为**,记录为接受而非缺陷。
+
+方法论教训(写给未来重拟合的人):校准集的**难度分布**决定 LR 学到
+什么——只喂易例,模型必然塌缩到单一主导特征;每次重拟合都要保证
+难正例(jargon_style)与缺失证据域(zh)样本在场,并对 q013/q018/q042
+三个锚点 query 手算验证后再上线。
