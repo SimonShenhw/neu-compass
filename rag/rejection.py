@@ -53,20 +53,31 @@ _NOT_DEPT_WORDS = frozenset({
     "fall", "spring", "summer", "winter", "autumn", "term", "year", "since",
 })
 
-# Fitted on the NAS 2026-06-11 by scripts/calibrate_rejection.py
-# (see ADR-0018 for the run report; do not hand-edit — re-run the script).
+# Fitted on the NAS 2026-06-11 by scripts/calibrate_rejection.py against
+# the production stack (openvino int8, pool=10): n=90 gate-path queries
+# (50 answerable synthesized from catalog / 40 unanswerable, 8 categories),
+# AUC 0.9795 vs 0.9605 for max-sigmoid alone. Run report:
+# NAS /data/rejection_calibration.json + ADR-0018. Do not hand-edit —
+# re-run the script if the embedder/reranker/corpus changes.
 DEFAULT_COEFFICIENTS: dict[str, float] = {
-    "bias": 1.20,
-    "w_logit_sigmoid": 0.55,
-    "w_log1p_bm25": 0.85,
-    "w_vec_top": 1.10,
-    "w_code_miss": -2.60,
+    "bias": -4.4408,
+    "w_logit_sigmoid": 0.5844,
+    "w_log1p_bm25": 1.5115,
+    "w_vec_top": 4.3305,
+    "w_code_miss": -4.5121,
 }
 
-REJECT_BELOW = 0.5
-"""Reject when P(answerable) < this. 0.5 is the LR decision midpoint; the
-calibration script reports the false-reject / false-accept trade-off grid
-around it — adjust only together with a re-fit (ADR-0018)."""
+REJECT_BELOW = 0.3
+"""Reject when P(answerable) < this. NOT the LR midpoint (0.5) on purpose:
+the operating rule is "maximize unanswerable catch subject to ZERO
+false-rejects on the calibration answerable set", which the calibration
+grid resolves to 0.3 (false-rej 0/50, caught 31/40; at 0.5 it's 1/50 and
+36/40). Product asymmetry: refusing a real student query is worse than
+returning weak results for an unanswerable one — /chat's grounded prompt
+still answers "not in catalog" for the latter. Live feature probes show
+the residual irreducible overlap is q042-style homework-admin (p≈0.25,
+reject) vs q018-style theory jargon (p≈0.20, sadly also rejected) — see
+ADR-0018 for the measured distribution. Adjust only with a re-fit."""
 
 _LOGIT_EPS = 1e-6  # max_sigmoid=0.0 → logit ≈ -13.8 instead of -inf
 

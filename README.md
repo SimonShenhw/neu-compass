@@ -20,6 +20,7 @@
 | Lifespan startup PyTorch / ONNX ⭐ | 70 s / **6 s** (-91%) |
 | **`/search` p50 — NAS Iris Xe + optimum-intel OpenVINO IR** ⭐ | **~2310 ms** (10 query smoke,reranker on) |
 | **`/search` p50 — NAS pool=10 + int8 reranker (ADR-0017, live-API n=42)** ⭐ | **849 ms** (p95 1167,R@5 无损,api RSS 4.9→3.5GB) |
+| **Eval R@5 / MRR — 校准拒绝门控 (ADR-0018, live-API 生产路径)** ⭐ | **0.568 / 0.544** (误拒 4→1,adversarial 4/4 保持,延迟持平) |
 | **api 容器 RSS — NAS (reranker on + Iris Xe)** | **4.9 GB** (vs ONNX+CPU 17 GB) |
 | **NAS 冷启 lifespan(OpenVINO compile cache 持久化)** | **13 s** (首次 ~50 s,缓存命中后 5 s) |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
@@ -321,6 +322,7 @@ neu-compass/
 - **[ADR-0015](docs/adr/0015-z-score-blending.md)** Z-score 混合 RRF + reranker (α=0.4) — Week 7
 - **[ADR-0016](docs/adr/0016-reranker-reject-threshold.md)** Reranker 拒绝阈值 0.05 (数据校准,从 spec 0.4 下调) — Week 7
 - **[ADR-0017](docs/adr/0017-nas-rerank-pool-int8.md)** NAS rerank pool 20→10 + int8 reranker (live-API 实测 p50 -58% 质量无损) — 2026-06
+- **[ADR-0018](docs/adr/0018-calibrated-rejection-gate.md)** 校准拒绝门控 (sigmoid+BM25+vec+code-miss 逻辑回归,R@5 +7.5%,误拒 -75%) — 2026-06
 
 完整 ADR: [docs/adr/](docs/adr/)
 

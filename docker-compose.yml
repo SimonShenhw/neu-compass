@@ -49,6 +49,7 @@ services:
       OPENVINO_CACHE_DIR: /data/openvino_cache   # persists compiled GPU kernels (first boot ~60s → subsequent ~5s)
       ENABLE_RERANKER: "true"                    # NAS has 32GB dual-channel
       RERANK_POOL_SIZE: "10"                     # ADR-0017: 20→10, quality-neutral, halves rerank latency
+      REJECTION_MODE: calibrated                 # ADR-0018: logistic gate (sigmoid+BM25+vec+code-miss) replaces bare T=0.05
       # === Storage paths (bind-mounted volume) ===
       SQLITE_PATH: /data/courses.db
       FAISS_INDEX_PATH: /data/faiss_index
