@@ -45,6 +45,7 @@ from db.repository import CourseRepository
 from llm.query_filter_extractor import extract_filters_adaptive
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import normalize_query_to_course_ids
+from rag.rejection import build_gate_fn
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from schemas.course import DeliveryMode
 
@@ -227,12 +228,24 @@ def search(
     else:
         # One batched SELECT for all candidate texts (was ≤20 per-row queries).
         texts = fetch_texts(conn, [h.course.course_id for h in hybrid_hits])
+        # ADR-0018: calibrated gate fuses leg evidence the cross-encoder
+        # can't see; opt-in via REJECTION_MODE=calibrated. Falls back to
+        # the ADR-0016 threshold gate otherwise (gate_fn=None).
+        gate_fn = None
+        if settings.rejection_mode == "calibrated":
+            diag = hybrid.last_diagnostics or {}
+            gate_fn = build_gate_fn(
+                query=req.query,
+                bm25_top=diag.get("bm25_top", 0.0),
+                vec_top=diag.get("vec_top", 0.0),
+            )
         blended_hits, meta = rerank_blend_with_rejection(
             req.query, hybrid_hits, reranker,
             fetch_text=texts.get,
             blend_alpha=BLEND_ALPHA,
             reject_threshold=RERANKER_REJECT_THRESHOLD,
             top_k=req.k,
+            gate_fn=gate_fn,
         )
         if meta["rejected"]:
             elapsed_ms = _elapsed_ms(started)

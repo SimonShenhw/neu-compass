@@ -295,14 +295,17 @@ def rerank_blend_with_rejection(
     blend_alpha: float,
     reject_threshold: float,
     top_k: int | None = None,
+    gate_fn: Callable[[list[float]], tuple[bool, str]] | None = None,
 ) -> tuple[list[SearchHit], dict[str, object]]:
     """Combined rejection-and-blend pass for PLAN v2.2 §3.4 + §3.5.
 
     Two questions in one reranker call:
-      1. **Reject?** If `max(raw_sigmoid) < reject_threshold`, the query
-         has no good answer — return ([], {"rejected": True, ...}).
-         Rejection is decided on RAW sigmoid (not blended z-score) because
-         it's an absolute-confidence question, not a ranking question.
+      1. **Reject?** Default gate: `max(raw_sigmoid) < reject_threshold`
+         (ADR-0016). When `gate_fn` is provided (ADR-0018 calibrated gate),
+         it receives the full sigmoid list and returns (reject, reason) —
+         the threshold parameter is then ignored. Rejection is decided on
+         RAW sigmoids (not blended z-scores) because it's an
+         absolute-confidence question, not a ranking question.
       2. **Order?** If accepted, Z-score blend the upstream RRF score with
          the same raw sigmoid (alpha = blend_alpha), sort desc, truncate
          to top_k, return as SearchHits with blended z-score in `.score`.
@@ -339,12 +342,16 @@ def rerank_blend_with_rejection(
     max_sig = max(rerank_scores) if rerank_scores else 0.0
     n_above = sum(1 for s in rerank_scores if s >= reject_threshold)
 
-    if max_sig < reject_threshold:
+    if gate_fn is not None:
+        rejected, reason = gate_fn(rerank_scores)
+    else:
+        rejected = max_sig < reject_threshold
+        reason = f"max_reranker_sigmoid {max_sig:.3f} < threshold {reject_threshold}"
+
+    if rejected:
         return [], {
             "rejected": True,
-            "reason": (
-                f"max_reranker_sigmoid {max_sig:.3f} < threshold {reject_threshold}"
-            ),
+            "reason": reason,
             "max_sigmoid": float(max_sig),
             "n_candidates": n,
             "n_above_threshold": 0,

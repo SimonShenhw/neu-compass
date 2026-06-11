@@ -226,6 +226,13 @@ class HybridRetriever:
         self._course_repo = course_repo
         self._rrf_k = rrf_k
         self._candidate_multiplier = candidate_multiplier
+        # Per-leg top scores from the LAST search() call. The calibrated
+        # rejection gate (rag/rejection.py, ADR-0018) reads these — the
+        # fused RRF score deliberately erases score magnitudes, but the
+        # gate needs the raw lexical/dense evidence the cross-encoder
+        # doesn't see. Instance attribute is safe: routes get a fresh
+        # HybridRetriever per request (api/dependencies.py).
+        self.last_diagnostics: dict[str, float] | None = None
 
     def search(
         self,
@@ -242,16 +249,15 @@ class HybridRetriever:
         # that only implement the SearchHit interface.
         search_ids = getattr(self._vector, "search_ids", None)
         if callable(search_ids):
-            vec_ids = [
-                cid for cid, _ in search_ids(
+            vec_pairs = search_ids(query, hard_filters=hard_filters, k=candidate_k)
+        else:
+            vec_pairs = [
+                (h.course.course_id, h.score)
+                for h in self._vector.search(
                     query, hard_filters=hard_filters, k=candidate_k,
                 )
             ]
-        else:
-            vec_hits = self._vector.search(
-                query, hard_filters=hard_filters, k=candidate_k,
-            )
-            vec_ids = [h.course.course_id for h in vec_hits]
+        vec_ids = [cid for cid, _ in vec_pairs]
 
         # Leg 2: BM25, scoped to the SAME filtered set as the vector leg when
         # hard_filters are active. The old approach intersected BM25 output
@@ -266,6 +272,11 @@ class HybridRetriever:
             )
         bm25_hits = self._bm25.search(query, k=candidate_k, allowed_ids=allowed)
         bm25_ids = [cid for cid, _ in bm25_hits]
+
+        self.last_diagnostics = {
+            "vec_top": float(vec_pairs[0][1]) if vec_pairs else 0.0,
+            "bm25_top": float(bm25_hits[0][1]) if bm25_hits else 0.0,
+        }
 
         if not vec_ids and not bm25_ids:
             return []

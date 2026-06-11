@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     # ADR-locked default stays 20 until the eval says otherwise.
     rerank_pool_size: int = 20
 
+    # Rejection gate flavor (ADR-0018):
+    #   threshold  — ADR-0016 behavior: max(sigmoid) < 0.05 rejects (default)
+    #   calibrated — logistic gate fusing sigmoid + BM25/vector evidence +
+    #                code-pattern miss (rag/rejection.py). Opt-in via env
+    #                REJECTION_MODE=calibrated after a calibration run.
+    rejection_mode: str = "threshold"
+
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
     # Wraps the reranker (and best-effort the embedder backbone) with
     # torch.compile when `inference_backend=pytorch`. ~10-25% latency

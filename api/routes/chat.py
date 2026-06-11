@@ -48,11 +48,13 @@ from api.routes.search import (
 from db.alias_repository import AliasRepository
 from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
+from config import settings
 from llm.gemini_client import GeminiError
 from llm.prompts.chat_v2 import build_prompt
 from llm.query_filter_extractor import extract_filters_adaptive
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import normalize_query_to_course_ids
+from rag.rejection import build_gate_fn
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from rag.retriever import SearchHit
 from schemas.course import DeliveryMode
@@ -168,14 +170,25 @@ def chat(
 
         # Threshold=0.0 disables rejection while still computing blended scores
         # for ordering. We could call a no-reject variant of the function but
-        # keeping a single call site is clearer.
+        # keeping a single call site is clearer. When the Layer 2 prefix
+        # filter narrowed the pool, NO gate runs (threshold or calibrated) —
+        # within-prefix candidates shouldn't be rejected wholesale.
         effective_threshold = 0.0 if prefix_applied else RERANKER_REJECT_THRESHOLD
+        gate_fn = None
+        if not prefix_applied and settings.rejection_mode == "calibrated":
+            diag = hybrid.last_diagnostics or {}
+            gate_fn = build_gate_fn(
+                query=req.query,
+                bm25_top=diag.get("bm25_top", 0.0),
+                vec_top=diag.get("vec_top", 0.0),
+            )
         blended_hits, rerank_meta = rerank_blend_with_rejection(
             req.query, hits, reranker,
             fetch_text=texts.get,
             blend_alpha=BLEND_ALPHA,
             reject_threshold=effective_threshold,
             top_k=req.k,
+            gate_fn=gate_fn,
         )
         if rerank_meta["rejected"]:
             hits = []
