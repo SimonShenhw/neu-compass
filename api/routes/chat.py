@@ -35,11 +35,12 @@ from api.dependencies import (
     get_chat_stream_fn,
     get_course_repo,
     get_hybrid_retriever,
+    get_hyde_rescue_fn,
     get_program_repo,
     get_reranker,
 )
 from api.models import ChatRequest
-from api.routes.common import build_hard_filters, fetch_texts
+from api.routes.common import attempt_hyde_rescue, build_hard_filters, fetch_texts
 from api.routes.search import (
     BLEND_ALPHA,
     RERANK_POOL_SIZE,
@@ -116,6 +117,9 @@ def chat(
         Callable[[str], _Iter[str]],
         Depends(get_chat_stream_fn),
     ],
+    rescue_fn: Annotated[
+        Callable[[str], str | None] | None, Depends(get_hyde_rescue_fn)
+    ] = None,
 ) -> StreamingResponse:
     """Stream a Gemini-generated answer grounded in the retrieved courses.
 
@@ -191,9 +195,23 @@ def chat(
             gate_fn=gate_fn,
         )
         if rerank_meta["rejected"]:
-            hits = []
-            matched_via = "rejected"
-            rejection_reason = str(rerank_meta["reason"])
+            # ADR-0019 rescue — same semantics as /search.
+            rescued = None
+            if rescue_fn is not None:
+                rescued = attempt_hyde_rescue(
+                    query=req.query, conn=conn, hybrid=hybrid,
+                    reranker=reranker, rescue_fn=rescue_fn,
+                    hard_filters=build_hard_filters(req) or None,
+                    pool_size=max(req.k, RERANK_POOL_SIZE),
+                    blend_alpha=BLEND_ALPHA, top_k=req.k,
+                )
+            if rescued is not None:
+                log.info("chat.hyde_rescued", query=req.query, count=len(rescued))
+                hits = rescued
+            else:
+                hits = []
+                matched_via = "rejected"
+                rejection_reason = str(rerank_meta["reason"])
         else:
             hits = blended_hits
 

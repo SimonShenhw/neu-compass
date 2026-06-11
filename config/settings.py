@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     #                REJECTION_MODE=calibrated after a calibration run.
     rejection_mode: str = "threshold"
 
+    # HyDE rescue pass (ADR-0019): when the gate rejects, one Gemini call
+    # second-opinions the query — garbage stays rejected (REJECT verdict),
+    # plausible course queries get a HyDE expansion + retrieval retry.
+    # Costs 1 LLM call + 1 retrieval pass ONLY on would-be-rejected queries
+    # (~12% of traffic measured on test_set v0.3). Opt-in: HYDE_RESCUE=true.
+    hyde_rescue: bool = False
+
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
     # Wraps the reranker (and best-effort the embedder backbone) with
     # torch.compile when `inference_backend=pytorch`. ~10-25% latency

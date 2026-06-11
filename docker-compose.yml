@@ -50,6 +50,7 @@ services:
       ENABLE_RERANKER: "true"                    # NAS has 32GB dual-channel
       RERANK_POOL_SIZE: "10"                     # ADR-0017: 20→10, quality-neutral, halves rerank latency
       REJECTION_MODE: calibrated                 # ADR-0018: logistic gate (sigmoid+BM25+vec+code-miss) replaces bare T=0.05
+      HYDE_RESCUE: "true"                        # ADR-0019: LLM second-opinion + HyDE retry for gate-rejected queries only
       # === Storage paths (bind-mounted volume) ===
       SQLITE_PATH: /data/courses.db
       FAISS_INDEX_PATH: /data/faiss_index

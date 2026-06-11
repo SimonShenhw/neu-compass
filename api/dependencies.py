@@ -78,6 +78,16 @@ def get_chat_stream_fn() -> Callable[[str], _Iter[str]]:
     return generate_text_stream
 
 
+# HyDE rescue expansion (ADR-0019). None when the feature is off — routes
+# skip the rescue entirely. Tests override with a fake to avoid Gemini.
+def get_hyde_rescue_fn() -> Callable[[str], str | None] | None:
+    if not settings.hyde_rescue:
+        return None
+    from rag.hyde import rescue_expand  # noqa: PLC0415
+
+    return rescue_expand
+
+
 # OAuth code-exchange function. Tests override to bypass real Google.
 def get_oauth_exchange_fn() -> Callable[..., dict[str, Any]]:
     return exchange_code_for_token
@@ -150,6 +160,7 @@ __all__ = [
     "get_embedder",
     "get_faiss_index",
     "get_hybrid_retriever",
+    "get_hyde_rescue_fn",
     "get_oauth_exchange_fn",
     "get_program_repo",
     "get_reranker",

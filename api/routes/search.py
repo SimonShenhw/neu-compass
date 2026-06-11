@@ -25,7 +25,7 @@ exercise rejection inject a deterministic stub via conftest.
 from __future__ import annotations
 
 import time
-from typing import Annotated
+from typing import Annotated, Callable
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -35,10 +35,11 @@ from api.dependencies import (
     get_alias_repo,
     get_course_repo,
     get_hybrid_retriever,
+    get_hyde_rescue_fn,
     get_reranker,
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
-from api.routes.common import build_hard_filters, fetch_texts
+from api.routes.common import attempt_hyde_rescue, build_hard_filters, fetch_texts
 from config import settings
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
@@ -121,6 +122,9 @@ def search(
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     hybrid: Annotated[HybridRetriever, Depends(get_hybrid_retriever)],
     reranker: Annotated[CrossEncoderReranker | None, Depends(get_reranker)],
+    rescue_fn: Annotated[
+        Callable[[str], str | None] | None, Depends(get_hyde_rescue_fn)
+    ],
     conn: DbConn,
 ) -> SearchResponse:
     # Sync `def` on purpose: FastAPI runs it in the threadpool. The embedder +
@@ -248,21 +252,38 @@ def search(
             gate_fn=gate_fn,
         )
         if meta["rejected"]:
-            elapsed_ms = _elapsed_ms(started)
-            log.info(
-                "search.rejected",
-                query=req.query,
-                max_sigmoid=meta["max_sigmoid"],
-                n_candidates=meta["n_candidates"],
-                duration_ms=elapsed_ms,
-            )
-            return SearchResponse(
-                query=req.query, k=req.k, matched_via="rejected",
-                results=[], latency_ms=round(elapsed_ms, 2),
-                rejection_reason=str(meta["reason"]),
-            )
-        final_hits = blended_hits
-        rejection_reason = None
+            # ADR-0019: one LLM second-opinion + HyDE retrieval retry for
+            # would-be-rejected queries. Garbage stays rejected (REJECT
+            # verdict); evidence-poor real queries get a second chance.
+            rescued = None
+            if rescue_fn is not None:
+                rescued = attempt_hyde_rescue(
+                    query=req.query, conn=conn, hybrid=hybrid,
+                    reranker=reranker, rescue_fn=rescue_fn,
+                    hard_filters=hard_filters or None,
+                    pool_size=pool_size, blend_alpha=BLEND_ALPHA,
+                    top_k=req.k,
+                )
+            if rescued is None:
+                elapsed_ms = _elapsed_ms(started)
+                log.info(
+                    "search.rejected",
+                    query=req.query,
+                    max_sigmoid=meta["max_sigmoid"],
+                    n_candidates=meta["n_candidates"],
+                    duration_ms=elapsed_ms,
+                )
+                return SearchResponse(
+                    query=req.query, k=req.k, matched_via="rejected",
+                    results=[], latency_ms=round(elapsed_ms, 2),
+                    rejection_reason=str(meta["reason"]),
+                )
+            log.info("search.hyde_rescued", query=req.query, count=len(rescued))
+            final_hits = rescued
+            rejection_reason = None
+        else:
+            final_hits = blended_hits
+            rejection_reason = None
 
     results = [
         SearchHitOut(

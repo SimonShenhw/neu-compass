@@ -41,6 +41,57 @@ class _RetrieverLike(Protocol):
     ) -> list[SearchHit]: ...
 
 
+# ADR-0019: second-opinion prompt for the rescue pass. One call does BOTH
+# jobs — intent judgment (keeps the adversarial wall: garbage gets no
+# second chance) and HyDE expansion (gives real-but-evidence-poor queries
+# like "VC dimension PAC learning" / "CRM 认知偏差" a retrieval retry).
+RESCUE_PROMPT_TEMPLATE = """A university course-search engine rejected the \
+query below as "no matching course". You are the second-opinion judge.
+
+Decide: is this a plausible query a student would type to find an EXISTING \
+university course or course topic? The query may be in Chinese or mixed \
+Chinese/English; technical jargon, theory terms, and field acronyms (expand \
+them from context) are all plausible course topics.
+
+- If NO — gibberish, homework/assignment requests, campus services or \
+admin questions, chit-chat, jokes, or fictional/speculative topics that no \
+real university teaches as a course today (e.g. time travel, teleportation, \
+magic) — output exactly: REJECT
+- If YES — output a 2-3 sentence hypothetical course description (in \
+English) that would answer it, written as if from the course catalog. \
+Spell out any acronyms using the query's context. No preamble.
+
+Query: {query}
+"""
+
+
+def rescue_expand(
+    query: str,
+    *,
+    generate_fn: Callable[[str], str] | None = None,
+    temperature: float = 0.0,
+) -> str | None:
+    """Second-opinion expansion for the rejection rescue pass (ADR-0019).
+
+    Returns the hypothetical description, or None when the LLM judges the
+    query not course-seeking (REJECT) — caller keeps the original rejection.
+
+    temperature=0.0 (not DEFAULT_TEMPERATURE): the REJECT-vs-expand verdict
+    is a judgment call and must be as deterministic as possible — at 0.3,
+    borderline fictional queries ("time travel paradox engineering")
+    flipped verdicts between runs (observed on the v0.3 eval).
+    """
+    prompt = RESCUE_PROMPT_TEMPLATE.format(query=query)
+    if generate_fn is None:
+        out = generate_text(prompt, temperature=temperature)
+    else:
+        out = generate_fn(prompt)
+    text = out.strip()
+    if not text or text.upper().startswith("REJECT"):
+        return None
+    return text
+
+
 def expand_query_via_hyde(
     query: str,
     *,
@@ -102,6 +153,8 @@ class HydeRetriever:
 __all__ = [
     "DEFAULT_TEMPERATURE",
     "HYDE_PROMPT_TEMPLATE",
+    "RESCUE_PROMPT_TEMPLATE",
     "HydeRetriever",
     "expand_query_via_hyde",
+    "rescue_expand",
 ]
