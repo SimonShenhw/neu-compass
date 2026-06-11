@@ -26,6 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "user_id": None,
     "user_email": None,
     "user_contribution_count": 0,
+    "session_token": None,   # ADR-0021 signed bearer credential
     # Conversation (chat)
     "messages": [],          # [{"role", "content", "evidence", "matched_via"}]
     # Last search context (drives course detail panel)
@@ -63,10 +64,12 @@ def login(
     user_id: str,
     user_email: str,
     contribution_count: int = 0,
+    session_token: str | None = None,
 ) -> None:
     state["user_id"] = user_id
     state["user_email"] = user_email
     state["user_contribution_count"] = contribution_count
+    state["session_token"] = session_token
 
 
 def logout(state: SessionState) -> None:
@@ -75,6 +78,7 @@ def logout(state: SessionState) -> None:
     state["user_id"] = None
     state["user_email"] = None
     state["user_contribution_count"] = 0
+    state["session_token"] = None
     state["messages"] = []
     state["search_results"] = []
     state["selected_course_id"] = None

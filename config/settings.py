@@ -113,5 +113,11 @@ class Settings(BaseSettings):
     # === OAuth domain whitelist ===
     allowed_email_domains: list[str] = ["husky.neu.edu", "northeastern.edu"]
 
+    # === Session tokens (ADR-0021, replaces the X-User-Id stub) ===
+    # Empty secret = mechanism off (anonymous-only) so fresh checkouts run.
+    # Generate: python -c "import secrets; print(secrets.token_urlsafe(48))"
+    session_secret: str = ""
+    session_max_age_seconds: int = 604800  # 7 days
+
 
 settings = Settings()

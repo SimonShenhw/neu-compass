@@ -88,6 +88,33 @@ def get_hyde_rescue_fn() -> Callable[[str], str | None] | None:
     return rescue_expand
 
 
+# === Session auth (ADR-0021) ===
+
+
+def get_current_user_id(request: Request) -> str | None:
+    """Resolve the caller's identity from `Authorization: Bearer <token>`.
+
+    - no Authorization header → None (anonymous — fine for public routes)
+    - header present but token invalid/expired → 401 (an explicit credential
+      that fails verification is an error, never silent anonymity)
+    """
+    from fastapi import HTTPException, status  # noqa: PLC0415
+
+    from app.session_tokens import verify_session_token  # noqa: PLC0415
+
+    header = request.headers.get("Authorization", "")
+    if not header:
+        return None
+    token = header.removeprefix("Bearer ").strip()
+    payload = verify_session_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session token. Log in again.",
+        )
+    return str(payload["user_id"])
+
+
 # OAuth code-exchange function. Tests override to bypass real Google.
 def get_oauth_exchange_fn() -> Callable[..., dict[str, Any]]:
     return exchange_code_for_token

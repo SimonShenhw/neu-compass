@@ -132,7 +132,11 @@ class OAuthCallbackRequest(BaseModel):
 
 class OAuthCallbackResponse(BaseModel):
     """Sanitized identity persisted server-side. Streamlit calls
-    state_manager.login with these fields."""
+    state_manager.login with these fields.
+
+    session_token (ADR-0021): signed bearer credential for subsequent API
+    calls (`Authorization: Bearer <token>`). None when the server runs
+    without SESSION_SECRET (dev degraded mode)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -140,6 +144,7 @@ class OAuthCallbackResponse(BaseModel):
     email: str
     display_name: str | None = None
     contribution_count: int = 0
+    session_token: str | None = None
 
 
 # === /health, /ready ===

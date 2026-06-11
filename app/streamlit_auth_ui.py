@@ -28,6 +28,17 @@ def handle_oauth_callback() -> None:
     if not code:
         return
 
+    # CSRF (ADR-0021): the state we generated before redirecting to Google
+    # must round-trip unchanged. A mismatch means this ?code= was NOT the
+    # continuation of a flow this tab started — discard it.
+    expected_state = st.session_state.get("oauth_state")
+    returned_state = st.query_params.get("state")
+    if not expected_state or returned_state != expected_state:
+        st.error("Login flow state mismatch — please try signing in again.")
+        st.query_params.clear()
+        return
+    st.session_state.pop("oauth_state", None)  # one-shot
+
     try:
         with ApiClient() as api:
             identity = api.oauth_callback(code)
@@ -41,6 +52,7 @@ def handle_oauth_callback() -> None:
         user_id=identity["user_id"],
         user_email=identity["email"],
         contribution_count=identity.get("contribution_count", 0),
+        session_token=identity.get("session_token"),
     )
     if identity.get("display_name"):
         st.session_state["user_display_name"] = identity["display_name"]
@@ -69,7 +81,13 @@ def render_auth_sidebar() -> None:
                 logout(st.session_state)
                 st.rerun()
         else:
-            url = authorize_url()
+            # CSRF state survives reruns in session_state; regenerated only
+            # when absent so the link stays stable within one login attempt.
+            import secrets  # noqa: PLC0415
+
+            if not st.session_state.get("oauth_state"):
+                st.session_state["oauth_state"] = secrets.token_urlsafe(24)
+            url = authorize_url(state_token=st.session_state["oauth_state"])
             st.markdown(f"[🔐 Sign in with Google]({url})")
             st.caption("Restricted to husky.neu.edu / northeastern.edu.")
 

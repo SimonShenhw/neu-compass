@@ -37,7 +37,7 @@ class ApiClient:
         self,
         *,
         base_url: str | None = None,
-        user_id: str | None = None,
+        session_token: str | None = None,
         transport: httpx.BaseTransport | None = None,
         timeout: float = 30.0,
     ) -> None:
@@ -46,8 +46,8 @@ class ApiClient:
         # backend into raw ReadTimeout tracebacks in the Streamlit UI.
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
         headers: dict[str, str] = {}
-        if user_id:
-            headers["X-User-Id"] = user_id
+        if session_token:
+            headers["Authorization"] = f"Bearer {session_token}"
         self._client = httpx.Client(
             base_url=self.base_url,
             headers=headers,
@@ -66,13 +66,13 @@ class ApiClient:
     def close(self) -> None:
         self._client.close()
 
-    # === Auth (X-User-Id is the Week 6 OAuth stub; see api/routes/coop.py) ===
+    # === Auth (ADR-0021: signed session token from POST /auth/callback) ===
 
-    def set_user_id(self, user_id: str | None) -> None:
-        if user_id:
-            self._client.headers["X-User-Id"] = user_id
+    def set_session_token(self, token: str | None) -> None:
+        if token:
+            self._client.headers["Authorization"] = f"Bearer {token}"
         else:
-            self._client.headers.pop("X-User-Id", None)
+            self._client.headers.pop("Authorization", None)
 
     # === Routes ===
 

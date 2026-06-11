@@ -1,4 +1,4 @@
-"""Tests for api.routes.coop — POST upload (k-anonymity gated) + GET list (tiered).
+﻿"""Tests for api.routes.coop — POST upload (k-anonymity gated) + GET list (tiered).
 
 The k-anonymity gate is the security boundary that PLAN §3.4 marks as a red
 line. These tests pin down both the rejection path (would-be uniquely
@@ -10,10 +10,27 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
 
+from app.session_tokens import issue_session_token
+from config import settings
 from db.coop_repository import CoopRepository
 from schemas.coop import CoopExperience
+
+
+@pytest.fixture(autouse=True)
+def _session_secret(monkeypatch):
+    """ADR-0021: coop routes authenticate via signed Bearer tokens; tests
+    mint real ones against a test secret (settings is a module singleton —
+    monkeypatch the attribute, never re-instantiate)."""
+    monkeypatch.setattr(settings, "session_secret", "test-secret-coop")
+
+
+def _auth(user_id: str) -> dict[str, str]:
+    token = issue_session_token(user_id, f"{user_id}@husky.neu.edu")
+    assert token is not None
+    return {"Authorization": f"Bearer {token}"}
 
 
 # === helpers ===
@@ -60,7 +77,7 @@ def test_post_coop_first_unique_triple_rejected(
             "role": "Director of Quant Research",
             "coop_term": "Spring 2026",
         },
-        headers={"X-User-Id": "u-test"},
+        headers=_auth("u-test"),
     )
     assert r.status_code == 422
     detail = r.json()["detail"].lower()
@@ -91,7 +108,7 @@ def test_post_coop_second_match_accepted(
             "role": "Quant Dev",
             "coop_term": "Summer 2025",
         },
-        headers={"X-User-Id": "u-test"},
+        headers=_auth("u-test"),
     )
     assert r.status_code == 201
     body = r.json()
@@ -125,7 +142,7 @@ def test_post_coop_accepted_increments_contribution_count(
     r = api_client.post(
         "/coop",
         json={"company": "Fidelity", "role": "Quant Dev", "coop_term": "Summer 2025"},
-        headers={"X-User-Id": "u-test"},
+        headers=_auth("u-test"),
     )
     assert r.status_code == 201
     row = empty_db.execute(
@@ -160,7 +177,7 @@ def test_post_coop_salary_sets_premium_tier(
             "coop_term": "Summer 2025",
             "salary_range_usd": "$30-35/hr",
         },
-        headers={"X-User-Id": "u-test"},
+        headers=_auth("u-test"),
     )
     assert r.status_code == 201
     assert r.json()["visibility_level"] == 2
@@ -187,7 +204,7 @@ def test_post_coop_interview_only_sets_detail_tier(
             "coop_term": "Summer 2025",
             "interview_summary": "Two rounds. Behavioral + system design.",
         },
-        headers={"X-User-Id": "u-test"},
+        headers=_auth("u-test"),
     )
     assert r.status_code == 201
     assert r.json()["visibility_level"] == 1
@@ -232,7 +249,7 @@ def test_get_coop_with_high_contributor_sees_all(
         ))
     empty_db.commit()
 
-    r = api_client_unseeded.get("/coop", headers={"X-User-Id": "u-high"})
+    r = api_client_unseeded.get("/coop", headers=_auth("u-high"))
     assert r.status_code == 200
     rows = r.json()
     assert {row["coop_id"] for row in rows} == {"c0", "c1", "c2"}
@@ -250,6 +267,6 @@ def test_get_coop_mid_contributor_sees_levels_0_and_1(
         ))
     empty_db.commit()
 
-    r = api_client_unseeded.get("/coop", headers={"X-User-Id": "u-mid"})
+    r = api_client_unseeded.get("/coop", headers=_auth("u-mid"))
     assert r.status_code == 200
     assert {row["coop_id"] for row in r.json()} == {"c0", "c1"}

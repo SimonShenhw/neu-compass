@@ -100,9 +100,14 @@ def oauth_callback(
         domain=user.domain,
         contribution_count=user.contribution_count,
     )
+    # ADR-0021: the ONLY place session tokens are minted — downstream of a
+    # verified Google OAuth round-trip + domain whitelist.
+    from app.session_tokens import issue_session_token  # noqa: PLC0415
+
     return OAuthCallbackResponse(
         user_id=user.user_id,
         email=user.email,
         display_name=user.display_name,
         contribution_count=user.contribution_count,
+        session_token=issue_session_token(user.user_id, user.email),
     )

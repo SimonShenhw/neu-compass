@@ -8,10 +8,10 @@ import pytest
 from app.api_client import ApiClient, ApiError
 
 
-def _client(handler, *, user_id: str | None = None) -> ApiClient:
+def _client(handler, *, session_token: str | None = None) -> ApiClient:
     transport = httpx.MockTransport(handler)
     return ApiClient(
-        base_url="http://test", user_id=user_id, transport=transport,
+        base_url="http://test", session_token=session_token, transport=transport,
     )
 
 
@@ -84,34 +84,34 @@ def test_get_course_uses_path() -> None:
 # === Auth header ===
 
 
-def test_user_id_header_attached() -> None:
+def test_session_token_header_attached() -> None:
     seen: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen["x-user-id"] = request.headers.get("x-user-id")
+        seen["authorization"] = request.headers.get("authorization")
         return httpx.Response(200, json=[])
 
-    with _client(handler, user_id="u-test") as api:
+    with _client(handler, session_token="tok-abc") as api:
         api.list_coop()
 
-    assert seen["x-user-id"] == "u-test"
+    assert seen["authorization"] == "Bearer tok-abc"
 
 
-def test_set_user_id_swaps_header() -> None:
+def test_set_session_token_swaps_header() -> None:
     seen: list = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request.headers.get("x-user-id"))
+        seen.append(request.headers.get("authorization"))
         return httpx.Response(200, json=[])
 
     with _client(handler) as api:
         api.list_coop()
-        api.set_user_id("u-1")
+        api.set_session_token("tok-1")
         api.list_coop()
-        api.set_user_id(None)
+        api.set_session_token(None)
         api.list_coop()
 
-    assert seen == [None, "u-1", None]
+    assert seen == [None, "Bearer tok-1", None]
 
 
 # === Error path ===

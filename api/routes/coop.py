@@ -9,9 +9,10 @@ PII red lines (PLAN §3.4 / §6.3 / ADR §3.4):
     client. salary_range_usd → 2 (premium). interview/technical → 1
     (detail). bare row → 0 (preview). This stops a client from publishing
     salary at level=0 just by lying.
-  - User identity comes from `X-User-Id` header for now (Week 6 stub).
-    OAuth wiring lives behind the Streamlit auth.py and the API trusts the
-    header. Production fix in Week 7 once Authlib/session-cookie is in.
+  - User identity comes from a SIGNED session token (ADR-0021,
+    `Authorization: Bearer`) minted only by POST /auth/callback after the
+    Google OAuth round-trip — the old trusted X-User-Id header let anyone
+    on the network read salary-tier data or impersonate contributors.
 
 GET /coop returns rows visible to the user per CoopRepository
 .list_visible_to_user (PLAN §6.4 give-to-get gate). Anonymous request
@@ -24,9 +25,14 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.dependencies import DbConn, get_coop_repo, get_user_repo
+from api.dependencies import (
+    DbConn,
+    get_coop_repo,
+    get_current_user_id,
+    get_user_repo,
+)
 from api.models import (
     CoopOut,
     CoopUploadRequest,
@@ -73,15 +79,14 @@ def _derive_visibility(req: CoopUploadRequest) -> int:
         "  - `1` (detail) when `interview_summary` or `technical_questions` "
         "present\n"
         "  - `0` (preview) otherwise\n\n"
-        "User identity comes from the `X-User-Id` header (Week 6 OAuth "
-        "stub; Week 7 will replace with session cookie via "
-        "`POST /auth/callback`).\n\n"
+        "User identity comes from `Authorization: Bearer <session_token>` "
+        "(ADR-0021) — tokens are minted only by `POST /auth/callback`.\n\n"
         "**F1 compliance** (PLAN §9): no payments, no commercialization. "
         "PII redaction is the contributor's responsibility before submit."
     ),
     responses={
         201: {"description": "Co-op accepted and persisted."},
-        401: {"description": "`X-User-Id` header missing."},
+        401: {"description": "Missing, invalid, or expired session token."},
         422: {
             "description": (
                 "k=2 anonymity violation OR validation error (extra fields, "
@@ -95,12 +100,13 @@ def upload_coop(
     conn: DbConn,
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
-    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
+    x_user_id: Annotated[str | None, Depends(get_current_user_id)] = None,
 ) -> CoopUploadResponse:
     if not x_user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="X-User-Id header required (Week 6 OAuth stub)",
+            detail="Authentication required: log in and send "
+                   "Authorization: Bearer <session_token> (ADR-0021)",
         )
 
     coop_id = f"coop-{uuid.uuid4().hex[:12]}"
@@ -173,7 +179,7 @@ def upload_coop(
     description=(
         "Returns rows visible to the caller per the give-to-get gate "
         "(PLAN §6.4):\n\n"
-        "- Anonymous (no `X-User-Id`) → only `visibility_level=0` (preview) "
+        "- Anonymous (no token) → only `visibility_level=0` (preview) "
         "rows.\n"
         "- Authenticated → calls `CoopRepository.list_visible_to_user`, "
         "which exposes higher-tier rows in proportion to the user's own "
@@ -185,7 +191,7 @@ def upload_coop(
 )
 def list_coop(
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
-    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
+    x_user_id: Annotated[str | None, Depends(get_current_user_id)] = None,
 ) -> list[CoopOut]:
     if x_user_id:
         rows = coop_repo.list_visible_to_user(x_user_id)

@@ -327,7 +327,9 @@ def render() -> None:
             with st.chat_message("assistant"):
                 final_text = ""
                 try:
-                    with ApiClient(user_id=st.session_state.get("user_id")) as api:
+                    with ApiClient(
+                        session_token=st.session_state.get("session_token")
+                    ) as api:
                         stream = stream_assistant(api, chat_body, st.session_state)
                         final_text = st.write_stream(stream) or ""
                 except ApiError as e:
@@ -375,7 +377,9 @@ def render() -> None:
             )
             return
 
-        with ApiClient(user_id=st.session_state.get("user_id")) as api:
+        with ApiClient(
+            session_token=st.session_state.get("session_token")
+        ) as api:
             try:
                 course = api.get_course(cid)
             except ApiError as e:
