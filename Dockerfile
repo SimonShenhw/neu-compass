@@ -34,16 +34,41 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
+# Image-slim exclusions (ADR-0023). The NAS runs ONLY the OpenVINO path —
+# the locked CUDA torch (+ its nvidia-*/triton train, ~6GB installed) and
+# the scraper/eval-only heavies never execute in this image. uv's
+# --no-install-package skips them WITHOUT touching uv.lock, so the PC dev
+# venv resolution is completely unaffected. torch itself is replaced by
+# the CPU wheel below (optimum-intel imports torch unconditionally; the
+# tokenizers only pack tensors with it).
+ARG SLIM_EXCLUDES="--no-install-package torch --no-install-package triton \
+    --no-install-package nvidia-cublas-cu12 --no-install-package nvidia-cuda-cupti-cu12 \
+    --no-install-package nvidia-cuda-nvrtc-cu12 --no-install-package nvidia-cuda-runtime-cu12 \
+    --no-install-package nvidia-cudnn-cu12 --no-install-package nvidia-cufft-cu12 \
+    --no-install-package nvidia-cufile-cu12 --no-install-package nvidia-curand-cu12 \
+    --no-install-package nvidia-cusolver-cu12 --no-install-package nvidia-cusparse-cu12 \
+    --no-install-package nvidia-cusparselt-cu12 --no-install-package nvidia-nccl-cu12 \
+    --no-install-package nvidia-nvjitlink-cu12 --no-install-package nvidia-nvshmem-cu12 \
+    --no-install-package nvidia-nvtx-cu12 \
+    --no-install-package playwright --no-install-package pymupdf \
+    --no-install-package ragas --no-install-package deepeval \
+    --no-install-package datasets --no-install-package pyarrow"
+
 # Install locked runtime deps. We skip the `onnx` extra here because we want
 # onnxruntime-openvino (Intel-flavor) instead of the generic onnxruntime that
 # the extra pulls in. PC dev still uses the `onnx` extra + onnxruntime-gpu.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
+    uv sync --frozen --no-install-project --no-dev $SLIM_EXCLUDES
 
 COPY . .
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev $SLIM_EXCLUDES
+
+# CPU torch BEFORE optimum-intel: optimum's torch dependency is then already
+# satisfied, so the CUDA wheel never enters the image. ~200MB vs ~6GB.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --no-cache torch --index-url https://download.pytorch.org/whl/cpu
 
 # Layer in OpenVINO-native inference deps LAST. These are added via
 # `uv pip install` (not the lock) because they're platform-specific —
