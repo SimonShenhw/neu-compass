@@ -1,0 +1,20 @@
+# Streamlit theme — Alipay-inspired palette (2026-06 frontend pass).
+# Pairs with app/ui_theme.py (custom CSS layer); this file sets the
+# variables Streamlit's own widgets read so native controls match.
+# Ships in the Docker image (.dockerignore does not exclude it) and is
+# picked up from the repo root CWD by `streamlit run app/streamlit_app.py`.
+
+[theme]
+primaryColor = "#1677FF"
+backgroundColor = "#F5F7FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#26303E"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+# Streamlit "magic" renders bare module-level strings — it was painting the
+# SAMPLE_QUERIES docstring in app/streamlit_app.py onto the page. Off.
+magicEnabled = false

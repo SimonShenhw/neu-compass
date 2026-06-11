@@ -215,11 +215,20 @@ def render() -> None:
         handle_oauth_callback,
         render_auth_sidebar,
     )
+    from app.ui_theme import (  # noqa: PLC0415
+        course_header_html,
+        guest_banner_html,
+        hero_html,
+        inject_theme,
+        topic_pills_html,
+    )
 
     st.set_page_config(
         page_title="NEU-Compass · Course Search",
+        page_icon="🧭",
         layout="wide",
     )
+    inject_theme(st)
     init_state(st.session_state)
 
     # Process ?code= callback BEFORE rendering anything else (it may rerun).
@@ -228,14 +237,17 @@ def render() -> None:
     render_auth_sidebar()
     active_filters = _render_filters_sidebar(st, st.session_state)
 
-    st.title("NEU-Compass · 选课助手")
-    st.caption("F1 合规 MVP · 仅限 NEU 学生使用")
+    logged_in = is_logged_in(st.session_state)
+    st.markdown(
+        hero_html(
+            logged_in=logged_in,
+            display_name=st.session_state.get("user_display_name") or "",
+        ),
+        unsafe_allow_html=True,
+    )
 
-    if not is_logged_in(st.session_state):
-        st.info(
-            "🔒 You are browsing as guest — only level-0 (preview) Co-op data is "
-            "visible. Log in with your NEU email (sidebar) to see contribution-gated content."
-        )
+    if not logged_in:
+        st.markdown(guest_banner_html(), unsafe_allow_html=True)
 
     chat_col, detail_col = st.columns([3, 2])
 
@@ -370,21 +382,25 @@ def render() -> None:
                 st.error(f"Could not load course: {e.detail}")
                 return
 
-        st.markdown(f"### {course['primary_code']} — {course['primary_name']}")
-        meta_cols = st.columns(3)
-        meta_cols[0].metric("Term", course.get("term") or "—")
-        meta_cols[1].metric("Credits", course.get("credits") or "—")
-        meta_cols[2].metric(
-            "Mode",
-            (course.get("delivery_mode") or "—").replace("_", " "),
+        st.markdown(
+            course_header_html(
+                code=course["primary_code"],
+                name=course["primary_name"],
+                term=course.get("term"),
+                credits=course.get("credits"),
+                delivery_mode=course.get("delivery_mode"),
+            ),
+            unsafe_allow_html=True,
         )
 
         if course.get("professor"):
             st.markdown("**Professor:** " + ", ".join(course["professor"]))
         if course.get("topics_covered"):
             st.markdown("**Topics:**")
-            for t in course["topics_covered"]:
-                st.markdown(f"- {t}")
+            st.markdown(
+                topic_pills_html(course["topics_covered"]),
+                unsafe_allow_html=True,
+            )
         if course.get("ai_policy"):
             with st.expander("AI policy"):
                 st.json(course["ai_policy"])
