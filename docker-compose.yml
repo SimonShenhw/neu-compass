@@ -51,6 +51,8 @@ services:
       RERANK_POOL_SIZE: "10"                     # ADR-0017: 20→10, quality-neutral, halves rerank latency
       REJECTION_MODE: calibrated                 # ADR-0018: logistic gate (sigmoid+BM25+vec+code-miss) replaces bare T=0.05
       HYDE_RESCUE: "true"                        # ADR-0019: LLM second-opinion + HyDE retry for gate-rejected queries only
+      FUSION_MODE: convex                        # ADR-0022: score-aware min-max fusion beats RRF on v0.3 sweep
+      FUSION_WEIGHT: "0.7"                       # vector leg share; sweep plateau w∈[0.5,0.7], best cell 0.7 @ α=0.4
       # === Storage paths (bind-mounted volume) ===
       SQLITE_PATH: /data/courses.db
       FAISS_INDEX_PATH: /data/faiss_index

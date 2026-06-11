@@ -181,6 +181,8 @@ def get_hybrid_retriever(
     return HybridRetriever(
         vector_retriever=vector, bm25_corpus=bm25, course_repo=course_repo,
         query_expander=expander,
+        fusion_mode=settings.fusion_mode,
+        fusion_weight=settings.fusion_weight,
     )
 
 

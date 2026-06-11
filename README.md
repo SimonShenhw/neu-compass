@@ -23,6 +23,7 @@
 | **Eval R@5 / MRR — 校准拒绝门控 (ADR-0018, live-API 生产路径)** ⭐ | **0.568 / 0.544** (误拒 4→1,adversarial 4/4 保持,延迟持平) |
 | **Eval R@5 / MRR — test_set v0.3 (n=104) + 门控 v4 + HyDE rescue (ADR-0019)** ⭐ | **0.762 / 0.721** (误拒 **0**/92,adversarial 11/12,p50 893ms) |
 | **Eval R@5 / MRR — + 词汇层 ADR-0020 (doc2query+中文BM25+缩写词表)** ⭐ | **0.778 / 0.723** (中文类 0.92,q093 CRM 歧义修复 top1 正解,p95 1.2s) |
+| **Eval R@5 / MRR — + 凸组合融合 ADR-0022 (w=0.7, α=0.4 重确认)** ⭐ | **0.789 / 0.745** (中文类 **1.000**,误拒 0/92,p50 844ms) |
 | **api 容器 RSS — NAS (reranker on + Iris Xe)** | **4.9 GB** (vs ONNX+CPU 17 GB) |
 | **NAS 冷启 lifespan(OpenVINO compile cache 持久化)** | **13 s** (首次 ~50 s,缓存命中后 5 s) |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
@@ -328,6 +329,7 @@ neu-compass/
 - **[ADR-0019](docs/adr/0019-hyde-rescue-pass.md)** HyDE rescue pass (拒绝后 LLM 二审 + 检索重试,误拒归零,主路径零开销) — 2026-06
 - **[ADR-0020](docs/adr/0020-doc-expansion-vocabulary-layer.md)** 词汇层 (doc2query 扩展 + CJK bigram 中文 BM25 + 520 词条缩写词表,R@5 0.762→0.778) — 2026-06
 - **[ADR-0021](docs/adr/0021-session-token-auth.md)** 签名 session token 鉴权 (itsdangerous Bearer + OAuth state CSRF,X-User-Id stub 退役) — 2026-06
+- **[ADR-0022](docs/adr/0022-convex-fusion.md)** 凸组合融合替代 RRF (w=0.7,MRR +3%,中文类满分;α=0.4 v0.3 重确认) — 2026-06
 
 完整 ADR: [docs/adr/](docs/adr/)
 

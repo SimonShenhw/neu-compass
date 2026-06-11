@@ -226,6 +226,44 @@ def reciprocal_rank_fusion(
     return fused
 
 
+def convex_combination(
+    vec_pairs: list[tuple[str, float]],
+    bm25_pairs: list[tuple[str, float]],
+    *,
+    weight_vec: float,
+) -> dict[str, float]:
+    """Score-aware fusion: weight_vec·minmax(vec) + (1-weight_vec)·minmax(bm25).
+
+    Bruch et al. (TOIS 2023, arXiv:2210.11934): a tuned convex combination
+    of NORMALIZED scores beats RRF in- and out-of-domain — RRF's rank-only
+    view throws away the score magnitudes that distinguish a confident
+    dense match from barely-made-the-cutoff noise. Min-max is per leg per
+    query (intra-pool); a doc missing from one leg contributes 0 from that
+    leg (it wasn't competitive there). Degenerate one-item / all-equal legs
+    normalize to 1.0 — top of a leg is full evidence, however small the
+    pool.
+    """
+    if not 0.0 <= weight_vec <= 1.0:
+        raise ValueError(f"weight_vec must be in [0, 1], got {weight_vec}")
+
+    def _minmax(pairs: list[tuple[str, float]]) -> dict[str, float]:
+        if not pairs:
+            return {}
+        vals = [s for _, s in pairs]
+        lo, hi = min(vals), max(vals)
+        if hi - lo < 1e-12:
+            return {cid: 1.0 for cid, _ in pairs}
+        return {cid: (s - lo) / (hi - lo) for cid, s in pairs}
+
+    n_vec = _minmax(vec_pairs)
+    n_bm25 = _minmax(bm25_pairs)
+    return {
+        cid: weight_vec * n_vec.get(cid, 0.0)
+        + (1.0 - weight_vec) * n_bm25.get(cid, 0.0)
+        for cid in n_vec.keys() | n_bm25.keys()
+    }
+
+
 class HybridRetriever:
     """RRF combination of vector + BM25 retrieval.
 
@@ -246,12 +284,18 @@ class HybridRetriever:
         rrf_k: int = DEFAULT_RRF_K,
         candidate_multiplier: int = 3,
         query_expander: Any | None = None,
+        fusion_mode: str = "rrf",
+        fusion_weight: float = 0.5,
     ) -> None:
         self._vector = vector_retriever
         self._bm25 = bm25_corpus
         self._course_repo = course_repo
         self._rrf_k = rrf_k
         self._candidate_multiplier = candidate_multiplier
+        # ADR-0022: "rrf" (rank-only, ADR-0001 era default) or "convex"
+        # (score-aware min-max combination; weight = vector leg's share).
+        self._fusion_mode = fusion_mode
+        self._fusion_weight = fusion_weight
         # ADR-0020: optional Callable[[str], str] applied to the query for
         # the RETRIEVAL legs only (e.g. rag.acronyms.expand_query). Caller's
         # reranker + rejection gate keep seeing the original query, so the
@@ -314,10 +358,15 @@ class HybridRetriever:
         if not vec_ids and not bm25_ids:
             return []
 
-        fused = reciprocal_rank_fusion(
-            [vec_ids, bm25_ids],
-            k=self._rrf_k,
-        )
+        if self._fusion_mode == "convex":
+            fused = convex_combination(
+                vec_pairs, bm25_hits, weight_vec=self._fusion_weight,
+            )
+        else:
+            fused = reciprocal_rank_fusion(
+                [vec_ids, bm25_ids],
+                k=self._rrf_k,
+            )
 
         top_k = sorted(fused, key=lambda c: -fused[c])[:k]
         if not top_k:
@@ -335,6 +384,7 @@ __all__ = [
     "DEFAULT_RRF_K",
     "BM25Corpus",
     "HybridRetriever",
+    "convex_combination",
     "reciprocal_rank_fusion",
     "tokenize",
 ]

@@ -95,6 +95,12 @@ class Settings(BaseSettings):
     # so True is a safe default everywhere.
     acronym_expansion: bool = True
 
+    # ADR-0022: hybrid fusion flavor. "rrf" = rank-only (historic default);
+    # "convex" = score-aware min-max combination (Bruch TOIS'23), with
+    # FUSION_WEIGHT = the vector leg's share. Switch only on sweep evidence.
+    fusion_mode: str = "rrf"
+    fusion_weight: float = 0.5
+
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
     # Wraps the reranker (and best-effort the embedder backbone) with
     # torch.compile when `inference_backend=pytorch`. ~10-25% latency

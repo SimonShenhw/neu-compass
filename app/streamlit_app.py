@@ -249,6 +249,20 @@ def render() -> None:
     if not logged_in:
         st.markdown(guest_banner_html(), unsafe_allow_html=True)
 
+    # Sidebar nav (not st.tabs): chat_input must stay bottom-pinned on the
+    # search page, which tabs would break. Co-op finally gets an entry point
+    # in the product UI instead of living as an orphan standalone page.
+    nav = st.sidebar.radio(
+        "页面 / Pages",
+        ["🔍 课程搜索 · Search", "💼 Co-op 经验"],
+        key="nav_page",
+    )
+    if nav.startswith("💼"):
+        from app.coop_view import render_coop_panel  # noqa: PLC0415
+
+        render_coop_panel(st)
+        return
+
     chat_col, detail_col = st.columns([3, 2])
 
     with chat_col:

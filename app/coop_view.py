@@ -32,12 +32,11 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 
 def render() -> None:
-    """Render the Co-op page. Lazily imports Streamlit so tests can `import
-    app.coop_view` without spinning up Streamlit's session machinery."""
+    """Standalone Co-op page (page config + auth chrome + panel). The main
+    app (streamlit_app) mounts render_coop_panel directly instead."""
     import streamlit as st  # noqa: PLC0415
 
-    from app.api_client import ApiClient, ApiError  # noqa: PLC0415
-    from app.state_manager import init_state, is_logged_in  # noqa: PLC0415
+    from app.state_manager import init_state  # noqa: PLC0415
     from app.streamlit_auth_ui import (  # noqa: PLC0415
         handle_oauth_callback,
         render_auth_sidebar,
@@ -47,11 +46,19 @@ def render() -> None:
     init_state(st.session_state)
     handle_oauth_callback()
     render_auth_sidebar()
+    render_coop_panel(st)
 
-    st.title("📊 NEU Co-op Experiences")
-    st.caption("PII k=2 anonymity enforced server-side. F1 合规.")
 
-    user_id = st.session_state.get("user_id")
+def render_coop_panel(st) -> None:
+    """Co-op listing + upload form. Caller owns page config / auth chrome /
+    theme — this只负责面板本体, so the main app can mount it as a nav page."""
+    from app.api_client import ApiClient, ApiError  # noqa: PLC0415
+    from app.state_manager import is_logged_in  # noqa: PLC0415
+
+    st.subheader("💼 NEU Co-op Experiences")
+    st.caption("PII k=2 anonymity enforced server-side · give-to-get 解锁 · F1 合规")
+
+    session_token = st.session_state.get("session_token")
     if not is_logged_in(st.session_state):
         st.info(
             "Browsing as guest — only preview-tier rows visible. "
@@ -59,7 +66,7 @@ def render() -> None:
         )
 
     # === Listing ===
-    with ApiClient(user_id=user_id) as api:
+    with ApiClient(session_token=session_token) as api:
         try:
             coops = api.list_coop()
         except ApiError as e:
@@ -150,7 +157,7 @@ def render() -> None:
                 "technical_questions": technical_questions.strip() or None,
                 "salary_range_usd": salary_range_usd.strip() or None,
             }
-            with ApiClient(user_id=user_id) as api:
+            with ApiClient(session_token=session_token) as api:
                 try:
                     resp = api.upload_coop(payload)
                     st.success(
