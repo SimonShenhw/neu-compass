@@ -25,6 +25,7 @@
 | **Eval R@5 / MRR — + 词汇层 ADR-0020 (doc2query+中文BM25+缩写词表)** ⭐ | **0.778 / 0.723** (中文类 0.92,q093 CRM 歧义修复 top1 正解,p95 1.2s) |
 | **Eval R@5 / MRR — + 凸组合融合 ADR-0022 (w=0.7, α=0.4 重确认)** ⭐ | **0.789 / 0.745** (中文类 **1.000**,误拒 0/92,p50 844ms) |
 | **Eval R@5 / MRR — test_set v0.3.1 (n=116 +code_switched) + 瘦身镜像 (ADR-0023)** ⭐ | **0.799 / 0.743** (中英混合类 0.917 已覆盖,镜像 9GB→**2.59GB**) |
+| **Eval R@5 / MRR — test_set v0.4 多标签口径 (ADR-0024, 同一系统)** ⭐ | **0.863 / 0.931** (93% 查询 top-1 即相关;medium 0.644→0.762 证实评测假阴性;ColBERT 迁移否决) |
 | **api 容器 RSS — NAS (reranker on + Iris Xe)** | **4.9 GB** (vs ONNX+CPU 17 GB) |
 | **NAS 冷启 lifespan(OpenVINO compile cache 持久化)** | **13 s** (首次 ~50 s,缓存命中后 5 s) |
 | Eval R@5 / MRR — `hybrid_with_alias` (α=1.0) | 0.601 / **0.603** |
@@ -332,6 +333,7 @@ neu-compass/
 - **[ADR-0021](docs/adr/0021-session-token-auth.md)** 签名 session token 鉴权 (itsdangerous Bearer + OAuth state CSRF,X-User-Id stub 退役) — 2026-06
 - **[ADR-0022](docs/adr/0022-convex-fusion.md)** 凸组合融合替代 RRF (w=0.7,MRR +3%,中文类满分;α=0.4 v0.3 重确认) — 2026-06
 - **[ADR-0023](docs/adr/0023-image-slim-and-code-switched.md)** 镜像瘦身 9GB→2.6GB (uv.lock 零改动) + 中英混合查询实测已覆盖 (0.917) — 2026-06
+- **[ADR-0024](docs/adr/0024-multilabel-eval-colbert-verdict.md)** 多标签评测 v0.4 (池化+UMBRELA 标注,MRR 0.931) + ColBERT 迁移否决 — 2026-06
 
 完整 ADR: [docs/adr/](docs/adr/)
 

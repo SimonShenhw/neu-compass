@@ -1,0 +1,2329 @@
+{
+  "_comment": "Eval set v0.3 — v0.2's 42 queries verbatim + generated expansion (scripts/generate_test_set_v03.py, seed 42). Generated ground truth is weak-label: expected = the source course the query was derived from. ADR-0015/0016/0017/0018 re-validation target. | v0.3.1: +code_switched category (中英混合 register, the user base's dominant style). | v0.4: multi-label ground truth via production pooling + Gemini UMBRELA-style judging (scripts/build_test_set_v04.py). recall@k denominator capped at k.",
+  "version": "0.4",
+  "queries": [
+    {
+      "query_id": "q001",
+      "category": "simple",
+      "query": "CS 5800",
+      "expected_course_ids": [
+        "neu-cs-5800"
+      ],
+      "rationale": "Primary code lookup via v_course_lookup.",
+      "judge_grades": {
+        "neu-cs-5800": 3
+      }
+    },
+    {
+      "query_id": "q002",
+      "category": "simple",
+      "query": "AAI 6600",
+      "expected_course_ids": [
+        "neu-aai-6600"
+      ],
+      "rationale": "Primary code lookup.",
+      "judge_grades": {
+        "neu-aai-6600": 3
+      }
+    },
+    {
+      "query_id": "q003",
+      "category": "simple",
+      "query": "DS 5220",
+      "expected_course_ids": [
+        "neu-ds-5220"
+      ],
+      "rationale": "Primary code lookup.",
+      "judge_grades": {
+        "neu-ds-5220": 3
+      }
+    },
+    {
+      "query_id": "q004",
+      "category": "simple",
+      "query": "CS 6140",
+      "expected_course_ids": [
+        "neu-cs-6140"
+      ],
+      "rationale": "Primary code lookup — CS 6140 is the canonical Machine Learning course.",
+      "judge_grades": {
+        "neu-cs-6140": 3
+      }
+    },
+    {
+      "query_id": "q005",
+      "category": "simple",
+      "query": "MATH 7233",
+      "expected_course_ids": [
+        "neu-math-7233"
+      ],
+      "rationale": "Primary code — Graph Theory.",
+      "judge_grades": {
+        "neu-math-7233": 3
+      }
+    },
+    {
+      "query_id": "q006",
+      "category": "simple",
+      "query": "INFO 6105",
+      "expected_course_ids": [
+        "neu-info-6105"
+      ],
+      "rationale": "Primary code — Data Science Engineering Methods and Tools.",
+      "judge_grades": {
+        "neu-info-6105": 3
+      }
+    },
+    {
+      "query_id": "q007",
+      "category": "simple",
+      "query": "Algorithms",
+      "expected_course_ids": [
+        "neu-cs-5800"
+      ],
+      "rationale": "Course-name match — primary algorithms course.",
+      "judge_grades": {
+        "neu-cs-5800": 3
+      }
+    },
+    {
+      "query_id": "q008",
+      "category": "simple",
+      "query": "Machine Learning",
+      "expected_course_ids": [
+        "neu-aai-6610",
+        "neu-cs-6140",
+        "neu-cs-7140",
+        "neu-cs-7150",
+        "neu-ds-4420",
+        "neu-ds-5220",
+        "neu-ds-5230",
+        "neu-eai-6610",
+        "neu-eece-7397",
+        "neu-info-6105",
+        "neu-math-7243",
+        "neu-math-7339"
+      ],
+      "rationale": "Multiple ML offerings; any in top-K counts.",
+      "judge_grades": {
+        "neu-cs-6140": 3,
+        "neu-ds-5220": 3,
+        "neu-ds-5230": 3,
+        "neu-math-7243": 3,
+        "neu-math-7339": 3,
+        "neu-eai-6610": 3,
+        "neu-csye-7470": 1,
+        "neu-aai-6610": 3,
+        "neu-eece-7397": 3,
+        "neu-cs-7140": 3,
+        "neu-cs-7150": 2,
+        "neu-info-6105": 2,
+        "neu-ds-4420": 3
+      }
+    },
+    {
+      "query_id": "q009",
+      "category": "simple",
+      "query": "Information Retrieval",
+      "expected_course_ids": [
+        "neu-cs-4220",
+        "neu-cs-6200",
+        "neu-cs-7290",
+        "neu-cs-7840",
+        "neu-must-4600"
+      ],
+      "rationale": "Course-name exact match.",
+      "judge_grades": {
+        "neu-cs-6200": 3,
+        "neu-cs-4220": 3,
+        "neu-da-5020": 1,
+        "neu-cs-7840": 2,
+        "neu-must-4600": 2,
+        "neu-hmg-3210": 1,
+        "neu-cs-7290": 2,
+        "neu-ds-4300": 1,
+        "neu-mism-4983": 0,
+        "neu-cs-7295": 0
+      }
+    },
+    {
+      "query_id": "q010",
+      "category": "simple",
+      "query": "Probability Theory",
+      "expected_course_ids": [
+        "neu-aly-6010",
+        "neu-ie-3412",
+        "neu-math-3081",
+        "neu-math-3181",
+        "neu-math-5003",
+        "neu-math-5010",
+        "neu-math-6241",
+        "neu-math-7241",
+        "neu-math-7341"
+      ],
+      "rationale": "Course-name match — ALY 6010 Probability Theory and Introductory Statistics.",
+      "judge_grades": {
+        "neu-aly-6010": 2,
+        "neu-math-7241": 3,
+        "neu-math-7341": 3,
+        "neu-math-3081": 3,
+        "neu-ie-3412": 2,
+        "neu-math-5010": 2,
+        "neu-math-3181": 3,
+        "neu-math-5003": 2,
+        "neu-math-6241": 2,
+        "neu-cive-7341": 1,
+        "neu-phil-3050": 1
+      }
+    },
+    {
+      "query_id": "q011",
+      "category": "simple",
+      "query": "Mobile Application Development",
+      "expected_course_ids": [
+        "neu-cs-4520",
+        "neu-cs-5520",
+        "neu-ge-4100",
+        "neu-ge-4120",
+        "neu-info-6350",
+        "neu-itc-3100"
+      ],
+      "rationale": "Course-name match.",
+      "judge_grades": {
+        "neu-cs-5520": 3,
+        "neu-info-6350": 2,
+        "neu-cs-4520": 3,
+        "neu-ge-4100": 3,
+        "neu-itc-3100": 3,
+        "neu-ge-4120": 2,
+        "neu-mism-3460": 0,
+        "neu-itc-6355": 0,
+        "neu-itc-5355": 0,
+        "neu-cs-4550": 0
+      }
+    },
+    {
+      "query_id": "q012",
+      "category": "simple",
+      "query": "Web Design",
+      "expected_course_ids": [
+        "neu-artg-2401",
+        "neu-artg-3352",
+        "neu-dgm-6501",
+        "neu-info-6150",
+        "neu-itc-2400",
+        "neu-itc-5355",
+        "neu-itc-6355",
+        "neu-mism-3460"
+      ],
+      "rationale": "Course-name match — INFO 6150 Web Design and UX Engineering.",
+      "judge_grades": {
+        "neu-info-6150": 3,
+        "neu-dgm-6501": 3,
+        "neu-artg-2401": 2,
+        "neu-mism-3460": 3,
+        "neu-artg-3352": 2,
+        "neu-itc-5355": 2,
+        "neu-itc-6355": 2,
+        "neu-artg-2260": 1,
+        "neu-cs-5610": 1,
+        "neu-cs-4550": 1,
+        "neu-itc-2400": 2
+      }
+    },
+    {
+      "query_id": "q013",
+      "category": "medium",
+      "query": "graph algorithms BFS DFS shortest paths",
+      "expected_course_ids": [
+        "neu-cs-3000",
+        "neu-cs-4810",
+        "neu-cs-5008",
+        "neu-cs-5800",
+        "neu-math-3545",
+        "neu-math-7233"
+      ],
+      "rationale": "Either Algorithms (CS 5800) or Graph Theory (MATH 7233) is a legitimate hit.",
+      "judge_grades": {
+        "neu-cs-5800": 1,
+        "neu-math-7233": 3,
+        "neu-cs-3000": 2,
+        "neu-eece-7205": 0,
+        "neu-nets-7332": 1,
+        "neu-cs-7332": 1,
+        "neu-cs-4810": 3,
+        "neu-cs-5008": 3,
+        "neu-aai-6720": 1,
+        "neu-math-3545": 3,
+        "neu-aai-6710": 1
+      }
+    },
+    {
+      "query_id": "q014",
+      "category": "medium",
+      "query": "neural network training with backpropagation",
+      "expected_course_ids": [
+        "neu-cs-6140",
+        "neu-cs-7150",
+        "neu-ds-4440",
+        "neu-ie-7615",
+        "neu-math-7339"
+      ],
+      "rationale": "Backprop is core to all three ML offerings.",
+      "judge_grades": {
+        "neu-cs-6140": 2,
+        "neu-ds-5220": 1,
+        "neu-math-7243": 1,
+        "neu-ds-4440": 3,
+        "neu-cs-7150": 3,
+        "neu-ie-7615": 3,
+        "neu-math-7339": 2,
+        "neu-cnet-5052": 0,
+        "neu-cs-5180": 1,
+        "neu-eece-7345": 1,
+        "neu-eece-7268": 1,
+        "neu-cs-7268": 1,
+        "neu-rms-6110": 1
+      }
+    },
+    {
+      "query_id": "q015",
+      "category": "medium",
+      "query": "k-means clustering and dimensionality reduction",
+      "expected_course_ids": [
+        "neu-ds-4400",
+        "neu-ds-5230",
+        "neu-eece-7345",
+        "neu-ie-5640",
+        "neu-rms-6110"
+      ],
+      "rationale": "DS 5230 is the canonical unsupervised + clustering course.",
+      "judge_grades": {
+        "neu-ds-5230": 2,
+        "neu-cive-7150": 1,
+        "neu-math-7243": 1,
+        "neu-ds-4400": 3,
+        "neu-phth-6440": 0,
+        "neu-math-7237": 0,
+        "neu-eece-7345": 2,
+        "neu-ie-5640": 3,
+        "neu-rms-6110": 3,
+        "neu-math-7311": 0,
+        "neu-math-2331": 1
+      }
+    },
+    {
+      "query_id": "q016",
+      "category": "medium",
+      "query": "convex optimization Lagrangian duality",
+      "expected_course_ids": [
+        "neu-math-7237",
+        "neu-or-7270"
+      ],
+      "rationale": "MATH 7237 Theory of Optimization.",
+      "judge_grades": {
+        "neu-math-7237": 3,
+        "neu-or-7270": 3,
+        "neu-math-7234": 1,
+        "neu-math-7207": 1,
+        "neu-or-7245": 1,
+        "neu-me-5250": 0,
+        "neu-me-5655": 0,
+        "neu-eece-7323": 1,
+        "neu-eece-5360": 1,
+        "neu-math-4527": 0
+      }
+    },
+    {
+      "query_id": "q017",
+      "category": "medium",
+      "query": "Apache Spark distributed data processing",
+      "expected_course_ids": [
+        "neu-aly-4000",
+        "neu-cs-4730",
+        "neu-cs-6240",
+        "neu-cs-7280",
+        "neu-eece-5645"
+      ],
+      "rationale": "Big-data parallel processing is split across CS / INFO / EECE depts.",
+      "judge_grades": {
+        "neu-cs-6240": 2,
+        "neu-info-6105": 0,
+        "neu-eece-5645": 2,
+        "neu-cs-4730": 2,
+        "neu-ds-3500": 1,
+        "neu-ds-4300": 1,
+        "neu-cs-7280": 2,
+        "neu-aly-4000": 3,
+        "neu-ds-2500": 0,
+        "neu-cs-7295": 0,
+        "neu-mism-6205": 0
+      }
+    },
+    {
+      "query_id": "q018",
+      "category": "medium",
+      "query": "VC dimension PAC learning theory",
+      "expected_course_ids": [
+        "neu-cs-6140",
+        "neu-ds-5220",
+        "neu-math-6243",
+        "neu-math-7243"
+      ],
+      "rationale": "Statistical learning theory courses.",
+      "judge_grades": {
+        "neu-cs-6140": 1,
+        "neu-math-7243": 3,
+        "neu-cs-7840": 1,
+        "neu-eece-5644": 1,
+        "neu-info-6105": 0,
+        "neu-ds-5220": 3,
+        "neu-math-6243": 2,
+        "neu-ds-4400": 0,
+        "neu-eece-7397": 1,
+        "neu-cs-7140": 1
+      }
+    },
+    {
+      "query_id": "q019",
+      "category": "medium",
+      "query": "search algorithms heuristic A star",
+      "expected_course_ids": [
+        "neu-aai-6600",
+        "neu-cs-4100",
+        "neu-cs-5100",
+        "neu-eai-5000",
+        "neu-eai-6000"
+      ],
+      "rationale": "AI search is covered in Applied AI + CS 7180 Special Topics.",
+      "judge_grades": {
+        "neu-aai-6600": 2,
+        "neu-cs-7180": 0,
+        "neu-or-6500": 1,
+        "neu-eai-5000": 3,
+        "neu-eai-6000": 3,
+        "neu-cs-5100": 3,
+        "neu-cs-4100": 3,
+        "neu-cs-5800": 1,
+        "neu-hinf-9990": 0,
+        "neu-cy-9990": 0,
+        "neu-cs-9990": 0,
+        "neu-dgm-6550": 0
+      }
+    },
+    {
+      "query_id": "q020",
+      "category": "medium",
+      "query": "data mining applications",
+      "expected_course_ids": [
+        "neu-aly-3040",
+        "neu-aly-6040",
+        "neu-cive-7150",
+        "neu-cs-6220",
+        "neu-ds-5230",
+        "neu-ie-5640",
+        "neu-ie-7275",
+        "neu-mism-3515",
+        "neu-mism-6212",
+        "neu-mism-6412"
+      ],
+      "rationale": "ALY 6040 explicitly + DS 5230 contains data mining.",
+      "judge_grades": {
+        "neu-aly-6040": 3,
+        "neu-ds-5230": 2,
+        "neu-ie-7275": 3,
+        "neu-mism-6212": 3,
+        "neu-mism-6412": 3,
+        "neu-aly-3040": 2,
+        "neu-mism-3515": 3,
+        "neu-ie-5640": 3,
+        "neu-mism-6206": 1,
+        "neu-cs-6220": 2,
+        "neu-cive-7150": 3
+      }
+    },
+    {
+      "query_id": "q021",
+      "category": "medium",
+      "query": "Python programming for analytics",
+      "expected_course_ids": [
+        "neu-aly-2100",
+        "neu-aly-5050",
+        "neu-aly-6050",
+        "neu-aly-6140",
+        "neu-damg-6105",
+        "neu-ds-2500",
+        "neu-fina-4350",
+        "neu-fina-6333",
+        "neu-fina-6433"
+      ],
+      "rationale": "ALY 6140 Python and Analytics Systems Technology.",
+      "judge_grades": {
+        "neu-aly-6140": 3,
+        "neu-fina-6333": 3,
+        "neu-aly-2100": 3,
+        "neu-damg-6105": 3,
+        "neu-fina-4350": 2,
+        "neu-dgtr-3550": 0,
+        "neu-aly-5050": 3,
+        "neu-aly-6050": 3,
+        "neu-fina-6433": 2,
+        "neu-ds-2500": 3
+      }
+    },
+    {
+      "query_id": "q022",
+      "category": "medium",
+      "query": "parallel programming MPI distributed computing",
+      "expected_course_ids": [
+        "neu-cs-4730",
+        "neu-cs-7610",
+        "neu-cs-7880",
+        "neu-csye-7105",
+        "neu-csye-7215",
+        "neu-eece-5640",
+        "neu-eece-5645"
+      ],
+      "rationale": "EECE 5645 Parallel Processing for Data Analytics.",
+      "judge_grades": {
+        "neu-eece-5645": 2,
+        "neu-csye-7105": 2,
+        "neu-cs-7880": 3,
+        "neu-cs-7610": 2,
+        "neu-eece-5640": 2,
+        "neu-cs-7390": 0,
+        "neu-csye-7215": 2,
+        "neu-cs-4730": 2,
+        "neu-ds-4300": 1,
+        "neu-ds-2501": 0
+      }
+    },
+    {
+      "query_id": "q023",
+      "category": "medium",
+      "query": "data engineering pipelines ETL",
+      "expected_course_ids": [
+        "neu-aly-6020",
+        "neu-cs-6240",
+        "neu-hsci-5160",
+        "neu-ie-6750",
+        "neu-info-6105"
+      ],
+      "rationale": "INFO 6105 is Data Science Engineering; CS 6240 is Large-Scale Parallel Processing.",
+      "judge_grades": {
+        "neu-info-6105": 1,
+        "neu-cs-6240": 2,
+        "neu-ie-6750": 3,
+        "neu-hsci-5160": 3,
+        "neu-chme-7350": 0,
+        "neu-ie-7275": 1,
+        "neu-ie-5640": 1,
+        "neu-dads-6400": 1,
+        "neu-ie-6400": 1,
+        "neu-chme-2310": 0,
+        "neu-aly-6020": 3,
+        "neu-chem-5614": 0
+      }
+    },
+    {
+      "query_id": "q024",
+      "category": "medium",
+      "query": "introduction to data science fundamentals",
+      "expected_course_ids": [
+        "neu-cs-2000",
+        "neu-ds-5010",
+        "neu-ds-5110",
+        "neu-eece-5612"
+      ],
+      "rationale": "DS 5110 Essentials of Data Science.",
+      "judge_grades": {
+        "neu-ds-5110": 3,
+        "neu-cs-2000": 2,
+        "neu-ds-5010": 2,
+        "neu-slpa-6420": 1,
+        "neu-cs-5002": 0,
+        "neu-pth-6200": 1,
+        "neu-dgtr-1101": 0,
+        "neu-eece-5612": 2,
+        "neu-cs-1800": 0,
+        "neu-math-2280": 1
+      }
+    },
+    {
+      "query_id": "q025",
+      "category": "complex",
+      "query": "course covering deep learning project with Python",
+      "expected_course_ids": [
+        "neu-cs-4180",
+        "neu-cs-7150",
+        "neu-ds-5220"
+      ],
+      "rationale": "Multi-aspect: deep learning + project + Python — any ML course satisfies.",
+      "judge_grades": {
+        "neu-ds-5220": 1,
+        "neu-cs-6140": 1,
+        "neu-math-7243": 1,
+        "neu-math-4570": 1,
+        "neu-ds-2500": 0,
+        "neu-ds-3000": 1,
+        "neu-info-5002": 0,
+        "neu-cs-4180": 2,
+        "neu-cnet-5051": 0,
+        "neu-cs-7150": 3,
+        "neu-binf-6309": 0,
+        "neu-damg-7245": 1
+      }
+    },
+    {
+      "query_id": "q026",
+      "category": "complex",
+      "query": "graduate AI seminar with applied focus",
+      "expected_course_ids": [
+        "neu-aai-6600",
+        "neu-aai-6665",
+        "neu-aai-6680",
+        "neu-aai-6900",
+        "neu-chme-6580",
+        "neu-cs-7180",
+        "neu-eai-6980",
+        "neu-hlth-5800",
+        "neu-inpr-5201",
+        "neu-mism-6250",
+        "neu-phsc-5900"
+      ],
+      "rationale": "Either Applied AI or CS 7180 Special Topics in AI.",
+      "judge_grades": {
+        "neu-aai-6600": 1,
+        "neu-cs-7180": 3,
+        "neu-inpr-5201": 2,
+        "neu-eai-6980": 2,
+        "neu-aai-6900": 2,
+        "neu-aai-6665": 2,
+        "neu-cs-6180": 1,
+        "neu-chme-6580": 2,
+        "neu-hlth-5800": 2,
+        "neu-aai-6680": 3,
+        "neu-phsc-5900": 2,
+        "neu-mism-6250": 2
+      }
+    },
+    {
+      "query_id": "q027",
+      "category": "complex",
+      "query": "course on both clustering and dimensionality reduction techniques",
+      "expected_course_ids": [
+        "neu-ds-4400",
+        "neu-ds-5230",
+        "neu-ie-5640",
+        "neu-rms-6110"
+      ],
+      "rationale": "DS 5230 explicitly covers both.",
+      "judge_grades": {
+        "neu-ds-5230": 2,
+        "neu-cive-7150": 1,
+        "neu-math-7243": 1,
+        "neu-eece-7345": 1,
+        "neu-ds-4400": 3,
+        "neu-phth-6440": 0,
+        "neu-mism-3525": 1,
+        "neu-rms-6110": 3,
+        "neu-ie-5640": 2,
+        "neu-cs-6240": 0,
+        "neu-cs-7880": 0
+      }
+    },
+    {
+      "query_id": "q028",
+      "category": "complex",
+      "query": "probability and statistics for machine learning practitioners",
+      "expected_course_ids": [
+        "neu-aai-5015",
+        "neu-aly-6010",
+        "neu-eece-7204",
+        "neu-math-5003",
+        "neu-math-5010"
+      ],
+      "rationale": "ALY 6010 prob+stats foundation; MATH 7243 has the ML+stats angle.",
+      "judge_grades": {
+        "neu-aly-6010": 1,
+        "neu-math-7243": 1,
+        "neu-math-5003": 2,
+        "neu-math-7340": 1,
+        "neu-math-5010": 2,
+        "neu-aai-5015": 2,
+        "neu-math-6241": 1,
+        "neu-math-4681": 1,
+        "neu-eece-7204": 2,
+        "neu-cnet-6063": 1,
+        "neu-ie-7300": 1,
+        "neu-aly-5010": 1
+      }
+    },
+    {
+      "query_id": "q029",
+      "category": "complex",
+      "query": "Python and SQL together for data engineering",
+      "expected_course_ids": [
+        "neu-aly-5030",
+        "neu-aly-6030",
+        "neu-aly-6140"
+      ],
+      "rationale": "Spans analytics tools + DS engineering courses.",
+      "judge_grades": {
+        "neu-aly-6140": 1,
+        "neu-info-6105": 1,
+        "neu-ie-3425": 1,
+        "neu-itc-2300": 1,
+        "neu-damg-5210": 1,
+        "neu-cs-3200": 1,
+        "neu-aly-6030": 2,
+        "neu-aly-5030": 2,
+        "neu-dgtr-2199": 1,
+        "neu-hinf-6220": 1,
+        "neu-insh-6406": 1
+      }
+    },
+    {
+      "query_id": "q030",
+      "category": "complex",
+      "query": "applied capstone project for data science master students",
+      "expected_course_ids": [
+        "neu-aly-6080",
+        "neu-aly-6980",
+        "neu-ds-5500",
+        "neu-eai-6980",
+        "neu-mism-6414"
+      ],
+      "rationale": "DS 5500 Capstone or ALY 6080 Integrated Experiential Learning.",
+      "judge_grades": {
+        "neu-ds-5500": 3,
+        "neu-aly-6080": 2,
+        "neu-hsci-6980": 1,
+        "neu-hrm-6980": 0,
+        "neu-eai-6980": 2,
+        "neu-mism-6414": 2,
+        "neu-aly-4850": 1,
+        "neu-aly-6980": 2,
+        "neu-ins-6980": 1,
+        "neu-hsc-4850": 0
+      }
+    },
+    {
+      "query_id": "q031",
+      "category": "complex",
+      "query": "linear algebra essentials for AI students with no math background",
+      "expected_course_ids": [
+        "neu-aai-5015",
+        "neu-math-4570"
+      ],
+      "rationale": "AAI 5015 Mathematical Concepts is exactly this remedial course.",
+      "judge_grades": {
+        "neu-aai-5015": 3,
+        "neu-math-4570": 2,
+        "neu-math-5001": 0,
+        "neu-math-5110": 1,
+        "neu-math-5352": 0,
+        "neu-math-4577": 0,
+        "neu-math-2341": 1,
+        "neu-math-3090": 0,
+        "neu-math-7362": 0,
+        "neu-math-1260": 1,
+        "neu-math-7320": 0
+      }
+    },
+    {
+      "query_id": "q032",
+      "category": "complex",
+      "query": "supervised learning regression and classification with theory",
+      "expected_course_ids": [
+        "neu-cs-6140",
+        "neu-cs-7150",
+        "neu-ds-4400",
+        "neu-ds-4420",
+        "neu-ds-5220",
+        "neu-ie-7300",
+        "neu-math-6243",
+        "neu-math-7243",
+        "neu-math-7339"
+      ],
+      "rationale": "DS 5220 Supervised ML + CS 6140 Machine Learning.",
+      "judge_grades": {
+        "neu-ds-5220": 3,
+        "neu-cs-6140": 2,
+        "neu-math-7339": 3,
+        "neu-math-6243": 3,
+        "neu-ds-4400": 2,
+        "neu-cive-7150": 1,
+        "neu-ie-7300": 2,
+        "neu-math-7243": 3,
+        "neu-ds-4420": 2,
+        "neu-cs-7150": 2
+      }
+    },
+    {
+      "query_id": "q033",
+      "category": "boundary",
+      "query": "5800",
+      "expected_course_ids": [
+        "neu-cs-5800"
+      ],
+      "rationale": "Bare 4-digit number; query_normalizer + slang_dict resolve.",
+      "judge_grades": {
+        "neu-cs-5800": 3
+      }
+    },
+    {
+      "query_id": "q034",
+      "category": "boundary",
+      "query": "应用 AI",
+      "expected_course_ids": [
+        "neu-aai-6600"
+      ],
+      "rationale": "Chinese slang alias for Applied AI.",
+      "judge_grades": {
+        "neu-aai-6600": 1
+      }
+    },
+    {
+      "query_id": "q035",
+      "category": "boundary",
+      "query": "Algo",
+      "expected_course_ids": [
+        "neu-cs-5800"
+      ],
+      "rationale": "English short slang via course_aliases.",
+      "judge_grades": {
+        "neu-cs-5800": 3
+      }
+    },
+    {
+      "query_id": "q036",
+      "category": "boundary",
+      "query": "AAI6600",
+      "expected_course_ids": [
+        "neu-aai-6600"
+      ],
+      "rationale": "No-space code variant; query_normalizer regex normalizes to 'AAI 6600'.",
+      "judge_grades": {
+        "neu-aai-6600": 3
+      }
+    },
+    {
+      "query_id": "q037",
+      "category": "boundary",
+      "query": "ds 5220",
+      "expected_course_ids": [
+        "neu-ds-5220"
+      ],
+      "rationale": "Lowercase + space; case-insensitive match via v_course_lookup.",
+      "judge_grades": {
+        "neu-ds-5220": 3
+      }
+    },
+    {
+      "query_id": "q038",
+      "category": "boundary",
+      "query": "6600",
+      "expected_course_ids": [
+        "neu-aai-6600"
+      ],
+      "rationale": "Bare 4-digit; alias-only entry — should hit AAI 6600 even with multiple X 6600 codes since alias is explicit.",
+      "judge_grades": {
+        "neu-aai-6600": 3
+      }
+    },
+    {
+      "query_id": "q039",
+      "category": "adversarial",
+      "query": "AAI 9999",
+      "expected_course_ids": [],
+      "rationale": "Non-existent code — retriever must NOT return AAI 6600 just because dept matches."
+    },
+    {
+      "query_id": "q040",
+      "category": "adversarial",
+      "query": "CS 0001",
+      "expected_course_ids": [],
+      "rationale": "Non-existent code with valid dept prefix."
+    },
+    {
+      "query_id": "q041",
+      "category": "adversarial",
+      "query": "asdf qwerty zxcvbnm random keyboard mash",
+      "expected_course_ids": [],
+      "rationale": "Pure noise — no semantic match anywhere in the catalog."
+    },
+    {
+      "query_id": "q042",
+      "category": "adversarial",
+      "query": "homework due monday assignment 3 grading rubric",
+      "expected_course_ids": [],
+      "rationale": "Query is meta-task language, not a course topic — should not match a specific course."
+    },
+    {
+      "query_id": "q043",
+      "category": "simple",
+      "query": "NETS 7370",
+      "expected_course_ids": [
+        "neu-nets-7370"
+      ],
+      "rationale": "v0.3 generated: code-format variant of NETS 7370",
+      "judge_grades": {
+        "neu-nets-7370": 3
+      }
+    },
+    {
+      "query_id": "q044",
+      "category": "simple",
+      "query": "chm2110",
+      "expected_course_ids": [
+        "neu-chm-2110"
+      ],
+      "rationale": "v0.3 generated: code-format variant of CHM 2110",
+      "judge_grades": {
+        "neu-chm-2110": 3
+      }
+    },
+    {
+      "query_id": "q045",
+      "category": "simple",
+      "query": "PDM6000 这门课怎么样",
+      "expected_course_ids": [
+        "neu-pdm-6000"
+      ],
+      "rationale": "v0.3 generated: code-format variant of PDM 6000",
+      "judge_grades": {
+        "neu-pdm-6000": 3
+      }
+    },
+    {
+      "query_id": "q046",
+      "category": "simple",
+      "query": "ACC 2200",
+      "expected_course_ids": [
+        "neu-acc-2200"
+      ],
+      "rationale": "v0.3 generated: code-format variant of ACC 2200",
+      "judge_grades": {
+        "neu-acc-2200": 3
+      }
+    },
+    {
+      "query_id": "q047",
+      "category": "simple",
+      "query": "cnet5051",
+      "expected_course_ids": [
+        "neu-cnet-5051"
+      ],
+      "rationale": "v0.3 generated: code-format variant of CNET 5051",
+      "judge_grades": {
+        "neu-cnet-5051": 3
+      }
+    },
+    {
+      "query_id": "q048",
+      "category": "simple",
+      "query": "PHMD5140 这门课怎么样",
+      "expected_course_ids": [
+        "neu-phmd-5140"
+      ],
+      "rationale": "v0.3 generated: code-format variant of PHMD 5140",
+      "judge_grades": {
+        "neu-phmd-5140": 3
+      }
+    },
+    {
+      "query_id": "q049",
+      "category": "simple",
+      "query": "GST 6200",
+      "expected_course_ids": [
+        "neu-gst-6200"
+      ],
+      "rationale": "v0.3 generated: code-format variant of GST 6200",
+      "judge_grades": {
+        "neu-gst-6200": 3
+      }
+    },
+    {
+      "query_id": "q050",
+      "category": "simple",
+      "query": "kore1101",
+      "expected_course_ids": [
+        "neu-kore-1101"
+      ],
+      "rationale": "v0.3 generated: code-format variant of KORE 1101",
+      "judge_grades": {
+        "neu-kore-1101": 3
+      }
+    },
+    {
+      "query_id": "q051",
+      "category": "simple",
+      "query": "CS5964 这门课怎么样",
+      "expected_course_ids": [
+        "neu-cs-5964"
+      ],
+      "rationale": "v0.3 generated: code-format variant of CS 5964",
+      "judge_grades": {
+        "neu-cs-5964": 3
+      }
+    },
+    {
+      "query_id": "q052",
+      "category": "simple",
+      "query": "MATM 1120",
+      "expected_course_ids": [
+        "neu-matm-1120"
+      ],
+      "rationale": "v0.3 generated: code-format variant of MATM 1120",
+      "judge_grades": {
+        "neu-matm-1120": 3
+      }
+    },
+    {
+      "query_id": "q053",
+      "category": "simple",
+      "query": "engl4971",
+      "expected_course_ids": [
+        "neu-engl-4971"
+      ],
+      "rationale": "v0.3 generated: code-format variant of ENGL 4971",
+      "judge_grades": {
+        "neu-engl-4971": 3
+      }
+    },
+    {
+      "query_id": "q054",
+      "category": "simple",
+      "query": "MKTG4504 这门课怎么样",
+      "expected_course_ids": [
+        "neu-mktg-4504"
+      ],
+      "rationale": "v0.3 generated: code-format variant of MKTG 4504",
+      "judge_grades": {
+        "neu-mktg-4504": 3
+      }
+    },
+    {
+      "query_id": "q055",
+      "category": "simple",
+      "query": "HRM 6036",
+      "expected_course_ids": [
+        "neu-hrm-6036"
+      ],
+      "rationale": "v0.3 generated: code-format variant of HRM 6036",
+      "judge_grades": {
+        "neu-hrm-6036": 3
+      }
+    },
+    {
+      "query_id": "q056",
+      "category": "simple",
+      "query": "hsc4850",
+      "expected_course_ids": [
+        "neu-hsc-4850"
+      ],
+      "rationale": "v0.3 generated: code-format variant of HSC 4850",
+      "judge_grades": {
+        "neu-hsc-4850": 3
+      }
+    },
+    {
+      "query_id": "q057",
+      "category": "simple",
+      "query": "HIST1357 这门课怎么样",
+      "expected_course_ids": [
+        "neu-hist-1357"
+      ],
+      "rationale": "v0.3 generated: code-format variant of HIST 1357",
+      "judge_grades": {
+        "neu-hist-1357": 3
+      }
+    },
+    {
+      "query_id": "q058",
+      "category": "simple",
+      "query": "JRNL 5360",
+      "expected_course_ids": [
+        "neu-jrnl-5360"
+      ],
+      "rationale": "v0.3 generated: code-format variant of JRNL 5360",
+      "judge_grades": {
+        "neu-jrnl-5360": 3
+      }
+    },
+    {
+      "query_id": "q059",
+      "category": "simple",
+      "query": "port1102",
+      "expected_course_ids": [
+        "neu-port-1102"
+      ],
+      "rationale": "v0.3 generated: code-format variant of PORT 1102",
+      "judge_grades": {
+        "neu-port-1102": 3
+      }
+    },
+    {
+      "query_id": "q060",
+      "category": "simple",
+      "query": "DGTR4100 这门课怎么样",
+      "expected_course_ids": [
+        "neu-dgtr-4100"
+      ],
+      "rationale": "v0.3 generated: code-format variant of DGTR 4100",
+      "judge_grades": {
+        "neu-dgtr-4100": 3
+      }
+    },
+    {
+      "query_id": "q061",
+      "category": "medium",
+      "query": "Learn business communication, analysis, and client management through practical application",
+      "expected_course_ids": [
+        "neu-cmn-3850",
+        "neu-int-5964",
+        "neu-mism-2420",
+        "neu-mism-6214",
+        "neu-mktg-3301",
+        "neu-mktg-3401",
+        "neu-mktg-4606",
+        "neu-mktg-6294",
+        "neu-mktg-6606"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of INT 5964 (Projects for Professionals)",
+      "judge_grades": {
+        "neu-int-5964": 3,
+        "neu-mktg-4606": 2,
+        "neu-mism-2420": 3,
+        "neu-fin-2105": 1,
+        "neu-mktg-3401": 3,
+        "neu-mktg-3301": 2,
+        "neu-mism-6214": 2,
+        "neu-cmn-3850": 3,
+        "neu-mktg-6606": 3,
+        "neu-mktg-2601": 1,
+        "neu-mktg-6294": 2
+      }
+    },
+    {
+      "query_id": "q062",
+      "category": "medium",
+      "query": "Learn to prepare documents for medical instrument regulatory approval agencies.",
+      "expected_course_ids": [
+        "neu-rga-5001",
+        "neu-rga-5202",
+        "neu-rga-6001",
+        "neu-rga-6202",
+        "neu-rga-6222",
+        "neu-rga-6370"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of RGA 6370 (Advanced Regulatory Writing: Medical Dev)",
+      "judge_grades": {
+        "neu-rga-6370": 3,
+        "neu-rga-6210": 1,
+        "neu-rga-6243": 1,
+        "neu-rga-6380": 1,
+        "neu-rga-5202": 2,
+        "neu-rga-6202": 2,
+        "neu-rga-6001": 2,
+        "neu-btc-4450": 1,
+        "neu-rga-5001": 2,
+        "neu-rga-6222": 2
+      }
+    },
+    {
+      "query_id": "q063",
+      "category": "medium",
+      "query": "Understand human-centric strategies for customer engagement and online business promotion.",
+      "expected_course_ids": [
+        "neu-csye-5280",
+        "neu-inam-5440",
+        "neu-mkt-3010",
+        "neu-mktg-4502",
+        "neu-mktg-6226",
+        "neu-mktg-6232",
+        "neu-mktg-6318",
+        "neu-smt-6020"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of MKT 3010 (Digital Marketing)",
+      "judge_grades": {
+        "neu-mkt-3010": 3,
+        "neu-csye-5280": 2,
+        "neu-mktg-4502": 3,
+        "neu-inam-5440": 2,
+        "neu-mktg-6232": 2,
+        "neu-hrmg-6318": 0,
+        "neu-smt-6020": 3,
+        "neu-mktg-6318": 2,
+        "neu-mktg-6226": 2,
+        "neu-ins-6140": 1
+      }
+    },
+    {
+      "query_id": "q064",
+      "category": "medium",
+      "query": "Learn industrial bioproduct creation, cell kinetics, and good manufacturing practices",
+      "expected_course_ids": [
+        "neu-biot-5560",
+        "neu-biot-5630",
+        "neu-btc-4300",
+        "neu-chme-5630",
+        "neu-chme-7602"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of BTC 4300 (Biotechnology and Pharmaceutical Process)",
+      "judge_grades": {
+        "neu-btc-4300": 3,
+        "neu-biot-5630": 2,
+        "neu-chme-5630": 2,
+        "neu-biot-5560": 2,
+        "neu-bioe-5510": 0,
+        "neu-rga-6405": 1,
+        "neu-chme-7602": 2,
+        "neu-bioe-5430": 1,
+        "neu-biot-5820": 0,
+        "neu-biot-5750": 0
+      }
+    },
+    {
+      "query_id": "q065",
+      "category": "medium",
+      "query": "Real-world leadership projects addressing national and global security threats",
+      "expected_course_ids": [
+        "neu-cy-5250",
+        "neu-hls-6155",
+        "neu-hls-6160",
+        "neu-sia-6980"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of SIA 6980 (Capstone)",
+      "judge_grades": {
+        "neu-sia-6980": 3,
+        "neu-cy-5250": 2,
+        "neu-hls-6160": 2,
+        "neu-pols-5408": 1,
+        "neu-busn-6389": 0,
+        "neu-hls-6155": 2,
+        "neu-crim-5203": 1,
+        "neu-pols-7341": 1,
+        "neu-gst-6430": 0,
+        "neu-phdl-7666": 0
+      }
+    },
+    {
+      "query_id": "q066",
+      "category": "medium",
+      "query": "Speech language pathology assessment and therapy for human phonation problems.",
+      "expected_course_ids": [
+        "neu-slpa-6307"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of SLPA 6307 (Voice Disorders)",
+      "judge_grades": {
+        "neu-slpa-6307": 3,
+        "neu-slpa-6321": 1,
+        "neu-slpa-6308": 0,
+        "neu-slpa-4219": 0,
+        "neu-slpa-1101": 1,
+        "neu-slpa-6339": 0,
+        "neu-slpa-6305": 1,
+        "neu-slpa-4651": 1,
+        "neu-slpa-5201": 1,
+        "neu-ling-3422": 0
+      }
+    },
+    {
+      "query_id": "q067",
+      "category": "medium",
+      "query": "Study river processes, environmental issues, and restoration techniques.",
+      "expected_course_ids": [
+        "neu-envr-3200",
+        "neu-envr-5210",
+        "neu-envr-5700",
+        "neu-envr-6200"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of ENVR 5700 (Streams and Watershed Ecology)",
+      "judge_grades": {
+        "neu-envr-5700": 2,
+        "neu-envr-2900": 0,
+        "neu-envr-5210": 2,
+        "neu-cive-7255": 1,
+        "neu-envr-3200": 2,
+        "neu-hist-1575": 0,
+        "neu-envr-6200": 2,
+        "neu-envr-1120": 1,
+        "neu-envr-5115": 1,
+        "neu-eemb-5506": 0
+      }
+    },
+    {
+      "query_id": "q068",
+      "category": "medium",
+      "query": "Learn to programmatically manage computer networks and their functions",
+      "expected_course_ids": [
+        "neu-cet-3100",
+        "neu-tele-6400"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of TELE 6400 (Software-Defined Networking)",
+      "judge_grades": {
+        "neu-tele-6400": 3,
+        "neu-cs-4700": 1,
+        "neu-cs-5700": 1,
+        "neu-phys-7332": 1,
+        "neu-itc-6030": 0,
+        "neu-dgtr-2822": 0,
+        "neu-itc-2200": 1,
+        "neu-cs-3700": 1,
+        "neu-cy-5150": 0,
+        "neu-cet-3100": 2
+      }
+    },
+    {
+      "query_id": "q069",
+      "category": "medium",
+      "query": "Individualized academic project supervised by faculty members on student's topic",
+      "expected_course_ids": [
+        "neu-emgt-7945",
+        "neu-ensy-7945",
+        "neu-ge-7945",
+        "neu-ie-7945",
+        "neu-inam-9996",
+        "neu-matl-7945",
+        "neu-me-7945",
+        "neu-or-7945",
+        "neu-pols-9990",
+        "neu-port-5976",
+        "neu-ppua-9990"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of PORT 5976 (Directed Study)",
+      "judge_grades": {
+        "neu-port-5976": 3,
+        "neu-ensy-7945": 2,
+        "neu-me-7945": 2,
+        "neu-or-7945": 2,
+        "neu-ge-7945": 2,
+        "neu-emgt-7945": 2,
+        "neu-matl-7945": 2,
+        "neu-ie-7945": 2,
+        "neu-ppua-9990": 3,
+        "neu-pols-9990": 3,
+        "neu-inam-9996": 3
+      }
+    },
+    {
+      "query_id": "q070",
+      "category": "medium",
+      "query": "Connections among global Black communities: migration, identity, and popular culture.",
+      "expected_course_ids": [
+        "neu-afcs-1113",
+        "neu-afrs-2392"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of AFRS 2392 (African Diaspora)",
+      "judge_grades": {
+        "neu-afrs-2392": 3,
+        "neu-afcs-1113": 2,
+        "neu-intl-2500": 1,
+        "neu-socl-2500": 1,
+        "neu-hist-2318": 1,
+        "neu-afcs-2318": 1,
+        "neu-musc-2101": 1,
+        "neu-gst-6310": 0,
+        "neu-gbst-1012": 0,
+        "neu-afcs-4526": 1
+      }
+    },
+    {
+      "query_id": "q071",
+      "category": "medium",
+      "query": "Understand cutting-edge medical solutions for human health through expert discussions",
+      "expected_course_ids": [
+        "neu-bioe-5770",
+        "neu-nnmd-5272",
+        "neu-nnmd-6272"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of NNMD 6272 (Professional Nanomedicine Seminar)",
+      "judge_grades": {
+        "neu-nnmd-6272": 3,
+        "neu-hsci-4950": 1,
+        "neu-gst-6710": 0,
+        "neu-ppua-5240": 0,
+        "neu-nnmd-5272": 3,
+        "neu-bioe-5770": 2,
+        "neu-lw-7494": 0,
+        "neu-law-7494": 0,
+        "neu-phth-2301": 0,
+        "neu-law-7697": 0
+      }
+    },
+    {
+      "query_id": "q072",
+      "category": "medium",
+      "query": "study moral dilemmas and fairness issues in biomedical innovations",
+      "expected_course_ids": [
+        "neu-biol-2329",
+        "neu-biol-6381",
+        "neu-hlth-2100",
+        "neu-nnmd-5310",
+        "neu-nrsg-2150",
+        "neu-phil-3065",
+        "neu-phl-2130",
+        "neu-phth-6130"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of PHTH 6130 (Public Health Technologies: Ethics and E)",
+      "judge_grades": {
+        "neu-phth-6130": 3,
+        "neu-biol-6381": 2,
+        "neu-nrsg-2150": 2,
+        "neu-hlth-2100": 2,
+        "neu-phil-3065": 2,
+        "neu-phl-2140": 1,
+        "neu-phl-2130": 2,
+        "neu-phil-1165": 1,
+        "neu-nnmd-5310": 3,
+        "neu-biol-2329": 3,
+        "neu-comm-1600": 0
+      }
+    },
+    {
+      "query_id": "q073",
+      "category": "medium",
+      "query": "strategies for creating engaging digital communications to promote brands",
+      "expected_course_ids": [
+        "neu-cmn-3410",
+        "neu-cmn-3800",
+        "neu-cmn-6010",
+        "neu-eeba-6407",
+        "neu-mktg-6223",
+        "neu-pbr-6001",
+        "neu-pbr-6130"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of PBR 6130 (Public Relations Content Development)",
+      "judge_grades": {
+        "neu-pbr-6130": 3,
+        "neu-inam-6500": 1,
+        "neu-eeba-6407": 2,
+        "neu-mktg-6223": 2,
+        "neu-cmn-3410": 2,
+        "neu-jrnl-5400": 1,
+        "neu-pbr-6001": 3,
+        "neu-cmn-3800": 3,
+        "neu-jrnl-2200": 1,
+        "neu-cmn-6010": 2
+      }
+    },
+    {
+      "query_id": "q074",
+      "category": "medium",
+      "query": "learn how to analyze and control financial risks in institutions",
+      "expected_course_ids": [
+        "neu-aly-6130",
+        "neu-ced-6220",
+        "neu-fin-6102",
+        "neu-fina-6343",
+        "neu-fina-6435",
+        "neu-math-4683"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of FIN 6102 (Asset and Liability Management)",
+      "judge_grades": {
+        "neu-fin-6102": 3,
+        "neu-fin-6101": 1,
+        "neu-fina-6435": 2,
+        "neu-aly-6130": 2,
+        "neu-fina-6343": 2,
+        "neu-edu-7256": 1,
+        "neu-jrnl-6201": 0,
+        "neu-ced-6220": 2,
+        "neu-crim-5601": 1,
+        "neu-math-4683": 2
+      }
+    },
+    {
+      "query_id": "q075",
+      "category": "medium",
+      "query": "Oracle application development using PL/SQL, advanced SQL, and performance tuning",
+      "expected_course_ids": [
+        "neu-cs-5200",
+        "neu-damg-7275",
+        "neu-dgtr-3199"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of DAMG 7275 (Advanced Database Management Systems)",
+      "judge_grades": {
+        "neu-damg-7275": 3,
+        "neu-itc-2300": 1,
+        "neu-aly-6030": 1,
+        "neu-aly-5030": 1,
+        "neu-cs-3200": 1,
+        "neu-cs-5200": 2,
+        "neu-dgtr-2199": 1,
+        "neu-ie-3425": 1,
+        "neu-dgtr-3199": 2,
+        "neu-hinf-6220": 1
+      }
+    },
+    {
+      "query_id": "q076",
+      "category": "medium",
+      "query": "Planning and researching new product solutions following a design process",
+      "expected_course_ids": [
+        "neu-artg-5540",
+        "neu-dgtr-3000",
+        "neu-ge-5020",
+        "neu-ge-5100",
+        "neu-get-4840",
+        "neu-hlth-2550",
+        "neu-inno-6200",
+        "neu-mkt-2700",
+        "neu-mktg-4510",
+        "neu-mktg-6214"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of GET 4840 (Engineering Technology Capstone Project )",
+      "judge_grades": {
+        "neu-get-4840": 2,
+        "neu-mkt-2700": 3,
+        "neu-mktg-6214": 3,
+        "neu-dgtr-3000": 3,
+        "neu-mktg-4510": 3,
+        "neu-ge-5020": 3,
+        "neu-artg-5540": 3,
+        "neu-hlth-2550": 3,
+        "neu-edu-6335": 1,
+        "neu-inno-6200": 2,
+        "neu-ge-5100": 3
+      }
+    },
+    {
+      "query_id": "q077",
+      "category": "medium",
+      "query": "Understanding organic chemical structure from spectroscopic data and NMR techniques",
+      "expected_course_ids": [
+        "neu-chem-2314",
+        "neu-chem-2317",
+        "neu-chem-2318",
+        "neu-chem-4628",
+        "neu-chem-4629",
+        "neu-chem-5628",
+        "neu-chem-5631"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of CHEM 5631 (Lab for CHEM 5628)",
+      "judge_grades": {
+        "neu-chem-5631": 3,
+        "neu-chem-2318": 2,
+        "neu-chem-4628": 3,
+        "neu-chem-5628": 3,
+        "neu-chem-4629": 3,
+        "neu-chem-2314": 2,
+        "neu-chem-2317": 2,
+        "neu-chem-5688": 1,
+        "neu-phsc-6290": 1,
+        "neu-chem-5627": 0
+      }
+    },
+    {
+      "query_id": "q078",
+      "category": "medium",
+      "query": "planning and designing ecological infrastructure within built environments for environmental justice",
+      "expected_course_ids": [
+        "neu-suen-6120"
+      ],
+      "rationale": "v0.3 generated: Gemini medium paraphrase of SUEN 6120 (Graduate Studio 2: Sustainable Urban Sys)",
+      "judge_grades": {
+        "neu-suen-6120": 2,
+        "neu-cive-3430": 1,
+        "neu-larc-2340": 1,
+        "neu-arch-3210": 0,
+        "neu-arch-7220": 0,
+        "neu-socl-4522": 1,
+        "neu-larc-2330": 1,
+        "neu-arch-5220": 0,
+        "neu-lw-7703": 1,
+        "neu-law-7703": 1
+      }
+    },
+    {
+      "query_id": "q079",
+      "category": "complex",
+      "query": "Courses focused on implementing distributed databases and large-scale data storage systems with practical projects.",
+      "expected_course_ids": [
+        "neu-cs-4730",
+        "neu-ds-4300"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of DS 4300 (Large-Scale Information Storage and Retr)",
+      "judge_grades": {
+        "neu-ds-4300": 2,
+        "neu-cs-7280": 1,
+        "neu-aly-6030": 1,
+        "neu-aly-5030": 1,
+        "neu-cs-4730": 2,
+        "neu-ds-3500": 1,
+        "neu-itc-3150": 0,
+        "neu-aly-6110": 1,
+        "neu-aly-5110": 1,
+        "neu-cs-5200": 0
+      }
+    },
+    {
+      "query_id": "q080",
+      "category": "complex",
+      "query": "Courses examining institutional control of language use and its impact, offering opportunities for individual case studies.",
+      "expected_course_ids": [
+        "neu-engl-2760",
+        "neu-lang-3600",
+        "neu-ling-3446"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of LANG 3600 (Language Policy)",
+      "judge_grades": {
+        "neu-lang-3600": 3,
+        "neu-psyc-4658": 0,
+        "neu-ling-3446": 2,
+        "neu-edut-6112": 1,
+        "neu-edut-6113": 1,
+        "neu-psyc-4610": 0,
+        "neu-engl-2760": 3,
+        "neu-edu-6162": 1,
+        "neu-mgt-2310": 0,
+        "neu-engl-3370": 0
+      }
+    },
+    {
+      "query_id": "q081",
+      "category": "complex",
+      "query": "Foundational course on statistical modeling with practical end-to-end data analysis applications.",
+      "expected_course_ids": [
+        "neu-aly-6020",
+        "neu-cs-7200",
+        "neu-dgtr-3310",
+        "neu-econ-5105",
+        "neu-fina-6412",
+        "neu-hlth-5120",
+        "neu-nrsg-3120",
+        "neu-nrsg-5120"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of DGTR 3310 (Predictive Analytics)",
+      "judge_grades": {
+        "neu-dgtr-3310": 3,
+        "neu-mth-1105": 1,
+        "neu-aly-6020": 3,
+        "neu-nrsg-3120": 2,
+        "neu-cs-7200": 3,
+        "neu-aai-5025": 0,
+        "neu-fina-6412": 2,
+        "neu-nrsg-5120": 2,
+        "neu-hlth-5120": 2,
+        "neu-econ-5105": 2
+      }
+    },
+    {
+      "query_id": "q082",
+      "category": "complex",
+      "query": "Introductory course on global criminal organizations and policies to combat their persistence.",
+      "expected_course_ids": [
+        "neu-cjs-6030",
+        "neu-crim-5201"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of CJS 6030 (Organized Crime)",
+      "judge_grades": {
+        "neu-cjs-6030": 3,
+        "neu-crim-5201": 2,
+        "neu-crim-3030": 1,
+        "neu-crim-3050": 1,
+        "neu-crim-3600": 0,
+        "neu-crim-3070": 0,
+        "neu-pol-1200": 0,
+        "neu-econ-1240": 1,
+        "neu-law-7699": 0,
+        "neu-lw-7699": 0
+      }
+    },
+    {
+      "query_id": "q083",
+      "category": "complex",
+      "query": "Introductory logic course focused on constructing proofs and evaluating logical arguments.",
+      "expected_course_ids": [
+        "neu-cs-2800",
+        "neu-math-1365",
+        "neu-math-1465",
+        "neu-phil-1115",
+        "neu-phl-2310"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of PHL 2310 (Symbolic Logic)",
+      "judge_grades": {
+        "neu-phl-2310": 3,
+        "neu-math-1465": 3,
+        "neu-phil-1115": 2,
+        "neu-cs-2800": 2,
+        "neu-eng-1107": 0,
+        "neu-math-1365": 3,
+        "neu-phil-4515": 1,
+        "neu-comm-1120": 1,
+        "neu-law-6165": 0,
+        "neu-engl-3325": 0
+      }
+    },
+    {
+      "query_id": "q084",
+      "category": "complex",
+      "query": "Beginner philosophy course exploring morality, free will, and the existence of God.",
+      "expected_course_ids": [
+        "neu-phil-1101",
+        "neu-phil-1112",
+        "neu-phls-1101"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of PHLS 1101 (Introduction to Philosophy)",
+      "judge_grades": {
+        "neu-phls-1101": 3,
+        "neu-phil-1101": 3,
+        "neu-phil-3435": 1,
+        "neu-phil-3360": 1,
+        "neu-psyc-1214": 1,
+        "neu-phl-2140": 1,
+        "neu-phil-1112": 2,
+        "neu-phil-4903": 1,
+        "neu-mgmt-6413": 0,
+        "neu-law-7552": 0
+      }
+    },
+    {
+      "query_id": "q085",
+      "category": "complex",
+      "query": "Urban sustainability planning for career opportunities in renewable energy and social justice.",
+      "expected_course_ids": [
+        "neu-inno-6252",
+        "neu-lpsc-7312",
+        "neu-ppua-5264"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of LPSC 7312 (Cities, Sustainability, and Climate Chan)",
+      "judge_grades": {
+        "neu-lpsc-7312": 3,
+        "neu-ppua-5264": 3,
+        "neu-ppua-6219": 1,
+        "neu-eece-5670": 1,
+        "neu-socl-4522": 1,
+        "neu-ge-3300": 1,
+        "neu-inno-6252": 2,
+        "neu-larc-5310": 1,
+        "neu-mgt-2550": 1,
+        "neu-eeba-6402": 1
+      }
+    },
+    {
+      "query_id": "q086",
+      "category": "complex",
+      "query": "Clinical practice skills for working with marginalized populations in global health services",
+      "expected_course_ids": [
+        "neu-caep-5880",
+        "neu-hsv-2200",
+        "neu-hsv-3200",
+        "neu-msci-5405",
+        "neu-nrsg-6451"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of HSV 3200 (Techniques in Individual and Group Couns)",
+      "judge_grades": {
+        "neu-hsv-3200": 2,
+        "neu-husv-2320": 1,
+        "neu-hsv-2200": 2,
+        "neu-nrsg-6451": 2,
+        "neu-afcs-1270": 1,
+        "neu-phth-4120": 1,
+        "neu-msci-5405": 3,
+        "neu-caep-5880": 2,
+        "neu-caep-6399": 1,
+        "neu-nrsg-7924": 1
+      }
+    },
+    {
+      "query_id": "q087",
+      "category": "complex",
+      "query": "Introductory drawing classes exploring mark-making processes for understanding visual communication concepts.",
+      "expected_course_ids": [
+        "neu-artf-1121",
+        "neu-artf-1210",
+        "neu-arts-5200"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of ARTF 1121 (Conceptual Drawing)",
+      "judge_grades": {
+        "neu-artf-1121": 3,
+        "neu-artf-1210": 3,
+        "neu-arts-5200": 2,
+        "neu-artg-3451": 1,
+        "neu-artg-2242": 1,
+        "neu-artg-2252": 1,
+        "neu-artf-2220": 0,
+        "neu-artg-5310": 0,
+        "neu-law-3236": 0,
+        "neu-dgm-6450": 0
+      }
+    },
+    {
+      "query_id": "q088",
+      "category": "complex",
+      "query": "Seeking full-time international work experience to apply my field of study globally.",
+      "expected_course_ids": [
+        "neu-cop-4946",
+        "neu-cop-6946",
+        "neu-law-7955",
+        "neu-law-7957",
+        "neu-math-6955"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of COP 6946 (Global Co-op Work Experience—Full Time)",
+      "judge_grades": {
+        "neu-cop-6946": 3,
+        "neu-cop-4946": 3,
+        "neu-law-7955": 2,
+        "neu-hlth-4981": 1,
+        "neu-math-6955": 2,
+        "neu-honr-3309": 1,
+        "neu-cop-3945": 1,
+        "neu-law-7957": 2,
+        "neu-hlth-7999": 0,
+        "neu-phsc-9990": 0
+      }
+    },
+    {
+      "query_id": "q089",
+      "category": "complex",
+      "query": "Hands-on learning for designing spatial narratives and world building in augmented and virtual realities.",
+      "expected_course_ids": [
+        "neu-cs-4097",
+        "neu-cs-5097",
+        "neu-dgm-6516",
+        "neu-exre-5030",
+        "neu-exre-7500",
+        "neu-gsnd-6250",
+        "neu-inam-6520"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of EXRE 5030 (Designing Extended Realities (XR))",
+      "judge_grades": {
+        "neu-exre-5030": 3,
+        "neu-exre-7500": 2,
+        "neu-dgm-6516": 2,
+        "neu-gsnd-6250": 2,
+        "neu-inno-6253": 1,
+        "neu-cs-4097": 2,
+        "neu-cs-5097": 2,
+        "neu-must-3300": 1,
+        "neu-arch-3450": 0,
+        "neu-inam-6520": 3
+      }
+    },
+    {
+      "query_id": "q090",
+      "category": "complex",
+      "query": "advanced motor learning mechanisms with clinical applications for physical therapy practice",
+      "expected_course_ids": [
+        "neu-pth-6140"
+      ],
+      "rationale": "v0.3 generated: Gemini complex paraphrase of PTH 6140 (Motor Control)",
+      "judge_grades": {
+        "neu-pth-6140": 3,
+        "neu-pt-5151": 1,
+        "neu-pt-6600": 1,
+        "neu-bioe-5520": 1,
+        "neu-pth-6130": 0,
+        "neu-pt-5101": 0,
+        "neu-pt-7020": 1,
+        "neu-pt-3500": 1,
+        "neu-pt-5150": 1,
+        "neu-pt-6215": 0
+      }
+    },
+    {
+      "query_id": "q091",
+      "category": "boundary",
+      "query": "金融财报分析入门选课",
+      "expected_course_ids": [
+        "neu-acc-4320",
+        "neu-acct-3401",
+        "neu-acct-3402",
+        "neu-acct-5201"
+      ],
+      "rationale": "v0.3 generated: Gemini boundary paraphrase of ACCT 5201 (Foundations of Financial Reporting and A)",
+      "judge_grades": {
+        "neu-acct-5201": 3,
+        "neu-acct-3401": 3,
+        "neu-acc-4320": 2,
+        "neu-acct-3402": 2,
+        "neu-acct-1201": 1,
+        "neu-fina-6334": 0,
+        "neu-fina-6433": 0,
+        "neu-fina-6332": 0,
+        "neu-fina-6421": 0,
+        "neu-chm-2111": 0
+      }
+    },
+    {
+      "query_id": "q092",
+      "category": "boundary",
+      "query": "体验式学习设计、应用和领导力提升",
+      "expected_course_ids": [
+        "neu-edu-6004",
+        "neu-edu-7228",
+        "neu-edu-7229"
+      ],
+      "rationale": "v0.3 generated: Gemini boundary paraphrase of EDU 7229 (The Experiential Learning Leader)",
+      "judge_grades": {
+        "neu-edu-7229": 3,
+        "neu-edu-7228": 2,
+        "neu-edu-6410": 1,
+        "neu-edu-6004": 2,
+        "neu-ldr-6101": 1,
+        "neu-edu-6003": 1,
+        "neu-exed-5945": 1,
+        "neu-edu-6334": 1,
+        "neu-exre-7500": 0,
+        "neu-gsnd-6460": 0
+      }
+    },
+    {
+      "query_id": "q093",
+      "category": "boundary",
+      "query": "CRM 认知偏差 团队决策 选课",
+      "expected_course_ids": [
+        "neu-aly-6060",
+        "neu-msci-5002",
+        "neu-nrsg-6243",
+        "neu-smt-6060"
+      ],
+      "rationale": "v0.3 generated: Gemini boundary paraphrase of MSCI 5002 (Crisis Resource Management and Case Stud)",
+      "judge_grades": {
+        "neu-msci-5002": 3,
+        "neu-hrm-6005": 1,
+        "neu-smt-6060": 2,
+        "neu-aly-6060": 2,
+        "neu-nrsg-6243": 3,
+        "neu-mktg-6210": 1,
+        "neu-mism-3525": 0,
+        "neu-acct-6200": 0,
+        "neu-info-7285": 0,
+        "neu-hrmg-6260": 0
+      }
+    },
+    {
+      "query_id": "q094",
+      "category": "boundary",
+      "query": "医疗健康决策支持, 区块链, 供应链",
+      "expected_course_ids": [
+        "neu-hinf-5407",
+        "neu-inno-6401",
+        "neu-nrsg-7130",
+        "neu-schm-3315",
+        "neu-schm-6223"
+      ],
+      "rationale": "v0.3 generated: Gemini boundary paraphrase of HINF 5407 (Business Application of Decision Support)",
+      "judge_grades": {
+        "neu-hinf-5407": 2,
+        "neu-inno-6401": 3,
+        "neu-schm-6223": 2,
+        "neu-nrsg-7130": 2,
+        "neu-schm-6215": 1,
+        "neu-schm-3308": 1,
+        "neu-hinf-6202": 1,
+        "neu-schm-3315": 2,
+        "neu-rga-6203": 0,
+        "neu-rga-5203": 0
+      }
+    },
+    {
+      "query_id": "q095",
+      "category": "boundary",
+      "query": "供应链 analytics 决策技术",
+      "expected_course_ids": [
+        "neu-ie-7200",
+        "neu-mism-3525",
+        "neu-mism-6206",
+        "neu-mism-6406",
+        "neu-schm-3308",
+        "neu-schm-6215"
+      ],
+      "rationale": "v0.3 generated: Gemini boundary paraphrase of SCHM 3308 (Supply Chain Analytics and Emerging Tech)",
+      "judge_grades": {
+        "neu-schm-3308": 3,
+        "neu-ie-7200": 2,
+        "neu-schm-6215": 3,
+        "neu-mism-6206": 2,
+        "neu-mism-6406": 2,
+        "neu-mism-3525": 2,
+        "neu-or-7310": 1,
+        "neu-smt-6060": 1,
+        "neu-pjm-6620": 0,
+        "neu-cs-6240": 0
+      }
+    },
+    {
+      "query_id": "q096",
+      "category": "boundary",
+      "query": "System-level design 软硬件协同",
+      "expected_course_ids": [
+        "neu-eece-2323",
+        "neu-eece-4632",
+        "neu-eece-7368"
+      ],
+      "rationale": "v0.3 generated: Gemini boundary paraphrase of EECE 7368 (High-Level Design of Hardware-Software S)",
+      "judge_grades": {
+        "neu-eece-7368": 3,
+        "neu-eece-4632": 3,
+        "neu-ds-3500": 0,
+        "neu-cs-5600": 1,
+        "neu-game-3400": 0,
+        "neu-cs-7600": 1,
+        "neu-csye-7105": 0,
+        "neu-met-2000": 0,
+        "neu-eece-2323": 2,
+        "neu-damg-6210": 0
+      }
+    },
+    {
+      "query_id": "q097",
+      "category": "adversarial",
+      "query": "EECE 0000",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q098",
+      "category": "adversarial",
+      "query": "BINF 99999 advanced seminar",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q099",
+      "category": "adversarial",
+      "query": "Oxford PPE admissions requirements",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q100",
+      "category": "adversarial",
+      "query": "UCLA CS 188 reinforcement learning",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q101",
+      "category": "adversarial",
+      "query": "library printing quota per semester",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q102",
+      "category": "adversarial",
+      "query": "wpeofij qwelkrj zxocvib",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q103",
+      "category": "adversarial",
+      "query": "registrar office phone number please",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q104",
+      "category": "adversarial",
+      "query": "course that teaches time travel paradox engineering",
+      "expected_course_ids": [],
+      "rationale": "v0.3 generated: fresh adversarial (disjoint from ADR-0018 calibration set wording)"
+    },
+    {
+      "query_id": "q105",
+      "category": "code_switched",
+      "query": "有没有关于 audience engagement strategy 的课？",
+      "expected_course_ids": [
+        "neu-aace-6220",
+        "neu-cmn-6010"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Innovative Approaches to Audience Engage",
+      "judge_grades": {
+        "neu-aace-6220": 3,
+        "neu-cmn-6010": 2,
+        "neu-cmn-3410": 1,
+        "neu-edu-6224": 0,
+        "neu-pbr-6710": 1,
+        "neu-dgm-6550": 0,
+        "neu-cmn-3850": 0,
+        "neu-mktg-4983": 0,
+        "neu-pbr-6001": 1,
+        "neu-comm-1112": 1
+      }
+    },
+    {
+      "query_id": "q106",
+      "category": "code_switched",
+      "query": "想找个 abroad 建筑实地考察课。",
+      "expected_course_ids": [
+        "neu-arch-4850",
+        "neu-arte-2500"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Urban and Architectural History Abroad",
+      "judge_grades": {
+        "neu-arch-4850": 3,
+        "neu-arte-2500": 2,
+        "neu-abrc-5005": 0,
+        "neu-intb-6230": 0,
+        "neu-gst-6109": 0,
+        "neu-hlth-7999": 0,
+        "neu-abrc-5001": 0,
+        "neu-abrc-5013": 0,
+        "neu-abrc-5047": 0,
+        "neu-arch-2345": 1
+      }
+    },
+    {
+      "query_id": "q107",
+      "category": "code_switched",
+      "query": "有没有讲 linear algebra 和 differential equations 的课？",
+      "expected_course_ids": [
+        "neu-bioe-5150",
+        "neu-math-1252",
+        "neu-math-2341",
+        "neu-math-5110",
+        "neu-me-6200",
+        "neu-me-6202"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Foundational Mathematics of Bioengineeri",
+      "judge_grades": {
+        "neu-bioe-5150": 3,
+        "neu-math-2341": 3,
+        "neu-me-6200": 3,
+        "neu-math-5110": 2,
+        "neu-math-1260": 1,
+        "neu-me-6202": 2,
+        "neu-math-1252": 3,
+        "neu-math-1251": 1,
+        "neu-math-5001": 1,
+        "neu-math-4570": 1
+      }
+    },
+    {
+      "query_id": "q108",
+      "category": "code_switched",
+      "query": "有没有讲 behavior analysis 的课",
+      "expected_course_ids": [
+        "neu-caep-2101",
+        "neu-caep-6324",
+        "neu-caep-6329",
+        "neu-caep-6334",
+        "neu-caep-6342",
+        "neu-caep-6344",
+        "neu-caep-8417",
+        "neu-caep-8418",
+        "neu-hlth-1717",
+        "neu-psy-4400"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Programmed Learning",
+      "judge_grades": {
+        "neu-caep-6324": 2,
+        "neu-caep-6344": 3,
+        "neu-psy-4400": 3,
+        "neu-caep-8417": 3,
+        "neu-caep-6334": 3,
+        "neu-caep-6329": 3,
+        "neu-hlth-1717": 3,
+        "neu-caep-2101": 3,
+        "neu-caep-8418": 3,
+        "neu-caep-6342": 2,
+        "neu-biol-3415": 1
+      }
+    },
+    {
+      "query_id": "q109",
+      "category": "code_switched",
+      "query": "有没有 Chemical Engineering 的 Journal Club 课",
+      "expected_course_ids": [
+        "neu-chme-7901"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Journal Club in Chemical Engineering",
+      "judge_grades": {
+        "neu-chme-7901": 3,
+        "neu-phsc-6300": 1,
+        "neu-chme-6390": 0,
+        "neu-chme-7393": 0,
+        "neu-chem-9996": 0,
+        "neu-ie-5374": 0,
+        "neu-bioe-7374": 0,
+        "neu-chme-7391": 0,
+        "neu-phsc-2330": 0,
+        "neu-chem-1153": 0
+      }
+    },
+    {
+      "query_id": "q110",
+      "category": "code_switched",
+      "query": "探讨 tech 和 society 关系的课",
+      "expected_course_ids": [
+        "neu-comm-2625",
+        "neu-comm-4605",
+        "neu-comm-6605",
+        "neu-inmi-2700",
+        "neu-phil-1145",
+        "neu-socl-4528"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Communication, Technology, and Society",
+      "judge_grades": {
+        "neu-comm-2625": 3,
+        "neu-socl-4528": 3,
+        "neu-comm-6605": 2,
+        "neu-comm-4605": 2,
+        "neu-phil-1145": 3,
+        "neu-inmi-2700": 2,
+        "neu-phth-6130": 1,
+        "neu-aace-6110": 0,
+        "neu-mgsc-6201": 0,
+        "neu-hist-3310": 0
+      }
+    },
+    {
+      "query_id": "q111",
+      "category": "code_switched",
+      "query": "有没有讲 data visualization theory 的课？",
+      "expected_course_ids": [
+        "neu-aly-3070",
+        "neu-aly-5070",
+        "neu-aly-6070",
+        "neu-cs-7250",
+        "neu-cs-7295",
+        "neu-ds-4200",
+        "neu-eece-5642",
+        "neu-insh-5302",
+        "neu-pst-7730"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Information Visualization: Theory and Ap",
+      "judge_grades": {
+        "neu-cs-7250": 3,
+        "neu-cs-7295": 2,
+        "neu-eece-5642": 3,
+        "neu-pst-7730": 2,
+        "neu-aly-5070": 3,
+        "neu-aly-6070": 3,
+        "neu-aly-3070": 3,
+        "neu-ie-6600": 1,
+        "neu-insh-5302": 3,
+        "neu-ds-4200": 3
+      }
+    },
+    {
+      "query_id": "q112",
+      "category": "code_switched",
+      "query": "想找讲 urban problems 经济分析的课。",
+      "expected_course_ids": [
+        "neu-econ-3420"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Urban Economic Issues",
+      "judge_grades": {
+        "neu-econ-3420": 3,
+        "neu-pols-2358": 1,
+        "neu-socl-2359": 1,
+        "neu-socl-2358": 1,
+        "neu-ppua-5265": 1,
+        "neu-ecnm-1115": 0,
+        "neu-econ-7720": 0,
+        "neu-ie-4512": 0,
+        "neu-ppua-6502": 1,
+        "neu-econ-6232": 0
+      }
+    },
+    {
+      "query_id": "q113",
+      "category": "code_switched",
+      "query": "想找个能拿 internship credit 的课。",
+      "expected_course_ids": [
+        "neu-bioc-4994",
+        "neu-biol-4994",
+        "neu-busn-3944",
+        "neu-eeam-2010",
+        "neu-eesh-2994",
+        "neu-musc-4994",
+        "neu-musi-4994",
+        "neu-must-4994",
+        "neu-ppua-6861",
+        "neu-ppua-6862"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Internship for Career Decision Making",
+      "judge_grades": {
+        "neu-eeam-2010": 3,
+        "neu-biol-4994": 2,
+        "neu-ppua-6862": 2,
+        "neu-bioc-4994": 3,
+        "neu-ppua-6861": 3,
+        "neu-eesh-2994": 2,
+        "neu-musi-4994": 2,
+        "neu-musc-4994": 2,
+        "neu-must-4994": 2,
+        "neu-busn-3944": 2
+      }
+    },
+    {
+      "query_id": "q114",
+      "category": "code_switched",
+      "query": "找 early American Lit 的课",
+      "expected_course_ids": [
+        "neu-engl-1502",
+        "neu-engl-2296"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for American Literature to 1865",
+      "judge_grades": {
+        "neu-engl-1502": 3,
+        "neu-engl-1700": 0,
+        "neu-pol-1300": 0,
+        "neu-engl-2470": 0,
+        "neu-engl-2296": 2,
+        "neu-crwt-3378": 0,
+        "neu-engl-3378": 0,
+        "neu-engl-1701": 0,
+        "neu-spns-1973": 0,
+        "neu-spns-1505": 0
+      }
+    },
+    {
+      "query_id": "q115",
+      "category": "code_switched",
+      "query": "有没有 Fintech 创新的 overview 课？",
+      "expected_course_ids": [
+        "neu-busn-6344",
+        "neu-fina-2730",
+        "neu-fina-6237",
+        "neu-fina-6437"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Fintech and Financial Innovation",
+      "judge_grades": {
+        "neu-fina-2730": 3,
+        "neu-fina-6237": 3,
+        "neu-fina-6437": 3,
+        "neu-busn-6344": 2,
+        "neu-fina-4605": 0,
+        "neu-dgtr-1001": 1,
+        "neu-info-7110": 0,
+        "neu-fina-4983": 0,
+        "neu-fina-6284": 1,
+        "neu-fina-4390": 1
+      }
+    },
+    {
+      "query_id": "q116",
+      "category": "code_switched",
+      "query": "有没有讲 Health Informatics 的系统课？",
+      "expected_course_ids": [
+        "neu-hinf-5101",
+        "neu-hinf-5110",
+        "neu-hinf-6350",
+        "neu-hinf-6355",
+        "neu-mgsc-6221",
+        "neu-nrsg-6306"
+      ],
+      "rationale": "v0.3.1 generated: Gemini code-switched query for Introduction to Health Informatics and H",
+      "judge_grades": {
+        "neu-hinf-5101": 3,
+        "neu-hinf-6355": 2,
+        "neu-hinf-6215": 1,
+        "neu-hinf-6350": 2,
+        "neu-hinf-5110": 2,
+        "neu-hinf-5976": 0,
+        "neu-nrsg-6306": 3,
+        "neu-mgsc-6221": 3,
+        "neu-hinf-5105": 0,
+        "neu-hinf-7701": 1
+      }
+    }
+  ]
+}

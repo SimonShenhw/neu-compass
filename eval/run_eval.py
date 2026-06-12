@@ -81,7 +81,14 @@ class EvalReport:
 
 
 def recall_at_k(retrieved: list[str], expected: list[str], k: int = 5) -> float:
-    """Fraction of expected items present in top-k retrieved.
+    """Fraction of expected items present in top-k retrieved, with the
+    denominator capped at k (R-precision convention).
+
+    The cap matters for multi-label ground truth (test_set v0.4+): a query
+    with 8 relevant courses can show at most 5 in the top-5 — uncapped
+    recall would top out at 0.625 through no fault of the system. For the
+    single-label v0.2/v0.3 sets (|expected| ≤ 3 ≤ k) min() is a no-op, so
+    historic numbers are unaffected.
 
     For empty-expected queries (adversarial: 'AAI 9999'), recall is undefined;
     we return 1.0 if retrieved is also empty (correct rejection), else 0.0.
@@ -90,7 +97,7 @@ def recall_at_k(retrieved: list[str], expected: list[str], k: int = 5) -> float:
         return 1.0 if not retrieved else 0.0
     top_k = set(retrieved[:k])
     hits = sum(1 for e in expected if e in top_k)
-    return hits / len(expected)
+    return hits / min(len(expected), k)
 
 
 def reciprocal_rank(retrieved: list[str], expected: list[str]) -> float:
