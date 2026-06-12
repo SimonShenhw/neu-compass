@@ -52,7 +52,12 @@ ARG SLIM_EXCLUDES="--no-install-package torch --no-install-package triton \
     --no-install-package nvidia-nvtx-cu12 \
     --no-install-package playwright --no-install-package pymupdf \
     --no-install-package ragas --no-install-package deepeval \
-    --no-install-package datasets --no-install-package pyarrow"
+    --no-install-package datasets"
+# pyarrow is NOT excludable: it's a hard dependency of streamlit itself —
+# st.write_stream imports streamlit/dataframe_util which does
+# `import pyarrow` unconditionally. Excluding it (ADR-0023 v1) crashed the
+# UI container's chat path with ModuleNotFoundError on the FIRST prod use
+# (eval drives the API directly and never caught it). ~150MB, worth it.
 
 # Install locked runtime deps. We skip the `onnx` extra here because we want
 # onnxruntime-openvino (Intel-flavor) instead of the generic onnxruntime that
