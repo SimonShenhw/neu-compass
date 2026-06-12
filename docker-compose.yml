@@ -60,8 +60,13 @@ services:
       LOG_LEVEL: INFO
       LOG_FORMAT: json
       # === OAuth callback must be the public URL, not localhost ===
-      # Override the .env value (which points at localhost for PC dev).
-      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/oauth/callback
+      # ROOT path on purpose: Streamlit handles ?code= on the main page
+      # (handle_oauth_callback reads st.query_params); a sub-path like
+      # /oauth/callback relies on Streamlit ignoring unknown routes.
+      # Must byte-match BOTH the URI registered in Google Cloud Console
+      # AND the ui service's value below — Google rejects any difference,
+      # trailing slash included.
+      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/
     volumes:
       - ./runtime-data:/data
     devices:
@@ -87,7 +92,8 @@ services:
     environment:
       # Streamlit reaches FastAPI by compose service name, not localhost.
       API_BASE_URL: http://api:8000
-      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/oauth/callback
+      # Keep byte-identical to the api service value (see comment there).
+      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/
     command:
       - streamlit
       - run
