@@ -29,6 +29,7 @@ _BADGE_STYLES: dict[str, tuple[str, str, str]] = {
     "alias": ("直达 · alias", "#E6F7EE", "#18A058"),
     "hybrid": ("检索 · hybrid", "#E8F1FF", ALIPAY_BLUE),
     "program": ("培养方案 · program", "#F0EBFF", "#7B61FF"),
+    "context": ("续聊 · context", "#E6FFFB", "#0E9A8F"),
     "rejected": ("无匹配 · rejected", "#FFF1E6", "#E8731A"),
     "empty": ("空结果 · empty", "#F2F3F5", "#646A73"),
 }
@@ -38,7 +39,7 @@ GLOBAL_CSS = """
 .stApp {
   background: linear-gradient(180deg, #EAF1FB 0%, #F5F7FA 260px, #F5F7FA 100%);
 }
-.block-container { padding-top: 1.1rem; max-width: 1180px; }
+.block-container { padding-top: 1.1rem; max-width: 1280px; }
 header[data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
 
@@ -106,36 +107,45 @@ h3 { font-weight: 600; color: #26303E; letter-spacing: 0.2px; }
 [data-testid="stAlert"] { border-radius: 12px; }
 
 /* ===== Custom components (nc- prefix = neu-compass) ===== */
+/* Compact strip, not a billboard (2026-06 round 3): the old 26px-padding
+   gradient banner ate the first screen on every visit of a daily-use
+   tool. One row: brand left, status pills right. */
 .nc-hero {
-  background: linear-gradient(135deg, #1677FF 0%, #3D8BFF 55%, #66A6FF 100%);
-  border-radius: 20px;
-  padding: 26px 30px 22px;
+  background: linear-gradient(135deg, #1677FF 0%, #3D8BFF 70%, #66A6FF 100%);
+  border-radius: 14px;
+  padding: 12px 18px;
   color: #FFFFFF;
-  box-shadow: 0 10px 28px rgba(22, 119, 255, 0.28);
-  margin-bottom: 1.1rem;
+  box-shadow: 0 4px 14px rgba(22, 119, 255, 0.22);
+  margin-bottom: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .nc-hero-title {
-  font-size: 1.7rem;
+  font-size: 1.15rem;
   font-weight: 700;
   margin: 0;
   color: #FFFFFF;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
+  display: inline;
 }
 .nc-hero-sub {
-  margin: 6px 0 14px;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 0.95rem;
+  margin: 0 0 0 10px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.82rem;
+  display: inline;
 }
 .nc-hero-pill {
   display: inline-block;
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.28);
   color: #FFFFFF;
-  padding: 3px 12px;
+  padding: 2px 10px;
   border-radius: 999px;
-  font-size: 0.78rem;
-  margin-right: 8px;
-  backdrop-filter: blur(4px);
+  font-size: 0.75rem;
+  margin-left: 6px;
 }
 
 .nc-banner {
@@ -325,16 +335,15 @@ def hero_html(
     else:
         status_pill = "🔒 游客模式 · Guest"
     if courses_indexed:
-        corpus_pill = f"📚 {courses_indexed:,} courses indexed"
+        corpus_pill = f"📚 {courses_indexed:,} 门课"
     else:
-        corpus_pill = "📚 Full NEU graduate catalog"
+        corpus_pill = "📚 NEU 研究生课程目录"
     return (
         '<div class="nc-hero">'
-        '<p class="nc-hero-title">🧭 NEU-Compass</p>'
-        '<p class="nc-hero-sub">选课助手 · Course intelligence for NEU graduate students</p>'
-        f'<span class="nc-hero-pill">{corpus_pill}</span>'
-        '<span class="nc-hero-pill">⚡ alias → ontology → hybrid RAG</span>'
-        f'<span class="nc-hero-pill">{status_pill}</span>'
+        '<div><span class="nc-hero-title">🧭 NEU-Compass</span>'
+        '<span class="nc-hero-sub">选课助手 · course intelligence</span></div>'
+        f'<div><span class="nc-hero-pill">{corpus_pill}</span>'
+        f'<span class="nc-hero-pill">{status_pill}</span></div>'
         "</div>"
     )
 
@@ -367,25 +376,30 @@ def course_header_html(
     delivery_mode: str | None = None,
 ) -> str:
     """Course-detail header card: blue code + name + meta chips row.
-    Replaces the old st.metric trio (whose look fought the card design)."""
+
+    Chips with NO value are omitted entirely (was an em-dash placeholder —
+    review feedback: a row of '—' broadcasts missing data instead of
+    presenting what we have). All three absent → no chips row at all."""
     chips = ""
     for label, value in (
         ("Term", term),
         ("Credits", credits),
         ("Mode", str(delivery_mode).replace("_", " ") if delivery_mode else None),
     ):
-        shown = html.escape(str(value)) if value not in (None, "") else "—"
+        if value in (None, ""):
+            continue
         chips += (
             '<div class="nc-meta-chip">'
             f'<span class="nc-meta-label">{label}</span>'
-            f'<span class="nc-meta-value">{shown}</span>'
+            f'<span class="nc-meta-value">{html.escape(str(value))}</span>'
             "</div>"
         )
+    chips_row = f'<div class="nc-meta-row">{chips}</div>' if chips else ""
     return (
         '<div class="nc-card">'
         f'<span class="nc-card-code">{html.escape(code)}</span>'
         f'<p class="nc-card-name">{html.escape(name)}</p>'
-        f'<div class="nc-meta-row">{chips}</div>'
+        f"{chips_row}"
         "</div>"
     )
 

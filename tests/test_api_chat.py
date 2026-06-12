@@ -337,3 +337,86 @@ def test_chat_program_path_not_used_on_explicit_alias(
     r = api_client.post("/chat", json={"query": "Algo", "k": 3})
     meta = _parse_ndjson(r.text)[0]
     assert meta["matched_via"] == "alias"
+
+
+# === Conversation continuity: context tier (2026-06) ===
+
+
+def test_chat_followup_takes_context_tier(api_client, empty_db) -> None:
+    """A referent query ('这门课...') + context_course_ids from the
+    previous turn must resolve via the context tier — matched_via=context,
+    results = exactly the context course — instead of running noisy
+    retrieval on a query with no course signal."""
+    import json as _json
+
+    from api.dependencies import get_chat_stream_fn
+
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: (
+        lambda prompt: iter(["回答"])
+    )
+    r = api_client.post("/chat", json={
+        "query": "那你能给我讲讲这门课大概讲什么内容吗？",
+        "k": 5,
+        "history": [
+            {"role": "user", "content": "CS 5800 这门课怎么样?"},
+            {"role": "assistant", "content": "CS 5800 是 Algorithms..."},
+        ],
+        "context_course_ids": ["c-cs-5800"],
+    })
+    assert r.status_code == 200
+    meta = _json.loads(r.text.strip().splitlines()[0])
+    assert meta["matched_via"] == "context"
+    assert [h["course_id"] for h in meta["results"]] == ["c-cs-5800"]
+
+
+def test_chat_fresh_query_ignores_context_ids(api_client, empty_db) -> None:
+    """A query that names its own course must NOT be hijacked by stale
+    context ids — alias tier wins."""
+    import json as _json
+
+    from api.dependencies import get_chat_stream_fn
+
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: (
+        lambda prompt: iter(["ok"])
+    )
+    r = api_client.post("/chat", json={
+        "query": "AAI 6600 怎么样",
+        "k": 3,
+        "context_course_ids": ["c-cs-5800"],
+    })
+    assert r.status_code == 200
+    meta = _json.loads(r.text.strip().splitlines()[0])
+    assert meta["matched_via"] == "alias"
+    assert meta["results"][0]["course_id"] == "c-aai-6600"
+
+
+def test_chat_history_reaches_prompt(api_client, empty_db) -> None:
+    """The answer prompt must carry the conversation history block."""
+    captured: dict = {}
+
+    from api.dependencies import get_chat_stream_fn
+
+    def _capture_fn(prompt: str):
+        captured["prompt"] = prompt
+        return iter(["ok"])
+
+    api_client.app.dependency_overrides[get_chat_stream_fn] = (
+        lambda: _capture_fn
+    )
+    r = api_client.post("/chat", json={
+        "query": "这门课作业量大吗?",
+        "k": 3,
+        "history": [{"role": "user", "content": "CS 5800 怎么样"}],
+        "context_course_ids": ["c-cs-5800"],
+    })
+    assert r.status_code == 200
+    assert "Student: CS 5800 怎么样" in captured["prompt"]
+
+
+def test_chat_context_ids_capped_and_validated(api_client) -> None:
+    """history >12 turns or >10 context ids → 422 (bounded payloads)."""
+    r = api_client.post("/chat", json={
+        "query": "这门课怎么样",
+        "context_course_ids": [f"c-{i}" for i in range(11)],
+    })
+    assert r.status_code == 422

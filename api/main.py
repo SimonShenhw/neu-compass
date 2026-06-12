@@ -24,7 +24,7 @@ from fastapi import FastAPI
 
 from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
-from api.routes import auth, chat, coop, course, health, search
+from api.routes import auth, chat, coop, course, health, program, search
 from config import settings
 from db.connection import connect
 from rag.embedder import BGEM3Embedder
@@ -299,6 +299,7 @@ def create_app(*, run_startup: bool = True) -> FastAPI:
     app.include_router(coop.router)
     app.include_router(chat.router)
     app.include_router(auth.router)
+    app.include_router(program.router)
 
     return app
 

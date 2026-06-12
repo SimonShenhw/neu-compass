@@ -106,6 +106,12 @@ class ApiClient:
     def get_course(self, course_id: str) -> dict[str, Any]:
         return self._get(f"/course/{course_id}")
 
+    def list_programs(self) -> list[dict[str, Any]]:
+        return self._get("/programs")
+
+    def get_program_curriculum(self, program_id: str) -> dict[str, Any]:
+        return self._get(f"/programs/{program_id}")
+
     def list_coop(self) -> list[dict[str, Any]]:
         return self._get("/coop")
 

@@ -90,9 +90,12 @@ def test_course_header_includes_code_name_and_chips() -> None:
     assert "in person" in out  # underscore replaced
 
 
-def test_course_header_missing_meta_shows_dash() -> None:
+def test_course_header_missing_meta_omits_chips() -> None:
+    """Absent values are dropped, not dashed — a row of '—' broadcasts
+    missing data instead of presenting what we have (round-3 feedback)."""
     out = course_header_html(code="CS 5800", name="Algorithms")
-    assert out.count("—") == 3  # term / credits / mode all dashed
+    assert "—" not in out
+    assert "nc-meta-chip" not in out  # no empty chips row at all
 
 
 def test_course_header_escapes_html_in_name() -> None:
@@ -121,15 +124,15 @@ def test_hero_courses_indexed_renders_count() -> None:
     from app.ui_theme import hero_html  # noqa: PLC0415
 
     out = hero_html(courses_indexed=6469)
-    assert "6,469 courses indexed" in out
+    assert "6,469 门课" in out
 
 
 def test_hero_no_count_falls_back_without_number() -> None:
     from app.ui_theme import hero_html  # noqa: PLC0415
 
     out = hero_html(courses_indexed=None)
-    assert "courses indexed" not in out
-    assert "catalog" in out.lower()
+    assert "6,469" not in out
+    assert "课程目录" in out
 
 
 def test_result_card_escapes_and_clamps() -> None:

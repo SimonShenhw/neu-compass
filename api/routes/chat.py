@@ -56,8 +56,9 @@ from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
 from config import settings
 from llm.gemini_client import GeminiError
-from llm.prompts.chat_v2 import build_prompt
+from llm.prompts.chat_v3 import build_prompt
 from llm.query_filter_extractor import extract_filters_adaptive
+from rag.followup import is_followup_query
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import normalize_query_to_course_ids
 from rag.rejection import build_gate_fn
@@ -248,7 +249,10 @@ def chat(
         user_id=f"eval:{x_eval_run}" if x_eval_run else None,
     )
 
-    prompt = build_prompt(req.query, hits)
+    prompt = build_prompt(
+        req.query, hits,
+        history=[t.model_dump() for t in req.history],
+    )
 
     def event_stream() -> Iterator[bytes]:
         # Meta first so the client can render evidence bubbles before LLM
@@ -325,6 +329,28 @@ def _retrieve(
     When a reranker is available the hybrid leg requests a wider pool
     (RERANK_POOL_SIZE=20) so the reranker has room to reorder.
     """
+    # Tier 0: conversation context (2026-06 continuity). A follow-up that
+    # references "this course" without naming one resolves against the
+    # previous turn's evidence (context_course_ids from the client) —
+    # otherwise retrieval runs on a query with zero course signal, returns
+    # noise, and the user gets "找不到匹配课程" right after discussing the
+    # course. score=1.0 like the alias tier: the referent is explicit, no
+    # ranking or rejection gate applies.
+    if req.context_course_ids and is_followup_query(req.query):
+        ctx_courses = course_repo.get_batch(req.context_course_ids[: req.k])
+        ctx_hits = [
+            SearchHit(course=ctx_courses[cid], score=1.0)
+            for cid in req.context_course_ids[: req.k]
+            if cid in ctx_courses
+        ]
+        if ctx_hits:
+            log.info(
+                "chat.context_path",
+                query=req.query[:80],
+                count=len(ctx_hits),
+            )
+            return ctx_hits, "context", False
+
     # Tier 1: alias — skipped when explicit request filters are present:
     # the alias tier can't apply term/credits/mode/professor, so returning
     # an unfiltered hit would contradict the request. Mirrors /search.

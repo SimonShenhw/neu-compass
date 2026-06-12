@@ -109,6 +109,43 @@ def stream_assistant(
             return
 
 
+def _recent_history(messages: list[dict], limit: int = 6) -> list[dict]:
+    """Last `limit` turns as the {role, content} shape ChatRequest.history
+    expects. Content capped at 4000 chars (the API's ChatTurn bound);
+    assistant answers can exceed it with long evidence-rich replies."""
+    return [
+        {"role": m["role"], "content": str(m["content"])[:4000]}
+        for m in messages[-limit:]
+        if m.get("content")
+    ]
+
+
+def _context_course_ids(messages: list[dict], limit: int = 10) -> list[str]:
+    """Course ids from the most recent assistant turn that carried
+    evidence — the referent set for follow-ups ("这门课..."). The API
+    only uses these when its follow-up detector fires, so sending them
+    on every request is harmless."""
+    for m in reversed(messages):
+        if m.get("role") == "assistant" and m.get("evidence"):
+            return [ev["course_id"] for ev in m["evidence"]][:limit]
+    return []
+
+
+FOLLOWUP_CHIPS_SINGLE: list[str] = [
+    "这门课讲什么内容？",
+    "这门课作业量大吗？",
+    "先修要求是什么？",
+]
+FOLLOWUP_CHIPS_MULTI: list[str] = [
+    "这几门课怎么选？",
+    "哪门最适合零基础？",
+    "第一门的先修要求？",
+]
+"""Suggested follow-up chips under the latest answer. Click → injected
+via pending_query, riding the same conversation-continuity path the
+typed version would take."""
+
+
 SAMPLE_QUERIES: list[tuple[str, str]] = [
     ("📘 CS 5800", "CS 5800"),
     ("🤖 易学的 AI 选修课", "easy AI elective for ML beginner"),
@@ -312,13 +349,27 @@ def render() -> None:
         st.markdown(guest_banner_html(), unsafe_allow_html=True)
 
     # Sidebar nav (not st.tabs): chat_input must stay bottom-pinned on the
-    # search page, which tabs would break. Co-op finally gets an entry point
-    # in the product UI instead of living as an orphan standalone page.
-    nav = st.sidebar.radio(
-        "页面 / Pages",
-        ["🔍 课程搜索 · Search", "💼 Co-op 经验"],
-        key="nav_page",
-    )
+    # search page, which tabs would break. Pages: search / programs / co-op.
+    pages = ["🔍 课程搜索 · Search", "🎓 培养方案 · Programs", "💼 Co-op 经验"]
+
+    # Cross-page hand-offs (discover chips, curriculum 查看 buttons) queue
+    # a pending_nav_* flag + st.rerun(); we consume it HERE, before the
+    # radio instantiates — writing a widget-bound key after the widget
+    # rendered raises StreamlitAPIException (see filter-clear note).
+    if st.session_state.pop("pending_nav_to_programs", None):
+        st.session_state["nav_page"] = pages[1]
+    if st.session_state.pop("pending_nav_to_coop", None):
+        st.session_state["nav_page"] = pages[2]
+    if st.session_state.pop("pending_nav_to_search", None):
+        st.session_state["nav_page"] = pages[0]
+
+    nav = st.sidebar.radio("页面 / Pages", pages, key="nav_page")
+    if nav.startswith("🎓"):
+        from app.program_view import render_program_browser  # noqa: PLC0415
+
+        render_program_browser(st)
+        st.markdown(footer_html(), unsafe_allow_html=True)
+        return
     if nav.startswith("💼"):
         from app.coop_view import render_coop_panel  # noqa: PLC0415
 
@@ -326,17 +377,22 @@ def render() -> None:
         st.markdown(footer_html(), unsafe_allow_html=True)
         return
 
-    chat_col, detail_col = st.columns([3, 2])
+    # 5:3 (was 3:2): the chat stream is the primary surface — review
+    # feedback flagged ~35% wasted horizontal space with the old ratio.
+    chat_col, detail_col = st.columns([5, 3])
 
     with chat_col:
         st.subheader("💬 Chat")
 
-        # Hero block — only on first visit (no chat history yet). This is the
-        # main UX fix from Week 8 review: users were landing on an empty
-        # two-column layout and not realizing the chat_input below was the
-        # query entry point. Sample chips both signal "this is where you ask"
-        # AND give working examples for cold-start users.
+        # Discovery + sample chips — only on first visit (no chat history
+        # yet). Round-3 fix for the cold-start blank screen: the landing
+        # now offers browsable CONTENT (programs / starter courses / co-op
+        # teaser), not just an empty chat box with example queries.
         if not get_messages(st.session_state):
+            from app.discover_view import render_discover  # noqa: PLC0415
+
+            render_discover(st)
+            st.divider()
             st.markdown("**🔍 试试这些查询 / Try these queries:**")
             sample_cols = st.columns(2)
             for i, (label, query) in enumerate(SAMPLE_QUERIES):
@@ -359,12 +415,18 @@ def render() -> None:
         # blocks (common when user asks repeatedly about a topic) collides
         # on f"open-{role}-{course_id}" and Streamlit raises
         # DuplicateWidgetID, blowing up the entire chat history.
-        for msg_idx, msg in enumerate(get_messages(st.session_state)):
-            with st.chat_message(msg["role"]):
+        messages = get_messages(st.session_state)
+        for msg_idx, msg in enumerate(messages):
+            with st.chat_message(
+                msg["role"],
+                avatar="🎓" if msg["role"] == "user" else "🧭",
+            ):
                 st.markdown(msg["content"])
                 if msg.get("evidence"):
+                    n_ev = len(msg["evidence"])
                     with st.expander(
-                        f"📎 Evidence ({len(msg['evidence'])} courses)"
+                        f"📎 Evidence ({n_ev} course{'s' if n_ev > 1 else ''})",
+                        expanded=(n_ev <= 3),
                     ):
                         if msg.get("matched_via"):
                             st.markdown(
@@ -375,24 +437,59 @@ def render() -> None:
                             st, msg["evidence"],
                             key_prefix=f"open-{msg_idx}-{msg['role']}",
                         )
+            # Follow-up suggestion chips under the LATEST answer only —
+            # they ride the conversation-continuity path (context tier),
+            # so a click answers about the course(s) just discussed.
+            is_last = msg_idx == len(messages) - 1
+            if (
+                is_last
+                and msg["role"] == "assistant"
+                and msg.get("evidence")
+                and msg.get("matched_via") not in ("rejected", "empty")
+            ):
+                chips = (
+                    FOLLOWUP_CHIPS_SINGLE
+                    if len(msg["evidence"]) == 1
+                    else FOLLOWUP_CHIPS_MULTI
+                )
+                chip_cols = st.columns(len(chips))
+                for i, chip in enumerate(chips):
+                    if chip_cols[i].button(
+                        f"↳ {chip}", key=f"chip-{msg_idx}-{i}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["pending_query"] = chip
+                        st.rerun()
 
         # New input → stream assistant response. Two paths: chat_input box
         # OR a pending_query injected by a hero-block sample chip (above).
         chat_input_value = st.chat_input(
-            "Ask about a course (e.g. 'CS 5800', '易学的 ML 课', 'algo')..."
+            "问我任何课程问题：CS 5800 / 易学的 ML 课 / algo …"
         )
         pending_query = st.session_state.pop("pending_query", None)
         prompt = chat_input_value or pending_query
 
         if prompt:
+            # Continuity payload BEFORE the new prompt joins the history:
+            # history = prior turns (the new question travels as `query`),
+            # context ids = the previous answer's evidence (follow-up
+            # referent set for the API's context tier).
+            prior_messages = get_messages(st.session_state)
+            chat_history = _recent_history(prior_messages)
+            context_ids = _context_course_ids(prior_messages)
+
             add_message(st.session_state, role="user", content=prompt)
-            with st.chat_message("user"):
+            with st.chat_message("user", avatar="🎓"):
                 st.markdown(prompt)
 
             chat_body: dict[str, object] = {
                 "query": prompt,
                 "k": min(st.session_state.get("search_k", 5), 10),
             }
+            if chat_history:
+                chat_body["history"] = chat_history
+            if context_ids:
+                chat_body["context_course_ids"] = context_ids
             # Propagate sidebar filters to the chat request — this is what
             # surfaces the backend's term / credits / delivery_mode / professor
             # filtering capability that was previously inaccessible from UI.
@@ -401,7 +498,7 @@ def render() -> None:
             for fk, fv in (active_filters or {}).items():
                 if fv is not None and fv != "":
                     chat_body[fk] = fv
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar="🧭"):
                 final_text = ""
                 try:
                     with ApiClient(
@@ -423,7 +520,10 @@ def render() -> None:
                         results=results,
                         matched_via=matched_via,
                     )
-                    with st.expander(f"📎 Evidence ({len(results)} courses)"):
+                    n_live = len(results)
+                    with st.expander(
+                        f"📎 Evidence ({n_live} course{'s' if n_live > 1 else ''})"
+                    ):
                         st.markdown(
                             matched_via_badge(matched_via),
                             unsafe_allow_html=True,
@@ -494,6 +594,16 @@ def render() -> None:
                 )
             if course.get("prerequisites"):
                 st.markdown("**🧱 先修关系 · Prerequisites**")
+                # Mini prereq graph (round-3 review's "killer feature" ask):
+                # st.graphviz_chart renders the DOT source client-side —
+                # no graphviz runtime in the image.
+                from rag.prereq_graph import build_prereq_dot  # noqa: PLC0415
+
+                dot = build_prereq_dot(
+                    course["primary_code"], course["prerequisites"],
+                )
+                if dot:
+                    st.graphviz_chart(dot)
                 for p in course["prerequisites"]:
                     cols = st.columns([4, 1])
                     cols[0].markdown(

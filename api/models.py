@@ -94,8 +94,24 @@ class CourseDetailOut(Course):
 # === /chat ===
 
 
+class ChatTurn(BaseModel):
+    """One prior conversation turn (client-supplied — /chat is stateless;
+    the Streamlit session owns the transcript and sends a recent window)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatRequest(BaseModel):
-    """Body for POST /chat. Filters mirror /search for re-use."""
+    """Body for POST /chat. Filters mirror /search for re-use.
+
+    Conversation continuity (2026-06): `history` reaches the answer prompt
+    (reference resolution + tone); `context_course_ids` are the previous
+    turn's evidence — when the new query is a follow-up ("这门课作业量大吗"),
+    retrieval short-circuits to those courses instead of searching a query
+    that carries no course signal of its own."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -105,6 +121,8 @@ class ChatRequest(BaseModel):
     credits: int | None = Field(default=None, ge=0, le=12)
     delivery_mode: str | None = None
     professor: str | None = None
+    history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+    context_course_ids: list[str] = Field(default_factory=list, max_length=10)
 
 
 # === /coop ===
@@ -220,6 +238,7 @@ class ReadyResponse(BaseModel):
 __all__ = [
     "AuthMeResponse",
     "ChatRequest",
+    "ChatTurn",
     "CoopOut",
     "CoopUploadRequest",
     "CoopUploadResponse",
