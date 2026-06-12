@@ -112,3 +112,92 @@ def test_topic_pills_render_one_pill_per_topic() -> None:
 
 def test_topic_pills_empty_list_renders_nothing() -> None:
     assert topic_pills_html([]) == ""
+
+
+# === UI round 2 builders (2026-06) ===
+
+
+def test_hero_courses_indexed_renders_count() -> None:
+    from app.ui_theme import hero_html  # noqa: PLC0415
+
+    out = hero_html(courses_indexed=6469)
+    assert "6,469 courses indexed" in out
+
+
+def test_hero_no_count_falls_back_without_number() -> None:
+    from app.ui_theme import hero_html  # noqa: PLC0415
+
+    out = hero_html(courses_indexed=None)
+    assert "courses indexed" not in out
+    assert "catalog" in out.lower()
+
+
+def test_result_card_escapes_and_clamps() -> None:
+    from app.ui_theme import result_card_html  # noqa: PLC0415
+
+    out = result_card_html(
+        rank=1, code="CS 5800", name="Algo <& Data>", score=0.987, pct=150,
+    )
+    assert "Algo &lt;&amp; Data&gt;" in out
+    assert "width:100%" in out  # clamped
+    assert "0.987" in out
+    out_low = result_card_html(rank=2, code="X", name="Y", score=0.1, pct=-5)
+    assert "width:0%" in out_low
+
+
+def test_requirement_badge_known_and_fallback() -> None:
+    from app.ui_theme import requirement_badge  # noqa: PLC0415
+
+    assert "core" in requirement_badge("core")
+    assert "capstone" in requirement_badge("capstone")
+    # Unknown type falls back to neutral foundation style, no crash
+    assert "nc-badge" in requirement_badge("weird_future_type")
+
+
+def test_program_context_html_rows() -> None:
+    from app.ui_theme import program_context_html  # noqa: PLC0415
+
+    out = program_context_html([
+        {
+            "program_name": "MS in CS <Khoury>",
+            "requirement_type": "core",
+            "semester_recommended": 1,
+        },
+        {
+            "program_name": "MSDS",
+            "requirement_type": "elective_pool",
+            "semester_recommended": None,
+        },
+    ])
+    assert "MS in CS &lt;Khoury&gt;" in out
+    assert "第 1 学期推荐" in out
+    assert out.count("nc-prog-row") == 2
+    # No semester chip for the second row
+    assert out.count("学期推荐") == 1
+    assert program_context_html([]) == ""
+
+
+def test_prereq_label_resolved_and_dangling() -> None:
+    from app.ui_theme import prereq_label_md  # noqa: PLC0415
+
+    resolved = prereq_label_md(
+        code="CS 5800", name="Algorithms", course_id="neu-cs-5800",
+        requirement="required",
+    )
+    assert "**CS 5800**" in resolved and "必须先修" in resolved
+    dangling = prereq_label_md(
+        code=None, name=None, course_id="c-ghost", requirement="recommended",
+    )
+    assert "`c-ghost`" in dangling and "建议先修" in dangling
+
+
+def test_empty_footer_brand_render() -> None:
+    from app.ui_theme import (  # noqa: PLC0415
+        empty_detail_html,
+        footer_html,
+        sidebar_brand_html,
+    )
+
+    assert "nc-empty" in empty_detail_html()
+    assert "非商业" in footer_html()
+    assert "NEU-Compass" in sidebar_brand_html()

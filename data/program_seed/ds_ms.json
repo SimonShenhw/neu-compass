@@ -1,0 +1,38 @@
+{
+  "program": {
+    "program_id": "ds-ms",
+    "full_name": "Master of Science in Data Science",
+    "prefix": "DS",
+    "department": "Khoury College of Computer Sciences",
+    "college": "Khoury College of Computer Sciences",
+    "notes": "Seed — Layer 3 expansion beyond AAI (2026-06). Structure is best-guess from course numbering + public Khoury MSDS layout (5010/5020 foundations / 5110+5220+5230 core / 5500 capstone / CS 6xxx-7xxx electives). User should verify against the official Plan of Study and revise."
+  },
+  "required_courses": [
+    {"course_id": "neu-ds-5010", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Intro Programming for Data Science"},
+    {"course_id": "neu-ds-5020", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Linear Algebra + Probability for DS"},
+    {"course_id": "neu-ds-5110", "requirement_type": "core",          "semester_recommended": 1, "notes": "Essentials of Data Science — wrangling/pipelines core"},
+
+    {"course_id": "neu-ds-5220", "requirement_type": "core",          "semester_recommended": 2, "notes": "Supervised ML and Learning Theory"},
+    {"course_id": "neu-ds-5230", "requirement_type": "core",          "semester_recommended": 2, "notes": "Unsupervised ML and Data Mining"},
+
+    {"course_id": "neu-cs-6220", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Data Mining Techniques (CS cross-list pool)"},
+    {"course_id": "neu-cs-6240", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Large-Scale Parallel Data Processing"},
+    {"course_id": "neu-cs-6120", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Natural Language Processing"},
+    {"course_id": "neu-cs-6200", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Information Retrieval"},
+    {"course_id": "neu-cs-7250", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Information Visualization"},
+
+    {"course_id": "neu-cs-7150", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Deep Learning — advanced elective"},
+    {"course_id": "neu-cs-7290", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Special Topics in Data Science"},
+    {"course_id": "neu-ds-5983", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Topics in Data Science"},
+    {"course_id": "neu-ds-5500", "requirement_type": "capstone",      "semester_recommended": 4, "notes": "Data Science Capstone"}
+  ],
+  "prerequisites": [
+    {"course_id": "neu-ds-5110", "prereq_course_id": "neu-ds-5010", "requirement": "recommended", "notes": "Essentials assumes DS programming"},
+    {"course_id": "neu-ds-5220", "prereq_course_id": "neu-ds-5020", "requirement": "required",    "notes": "Supervised ML needs linear algebra + probability"},
+    {"course_id": "neu-ds-5220", "prereq_course_id": "neu-ds-5110", "requirement": "recommended", "notes": "Core sequence order"},
+    {"course_id": "neu-ds-5230", "prereq_course_id": "neu-ds-5220", "requirement": "recommended", "notes": "Unsupervised follows supervised"},
+    {"course_id": "neu-cs-7150", "prereq_course_id": "neu-ds-5220", "requirement": "required",    "notes": "Deep Learning builds on supervised ML"},
+    {"course_id": "neu-ds-5500", "prereq_course_id": "neu-ds-5110", "requirement": "required",    "notes": "Capstone after core"},
+    {"course_id": "neu-ds-5500", "prereq_course_id": "neu-ds-5220", "requirement": "required",    "notes": "Capstone after ML core"}
+  ]
+}

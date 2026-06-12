@@ -22,6 +22,7 @@ def handle_oauth_callback() -> None:
     import streamlit as st  # noqa: PLC0415
 
     from app.api_client import ApiClient, ApiError  # noqa: PLC0415
+    from app.cookie_session import queue_cookie_write  # noqa: PLC0415
     from app.state_manager import login  # noqa: PLC0415
 
     code = st.query_params.get("code")
@@ -57,6 +58,12 @@ def handle_oauth_callback() -> None:
     if identity.get("display_name"):
         st.session_state["user_display_name"] = identity["display_name"]
 
+    # Persist the session across refreshes. Queued (not rendered inline)
+    # because the st.rerun() below would tear down an inline component
+    # before the browser executes it — cookie_session.flush_pending_cookie
+    # renders it early in the next pass.
+    queue_cookie_write(st.session_state, identity.get("session_token"))
+
     st.query_params.clear()
     st.rerun()
 
@@ -66,6 +73,7 @@ def render_auth_sidebar() -> None:
     import streamlit as st  # noqa: PLC0415
 
     from app.auth import authorize_url  # noqa: PLC0415
+    from app.cookie_session import queue_cookie_clear  # noqa: PLC0415
     from app.state_manager import is_logged_in, logout  # noqa: PLC0415
 
     with st.sidebar:
@@ -78,6 +86,7 @@ def render_auth_sidebar() -> None:
                 f"{st.session_state.get('user_contribution_count', 0)}"
             )
             if st.button("Log out", use_container_width=True):
+                queue_cookie_clear(st.session_state)
                 logout(st.session_state)
                 st.rerun()
         else:

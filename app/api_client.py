@@ -112,6 +112,11 @@ class ApiClient:
     def upload_coop(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/coop", payload)
 
+    def auth_me(self) -> dict[str, Any]:
+        """Identity behind the current session token (GET /auth/me).
+        Raises ApiError 401 when the token is missing/invalid/expired."""
+        return self._get("/auth/me")
+
     # === OAuth callback ===
 
     def oauth_callback(

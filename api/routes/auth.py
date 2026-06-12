@@ -24,8 +24,17 @@ from typing import Annotated, Any, Callable
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.dependencies import DbConn, get_oauth_exchange_fn, get_user_repo
-from api.models import OAuthCallbackRequest, OAuthCallbackResponse
+from api.dependencies import (
+    DbConn,
+    get_current_user_id,
+    get_oauth_exchange_fn,
+    get_user_repo,
+)
+from api.models import (
+    AuthMeResponse,
+    OAuthCallbackRequest,
+    OAuthCallbackResponse,
+)
 from app.auth import OAuthError
 from db.user_repository import UserRepository
 
@@ -110,4 +119,53 @@ def oauth_callback(
         display_name=user.display_name,
         contribution_count=user.contribution_count,
         session_token=issue_session_token(user.user_id, user.email),
+    )
+
+
+@router.get(
+    "/me",
+    response_model=AuthMeResponse,
+    summary="Identity behind the Bearer session token",
+    description=(
+        "Verifies the `Authorization: Bearer <session_token>` credential "
+        "and returns the current identity from the users table. The UI "
+        "calls this on page load to restore login state from a persisted "
+        "cookie — the token signature + max-age are re-checked server-side "
+        "on every call, so a stale or tampered cookie degrades to 401, "
+        "never a forged identity."
+    ),
+    responses={
+        200: {"description": "Token valid; identity returned."},
+        401: {
+            "description": (
+                "Missing, invalid, or expired token — or the token's user "
+                "row no longer exists."
+            ),
+        },
+    },
+)
+def auth_me(
+    user_id: Annotated[str | None, Depends(get_current_user_id)],
+    user_repo: Annotated[UserRepository, Depends(get_user_repo)],
+) -> AuthMeResponse:
+    # get_current_user_id already 401s on a present-but-invalid token;
+    # None here means no Authorization header at all.
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token.",
+        )
+    user = user_repo.get(user_id)
+    if user is None:
+        # Token outlived the user row (account deleted) — same contract as
+        # an expired token: the client clears its cookie and re-logs-in.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unknown user.",
+        )
+    return AuthMeResponse(
+        user_id=user.user_id,
+        email=user.email,
+        display_name=user.display_name,
+        contribution_count=user.contribution_count,
     )

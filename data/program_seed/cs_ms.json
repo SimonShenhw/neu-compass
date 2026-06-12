@@ -1,0 +1,51 @@
+{
+  "program": {
+    "program_id": "cs-ms",
+    "full_name": "Master of Science in Computer Science",
+    "prefix": "CS",
+    "department": "Khoury College of Computer Sciences",
+    "college": "Khoury College of Computer Sciences",
+    "notes": "Seed — Layer 3 expansion beyond AAI (2026-06). Structure is best-guess from course numbering + public Khoury MSCS layout (5xxx foundations incl. Align bridge / 5800 algorithms core / 6xxx breadth / 7xxx advanced / 7980-8674 project-research exits). User should verify against the official Plan of Study and revise."
+  },
+  "required_courses": [
+    {"course_id": "neu-cs-5001", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Intensive Foundations — Align bridge entry"},
+    {"course_id": "neu-cs-5002", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Discrete Structures — Align bridge math"},
+    {"course_id": "neu-cs-5004", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Object-Oriented Design — Align bridge"},
+    {"course_id": "neu-cs-5008", "requirement_type": "foundation",    "semester_recommended": 2, "notes": "Data Structures + Algorithms in Systems — Align bridge"},
+    {"course_id": "neu-cs-5010", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Programming Design Paradigm — classic MSCS entry"},
+    {"course_id": "neu-cs-5800", "requirement_type": "core",          "semester_recommended": 1, "notes": "Algorithms — the one near-universal MSCS core"},
+
+    {"course_id": "neu-cs-5500", "requirement_type": "core",          "semester_recommended": 2, "notes": "Foundations of Software Engineering — SWE area core"},
+    {"course_id": "neu-cs-5600", "requirement_type": "core",          "semester_recommended": 2, "notes": "Computer Systems — systems area core"},
+    {"course_id": "neu-cs-5200", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Database Management Systems"},
+    {"course_id": "neu-cs-5700", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Fundamentals of Computer Networking"},
+    {"course_id": "neu-cs-5100", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Foundations of AI — AI track entry"},
+
+    {"course_id": "neu-cs-6140", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Machine Learning — AI/ML track"},
+    {"course_id": "neu-cs-6120", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Natural Language Processing"},
+    {"course_id": "neu-cs-6200", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Information Retrieval"},
+    {"course_id": "neu-cs-6220", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Data Mining Techniques"},
+    {"course_id": "neu-cs-6510", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Advanced Software Development"},
+    {"course_id": "neu-cs-6650", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Building Scalable Distributed Systems"},
+    {"course_id": "neu-cs-6620", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Fundamentals of Cloud Computing"},
+
+    {"course_id": "neu-cs-7150", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Deep Learning — advanced AI"},
+    {"course_id": "neu-cs-7140", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Advanced Machine Learning"},
+    {"course_id": "neu-cs-7800", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Advanced Algorithms — theory track"},
+    {"course_id": "neu-cs-8674", "requirement_type": "capstone",      "semester_recommended": 4, "notes": "Master's Project — project exit"},
+    {"course_id": "neu-cs-7980", "requirement_type": "capstone",      "semester_recommended": 4, "notes": "Research Capstone — research exit"}
+  ],
+  "prerequisites": [
+    {"course_id": "neu-cs-5004", "prereq_course_id": "neu-cs-5001", "requirement": "required",    "notes": "OOD builds on intensive foundations (Align sequence)"},
+    {"course_id": "neu-cs-5008", "prereq_course_id": "neu-cs-5004", "requirement": "required",    "notes": "Align bridge sequence order"},
+    {"course_id": "neu-cs-5800", "prereq_course_id": "neu-cs-5002", "requirement": "recommended", "notes": "Algorithms assumes discrete math maturity"},
+    {"course_id": "neu-cs-5100", "prereq_course_id": "neu-cs-5010", "requirement": "recommended", "notes": "AI foundations assumes solid programming"},
+    {"course_id": "neu-cs-6140", "prereq_course_id": "neu-cs-5800", "requirement": "recommended", "notes": "ML assumes algorithmic maturity"},
+    {"course_id": "neu-cs-6120", "prereq_course_id": "neu-cs-6140", "requirement": "recommended", "notes": "NLP assumes ML basics"},
+    {"course_id": "neu-cs-7150", "prereq_course_id": "neu-cs-6140", "requirement": "required",    "notes": "Deep Learning builds on ML"},
+    {"course_id": "neu-cs-7140", "prereq_course_id": "neu-cs-6140", "requirement": "required",    "notes": "Advanced ML builds on ML"},
+    {"course_id": "neu-cs-6650", "prereq_course_id": "neu-cs-5600", "requirement": "recommended", "notes": "Distributed systems assumes systems fundamentals"},
+    {"course_id": "neu-cs-6510", "prereq_course_id": "neu-cs-5500", "requirement": "recommended", "notes": "Advanced SWE follows SWE foundations"},
+    {"course_id": "neu-cs-7800", "prereq_course_id": "neu-cs-5800", "requirement": "required",    "notes": "Advanced algorithms follows algorithms"}
+  ]
+}

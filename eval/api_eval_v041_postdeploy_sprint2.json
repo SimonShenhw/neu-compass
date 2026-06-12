@@ -1,0 +1,1979 @@
+{
+  "summary": {
+    "label": "v041_postdeploy_sprint2",
+    "base_url": "http://simonshen:8000",
+    "test_set_version": "0.4",
+    "k": 5,
+    "recall_at_5": 0.8647,
+    "mrr": 0.9357,
+    "queries_with_expected": 104,
+    "matched_via": {
+      "alias": 31,
+      "hybrid": 75,
+      "rejected": 10
+    },
+    "server_latency_ms": {
+      "p50": 850.5,
+      "p95": 1205.1,
+      "mean": 801.1
+    },
+    "wall_latency_ms": {
+      "p50": 948.3,
+      "p95": 1337.7
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "q001",
+      "query": "CS 5800",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q002",
+      "query": "AAI 6600",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q003",
+      "query": "DS 5220",
+      "expected": [
+        "neu-ds-5220"
+      ],
+      "retrieved": [
+        "neu-ds-5220"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q004",
+      "query": "CS 6140",
+      "expected": [
+        "neu-cs-6140"
+      ],
+      "retrieved": [
+        "neu-cs-6140"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q005",
+      "query": "MATH 7233",
+      "expected": [
+        "neu-math-7233"
+      ],
+      "retrieved": [
+        "neu-math-7233"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q006",
+      "query": "INFO 6105",
+      "expected": [
+        "neu-info-6105"
+      ],
+      "retrieved": [
+        "neu-info-6105"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q007",
+      "query": "Algorithms",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q008",
+      "query": "Machine Learning",
+      "expected": [
+        "neu-aai-6610",
+        "neu-cs-6140",
+        "neu-cs-7140",
+        "neu-cs-7150",
+        "neu-ds-4420",
+        "neu-ds-5220",
+        "neu-ds-5230",
+        "neu-eai-6610",
+        "neu-eece-7397",
+        "neu-info-6105",
+        "neu-math-7243",
+        "neu-math-7339"
+      ],
+      "retrieved": [
+        "neu-math-7243",
+        "neu-math-7339",
+        "neu-eai-6610",
+        "neu-aai-6610",
+        "neu-csye-7470"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q009",
+      "query": "Information Retrieval",
+      "expected": [
+        "neu-cs-4220",
+        "neu-cs-6200",
+        "neu-cs-7290",
+        "neu-cs-7840",
+        "neu-must-4600"
+      ],
+      "retrieved": [
+        "neu-cs-6200",
+        "neu-cs-4220",
+        "neu-da-5020",
+        "neu-cs-7840",
+        "neu-must-4600"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q010",
+      "query": "Probability Theory",
+      "expected": [
+        "neu-aly-6010",
+        "neu-ie-3412",
+        "neu-math-3081",
+        "neu-math-3181",
+        "neu-math-5003",
+        "neu-math-5010",
+        "neu-math-6241",
+        "neu-math-7241",
+        "neu-math-7341"
+      ],
+      "retrieved": [
+        "neu-math-7241",
+        "neu-math-7341",
+        "neu-math-3081",
+        "neu-ie-3412",
+        "neu-math-5010"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q011",
+      "query": "Mobile Application Development",
+      "expected": [
+        "neu-cs-4520",
+        "neu-cs-5520",
+        "neu-ge-4100",
+        "neu-ge-4120",
+        "neu-info-6350",
+        "neu-itc-3100"
+      ],
+      "retrieved": [
+        "neu-cs-5520",
+        "neu-info-6350",
+        "neu-cs-4520",
+        "neu-ge-4100",
+        "neu-itc-3100"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q012",
+      "query": "Web Design",
+      "expected": [
+        "neu-artg-2401",
+        "neu-artg-3352",
+        "neu-dgm-6501",
+        "neu-info-6150",
+        "neu-itc-2400",
+        "neu-itc-5355",
+        "neu-itc-6355",
+        "neu-mism-3460"
+      ],
+      "retrieved": [
+        "neu-dgm-6501",
+        "neu-artg-2401",
+        "neu-mism-3460",
+        "neu-artg-3352",
+        "neu-itc-5355"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q013",
+      "query": "graph algorithms BFS DFS shortest paths",
+      "expected": [
+        "neu-cs-3000",
+        "neu-cs-4810",
+        "neu-cs-5008",
+        "neu-cs-5800",
+        "neu-math-3545",
+        "neu-math-7233"
+      ],
+      "retrieved": [
+        "neu-math-7233",
+        "neu-cs-3000",
+        "neu-eece-7205",
+        "neu-nets-7332",
+        "neu-cs-7332"
+      ],
+      "recall_at_5": 0.4,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q014",
+      "query": "neural network training with backpropagation",
+      "expected": [
+        "neu-cs-6140",
+        "neu-cs-7150",
+        "neu-ds-4440",
+        "neu-ie-7615",
+        "neu-math-7339"
+      ],
+      "retrieved": [
+        "neu-ds-4440",
+        "neu-cs-7150",
+        "neu-ie-7615",
+        "neu-math-7339",
+        "neu-cnet-5052"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q015",
+      "query": "k-means clustering and dimensionality reduction",
+      "expected": [
+        "neu-ds-4400",
+        "neu-ds-5230",
+        "neu-eece-7345",
+        "neu-ie-5640",
+        "neu-rms-6110"
+      ],
+      "retrieved": [
+        "neu-cive-7150",
+        "neu-math-7243",
+        "neu-ds-4400",
+        "neu-phth-6440",
+        "neu-math-7237"
+      ],
+      "recall_at_5": 0.2,
+      "reciprocal_rank": 0.3333
+    },
+    {
+      "query_id": "q016",
+      "query": "convex optimization Lagrangian duality",
+      "expected": [
+        "neu-math-7237",
+        "neu-or-7270"
+      ],
+      "retrieved": [
+        "neu-or-7270",
+        "neu-math-7237",
+        "neu-math-7234",
+        "neu-math-7207",
+        "neu-or-7245"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q017",
+      "query": "Apache Spark distributed data processing",
+      "expected": [
+        "neu-aly-4000",
+        "neu-cs-4730",
+        "neu-cs-6240",
+        "neu-cs-7280",
+        "neu-eece-5645"
+      ],
+      "retrieved": [
+        "neu-eece-5645",
+        "neu-cs-4730",
+        "neu-ds-3500",
+        "neu-ds-4300",
+        "neu-cs-7280"
+      ],
+      "recall_at_5": 0.6,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q018",
+      "query": "VC dimension PAC learning theory",
+      "expected": [
+        "neu-cs-6140",
+        "neu-ds-5220",
+        "neu-math-6243",
+        "neu-math-7243"
+      ],
+      "retrieved": [
+        "neu-info-6105",
+        "neu-math-7243",
+        "neu-cs-6140",
+        "neu-ds-4400",
+        "neu-eece-5644"
+      ],
+      "recall_at_5": 0.5,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q019",
+      "query": "search algorithms heuristic A star",
+      "expected": [
+        "neu-aai-6600",
+        "neu-cs-4100",
+        "neu-cs-5100",
+        "neu-eai-5000",
+        "neu-eai-6000"
+      ],
+      "retrieved": [
+        "neu-or-6500",
+        "neu-eai-5000",
+        "neu-eai-6000",
+        "neu-cs-5100",
+        "neu-cs-4100"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q020",
+      "query": "data mining applications",
+      "expected": [
+        "neu-aly-3040",
+        "neu-aly-6040",
+        "neu-cive-7150",
+        "neu-cs-6220",
+        "neu-ds-5230",
+        "neu-ie-5640",
+        "neu-ie-7275",
+        "neu-mism-3515",
+        "neu-mism-6212",
+        "neu-mism-6412"
+      ],
+      "retrieved": [
+        "neu-ie-7275",
+        "neu-mism-6212",
+        "neu-mism-6412",
+        "neu-aly-3040",
+        "neu-mism-3515"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q021",
+      "query": "Python programming for analytics",
+      "expected": [
+        "neu-aly-2100",
+        "neu-aly-5050",
+        "neu-aly-6050",
+        "neu-aly-6140",
+        "neu-damg-6105",
+        "neu-ds-2500",
+        "neu-fina-4350",
+        "neu-fina-6333",
+        "neu-fina-6433"
+      ],
+      "retrieved": [
+        "neu-fina-6333",
+        "neu-aly-6140",
+        "neu-aly-2100",
+        "neu-fina-4350",
+        "neu-damg-6105"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q022",
+      "query": "parallel programming MPI distributed computing",
+      "expected": [
+        "neu-cs-4730",
+        "neu-cs-7610",
+        "neu-cs-7880",
+        "neu-csye-7105",
+        "neu-csye-7215",
+        "neu-eece-5640",
+        "neu-eece-5645"
+      ],
+      "retrieved": [
+        "neu-csye-7105",
+        "neu-cs-7880",
+        "neu-eece-5645",
+        "neu-cs-7610",
+        "neu-eece-5640"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q023",
+      "query": "data engineering pipelines ETL",
+      "expected": [
+        "neu-aly-6020",
+        "neu-cs-6240",
+        "neu-hsci-5160",
+        "neu-ie-6750",
+        "neu-info-6105"
+      ],
+      "retrieved": [
+        "neu-ie-6750",
+        "neu-hsci-5160",
+        "neu-chme-7350",
+        "neu-ie-7275",
+        "neu-ie-5640"
+      ],
+      "recall_at_5": 0.4,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q024",
+      "query": "introduction to data science fundamentals",
+      "expected": [
+        "neu-cs-2000",
+        "neu-ds-5010",
+        "neu-ds-5110",
+        "neu-eece-5612"
+      ],
+      "retrieved": [
+        "neu-ds-5110",
+        "neu-cs-2000",
+        "neu-ds-5010",
+        "neu-slpa-6420",
+        "neu-cs-5002"
+      ],
+      "recall_at_5": 0.75,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q025",
+      "query": "course covering deep learning project with Python",
+      "expected": [
+        "neu-cs-4180",
+        "neu-cs-7150",
+        "neu-ds-5220"
+      ],
+      "retrieved": [
+        "neu-math-4570",
+        "neu-ds-2500",
+        "neu-ds-3000",
+        "neu-info-5002",
+        "neu-cs-4180"
+      ],
+      "recall_at_5": 0.3333,
+      "reciprocal_rank": 0.2
+    },
+    {
+      "query_id": "q026",
+      "query": "graduate AI seminar with applied focus",
+      "expected": [
+        "neu-aai-6600",
+        "neu-aai-6665",
+        "neu-aai-6680",
+        "neu-aai-6900",
+        "neu-chme-6580",
+        "neu-cs-7180",
+        "neu-eai-6980",
+        "neu-hlth-5800",
+        "neu-inpr-5201",
+        "neu-mism-6250",
+        "neu-phsc-5900"
+      ],
+      "retrieved": [
+        "neu-inpr-5201",
+        "neu-eai-6980",
+        "neu-aai-6900",
+        "neu-aai-6665",
+        "neu-cs-6180"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q027",
+      "query": "course on both clustering and dimensionality reduction techniques",
+      "expected": [
+        "neu-ds-4400",
+        "neu-ds-5230",
+        "neu-ie-5640",
+        "neu-rms-6110"
+      ],
+      "retrieved": [
+        "neu-cive-7150",
+        "neu-math-7243",
+        "neu-eece-7345",
+        "neu-ds-4400",
+        "neu-phth-6440"
+      ],
+      "recall_at_5": 0.25,
+      "reciprocal_rank": 0.25
+    },
+    {
+      "query_id": "q028",
+      "query": "probability and statistics for machine learning practitioners",
+      "expected": [
+        "neu-aai-5015",
+        "neu-aly-6010",
+        "neu-eece-7204",
+        "neu-math-5003",
+        "neu-math-5010"
+      ],
+      "retrieved": [
+        "neu-math-5003",
+        "neu-math-7340",
+        "neu-math-5010",
+        "neu-aai-5015",
+        "neu-math-6241"
+      ],
+      "recall_at_5": 0.6,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q029",
+      "query": "Python and SQL together for data engineering",
+      "expected": [
+        "neu-aly-5030",
+        "neu-aly-6030",
+        "neu-aly-6140"
+      ],
+      "retrieved": [
+        "neu-ie-3425",
+        "neu-itc-2300",
+        "neu-damg-5210",
+        "neu-cs-3200",
+        "neu-aly-6030"
+      ],
+      "recall_at_5": 0.3333,
+      "reciprocal_rank": 0.2
+    },
+    {
+      "query_id": "q030",
+      "query": "applied capstone project for data science master students",
+      "expected": [
+        "neu-aly-6080",
+        "neu-aly-6980",
+        "neu-ds-5500",
+        "neu-eai-6980",
+        "neu-mism-6414"
+      ],
+      "retrieved": [
+        "neu-hsci-6980",
+        "neu-hrm-6980",
+        "neu-ds-5500",
+        "neu-mism-6414",
+        "neu-eai-6980"
+      ],
+      "recall_at_5": 0.6,
+      "reciprocal_rank": 0.3333
+    },
+    {
+      "query_id": "q031",
+      "query": "linear algebra essentials for AI students with no math background",
+      "expected": [
+        "neu-aai-5015",
+        "neu-math-4570"
+      ],
+      "retrieved": [
+        "neu-math-4570",
+        "neu-math-5001",
+        "neu-math-5110",
+        "neu-math-5352",
+        "neu-math-4577"
+      ],
+      "recall_at_5": 0.5,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q032",
+      "query": "supervised learning regression and classification with theory",
+      "expected": [
+        "neu-cs-6140",
+        "neu-cs-7150",
+        "neu-ds-4400",
+        "neu-ds-4420",
+        "neu-ds-5220",
+        "neu-ie-7300",
+        "neu-math-6243",
+        "neu-math-7243",
+        "neu-math-7339"
+      ],
+      "retrieved": [
+        "neu-math-7339",
+        "neu-math-6243",
+        "neu-cs-6140",
+        "neu-ds-4400",
+        "neu-ds-5220"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q033",
+      "query": "5800",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q034",
+      "query": "应用 AI",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q035",
+      "query": "Algo",
+      "expected": [
+        "neu-cs-5800"
+      ],
+      "retrieved": [
+        "neu-cs-5800"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q036",
+      "query": "AAI6600",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q037",
+      "query": "ds 5220",
+      "expected": [
+        "neu-ds-5220"
+      ],
+      "retrieved": [
+        "neu-ds-5220"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q038",
+      "query": "6600",
+      "expected": [
+        "neu-aai-6600"
+      ],
+      "retrieved": [
+        "neu-aai-6600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q039",
+      "query": "AAI 9999",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q040",
+      "query": "CS 0001",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q041",
+      "query": "asdf qwerty zxcvbnm random keyboard mash",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q042",
+      "query": "homework due monday assignment 3 grading rubric",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q043",
+      "query": "NETS 7370",
+      "expected": [
+        "neu-nets-7370"
+      ],
+      "retrieved": [
+        "neu-nets-7370"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q044",
+      "query": "chm2110",
+      "expected": [
+        "neu-chm-2110"
+      ],
+      "retrieved": [
+        "neu-chm-2110"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q045",
+      "query": "PDM6000 这门课怎么样",
+      "expected": [
+        "neu-pdm-6000"
+      ],
+      "retrieved": [
+        "neu-pdm-6000"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q046",
+      "query": "ACC 2200",
+      "expected": [
+        "neu-acc-2200"
+      ],
+      "retrieved": [
+        "neu-acc-2200"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q047",
+      "query": "cnet5051",
+      "expected": [
+        "neu-cnet-5051"
+      ],
+      "retrieved": [
+        "neu-cnet-5051"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q048",
+      "query": "PHMD5140 这门课怎么样",
+      "expected": [
+        "neu-phmd-5140"
+      ],
+      "retrieved": [
+        "neu-phmd-5140"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q049",
+      "query": "GST 6200",
+      "expected": [
+        "neu-gst-6200"
+      ],
+      "retrieved": [
+        "neu-gst-6200"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q050",
+      "query": "kore1101",
+      "expected": [
+        "neu-kore-1101"
+      ],
+      "retrieved": [
+        "neu-kore-1101"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q051",
+      "query": "CS5964 这门课怎么样",
+      "expected": [
+        "neu-cs-5964"
+      ],
+      "retrieved": [
+        "neu-cs-5964"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q052",
+      "query": "MATM 1120",
+      "expected": [
+        "neu-matm-1120"
+      ],
+      "retrieved": [
+        "neu-matm-1120"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q053",
+      "query": "engl4971",
+      "expected": [
+        "neu-engl-4971"
+      ],
+      "retrieved": [
+        "neu-engl-4971"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q054",
+      "query": "MKTG4504 这门课怎么样",
+      "expected": [
+        "neu-mktg-4504"
+      ],
+      "retrieved": [
+        "neu-mktg-4504"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q055",
+      "query": "HRM 6036",
+      "expected": [
+        "neu-hrm-6036"
+      ],
+      "retrieved": [
+        "neu-hrm-6036"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q056",
+      "query": "hsc4850",
+      "expected": [
+        "neu-hsc-4850"
+      ],
+      "retrieved": [
+        "neu-hsc-4850"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q057",
+      "query": "HIST1357 这门课怎么样",
+      "expected": [
+        "neu-hist-1357"
+      ],
+      "retrieved": [
+        "neu-hist-1357"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q058",
+      "query": "JRNL 5360",
+      "expected": [
+        "neu-jrnl-5360"
+      ],
+      "retrieved": [
+        "neu-jrnl-5360"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q059",
+      "query": "port1102",
+      "expected": [
+        "neu-port-1102"
+      ],
+      "retrieved": [
+        "neu-port-1102"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q060",
+      "query": "DGTR4100 这门课怎么样",
+      "expected": [
+        "neu-dgtr-4100"
+      ],
+      "retrieved": [
+        "neu-dgtr-4100"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q061",
+      "query": "Learn business communication, analysis, and client management through practical application",
+      "expected": [
+        "neu-cmn-3850",
+        "neu-int-5964",
+        "neu-mism-2420",
+        "neu-mism-6214",
+        "neu-mktg-3301",
+        "neu-mktg-3401",
+        "neu-mktg-4606",
+        "neu-mktg-6294",
+        "neu-mktg-6606"
+      ],
+      "retrieved": [
+        "neu-mktg-4606",
+        "neu-mism-2420",
+        "neu-fin-2105",
+        "neu-mktg-3401",
+        "neu-mktg-3301"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q062",
+      "query": "Learn to prepare documents for medical instrument regulatory approval agencies.",
+      "expected": [
+        "neu-rga-5001",
+        "neu-rga-5202",
+        "neu-rga-6001",
+        "neu-rga-6202",
+        "neu-rga-6222",
+        "neu-rga-6370"
+      ],
+      "retrieved": [
+        "neu-rga-6370",
+        "neu-rga-6210",
+        "neu-rga-6243",
+        "neu-rga-6380",
+        "neu-rga-5202"
+      ],
+      "recall_at_5": 0.4,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q063",
+      "query": "Understand human-centric strategies for customer engagement and online business promotion.",
+      "expected": [
+        "neu-csye-5280",
+        "neu-inam-5440",
+        "neu-mkt-3010",
+        "neu-mktg-4502",
+        "neu-mktg-6226",
+        "neu-mktg-6232",
+        "neu-mktg-6318",
+        "neu-smt-6020"
+      ],
+      "retrieved": [
+        "neu-mkt-3010",
+        "neu-csye-5280",
+        "neu-mktg-4502",
+        "neu-inam-5440",
+        "neu-mktg-6232"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q064",
+      "query": "Learn industrial bioproduct creation, cell kinetics, and good manufacturing practices",
+      "expected": [
+        "neu-biot-5560",
+        "neu-biot-5630",
+        "neu-btc-4300",
+        "neu-chme-5630",
+        "neu-chme-7602"
+      ],
+      "retrieved": [
+        "neu-btc-4300",
+        "neu-biot-5630",
+        "neu-chme-5630",
+        "neu-biot-5560",
+        "neu-bioe-5510"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q065",
+      "query": "Real-world leadership projects addressing national and global security threats",
+      "expected": [
+        "neu-cy-5250",
+        "neu-hls-6155",
+        "neu-hls-6160",
+        "neu-sia-6980"
+      ],
+      "retrieved": [
+        "neu-sia-6980",
+        "neu-cy-5250",
+        "neu-hls-6160",
+        "neu-pols-5408",
+        "neu-busn-6389"
+      ],
+      "recall_at_5": 0.75,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q066",
+      "query": "Speech language pathology assessment and therapy for human phonation problems.",
+      "expected": [
+        "neu-slpa-6307"
+      ],
+      "retrieved": [
+        "neu-slpa-6307",
+        "neu-slpa-6321",
+        "neu-slpa-6308",
+        "neu-slpa-4219",
+        "neu-slpa-1101"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q067",
+      "query": "Study river processes, environmental issues, and restoration techniques.",
+      "expected": [
+        "neu-envr-3200",
+        "neu-envr-5210",
+        "neu-envr-5700",
+        "neu-envr-6200"
+      ],
+      "retrieved": [
+        "neu-envr-5700",
+        "neu-envr-2900",
+        "neu-envr-5210",
+        "neu-cive-7255",
+        "neu-envr-3200"
+      ],
+      "recall_at_5": 0.75,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q068",
+      "query": "Learn to programmatically manage computer networks and their functions",
+      "expected": [
+        "neu-cet-3100",
+        "neu-tele-6400"
+      ],
+      "retrieved": [
+        "neu-tele-6400",
+        "neu-cs-4700",
+        "neu-cs-5700",
+        "neu-phys-7332",
+        "neu-itc-6030"
+      ],
+      "recall_at_5": 0.5,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q069",
+      "query": "Individualized academic project supervised by faculty members on student's topic",
+      "expected": [
+        "neu-emgt-7945",
+        "neu-ensy-7945",
+        "neu-ge-7945",
+        "neu-ie-7945",
+        "neu-inam-9996",
+        "neu-matl-7945",
+        "neu-me-7945",
+        "neu-or-7945",
+        "neu-pols-9990",
+        "neu-port-5976",
+        "neu-ppua-9990"
+      ],
+      "retrieved": [
+        "neu-ge-7945",
+        "neu-emgt-7945",
+        "neu-me-7945",
+        "neu-matl-7945",
+        "neu-or-7945"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q070",
+      "query": "Connections among global Black communities: migration, identity, and popular culture.",
+      "expected": [
+        "neu-afcs-1113",
+        "neu-afrs-2392"
+      ],
+      "retrieved": [
+        "neu-afrs-2392",
+        "neu-afcs-1113",
+        "neu-intl-2500",
+        "neu-socl-2500",
+        "neu-hist-2318"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q071",
+      "query": "Understand cutting-edge medical solutions for human health through expert discussions",
+      "expected": [
+        "neu-bioe-5770",
+        "neu-nnmd-5272",
+        "neu-nnmd-6272"
+      ],
+      "retrieved": [
+        "neu-hsci-4950",
+        "neu-gst-6710",
+        "neu-ppua-5240",
+        "neu-nnmd-6272",
+        "neu-nnmd-5272"
+      ],
+      "recall_at_5": 0.6667,
+      "reciprocal_rank": 0.25
+    },
+    {
+      "query_id": "q072",
+      "query": "study moral dilemmas and fairness issues in biomedical innovations",
+      "expected": [
+        "neu-biol-2329",
+        "neu-biol-6381",
+        "neu-hlth-2100",
+        "neu-nnmd-5310",
+        "neu-nrsg-2150",
+        "neu-phil-3065",
+        "neu-phl-2130",
+        "neu-phth-6130"
+      ],
+      "retrieved": [
+        "neu-biol-6381",
+        "neu-nrsg-2150",
+        "neu-hlth-2100",
+        "neu-phil-3065",
+        "neu-phl-2140"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q073",
+      "query": "strategies for creating engaging digital communications to promote brands",
+      "expected": [
+        "neu-cmn-3410",
+        "neu-cmn-3800",
+        "neu-cmn-6010",
+        "neu-eeba-6407",
+        "neu-mktg-6223",
+        "neu-pbr-6001",
+        "neu-pbr-6130"
+      ],
+      "retrieved": [
+        "neu-inam-6500",
+        "neu-eeba-6407",
+        "neu-mktg-6223",
+        "neu-cmn-3410",
+        "neu-pbr-6130"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query_id": "q074",
+      "query": "learn how to analyze and control financial risks in institutions",
+      "expected": [
+        "neu-aly-6130",
+        "neu-ced-6220",
+        "neu-fin-6102",
+        "neu-fina-6343",
+        "neu-fina-6435",
+        "neu-math-4683"
+      ],
+      "retrieved": [
+        "neu-fin-6102",
+        "neu-fin-6101",
+        "neu-fina-6435",
+        "neu-aly-6130",
+        "neu-fina-6343"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q075",
+      "query": "Oracle application development using PL/SQL, advanced SQL, and performance tuning",
+      "expected": [
+        "neu-cs-5200",
+        "neu-damg-7275",
+        "neu-dgtr-3199"
+      ],
+      "retrieved": [
+        "neu-damg-7275",
+        "neu-itc-2300",
+        "neu-aly-6030",
+        "neu-aly-5030",
+        "neu-cs-3200"
+      ],
+      "recall_at_5": 0.3333,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q076",
+      "query": "Planning and researching new product solutions following a design process",
+      "expected": [
+        "neu-artg-5540",
+        "neu-dgtr-3000",
+        "neu-ge-5020",
+        "neu-ge-5100",
+        "neu-get-4840",
+        "neu-hlth-2550",
+        "neu-inno-6200",
+        "neu-mkt-2700",
+        "neu-mktg-4510",
+        "neu-mktg-6214"
+      ],
+      "retrieved": [
+        "neu-mkt-2700",
+        "neu-mktg-6214",
+        "neu-dgtr-3000",
+        "neu-mktg-4510",
+        "neu-ge-5020"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q077",
+      "query": "Understanding organic chemical structure from spectroscopic data and NMR techniques",
+      "expected": [
+        "neu-chem-2314",
+        "neu-chem-2317",
+        "neu-chem-2318",
+        "neu-chem-4628",
+        "neu-chem-4629",
+        "neu-chem-5628",
+        "neu-chem-5631"
+      ],
+      "retrieved": [
+        "neu-chem-5631",
+        "neu-chem-2318",
+        "neu-chem-4628",
+        "neu-chem-5628",
+        "neu-chem-4629"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q078",
+      "query": "planning and designing ecological infrastructure within built environments for environmental justice",
+      "expected": [
+        "neu-suen-6120"
+      ],
+      "retrieved": [
+        "neu-suen-6120",
+        "neu-cive-3430",
+        "neu-larc-2340",
+        "neu-arch-3210",
+        "neu-arch-7220"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q079",
+      "query": "Courses focused on implementing distributed databases and large-scale data storage systems with practical projects.",
+      "expected": [
+        "neu-cs-4730",
+        "neu-ds-4300"
+      ],
+      "retrieved": [
+        "neu-ds-4300",
+        "neu-cs-7280",
+        "neu-aly-6030",
+        "neu-aly-5030",
+        "neu-cs-4730"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q080",
+      "query": "Courses examining institutional control of language use and its impact, offering opportunities for individual case studies.",
+      "expected": [
+        "neu-engl-2760",
+        "neu-lang-3600",
+        "neu-ling-3446"
+      ],
+      "retrieved": [
+        "neu-lang-3600",
+        "neu-psyc-4658",
+        "neu-ling-3446",
+        "neu-edut-6112",
+        "neu-edut-6113"
+      ],
+      "recall_at_5": 0.6667,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q081",
+      "query": "Foundational course on statistical modeling with practical end-to-end data analysis applications.",
+      "expected": [
+        "neu-aly-6020",
+        "neu-cs-7200",
+        "neu-dgtr-3310",
+        "neu-econ-5105",
+        "neu-fina-6412",
+        "neu-hlth-5120",
+        "neu-nrsg-3120",
+        "neu-nrsg-5120"
+      ],
+      "retrieved": [
+        "neu-dgtr-3310",
+        "neu-mth-1105",
+        "neu-aly-6020",
+        "neu-nrsg-3120",
+        "neu-cs-7200"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q082",
+      "query": "Introductory course on global criminal organizations and policies to combat their persistence.",
+      "expected": [
+        "neu-cjs-6030",
+        "neu-crim-5201"
+      ],
+      "retrieved": [
+        "neu-cjs-6030",
+        "neu-crim-5201",
+        "neu-crim-3030",
+        "neu-crim-3050",
+        "neu-crim-3600"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q083",
+      "query": "Introductory logic course focused on constructing proofs and evaluating logical arguments.",
+      "expected": [
+        "neu-cs-2800",
+        "neu-math-1365",
+        "neu-math-1465",
+        "neu-phil-1115",
+        "neu-phl-2310"
+      ],
+      "retrieved": [
+        "neu-phl-2310",
+        "neu-math-1465",
+        "neu-phil-1115",
+        "neu-cs-2800",
+        "neu-math-1365"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q084",
+      "query": "Beginner philosophy course exploring morality, free will, and the existence of God.",
+      "expected": [
+        "neu-phil-1101",
+        "neu-phil-1112",
+        "neu-phls-1101"
+      ],
+      "retrieved": [
+        "neu-phil-1101",
+        "neu-phls-1101",
+        "neu-phil-3435",
+        "neu-phil-3360",
+        "neu-psyc-1214"
+      ],
+      "recall_at_5": 0.6667,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q085",
+      "query": "Urban sustainability planning for career opportunities in renewable energy and social justice.",
+      "expected": [
+        "neu-inno-6252",
+        "neu-lpsc-7312",
+        "neu-ppua-5264"
+      ],
+      "retrieved": [
+        "neu-lpsc-7312",
+        "neu-ppua-5264",
+        "neu-ppua-6219",
+        "neu-eece-5670",
+        "neu-socl-4522"
+      ],
+      "recall_at_5": 0.6667,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q086",
+      "query": "Clinical practice skills for working with marginalized populations in global health services",
+      "expected": [
+        "neu-caep-5880",
+        "neu-hsv-2200",
+        "neu-hsv-3200",
+        "neu-msci-5405",
+        "neu-nrsg-6451"
+      ],
+      "retrieved": [
+        "neu-hsv-3200",
+        "neu-husv-2320",
+        "neu-hsv-2200",
+        "neu-nrsg-6451",
+        "neu-afcs-1270"
+      ],
+      "recall_at_5": 0.6,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q087",
+      "query": "Introductory drawing classes exploring mark-making processes for understanding visual communication concepts.",
+      "expected": [
+        "neu-artf-1121",
+        "neu-artf-1210",
+        "neu-arts-5200"
+      ],
+      "retrieved": [
+        "neu-artf-1121",
+        "neu-artf-1210",
+        "neu-arts-5200",
+        "neu-artg-3451",
+        "neu-artg-2242"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q088",
+      "query": "Seeking full-time international work experience to apply my field of study globally.",
+      "expected": [
+        "neu-cop-4946",
+        "neu-cop-6946",
+        "neu-law-7955",
+        "neu-law-7957",
+        "neu-math-6955"
+      ],
+      "retrieved": [
+        "neu-cop-6946",
+        "neu-cop-4946",
+        "neu-law-7955",
+        "neu-hlth-4981",
+        "neu-math-6955"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q089",
+      "query": "Hands-on learning for designing spatial narratives and world building in augmented and virtual realities.",
+      "expected": [
+        "neu-cs-4097",
+        "neu-cs-5097",
+        "neu-dgm-6516",
+        "neu-exre-5030",
+        "neu-exre-7500",
+        "neu-gsnd-6250",
+        "neu-inam-6520"
+      ],
+      "retrieved": [
+        "neu-exre-5030",
+        "neu-exre-7500",
+        "neu-dgm-6516",
+        "neu-gsnd-6250",
+        "neu-inno-6253"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q090",
+      "query": "advanced motor learning mechanisms with clinical applications for physical therapy practice",
+      "expected": [
+        "neu-pth-6140"
+      ],
+      "retrieved": [
+        "neu-pth-6140",
+        "neu-pt-5151",
+        "neu-pt-6600",
+        "neu-bioe-5520",
+        "neu-pth-6130"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q091",
+      "query": "金融财报分析入门选课",
+      "expected": [
+        "neu-acc-4320",
+        "neu-acct-3401",
+        "neu-acct-3402",
+        "neu-acct-5201"
+      ],
+      "retrieved": [
+        "neu-acct-3401",
+        "neu-acc-4320",
+        "neu-acct-3402",
+        "neu-acct-5201",
+        "neu-acct-1201"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q092",
+      "query": "体验式学习设计、应用和领导力提升",
+      "expected": [
+        "neu-edu-6004",
+        "neu-edu-7228",
+        "neu-edu-7229"
+      ],
+      "retrieved": [
+        "neu-edu-7229",
+        "neu-edu-7228",
+        "neu-edu-6410",
+        "neu-edu-6004",
+        "neu-ldr-6101"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q093",
+      "query": "CRM 认知偏差 团队决策 选课",
+      "expected": [
+        "neu-aly-6060",
+        "neu-msci-5002",
+        "neu-nrsg-6243",
+        "neu-smt-6060"
+      ],
+      "retrieved": [
+        "neu-msci-5002",
+        "neu-hrm-6005",
+        "neu-smt-6060",
+        "neu-aly-6060",
+        "neu-nrsg-6243"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q094",
+      "query": "医疗健康决策支持, 区块链, 供应链",
+      "expected": [
+        "neu-hinf-5407",
+        "neu-inno-6401",
+        "neu-nrsg-7130",
+        "neu-schm-3315",
+        "neu-schm-6223"
+      ],
+      "retrieved": [
+        "neu-hinf-5407",
+        "neu-inno-6401",
+        "neu-schm-6223",
+        "neu-nrsg-7130",
+        "neu-schm-6215"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q095",
+      "query": "供应链 analytics 决策技术",
+      "expected": [
+        "neu-ie-7200",
+        "neu-mism-3525",
+        "neu-mism-6206",
+        "neu-mism-6406",
+        "neu-schm-3308",
+        "neu-schm-6215"
+      ],
+      "retrieved": [
+        "neu-schm-3308",
+        "neu-ie-7200",
+        "neu-schm-6215",
+        "neu-mism-6206",
+        "neu-mism-6406"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q096",
+      "query": "System-level design 软硬件协同",
+      "expected": [
+        "neu-eece-2323",
+        "neu-eece-4632",
+        "neu-eece-7368"
+      ],
+      "retrieved": [
+        "neu-eece-7368",
+        "neu-eece-4632",
+        "neu-ds-3500",
+        "neu-cs-5600",
+        "neu-game-3400"
+      ],
+      "recall_at_5": 0.6667,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q097",
+      "query": "EECE 0000",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q098",
+      "query": "BINF 99999 advanced seminar",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q099",
+      "query": "Oxford PPE admissions requirements",
+      "expected": [],
+      "retrieved": [
+        "neu-phil-3000",
+        "neu-phil-4550",
+        "neu-pols-2399",
+        "neu-prel-3627",
+        "neu-pols-4701"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q100",
+      "query": "UCLA CS 188 reinforcement learning",
+      "expected": [],
+      "retrieved": [
+        "neu-cs-5180",
+        "neu-cs-4180",
+        "neu-cs-6140",
+        "neu-cs-7268",
+        "neu-cs-5009"
+      ],
+      "recall_at_5": 0.0,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "query_id": "q101",
+      "query": "library printing quota per semester",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q102",
+      "query": "wpeofij qwelkrj zxocvib",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q103",
+      "query": "registrar office phone number please",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q104",
+      "query": "course that teaches time travel paradox engineering",
+      "expected": [],
+      "retrieved": [],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q105",
+      "query": "有没有关于 audience engagement strategy 的课？",
+      "expected": [
+        "neu-aace-6220",
+        "neu-cmn-6010"
+      ],
+      "retrieved": [
+        "neu-aace-6220",
+        "neu-cmn-6010",
+        "neu-cmn-3410",
+        "neu-edu-6224",
+        "neu-pbr-6710"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q106",
+      "query": "想找个 abroad 建筑实地考察课。",
+      "expected": [
+        "neu-arch-4850",
+        "neu-arte-2500"
+      ],
+      "retrieved": [
+        "neu-arch-4850",
+        "neu-arte-2500",
+        "neu-abrc-5005",
+        "neu-intb-6230",
+        "neu-gst-6109"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q107",
+      "query": "有没有讲 linear algebra 和 differential equations 的课？",
+      "expected": [
+        "neu-bioe-5150",
+        "neu-math-1252",
+        "neu-math-2341",
+        "neu-math-5110",
+        "neu-me-6200",
+        "neu-me-6202"
+      ],
+      "retrieved": [
+        "neu-bioe-5150",
+        "neu-math-2341",
+        "neu-me-6200",
+        "neu-math-5110",
+        "neu-math-1260"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q108",
+      "query": "有没有讲 behavior analysis 的课",
+      "expected": [
+        "neu-caep-2101",
+        "neu-caep-6324",
+        "neu-caep-6329",
+        "neu-caep-6334",
+        "neu-caep-6342",
+        "neu-caep-6344",
+        "neu-caep-8417",
+        "neu-caep-8418",
+        "neu-hlth-1717",
+        "neu-psy-4400"
+      ],
+      "retrieved": [
+        "neu-caep-6344",
+        "neu-psy-4400",
+        "neu-caep-8417",
+        "neu-caep-6334",
+        "neu-caep-6329"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q109",
+      "query": "有没有 Chemical Engineering 的 Journal Club 课",
+      "expected": [
+        "neu-chme-7901"
+      ],
+      "retrieved": [
+        "neu-chme-7901",
+        "neu-phsc-6300",
+        "neu-chme-6390",
+        "neu-chme-7393",
+        "neu-chem-9996"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q110",
+      "query": "探讨 tech 和 society 关系的课",
+      "expected": [
+        "neu-comm-2625",
+        "neu-comm-4605",
+        "neu-comm-6605",
+        "neu-inmi-2700",
+        "neu-phil-1145",
+        "neu-socl-4528"
+      ],
+      "retrieved": [
+        "neu-comm-2625",
+        "neu-socl-4528",
+        "neu-comm-4605",
+        "neu-comm-6605",
+        "neu-phil-1145"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q111",
+      "query": "有没有讲 data visualization theory 的课？",
+      "expected": [
+        "neu-aly-3070",
+        "neu-aly-5070",
+        "neu-aly-6070",
+        "neu-cs-7250",
+        "neu-cs-7295",
+        "neu-ds-4200",
+        "neu-eece-5642",
+        "neu-insh-5302",
+        "neu-pst-7730"
+      ],
+      "retrieved": [
+        "neu-cs-7250",
+        "neu-cs-7295",
+        "neu-eece-5642",
+        "neu-aly-6070",
+        "neu-aly-5070"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q112",
+      "query": "想找讲 urban problems 经济分析的课。",
+      "expected": [
+        "neu-econ-3420"
+      ],
+      "retrieved": [
+        "neu-econ-3420",
+        "neu-pols-2358",
+        "neu-socl-2359",
+        "neu-socl-2358",
+        "neu-ppua-5265"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q113",
+      "query": "想找个能拿 internship credit 的课。",
+      "expected": [
+        "neu-bioc-4994",
+        "neu-biol-4994",
+        "neu-busn-3944",
+        "neu-eeam-2010",
+        "neu-eesh-2994",
+        "neu-musc-4994",
+        "neu-musi-4994",
+        "neu-must-4994",
+        "neu-ppua-6861",
+        "neu-ppua-6862"
+      ],
+      "retrieved": [
+        "neu-eeam-2010",
+        "neu-biol-4994",
+        "neu-ppua-6862",
+        "neu-bioc-4994",
+        "neu-ppua-6861"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q114",
+      "query": "找 early American Lit 的课",
+      "expected": [
+        "neu-engl-1502",
+        "neu-engl-2296"
+      ],
+      "retrieved": [
+        "neu-engl-1700",
+        "neu-pol-1300",
+        "neu-engl-2470",
+        "neu-engl-2296",
+        "neu-engl-1502"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 0.25
+    },
+    {
+      "query_id": "q115",
+      "query": "有没有 Fintech 创新的 overview 课？",
+      "expected": [
+        "neu-busn-6344",
+        "neu-fina-2730",
+        "neu-fina-6237",
+        "neu-fina-6437"
+      ],
+      "retrieved": [
+        "neu-fina-6237",
+        "neu-fina-6437",
+        "neu-fina-2730",
+        "neu-busn-6344",
+        "neu-fina-4605"
+      ],
+      "recall_at_5": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "q116",
+      "query": "有没有讲 Health Informatics 的系统课？",
+      "expected": [
+        "neu-hinf-5101",
+        "neu-hinf-5110",
+        "neu-hinf-6350",
+        "neu-hinf-6355",
+        "neu-mgsc-6221",
+        "neu-nrsg-6306"
+      ],
+      "retrieved": [
+        "neu-hinf-5101",
+        "neu-hinf-6355",
+        "neu-hinf-6215",
+        "neu-hinf-6350",
+        "neu-hinf-5110"
+      ],
+      "recall_at_5": 0.8,
+      "reciprocal_rank": 1.0
+    }
+  ]
+}

@@ -26,7 +26,7 @@ from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from api.dependencies import (
@@ -125,6 +125,7 @@ def chat(
     rescue_fn: Annotated[
         Callable[[str], str | None] | None, Depends(get_hyde_rescue_fn)
     ] = None,
+    x_eval_run: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     """Stream a Gemini-generated answer grounded in the retrieved courses.
 
@@ -238,6 +239,8 @@ def chat(
         k=req.k, latency_ms=round(retrieval_ms, 2),
         result_course_ids=[h.course.course_id for h in hits],
         rejection_reason=rejection_reason,
+        # Same eval-vs-organic split as /search: NULL = organic.
+        user_id=f"eval:{x_eval_run}" if x_eval_run else None,
     )
 
     prompt = build_prompt(req.query, hits)

@@ -77,6 +77,7 @@ def logout(state: SessionState) -> None:
     in them, and the user shouldn't have to retype after logout/login."""
     state["user_id"] = None
     state["user_email"] = None
+    state["user_display_name"] = None
     state["user_contribution_count"] = 0
     state["session_token"] = None
     state["messages"] = []

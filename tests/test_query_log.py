@@ -49,6 +49,48 @@ def test_search_alias_logs_row(api_client: TestClient, empty_db) -> None:
     assert rows[0]["latency_ms"] is not None
 
 
+def test_search_without_header_logs_null_user(
+    api_client: TestClient, empty_db,
+) -> None:
+    """Organic traffic (no X-Eval-Run) must keep user_id NULL — the
+    eval-vs-organic split in query_log mining keys on this."""
+    r = api_client.post("/search", json={"query": "CS 5800", "k": 3})
+    assert r.status_code == 200
+    rows = QueryLogRepository(empty_db).list_recent()
+    assert rows[0]["user_id"] is None
+
+
+def test_search_eval_header_tags_user_id(
+    api_client: TestClient, empty_db,
+) -> None:
+    r = api_client.post(
+        "/search",
+        json={"query": "CS 5800", "k": 3},
+        headers={"X-Eval-Run": "v04_pool10"},
+    )
+    assert r.status_code == 200
+    rows = QueryLogRepository(empty_db).list_recent()
+    assert rows[0]["user_id"] == "eval:v04_pool10"
+
+
+def test_chat_eval_header_tags_user_id(
+    api_client: TestClient, empty_db,
+) -> None:
+    from api.dependencies import get_chat_stream_fn  # noqa: PLC0415
+
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: (
+        lambda prompt: iter(["ok"])
+    )
+    r = api_client.post(
+        "/chat",
+        json={"query": "graph algorithms BFS", "k": 3},
+        headers={"X-Eval-Run": "v04"},
+    )
+    assert r.status_code == 200
+    rows = QueryLogRepository(empty_db).list_recent()
+    assert rows[0]["user_id"] == "eval:v04"
+
+
 def test_search_rejected_logs_reason(api_client: TestClient, empty_db) -> None:
     r = api_client.post("/search", json={"query": "zzz nonexistent topic", "k": 3})
     assert r.status_code == 200

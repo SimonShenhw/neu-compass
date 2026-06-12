@@ -1,0 +1,39 @@
+{
+  "program": {
+    "program_id": "info-ms",
+    "full_name": "Master of Science in Information Systems",
+    "prefix": "INFO",
+    "department": "Multidisciplinary Graduate Engineering",
+    "college": "College of Engineering",
+    "notes": "Seed — Layer 3 expansion beyond AAI (2026-06). Structure is best-guess from course numbering + public MSIS layout (5001/5002/5100 application core / 6205+6105 engineering core / 6xxx-7xxx electives / 7945 project exit). User should verify against the official Plan of Study and revise."
+  },
+  "required_courses": [
+    {"course_id": "neu-info-5002", "requirement_type": "foundation",    "semester_recommended": 1, "notes": "Intro Python for Information Systems"},
+    {"course_id": "neu-info-5001", "requirement_type": "core",          "semester_recommended": 1, "notes": "Application Modeling and Design"},
+    {"course_id": "neu-info-5100", "requirement_type": "core",          "semester_recommended": 1, "notes": "Application Engineering and Development — flagship core"},
+
+    {"course_id": "neu-info-6205", "requirement_type": "core",          "semester_recommended": 2, "notes": "Program Structure and Algorithms"},
+    {"course_id": "neu-info-6105", "requirement_type": "core",          "semester_recommended": 2, "notes": "Data Science Engineering Methods and Tools"},
+    {"course_id": "neu-info-6150", "requirement_type": "elective_pool", "semester_recommended": 2, "notes": "Web Design and User Experience Engineering"},
+
+    {"course_id": "neu-info-6250", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Web Development Tools and Methods"},
+    {"course_id": "neu-info-7245", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Agile Software Development"},
+    {"course_id": "neu-info-7250", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Engineering of Big-Data Systems"},
+    {"course_id": "neu-info-6106", "requirement_type": "elective_pool", "semester_recommended": 3, "notes": "Neural Modeling Methods and Tools"},
+
+    {"course_id": "neu-info-7255", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Advanced Big-Data Applications and Indexing"},
+    {"course_id": "neu-info-7390", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "Advances in Data Sciences and Architecture"},
+    {"course_id": "neu-info-7110", "requirement_type": "elective_pool", "semester_recommended": 4, "notes": "High-Performance Coding for Fintech"},
+    {"course_id": "neu-info-7205", "requirement_type": "capstone",      "semester_recommended": 4, "notes": "Advanced Application Engineering Project"},
+    {"course_id": "neu-info-7945", "requirement_type": "capstone",      "semester_recommended": 4, "notes": "Master's Project — alternative exit"}
+  ],
+  "prerequisites": [
+    {"course_id": "neu-info-5100", "prereq_course_id": "neu-info-5001", "requirement": "concurrent",  "notes": "Modeling/design pairs with application engineering"},
+    {"course_id": "neu-info-6205", "prereq_course_id": "neu-info-5100", "requirement": "recommended", "notes": "Algorithms course assumes application-dev fluency"},
+    {"course_id": "neu-info-6105", "prereq_course_id": "neu-info-5002", "requirement": "recommended", "notes": "DS methods assume Python"},
+    {"course_id": "neu-info-6250", "prereq_course_id": "neu-info-6150", "requirement": "recommended", "notes": "Web dev tools follow web design"},
+    {"course_id": "neu-info-7250", "prereq_course_id": "neu-info-6205", "requirement": "recommended", "notes": "Big-data systems assume algorithms"},
+    {"course_id": "neu-info-7255", "prereq_course_id": "neu-info-7250", "requirement": "required",    "notes": "Advanced big-data follows big-data systems"},
+    {"course_id": "neu-info-7205", "prereq_course_id": "neu-info-5100", "requirement": "required",    "notes": "Project after flagship core"}
+  ]
+}

@@ -149,6 +149,42 @@ class ProgramRepository:
         rows = self._conn.execute(sql, params).fetchall()
         return [ProgramRequiredCourse(**dict(r)) for r in rows]
 
+    def list_programs_for_course(
+        self, course_id: str,
+    ) -> list[tuple[Program, ProgramRequiredCourse]]:
+        """Reverse lookup: every program that lists `course_id` in its
+        curriculum, with the edge annotation (requirement_type / semester).
+        Powers the course-detail panel's "where does this course fit"
+        block. One JOIN, ordered by program_id for stable UI output."""
+        rows = self._conn.execute(
+            """
+            SELECT p.program_id, p.full_name, p.prefix, p.department,
+                   p.college, p.notes,
+                   e.course_id, e.requirement_type, e.semester_recommended,
+                   e.notes AS edge_notes
+            FROM program_required_courses e
+            JOIN programs p ON p.program_id = e.program_id
+            WHERE e.course_id = ?
+            ORDER BY p.program_id
+            """,
+            (course_id,),
+        ).fetchall()
+        out: list[tuple[Program, ProgramRequiredCourse]] = []
+        for r in rows:
+            program = Program(
+                program_id=r["program_id"], full_name=r["full_name"],
+                prefix=r["prefix"], department=r["department"],
+                college=r["college"], notes=r["notes"],
+            )
+            edge = ProgramRequiredCourse(
+                program_id=r["program_id"], course_id=r["course_id"],
+                requirement_type=r["requirement_type"],
+                semester_recommended=r["semester_recommended"],
+                notes=r["edge_notes"],
+            )
+            out.append((program, edge))
+        return out
+
     # === Prerequisites (course -> course edges) ===
 
     def add_prerequisite(self, edge: CoursePrerequisite) -> None:

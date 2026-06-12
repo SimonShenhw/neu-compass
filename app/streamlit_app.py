@@ -120,6 +120,38 @@ Two languages because the audience is bilingual NEU graduate students;
 clicking a chip injects the query string verbatim into the chat pipeline."""
 
 
+def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> None:
+    """Result cards for one evidence list: rank + code + name + relative
+    score bar, with a 查看 button per row. Bar widths normalize against
+    the top score WITHIN this list (relative confidence, not absolute).
+    Shared by chat history and the live response path so the two can't
+    drift apart visually."""
+    from app.state_manager import select_course  # noqa: PLC0415
+    from app.ui_theme import result_card_html  # noqa: PLC0415
+
+    top = max((float(r.get("score", 0.0)) for r in results), default=0.0)
+    for i, ev in enumerate(results):
+        score = float(ev.get("score", 0.0))
+        pct = int(round(100 * score / top)) if top > 0 else 50
+        cols = st.columns([5, 1])
+        cols[0].markdown(
+            result_card_html(
+                rank=i + 1,
+                code=ev["primary_code"],
+                name=ev["primary_name"],
+                score=score,
+                pct=max(pct, 8),  # keep a visible sliver for low scores
+            ),
+            unsafe_allow_html=True,
+        )
+        if cols[1].button(
+            "查看", key=f"{key_prefix}-{ev['course_id']}",
+            use_container_width=True,
+        ):
+            select_course(st.session_state, ev["course_id"])
+            st.rerun()
+
+
 def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
     """Sidebar 'Advanced filters' expander. Returns the active filters dict
     (already in session_state, returned for convenience). No-side-effect read.
@@ -217,9 +249,15 @@ def render() -> None:
     )
     from app.ui_theme import (  # noqa: PLC0415
         course_header_html,
+        empty_detail_html,
+        footer_html,
         guest_banner_html,
         hero_html,
         inject_theme,
+        matched_via_badge,
+        prereq_label_md,
+        program_context_html,
+        sidebar_brand_html,
         topic_pills_html,
     )
 
@@ -234,14 +272,38 @@ def render() -> None:
     # Process ?code= callback BEFORE rendering anything else (it may rerun).
     handle_oauth_callback()
 
+    # Cookie session (refresh-survival): restore first so a failed restore
+    # can queue a cookie clear, then flush — the flush also renders writes
+    # queued by the OAuth callback / logout on the previous pass.
+    from app.cookie_session import (  # noqa: PLC0415
+        flush_pending_cookie,
+        restore_login_from_cookie,
+    )
+
+    restore_login_from_cookie()
+    flush_pending_cookie()
+
+    st.sidebar.markdown(sidebar_brand_html(), unsafe_allow_html=True)
     render_auth_sidebar()
     active_filters = _render_filters_sidebar(st, st.session_state)
+
+    # Corpus size for the hero pill — one /ready call per browser tab,
+    # cached in session_state. Failure (API warming) degrades to the
+    # number-free wording inside hero_html.
+    if "_ready_info" not in st.session_state:
+        try:
+            with ApiClient(timeout=5.0) as api:
+                st.session_state["_ready_info"] = api.ready()
+        except ApiError:
+            st.session_state["_ready_info"] = {}
+    ready_info = st.session_state.get("_ready_info") or {}
 
     logged_in = is_logged_in(st.session_state)
     st.markdown(
         hero_html(
             logged_in=logged_in,
             display_name=st.session_state.get("user_display_name") or "",
+            courses_indexed=ready_info.get("courses_indexed"),
         ),
         unsafe_allow_html=True,
     )
@@ -261,6 +323,7 @@ def render() -> None:
         from app.coop_view import render_coop_panel  # noqa: PLC0415
 
         render_coop_panel(st)
+        st.markdown(footer_html(), unsafe_allow_html=True)
         return
 
     chat_col, detail_col = st.columns([3, 2])
@@ -303,17 +366,15 @@ def render() -> None:
                     with st.expander(
                         f"📎 Evidence ({len(msg['evidence'])} courses)"
                     ):
-                        for ev in msg["evidence"]:
-                            cols = st.columns([3, 1])
-                            cols[0].markdown(
-                                f"**{ev['primary_code']}** — {ev['primary_name']}"
+                        if msg.get("matched_via"):
+                            st.markdown(
+                                matched_via_badge(msg["matched_via"]),
+                                unsafe_allow_html=True,
                             )
-                            if cols[1].button(
-                                "Open",
-                                key=f"open-{msg_idx}-{msg['role']}-{ev['course_id']}",
-                            ):
-                                select_course(st.session_state, ev["course_id"])
-                                st.rerun()
+                        _render_evidence_block(
+                            st, msg["evidence"],
+                            key_prefix=f"open-{msg_idx}-{msg['role']}",
+                        )
 
         # New input → stream assistant response. Two paths: chat_input box
         # OR a pending_query injected by a hero-block sample chip (above).
@@ -361,17 +422,13 @@ def render() -> None:
                         matched_via=matched_via,
                     )
                     with st.expander(f"📎 Evidence ({len(results)} courses)"):
-                        for ev in results:
-                            cols = st.columns([3, 1])
-                            cols[0].markdown(
-                                f"**{ev['primary_code']}** — {ev['primary_name']}"
-                            )
-                            if cols[1].button(
-                                "Open",
-                                key=f"open-live-{ev['course_id']}",
-                            ):
-                                select_course(st.session_state, ev["course_id"])
-                                st.rerun()
+                        st.markdown(
+                            matched_via_badge(matched_via),
+                            unsafe_allow_html=True,
+                        )
+                        _render_evidence_block(
+                            st, results, key_prefix="open-live",
+                        )
 
             add_message(
                 st.session_state,
@@ -384,51 +441,82 @@ def render() -> None:
     with detail_col:
         st.subheader("📘 Course Detail")
         cid = st.session_state.get("selected_course_id")
+        course: dict | None = None
         if not cid:
-            st.info(
-                "Click a course in the chat panel to see full syllabus details "
-                "(grading, AI policy, evidence quotes)."
-            )
-            return
+            st.markdown(empty_detail_html(), unsafe_allow_html=True)
+        else:
+            with ApiClient(
+                session_token=st.session_state.get("session_token")
+            ) as api:
+                try:
+                    course = api.get_course(cid)
+                except ApiError as e:
+                    st.error(f"Could not load course: {e.detail}")
 
-        with ApiClient(
-            session_token=st.session_state.get("session_token")
-        ) as api:
-            try:
-                course = api.get_course(cid)
-            except ApiError as e:
-                st.error(f"Could not load course: {e.detail}")
-                return
-
-        st.markdown(
-            course_header_html(
-                code=course["primary_code"],
-                name=course["primary_name"],
-                term=course.get("term"),
-                credits=course.get("credits"),
-                delivery_mode=course.get("delivery_mode"),
-            ),
-            unsafe_allow_html=True,
-        )
-
-        if course.get("professor"):
-            st.markdown("**Professor:** " + ", ".join(course["professor"]))
-        if course.get("topics_covered"):
-            st.markdown("**Topics:**")
+        if course:
             st.markdown(
-                topic_pills_html(course["topics_covered"]),
+                course_header_html(
+                    code=course["primary_code"],
+                    name=course["primary_name"],
+                    term=course.get("term"),
+                    credits=course.get("credits"),
+                    delivery_mode=course.get("delivery_mode"),
+                ),
                 unsafe_allow_html=True,
             )
-        if course.get("ai_policy"):
-            with st.expander("AI policy"):
-                st.json(course["ai_policy"])
-        if course.get("evidence_snippets"):
-            with st.expander(f"Evidence ({len(course['evidence_snippets'])})"):
-                for ev in course["evidence_snippets"]:
-                    st.markdown(
-                        f"> *{ev['quote']}* — `{ev['source_id']}` "
-                        f"(confidence {ev['confidence']:.2f})"
+
+            if course.get("professor"):
+                st.markdown("**Professor:** " + ", ".join(course["professor"]))
+            if course.get("topics_covered"):
+                st.markdown("**Topics:**")
+                st.markdown(
+                    topic_pills_html(course["topics_covered"]),
+                    unsafe_allow_html=True,
+                )
+
+            # Layer 3 ontology context (UI round 2): where this course sits
+            # in seeded programs + what to take first. Both lists are []
+            # for courses outside any seeded program — sections vanish.
+            if course.get("program_context"):
+                st.markdown("**📋 培养方案定位 · Program fit**")
+                st.markdown(
+                    program_context_html(course["program_context"]),
+                    unsafe_allow_html=True,
+                )
+            if course.get("prerequisites"):
+                st.markdown("**🧱 先修关系 · Prerequisites**")
+                for p in course["prerequisites"]:
+                    cols = st.columns([4, 1])
+                    cols[0].markdown(
+                        prereq_label_md(
+                            code=p.get("primary_code"),
+                            name=p.get("primary_name"),
+                            course_id=p["course_id"],
+                            requirement=p["requirement"],
+                        )
                     )
+                    # Only navigable when the prereq exists in the catalog.
+                    if p.get("primary_code") and cols[1].button(
+                        "查看", key=f"prereq-{p['course_id']}",
+                        use_container_width=True,
+                    ):
+                        select_course(st.session_state, p["course_id"])
+                        st.rerun()
+
+            if course.get("ai_policy"):
+                with st.expander("AI policy"):
+                    st.json(course["ai_policy"])
+            if course.get("evidence_snippets"):
+                with st.expander(
+                    f"Evidence ({len(course['evidence_snippets'])})"
+                ):
+                    for ev in course["evidence_snippets"]:
+                        st.markdown(
+                            f"> *{ev['quote']}* — `{ev['source_id']}` "
+                            f"(confidence {ev['confidence']:.2f})"
+                        )
+
+    st.markdown(footer_html(), unsafe_allow_html=True)
 
 
 # Streamlit entry point: render() at module top when running via streamlit.

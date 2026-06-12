@@ -13,6 +13,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.coop import Industry
+from schemas.course import Course
 
 
 # === /search ===
@@ -50,6 +51,44 @@ class SearchResponse(BaseModel):
     results: list[SearchHitOut]
     latency_ms: float
     rejection_reason: str | None = None
+
+
+# === /course/{id} ===
+
+
+class CourseProgramEdgeOut(BaseModel):
+    """How a course fits into one seeded program (Layer 3 ontology)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    program_id: str
+    program_name: str
+    requirement_type: str
+    semester_recommended: int | None = None
+
+
+class CoursePrereqOut(BaseModel):
+    """A prerequisite edge with the prereq's display fields resolved.
+    code/name are None when the prereq course isn't in the catalog
+    (dangling seed edge) — the UI then shows the raw course_id."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    course_id: str
+    primary_code: str | None = None
+    primary_name: str | None = None
+    requirement: str
+
+
+class CourseDetailOut(Course):
+    """Course (schema v1.1, unchanged fields) + program-ontology context.
+
+    Subclass instead of wrapper so existing /course/{id} consumers keep
+    their flat field access; the two new lists default to empty for
+    courses outside any seeded program."""
+
+    program_context: list[CourseProgramEdgeOut] = Field(default_factory=list)
+    prerequisites: list[CoursePrereqOut] = Field(default_factory=list)
 
 
 # === /chat ===
@@ -147,6 +186,20 @@ class OAuthCallbackResponse(BaseModel):
     session_token: str | None = None
 
 
+class AuthMeResponse(BaseModel):
+    """Identity behind a Bearer session token (GET /auth/me). Lets the UI
+    restore login state from a persisted cookie without re-running OAuth —
+    and re-reads contribution_count from the DB, so it's also the cheap
+    "refresh my profile" call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str
+    email: str
+    display_name: str | None = None
+    contribution_count: int = 0
+
+
 # === /health, /ready ===
 
 
@@ -165,10 +218,14 @@ class ReadyResponse(BaseModel):
 
 
 __all__ = [
+    "AuthMeResponse",
     "ChatRequest",
     "CoopOut",
     "CoopUploadRequest",
     "CoopUploadResponse",
+    "CourseDetailOut",
+    "CoursePrereqOut",
+    "CourseProgramEdgeOut",
     "HealthResponse",
     "OAuthCallbackRequest",
     "OAuthCallbackResponse",

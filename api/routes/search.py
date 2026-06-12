@@ -28,7 +28,7 @@ import time
 from typing import Annotated, Callable
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from api.dependencies import (
     DbConn,
@@ -131,6 +131,7 @@ def search(
         Callable[[str], str | None] | None, Depends(get_hyde_rescue_fn)
     ],
     conn: DbConn,
+    x_eval_run: Annotated[str | None, Header()] = None,
 ) -> SearchResponse:
     # Sync `def` on purpose: FastAPI runs it in the threadpool. The embedder +
     # reranker forward passes here take 100ms (RTX 5090) to seconds (NAS Iris
@@ -138,6 +139,11 @@ def search(
     # request including /health and /ready (whose failures can trigger Docker
     # healthcheck restarts). Model singletons hold their own locks.
     started = time.perf_counter()
+
+    # Eval-harness traffic (scripts/eval_via_api.py) self-identifies via
+    # X-Eval-Run so query_log mining can separate it from organic users:
+    # user_id IS NULL = organic, 'eval:<label>' = our own measurement runs.
+    telemetry_user = f"eval:{x_eval_run}" if x_eval_run else None
 
     # Validate enum-typed filter early (FastAPI Pydantic accepts the str via
     # SearchRequest, but DeliveryMode would 500 if mistyped at the retriever).
@@ -182,6 +188,7 @@ def search(
             conn, route="search", query=req.query, matched_via="alias",
             k=req.k, latency_ms=elapsed_ms,
             result_course_ids=[r.course_id for r in results],
+            user_id=telemetry_user,
         )
         return SearchResponse(
             query=req.query,
@@ -231,7 +238,7 @@ def search(
         )
         log_query(
             conn, route="search", query=req.query, matched_via="empty",
-            k=req.k, latency_ms=elapsed_ms,
+            k=req.k, latency_ms=elapsed_ms, user_id=telemetry_user,
         )
         return SearchResponse(
             query=req.query, k=req.k, matched_via="empty",
@@ -297,6 +304,7 @@ def search(
                     conn, route="search", query=req.query,
                     matched_via="rejected", k=req.k, latency_ms=elapsed_ms,
                     rejection_reason=str(meta["reason"]),
+                    user_id=telemetry_user,
                 )
                 return SearchResponse(
                     query=req.query, k=req.k, matched_via="rejected",
@@ -333,6 +341,7 @@ def search(
         matched_via="hybrid" if results else "empty",
         k=req.k, latency_ms=round(elapsed_ms, 2),
         result_course_ids=[r.course_id for r in results],
+        user_id=telemetry_user,
     )
     return SearchResponse(
         query=req.query,

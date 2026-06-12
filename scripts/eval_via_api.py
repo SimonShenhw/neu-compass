@@ -72,7 +72,13 @@ def cli() -> int:
     wall_latencies: list[float] = []
     matched_via_counts: Counter[str] = Counter()
 
-    with httpx.Client(base_url=base_url, timeout=args.timeout) as client:
+    # X-Eval-Run tags every request in the server's query_log as
+    # 'eval:<label>' so eval traffic never pollutes organic-query mining
+    # (the v0.5 real-distribution work depends on this split staying clean).
+    with httpx.Client(
+        base_url=base_url, timeout=args.timeout,
+        headers={"X-Eval-Run": args.label},
+    ) as client:
         ready = client.get("/ready")
         if ready.status_code != 200:
             print(f"!! {base_url}/ready -> {ready.status_code}; aborting")
