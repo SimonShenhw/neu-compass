@@ -157,8 +157,20 @@ def search(
             ) from e
 
     # 1) Alias path — cheap. If the user typed a code or known slang, resolve
-    #    directly and skip the embedder/BM25 entirely.
-    alias_ids = normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
+    #    directly and skip the embedder/BM25 entirely. Two guards:
+    #    - Explicit request filters (term/credits/mode/professor) bypass the
+    #      alias shortcut entirely: the alias tier can't apply them, and
+    #      returning an unfiltered hit would silently contradict the request.
+    #      The hybrid path enforces filters at the SQLite layer.
+    #    - All-dangling alias resolution falls THROUGH to hybrid instead of
+    #      returning matched_via="alias" with empty results (/chat already
+    #      behaved this way; the routes had diverged).
+    hard_filters = build_hard_filters(req)
+    alias_ids = (
+        []
+        if hard_filters
+        else normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
+    )
     if alias_ids:
         results: list[SearchHitOut] = []
         for cid in alias_ids[: req.k]:
@@ -177,30 +189,30 @@ def search(
                     matched_via="alias",
                 )
             )
-        elapsed_ms = _elapsed_ms(started)
-        log.info(
-            "search.alias_hit",
-            query=req.query,
-            count=len(results),
-            duration_ms=elapsed_ms,
-        )
-        log_query(
-            conn, route="search", query=req.query, matched_via="alias",
-            k=req.k, latency_ms=elapsed_ms,
-            result_course_ids=[r.course_id for r in results],
-            user_id=telemetry_user,
-        )
-        return SearchResponse(
-            query=req.query,
-            k=req.k,
-            matched_via="alias",
-            results=results,
-            latency_ms=elapsed_ms,
-        )
+        if results:
+            elapsed_ms = _elapsed_ms(started)
+            log.info(
+                "search.alias_hit",
+                query=req.query,
+                count=len(results),
+                duration_ms=elapsed_ms,
+            )
+            log_query(
+                conn, route="search", query=req.query, matched_via="alias",
+                k=req.k, latency_ms=elapsed_ms,
+                result_course_ids=[r.course_id for r in results],
+                user_id=telemetry_user,
+            )
+            return SearchResponse(
+                query=req.query,
+                k=req.k,
+                matched_via="alias",
+                results=results,
+                latency_ms=elapsed_ms,
+            )
 
     # 2) Hybrid path — embedder + BM25 + RRF over a wider candidate pool
     #    so rerank has room to reorder.
-    hard_filters = build_hard_filters(req)
 
     # Layer 2 (PLAN v3.0+): if the query mentions a program / major prefix,
     # narrow the candidate pool at SQLite WHERE so vector + BM25 don't pull
@@ -247,6 +259,7 @@ def search(
 
     # 3) Rerank + Z-score blend + reject (PLAN v2.2 §3.4 + §3.5).
     #    If reranker isn't loaded, fall back to bare hybrid (degraded mode).
+    was_rescued = False
     if reranker is None:
         final_hits = hybrid_hits[: req.k]
         rejection_reason: str | None = None
@@ -314,6 +327,7 @@ def search(
             log.info("search.hyde_rescued", query=req.query, count=len(rescued))
             final_hits = rescued
             rejection_reason = None
+            was_rescued = True
         else:
             final_hits = blended_hits
             rejection_reason = None
@@ -336,9 +350,16 @@ def search(
         rerank_applied=reranker is not None,
         duration_ms=round(elapsed_ms, 2),
     )
+    # Telemetry distinguishes hyde_rescued from organic hybrid (the API
+    # response keeps "hybrid" — clients don't care HOW retrieval succeeded,
+    # but ADR-0019 rescue-rate measurement mines query_log for it).
+    if was_rescued:
+        telemetry_via = "hyde_rescued"
+    else:
+        telemetry_via = "hybrid" if results else "empty"
     log_query(
         conn, route="search", query=req.query,
-        matched_via="hybrid" if results else "empty",
+        matched_via=telemetry_via,
         k=req.k, latency_ms=round(elapsed_ms, 2),
         result_course_ids=[r.course_id for r in results],
         user_id=telemetry_user,

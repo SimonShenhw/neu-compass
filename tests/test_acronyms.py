@@ -133,3 +133,30 @@ def test_bm25_from_db_tolerates_missing_expansion_column() -> None:
     corpus = BM25Corpus.from_db(conn)
     assert corpus.count == 1
     assert [c for c, _ in corpus.search("graph", k=3)] == ["c-1"]
+
+
+# === 2026-06 review sweep: glossary value-type validation ===
+
+
+def test_load_glossary_drops_non_string_senses(tmp_path) -> None:
+    """A structurally-valid JSON with non-string senses must be filtered
+    out at load — previously it passed load and crashed expand_query's
+    sense.lower() on every non-alias request."""
+    import json as _json
+
+    from rag.acronyms import load_glossary
+
+    p = tmp_path / "glossary.json"
+    p.write_text(_json.dumps({
+        "GOOD": ["customer relationship management"],
+        "BAD_NESTED": [["a", "b"]],
+        "BAD_NUM": [42],
+        "MIXED": ["ok sense", 7],
+    }), encoding="utf-8")
+    load_glossary.cache_clear()
+    g = load_glossary(str(p))
+    load_glossary.cache_clear()
+    assert "GOOD" in g
+    assert "BAD_NESTED" not in g
+    assert "BAD_NUM" not in g
+    assert "MIXED" not in g

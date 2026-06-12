@@ -210,63 +210,96 @@ def test_post_coop_interview_only_sets_detail_tier(
     assert r.json()["visibility_level"] == 1
 
 
-# === GET /coop — visibility tier filtering ===
+# === GET /coop — give-to-get FIELD-level redaction ===
+#
+# Contract change (2026-06 review sweep): every row is listed for every
+# caller; tier-gated FIELDS are redacted server-side instead of hiding
+# whole rows. Row-level filtering starved the marketplace — all seed rows
+# carry salary (level 2), so anonymous/fresh users saw an EMPTY list and
+# the give-to-get loop could never bootstrap.
 
 
-def test_get_coop_anonymous_sees_only_level_0(
-    api_client_unseeded: TestClient, empty_db: sqlite3.Connection
-) -> None:
-    repo = CoopRepository(empty_db)
+def _seed_tiered_rows(conn: sqlite3.Connection) -> None:
+    """c0=preview, c1=detail (interview), c2=premium (salary+interview)."""
+    repo = CoopRepository(conn)
     repo.add(CoopExperience(
         coop_id="c0", company="Fidelity", role="Q", visibility_level=0,
         is_seed_data=True,
     ))
     repo.add(CoopExperience(
         coop_id="c1", company="Fidelity", role="Q", visibility_level=1,
+        interview_summary="3 rounds, leetcode medium",
         is_seed_data=True,
     ))
     repo.add(CoopExperience(
         coop_id="c2", company="Fidelity", role="Q", visibility_level=2,
+        interview_summary="2 rounds", salary_range_usd="$40-45/hr",
         is_seed_data=True,
     ))
-    empty_db.commit()
+    conn.commit()
+
+
+def test_get_coop_anonymous_sees_all_rows_fields_redacted(
+    api_client_unseeded: TestClient, empty_db: sqlite3.Connection
+) -> None:
+    _seed_tiered_rows(empty_db)
 
     r = api_client_unseeded.get("/coop")
     assert r.status_code == 200
-    rows = r.json()
-    assert {row["coop_id"] for row in rows} == {"c0"}
+    rows = {row["coop_id"]: row for row in r.json()}
+    # Every row visible — that's the bootstrap fix
+    assert set(rows) == {"c0", "c1", "c2"}
+    # ...but tier-gated fields are stripped server-side
+    assert rows["c1"]["interview_summary"] is None
+    assert rows["c2"]["interview_summary"] is None
+    assert rows["c2"]["salary_range_usd"] is None
+    # visibility_level still reports the row's intrinsic tier (drives the
+    # UI's "contribute to unlock" hints)
+    assert rows["c2"]["visibility_level"] == 2
+    # level-0 fields always present
+    assert rows["c2"]["company"] == "Fidelity"
 
 
-def test_get_coop_with_high_contributor_sees_all(
+def test_get_coop_high_contributor_sees_all_fields(
     api_client_unseeded: TestClient, empty_db: sqlite3.Connection
 ) -> None:
     _seed_user(empty_db, "u-high", contribution_count=2)
-    repo = CoopRepository(empty_db)
-    for cid, level in [("c0", 0), ("c1", 1), ("c2", 2)]:
-        repo.add(CoopExperience(
-            coop_id=cid, company="Fidelity", role="Q",
-            visibility_level=level, is_seed_data=True,
-        ))
-    empty_db.commit()
+    _seed_tiered_rows(empty_db)
 
     r = api_client_unseeded.get("/coop", headers=_auth("u-high"))
     assert r.status_code == 200
-    rows = r.json()
-    assert {row["coop_id"] for row in rows} == {"c0", "c1", "c2"}
+    rows = {row["coop_id"]: row for row in r.json()}
+    assert set(rows) == {"c0", "c1", "c2"}
+    assert rows["c1"]["interview_summary"] == "3 rounds, leetcode medium"
+    assert rows["c2"]["salary_range_usd"] == "$40-45/hr"
 
 
-def test_get_coop_mid_contributor_sees_levels_0_and_1(
+def test_get_coop_mid_contributor_gets_detail_not_salary(
     api_client_unseeded: TestClient, empty_db: sqlite3.Connection
 ) -> None:
     _seed_user(empty_db, "u-mid", contribution_count=1)
-    repo = CoopRepository(empty_db)
-    for cid, level in [("c0", 0), ("c1", 1), ("c2", 2)]:
-        repo.add(CoopExperience(
-            coop_id=cid, company="Fidelity", role="Q",
-            visibility_level=level, is_seed_data=True,
-        ))
-    empty_db.commit()
+    _seed_tiered_rows(empty_db)
 
     r = api_client_unseeded.get("/coop", headers=_auth("u-mid"))
     assert r.status_code == 200
-    assert {row["coop_id"] for row in r.json()} == {"c0", "c1"}
+    rows = {row["coop_id"]: row for row in r.json()}
+    assert set(rows) == {"c0", "c1", "c2"}
+    # tier 1 unlocks interview fields...
+    assert rows["c1"]["interview_summary"] == "3 rounds, leetcode medium"
+    assert rows["c2"]["interview_summary"] == "2 rounds"
+    # ...but NOT salary
+    assert rows["c2"]["salary_range_usd"] is None
+
+
+def test_post_coop_valid_token_deleted_user_401(
+    api_client_unseeded: TestClient, empty_db: sqlite3.Connection
+) -> None:
+    """A signed token can outlive its user row — must 401 like /auth/me,
+    not 500 on the contributor FK."""
+    r = api_client_unseeded.post(
+        "/coop",
+        json={"company": "X Corp", "role": "Dev"},
+        headers=_auth("u-ghost-deleted"),
+    )
+    assert r.status_code == 401
+    assert "unknown user" in r.json()["detail"].lower()

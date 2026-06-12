@@ -396,8 +396,10 @@ def render() -> None:
             # Propagate sidebar filters to the chat request — this is what
             # surfaces the backend's term / credits / delivery_mode / professor
             # filtering capability that was previously inaccessible from UI.
+            # NB: 0 is a VALID credits value (0-credit seminars/co-ops exist);
+            # only None/"" mean "filter not set".
             for fk, fv in (active_filters or {}).items():
-                if fv not in (None, "", 0):
+                if fv is not None and fv != "":
                     chat_body[fk] = fv
             with st.chat_message("assistant"):
                 final_text = ""
@@ -437,6 +439,13 @@ def render() -> None:
                 evidence=_format_evidence(results),
                 matched_via=matched_via,
             )
+            # Rerun immediately so the message renders via the HISTORY path.
+            # The live evidence block above only exists inside `if prompt:`;
+            # on the rerun a 查看 click triggers, prompt is None, so those
+            # `open-live-*` widgets are never re-instantiated and Streamlit
+            # silently DROPS the click — the buttons were dead. History keys
+            # are stable across reruns, so clicks work there.
+            st.rerun()
 
     with detail_col:
         st.subheader("📘 Course Detail")
@@ -519,7 +528,10 @@ def render() -> None:
     st.markdown(footer_html(), unsafe_allow_html=True)
 
 
-# Streamlit entry point: render() at module top when running via streamlit.
-# Guarded so `import app.streamlit_app` (in tests) doesn't trigger Streamlit.
-if __name__ == "__main__" or "streamlit" in sys.argv[0].lower():
+# Streamlit entry point: render() at module top when running via streamlit
+# (which sets the main script's __name__ to "__main__"). Plain __main__
+# guard so importing this module (tests, other pages) never renders — the
+# old `"streamlit" in sys.argv[0]` clause made ANY import under a running
+# streamlit process execute render() at import time (see coop_view bug).
+if __name__ == "__main__":
     render()

@@ -106,29 +106,34 @@ def attempt_hyde_rescue(
         log.info("rescue.code_pattern_guard", query=query[:80])
         return None
 
+    # ONE try over the whole rescue (LLM + retry retrieval + rerank): the
+    # caller already has a valid rejected response in hand — a transient
+    # inference/DB error during this OPTIONAL second chance must degrade to
+    # None, never 500 the request. (Previously only the LLM call was
+    # guarded, contradicting this function's documented contract.)
     try:
         expansion = rescue_fn(query)
+        if expansion is None:
+            log.info("rescue.declined", query=query[:80])
+            return None
+
+        combined = f"{query}\n\n{expansion}"
+        hits = hybrid.search(combined, hard_filters=hard_filters, k=pool_size)
+        if not hits:
+            log.info("rescue.empty_retrieval", query=query[:80])
+            return None
+
+        texts = fetch_texts(conn, [h.course.course_id for h in hits])
+        blended, _ = rerank_blend_with_rejection(
+            query, hits, reranker,
+            fetch_text=texts.get,
+            blend_alpha=blend_alpha,
+            reject_threshold=0.0,  # LLM verdict already vouched answerability
+            top_k=top_k,
+        )
     except Exception as e:  # noqa: BLE001 — rescue must never 500 a request
-        log.warning("rescue.llm_failed", error=str(e))
+        log.warning("rescue.failed", error=str(e)[:200])
         return None
-    if expansion is None:
-        log.info("rescue.declined", query=query[:80])
-        return None
-
-    combined = f"{query}\n\n{expansion}"
-    hits = hybrid.search(combined, hard_filters=hard_filters, k=pool_size)
-    if not hits:
-        log.info("rescue.empty_retrieval", query=query[:80])
-        return None
-
-    texts = fetch_texts(conn, [h.course.course_id for h in hits])
-    blended, _ = rerank_blend_with_rejection(
-        query, hits, reranker,
-        fetch_text=texts.get,
-        blend_alpha=blend_alpha,
-        reject_threshold=0.0,  # LLM verdict already vouched answerability
-        top_k=top_k,
-    )
     if not blended:
         return None
     log.info("rescue.accepted", query=query[:80], count=len(blended))

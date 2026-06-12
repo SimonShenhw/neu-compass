@@ -14,9 +14,15 @@ PII red lines (PLAN §3.4 / §6.3 / ADR §3.4):
     Google OAuth round-trip — the old trusted X-User-Id header let anyone
     on the network read salary-tier data or impersonate contributors.
 
-GET /coop returns rows visible to the user per CoopRepository
-.list_visible_to_user (PLAN §6.4 give-to-get gate). Anonymous request
-sees only level-0 rows (default contribution_count=0).
+GET /coop applies the give-to-get gate at FIELD level (PLAN §6.4 tier
+model): every row is listed for everyone, but interview/technical fields
+are stripped below tier 1 and salary below tier 2 (tier = the caller's
+contribution_count, clamped to 2). Row-level filtering — the original
+implementation — starved the marketplace: all seed rows carry salary
+(level 2), so anonymous and fresh users saw an EMPTY list and the
+give-to-get loop could never bootstrap. visibility_level still reports
+the row's intrinsic tier so the UI can render "contribute to unlock"
+hints for stripped fields.
 """
 
 from __future__ import annotations
@@ -108,6 +114,14 @@ def upload_coop(
             detail="Authentication required: log in and send "
                    "Authorization: Bearer <session_token> (ADR-0021)",
         )
+    # A signed token can outlive its user row (7-day max_age vs. account
+    # deletion); without this check the contributor_user_id FK fails as a
+    # 500. Same 401 contract as /auth/me — the client clears its session.
+    if user_repo.get(x_user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unknown user. Log in again.",
+        )
 
     coop_id = f"coop-{uuid.uuid4().hex[:12]}"
     visibility_level = _derive_visibility(req)
@@ -175,29 +189,33 @@ def upload_coop(
 @router.get(
     "",
     response_model=list[CoopOut],
-    summary="List Co-op records visible to user (give-to-get)",
+    summary="List Co-op records (give-to-get, field-level redaction)",
     description=(
-        "Returns rows visible to the caller per the give-to-get gate "
+        "Returns ALL rows with tier-gated FIELDS redacted server-side "
         "(PLAN §6.4):\n\n"
-        "- Anonymous (no token) → only `visibility_level=0` (preview) "
-        "rows.\n"
-        "- Authenticated → calls `CoopRepository.list_visible_to_user`, "
-        "which exposes higher-tier rows in proportion to the user's own "
-        "`contribution_count`.\n\n"
+        "- tier 0 (anonymous / no contributions): company, role, term, "
+        "industry, duration visible; interview/technical/salary `null`.\n"
+        "- tier 1 (contribution_count ≥ 1): + `interview_summary`, "
+        "`technical_questions`.\n"
+        "- tier 2 (contribution_count ≥ 2): + `salary_range_usd`.\n\n"
+        "`visibility_level` reports the row's intrinsic tier (from content "
+        "presence), so clients can render 'contribute to unlock' hints for "
+        "redacted fields.\n\n"
         "Each row is sanitized: `contributor_user_id` and `redaction_audit` "
         "are server-internal and NOT returned."
     ),
-    responses={200: {"description": "List of visible Co-op records."}},
+    responses={200: {"description": "List of Co-op records (redacted per tier)."}},
 )
 def list_coop(
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
+    user_repo: Annotated[UserRepository, Depends(get_user_repo)],
     x_user_id: Annotated[str | None, Depends(get_current_user_id)] = None,
 ) -> list[CoopOut]:
+    tier = 0
     if x_user_id:
-        rows = coop_repo.list_visible_to_user(x_user_id)
-    else:
-        # Equivalent to contribution_count=0 (only level-0 visible).
-        rows = [c for c in coop_repo.list_all() if c.visibility_level == 0]
+        user = user_repo.get(x_user_id)
+        if user is not None:
+            tier = min(user.contribution_count, 2)
 
     return [
         CoopOut(
@@ -208,10 +226,13 @@ def list_coop(
             coop_term=c.coop_term,
             duration_months=c.duration_months,
             related_courses=c.related_courses,
-            interview_summary=c.interview_summary,
-            technical_questions=c.technical_questions,
-            salary_range_usd=c.salary_range_usd,
+            # Field-level give-to-get gate — redaction happens HERE,
+            # server-side; clients never receive what their tier hasn't
+            # earned.
+            interview_summary=c.interview_summary if tier >= 1 else None,
+            technical_questions=c.technical_questions if tier >= 1 else None,
+            salary_range_usd=c.salary_range_usd if tier >= 2 else None,
             visibility_level=c.visibility_level,
         )
-        for c in rows
+        for c in coop_repo.list_all()
     ]

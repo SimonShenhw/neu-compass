@@ -174,6 +174,7 @@ def chat(
     # threshold (sigmoid 0.044, observed 2026-05-09) and the user gets a
     # frustrating "no match" reply when AAI 6740 is exactly the answer.
     rejection_reason: str | None = None
+    was_rescued = False
     if matched_via == "hybrid" and reranker is not None and hits:
         # One batched SELECT for all candidate texts (was ≤20 per-row queries).
         texts = fetch_texts(conn, [h.course.course_id for h in hits])
@@ -219,6 +220,7 @@ def chat(
             if rescued is not None:
                 log.info("chat.hyde_rescued", query=req.query, count=len(rescued))
                 hits = rescued
+                was_rescued = True
             else:
                 hits = []
                 matched_via = "rejected"
@@ -235,7 +237,10 @@ def chat(
         retrieval_ms=round(retrieval_ms, 2),
     )
     log_query(
-        conn, route="chat", query=req.query, matched_via=matched_via,
+        conn, route="chat", query=req.query,
+        # Telemetry-only distinction (response keeps "hybrid"): ADR-0019
+        # rescue-rate measurement mines query_log for hyde_rescued rows.
+        matched_via="hyde_rescued" if was_rescued else matched_via,
         k=req.k, latency_ms=round(retrieval_ms, 2),
         result_course_ids=[h.course.course_id for h in hits],
         rejection_reason=rejection_reason,
@@ -320,8 +325,14 @@ def _retrieve(
     When a reranker is available the hybrid leg requests a wider pool
     (RERANK_POOL_SIZE=20) so the reranker has room to reorder.
     """
-    # Tier 1: alias
-    alias_ids = normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
+    # Tier 1: alias — skipped when explicit request filters are present:
+    # the alias tier can't apply term/credits/mode/professor, so returning
+    # an unfiltered hit would contradict the request. Mirrors /search.
+    alias_ids = (
+        []
+        if build_hard_filters(req)
+        else normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
+    )
     if alias_ids:
         out: list[SearchHit] = []
         for cid in alias_ids[: req.k]:

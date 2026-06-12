@@ -30,7 +30,17 @@ def handle_oauth_callback() -> None:
     )
     from app.state_manager import login  # noqa: PLC0415
 
+    # Google's deny path redirects back with ?error=access_denied (no code).
+    # Without this branch the params silently stuck around and the page
+    # just looked logged-out with zero explanation.
+    oauth_error = st.query_params.get("error")
     code = st.query_params.get("code")
+    if oauth_error and not code:
+        st.warning(
+            f"登录未完成（{oauth_error}）。可从左侧栏重新发起登录。"
+        )
+        st.query_params.clear()
+        return
     if not code:
         return
 
@@ -113,10 +123,24 @@ def render_auth_sidebar() -> None:
 
             import streamlit.components.v1 as components  # noqa: PLC0415
 
-            from app.cookie_session import oauth_state_cookie_js  # noqa: PLC0415
+            from app.cookie_session import (  # noqa: PLC0415
+                OAUTH_STATE_COOKIE,
+                oauth_state_cookie_js,
+            )
 
             if not st.session_state.get("oauth_state"):
-                st.session_state["oauth_state"] = secrets.token_urlsafe(24)
+                # ADOPT an existing state cookie before minting a new one:
+                # the cookie is shared browser-wide, so two logged-out tabs
+                # each minting their own value would clobber each other —
+                # whichever tab the user logs in from then fails the CSRF
+                # check with the other tab's state.
+                try:
+                    existing = st.context.cookies.get(OAUTH_STATE_COOKIE)
+                except Exception:
+                    existing = None
+                st.session_state["oauth_state"] = (
+                    existing or secrets.token_urlsafe(24)
+                )
             state_token = st.session_state["oauth_state"]
             components.html(oauth_state_cookie_js(state_token), height=0)
 

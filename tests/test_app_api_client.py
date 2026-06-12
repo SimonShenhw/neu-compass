@@ -253,3 +253,47 @@ def test_chat_stream_raises_on_pre_stream_error() -> None:
             list(api.chat_stream({"query": ""}))
     assert ei.value.status_code == 422
     assert "Invalid query" in ei.value.detail
+
+
+# === 2026-06 review sweep: transport-error wrapping ===
+
+
+def test_connect_error_wrapped_as_api_error_503() -> None:
+    """API container down/restarting must surface as ApiError (every UI
+    call site catches ApiError only), not a raw httpx.ConnectError that
+    crashes the whole Streamlit page."""
+    import httpx
+    import pytest
+
+    from app.api_client import ApiClient, ApiError
+
+    def _boom(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    api = ApiClient(transport=httpx.MockTransport(_boom))
+    with pytest.raises(ApiError) as exc_info:
+        api.health()
+    assert exc_info.value.status_code == 503
+
+    with pytest.raises(ApiError) as exc_info:
+        api.search("ml")
+    assert exc_info.value.status_code == 503
+    api.close()
+
+
+def test_chat_stream_transport_error_degrades_to_error_event() -> None:
+    """Mid-stream transport failure yields an in-stream error event (same
+    shape as server-side failures) instead of raising out of the generator."""
+    import httpx
+
+    from app.api_client import ApiClient
+
+    def _boom(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadError("connection lost", request=request)
+
+    api = ApiClient(transport=httpx.MockTransport(_boom))
+    events = list(api.chat_stream({"query": "ml", "k": 3}))
+    assert len(events) == 1
+    assert events[0]["type"] == "error"
+    assert "lost" in events[0]["detail"].lower() or "ReadError" in events[0]["detail"]
+    api.close()

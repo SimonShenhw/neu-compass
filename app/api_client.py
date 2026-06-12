@@ -147,19 +147,31 @@ class ApiClient:
         starts. Errors mid-stream surface as in-stream `error` events,
         not exceptions — so the caller still gets the partial output.
         """
-        with self._client.stream("POST", "/chat", json=body) as resp:
-            if resp.status_code >= 400:
-                resp.read()
-                self._unwrap(resp)  # raises ApiError
-            for raw_line in resp.iter_lines():
-                line = raw_line.strip() if isinstance(raw_line, str) else raw_line
-                if not line:
-                    continue
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    # Malformed line — skip rather than break the whole stream.
-                    continue
+        try:
+            with self._client.stream("POST", "/chat", json=body) as resp:
+                if resp.status_code >= 400:
+                    resp.read()
+                    self._unwrap(resp)  # raises ApiError
+                for raw_line in resp.iter_lines():
+                    line = (
+                        raw_line.strip() if isinstance(raw_line, str) else raw_line
+                    )
+                    if not line:
+                        continue
+                    try:
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        # Malformed line — skip rather than break the stream.
+                        continue
+        except httpx.HTTPError as e:
+            # Mid-stream transport failure (read timeout between chunks,
+            # API container restart). Degrade to an in-stream error event —
+            # same shape as server-side failures — so the page keeps the
+            # partial output instead of crashing on a raw httpx exception.
+            yield {
+                "type": "error",
+                "detail": f"Connection to API lost mid-stream: {type(e).__name__}",
+            }
 
     # === Internal ===
 
@@ -168,12 +180,20 @@ class ApiClient:
             return self._unwrap(self._client.get(path))
         except httpx.TimeoutException as e:
             raise ApiError(504, f"API timed out: {type(e).__name__}") from e
+        except httpx.HTTPError as e:
+            # ConnectError (API container down/restarting), ReadError /
+            # RemoteProtocolError (died mid-response), ... — without this
+            # wrap they propagate raw and crash the whole Streamlit page,
+            # since every UI call site catches ApiError only.
+            raise ApiError(503, f"API unreachable: {type(e).__name__}") from e
 
     def _post(self, path: str, body: dict[str, Any]) -> Any:
         try:
             return self._unwrap(self._client.post(path, json=body))
         except httpx.TimeoutException as e:
             raise ApiError(504, f"API timed out: {type(e).__name__}") from e
+        except httpx.HTTPError as e:
+            raise ApiError(503, f"API unreachable: {type(e).__name__}") from e
 
     @staticmethod
     def _unwrap(r: httpx.Response) -> Any:

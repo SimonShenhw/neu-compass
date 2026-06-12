@@ -112,11 +112,8 @@ def render(results_dir: Path = DEFAULT_RESULTS_DIR) -> None:
             st.info("(pandas not available; skipping trend chart)")
 
 
-# Streamlit entry point: call render() at module top when running via streamlit.
-# Guarded so `import app.eval_dashboard` (in tests) doesn't trigger Streamlit.
-if __name__ == "__main__" or "streamlit" in sys.argv[0].lower():
-    try:
-        render()
-    except Exception as e:
-        # Streamlit's traceback formatting handles this gracefully
-        raise
+# __main__ only (streamlit sets the main script's __name__): the old
+# sys.argv clause executed render() whenever this module was merely
+# IMPORTED under a running streamlit process — see coop_view double-render.
+if __name__ == "__main__":
+    render()

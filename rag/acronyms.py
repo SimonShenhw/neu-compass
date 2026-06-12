@@ -53,10 +53,15 @@ def load_glossary(path: str | None = None) -> dict[str, tuple[str, ...]]:
         return {}
     try:
         raw = json.loads(p.read_text(encoding="utf-8"))
+        # Per-entry type check: a structurally-valid JSON with a non-string
+        # sense (nested list, number) would otherwise pass load and crash
+        # expand_query's sense.lower() on EVERY non-alias request — one bad
+        # glossary regeneration = total search outage.
         return {
             k.upper(): tuple(v)[:MAX_SENSES_PER_ACRONYM]
             for k, v in raw.items()
             if isinstance(v, list) and v
+            and all(isinstance(s, str) for s in v)
         }
     except Exception:  # noqa: BLE001 — bad glossary must not kill the API
         return {}

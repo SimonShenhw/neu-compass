@@ -117,14 +117,18 @@ class OvEmbedder:
         if not texts:
             return np.zeros((0, EMBEDDING_DIM), dtype=np.float32)
 
-        encoded = self._tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
-        )
+        # Tokenization INSIDE the lock on purpose: the shared HF fast
+        # tokenizer (Rust) raises "Already borrowed" under concurrent
+        # truncation/padding re-config — FastAPI's threadpool can run two
+        # /search requests at once. Mirrors the pytorch backend's locking.
         with self._lock:
+            encoded = self._tokenizer(
+                texts,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
             outputs = self._model(**encoded)
         # last_hidden_state shape: (batch, seq_len, hidden_dim). CLS-pool [:, 0, :].
         cls_emb = outputs.last_hidden_state[:, 0, :].numpy().astype(np.float32)
@@ -177,15 +181,16 @@ class OvReranker:
         if not candidates:
             return []
 
-        encoded = self._tokenizer(
-            [query] * len(candidates),
-            candidates,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
-        )
+        # Tokenize inside the lock — see OvEmbedder.encode for why.
         with self._lock:
+            encoded = self._tokenizer(
+                [query] * len(candidates),
+                candidates,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
             outputs = self._model(**encoded)
         # logits shape (batch, 1) for cross-encoder binary head.
         logits = outputs.logits.squeeze(-1).numpy().astype(np.float32)

@@ -4,6 +4,7 @@
 """
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -75,7 +76,9 @@ class Settings(BaseSettings):
     #   calibrated — logistic gate fusing sigmoid + BM25/vector evidence +
     #                code-pattern miss (rag/rejection.py). Opt-in via env
     #                REJECTION_MODE=calibrated after a calibration run.
-    rejection_mode: str = "threshold"
+    # Literal so a compose typo can't silently revert prod to the
+    # threshold gate (routes compare with bare ==).
+    rejection_mode: Literal["threshold", "calibrated"] = "threshold"
 
     # HyDE rescue pass (ADR-0019): when the gate rejects, one Gemini call
     # second-opinions the query — garbage stays rejected (REJECT verdict),
@@ -98,8 +101,11 @@ class Settings(BaseSettings):
     # ADR-0022: hybrid fusion flavor. "rrf" = rank-only (historic default);
     # "convex" = score-aware min-max combination (Bruch TOIS'23), with
     # FUSION_WEIGHT = the vector leg's share. Switch only on sweep evidence.
-    fusion_mode: str = "rrf"
-    fusion_weight: float = 0.5
+    # Literal + bounds so an env typo (FUSION_MODE casing, FUSION_WEIGHT=7)
+    # fails LOUDLY at boot instead of silently reverting to RRF / 500ing
+    # every non-alias query after a "successful" deploy.
+    fusion_mode: Literal["rrf", "convex"] = "rrf"
+    fusion_weight: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # === torch.compile (Week 9 Day 2: PyTorch path acceleration) ===
     # Wraps the reranker (and best-effort the embedder backbone) with

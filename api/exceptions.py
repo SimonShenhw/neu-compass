@@ -34,8 +34,10 @@ from __future__ import annotations
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth import OAuthError
 from db.repository import CourseNotFound
@@ -100,6 +102,27 @@ async def http_exception_handler(
     )
 
 
+async def validation_error_handler(
+    request: Request, exc: RequestValidationError,
+) -> JSONResponse:
+    """Body-validation 422s (the most common 4xx class) previously bypassed
+    the ErrorResponse contract entirely — FastAPI's default emits `detail`
+    as a LIST of error dicts, which the Streamlit client stringified into a
+    raw Python repr. Flatten to one human-readable string."""
+    msgs = []
+    for err in exc.errors():
+        loc = ".".join(
+            str(part) for part in err.get("loc", ()) if part != "body"
+        )
+        msg = err.get("msg", "invalid")
+        msgs.append(f"{loc}: {msg}" if loc else str(msg))
+    return _error_response(
+        status_code=422,
+        error_type="invalid_input",
+        detail="; ".join(msgs) or "Invalid request body",
+    )
+
+
 async def oauth_error_handler(
     request: Request, exc: OAuthError,
 ) -> JSONResponse:
@@ -149,11 +172,20 @@ async def unhandled_exception_handler(
         method=request.method,
         exc_type=type(exc).__name__,
     )
-    return _error_response(
+    response = _error_response(
         status_code=500,
         error_type="internal_error",
         detail="Internal server error. Check API logs by x-request-id.",
     )
+    # RequestLogMiddleware sets x-request-id on SUCCESS responses, but this
+    # handler runs in the outermost ServerErrorMiddleware — outside it — so
+    # the one response whose body says "correlate by x-request-id" was the
+    # one without the header. Recover it from the structlog contextvars the
+    # middleware bound before the exception.
+    request_id = structlog.contextvars.get_contextvars().get("request_id")
+    if request_id:
+        response.headers["x-request-id"] = str(request_id)
+    return response
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -163,7 +195,13 @@ def register_exception_handlers(app: FastAPI) -> None:
     preferred over their parents, so OAuthError (RuntimeError subclass)
     hits oauth_error_handler before hitting the generic Exception fallback.
     """
-    app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
+    # Registered against STARLETTE's HTTPException on purpose: router-level
+    # 404 (unknown path) and 405 (wrong method) raise the starlette class
+    # directly, which the FastAPI-subclass registration would miss — those
+    # responses then lacked error_type/status_code. FastAPI's HTTPException
+    # subclasses starlette's, so this one registration covers both.
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(OAuthError, oauth_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(CourseNotFound, course_not_found_handler)  # type: ignore[arg-type]
     app.add_exception_handler(GeminiError, gemini_error_handler)  # type: ignore[arg-type]

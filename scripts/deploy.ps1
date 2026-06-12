@@ -193,9 +193,16 @@ if ($SyncData) {
         Write-Host '  (dry-run: would transfer above)'
     } else {
         # Sync everything in ~/neu-compass-data/ except local benchmark artifacts
-        # (eval_results/, *.json probes, raw/). Picks up new dirs like openvino/
-        # automatically without needing this script edited each time.
-        $dataCmd = "cd $WslDataDir && tar --exclude='eval_results' --exclude='*.json' --exclude='raw' -cf - . 2>/dev/null | ssh $NasTarget 'tar -xf - -C $NasPath/runtime-data/ && echo OK'"
+        # (eval_results/, TOP-LEVEL *.json probes, raw/). Picks up new dirs like
+        # openvino/ automatically without needing this script edited each time.
+        #
+        # CRITICAL: the json exclude must be anchored to ./*.json (top level
+        # only). A bare --exclude='*.json' matched at ANY depth and silently
+        # dropped faiss_index/id_map.json (FaissIndex.load hard-requires it;
+        # a STALE copy mis-maps int ids -> wrong courses with no error) and
+        # every OpenVINO model dir's config.json (from_pretrained refuses to
+        # load -> api crash-loops, ui+cloudflared never start).
+        $dataCmd = "cd $WslDataDir && tar --anchored --exclude='./eval_results' --exclude='./*.json' --exclude='./raw' -cf - . 2>/dev/null | ssh $NasTarget 'tar -xf - -C $NasPath/runtime-data/ && echo OK'"
         $out = wsl -d $WslDistro -e bash -lc "$dataCmd" 2>&1
         if ($LASTEXITCODE -ne 0 -or ($out -join '') -notmatch 'OK') {
             Write-Host "  X runtime-data tar-pipe failed: $out" -ForegroundColor Red

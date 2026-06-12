@@ -56,6 +56,13 @@ services:
       # === Storage paths (bind-mounted volume) ===
       SQLITE_PATH: /data/courses.db
       FAISS_INDEX_PATH: /data/faiss_index
+      # Persist the HF cache on the volume: OvEmbedder/OvReranker load
+      # tokenizers by hub id (AutoTokenizer.from_pretrained("BAAI/...")),
+      # and without this every container recreation re-downloads them —
+      # and hard-fails the lifespan (api never healthy, whole stack down)
+      # if huggingface.co is unreachable at that moment. The in-container
+      # model exports already populated /data/.hf_cache.
+      HF_HOME: /data/.hf_cache
       # === Logging ===
       LOG_LEVEL: INFO
       LOG_FORMAT: json
@@ -104,6 +111,16 @@ services:
       - --browser.gatherUsageStats=false
     ports:
       - "8501:8501"
+    healthcheck:
+      # Streamlit's built-in liveness endpoint. Lets cloudflared wait for
+      # the UI to actually bind 8501 (cold streamlit import takes seconds)
+      # instead of routing public traffic into 502s right after a deploy,
+      # and surfaces a crash-looping UI as unhealthy in `docker ps`.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       api:
         condition: service_healthy
@@ -119,4 +136,4 @@ services:
       api:
         condition: service_healthy
       ui:
-        condition: service_started
+        condition: service_healthy

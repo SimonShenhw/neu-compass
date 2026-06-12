@@ -83,6 +83,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # We use `optimum-intel[openvino]` for direct OpenVINO IR inference (NOT
 # onnxruntime-openvino which routes via ONNX intermediate and breaks on
 # Intel GPU compile for bge-m3's u8 GatherND op). See rag/openvino_backend.py.
+# NO upper bound on purpose (2026-06-12 lesson): pinning optimum<2 DOWNGRADED
+# the resolution to an old 1.x whose onnx model_patcher imports
+# `_attention_scale` from torch.onnx.symbolic_opset14 — removed in current
+# torch — and the api crash-looped at boot. The working production stack is
+# optimum 2.x INFERENCE path (the PC-side 2.x incompatibility was the
+# optimum-onnx EXPORT path with transformers 4.57, a different code path).
+# These install outside uv.lock, so drift risk exists either way; if a
+# future rebuild breaks here, pin to the exact versions of the last good
+# image rather than guessing a range. Known-good as of 2026-06-12:
+#   optimum 2.2.0 / optimum-intel 2.0.0 / torch 2.12.0+cpu / transformers 4.57.6
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --no-cache \
         "optimum-intel[openvino]>=1.21" \

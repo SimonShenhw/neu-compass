@@ -203,3 +203,51 @@ def test_error_type_is_in_taxonomy(client: TestClient) -> None:
         r = client.get(path)
         et = r.json()["error_type"]
         assert et in expected, f"{path}: unknown error_type {et!r}"
+
+
+# === 2026-06 review sweep: validation 422s, starlette 404/405, request-id ===
+
+
+def test_body_validation_422_uses_error_contract(api_client) -> None:
+    """RequestValidationError previously bypassed the handlers entirely —
+    detail came back as a LIST of pydantic error dicts. Exercised against
+    the REAL app (/search with extra='forbid') so the wiring is tested."""
+    r = api_client.post("/search", json={"query": "ml", "rogue": 1})
+    assert r.status_code == 422
+    body = r.json()
+    assert body["error_type"] == "invalid_input"
+    assert body["status_code"] == 422
+    assert isinstance(body["detail"], str)  # flattened, not a list
+    assert "rogue" in body["detail"]
+
+
+def test_router_404_unknown_path_uses_error_contract(
+    client: TestClient,
+) -> None:
+    """Router-level 404 raises STARLETTE's HTTPException — the handler
+    registration must cover it, not just the FastAPI subclass."""
+    r = client.get("/no-such-route-anywhere")
+    assert r.status_code == 404
+    body = r.json()
+    assert body["error_type"] == "not_found"
+    assert body["status_code"] == 404
+
+
+def test_405_wrong_method_uses_error_contract(client: TestClient) -> None:
+    r = client.post("/raise-http-404")  # GET-only route
+    assert r.status_code == 405
+    assert r.json()["error_type"] == "client_error"
+
+
+def test_500_carries_request_id_header_when_bound(client: TestClient) -> None:
+    """The 500 body says 'correlate by x-request-id' — the header must
+    actually be present when the middleware bound one."""
+    import structlog
+
+    structlog.contextvars.bind_contextvars(request_id="rid-test-123")
+    try:
+        r = client.get("/raise-unhandled")
+    finally:
+        structlog.contextvars.clear_contextvars()
+    assert r.status_code == 500
+    assert r.headers.get("x-request-id") == "rid-test-123"
