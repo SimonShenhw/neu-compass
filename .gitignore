@@ -84,3 +84,4 @@ scripts/.stack_pids
 # OS
 *.tmp
 *~
+data/doc_expansion/
