@@ -9,10 +9,14 @@ import pytest
 from app.api_client import ApiError
 from app.cookie_session import (
     COOKIE_NAME,
+    OAUTH_STATE_COOKIE,
     clear_cookie_js,
+    oauth_state_cookie_js,
+    oauth_state_matches,
     pop_pending_cookie_html,
     queue_cookie_clear,
     queue_cookie_write,
+    queue_oauth_state_clear,
     restore_login,
     set_cookie_js,
 )
@@ -77,6 +81,37 @@ def test_clear_overrides_pending_write() -> None:
     queue_cookie_clear(state)
     html = pop_pending_cookie_html(state, 3600)
     assert html is not None and "max-age=0" in html
+
+
+def test_oauth_callback_queue_combines_state_clear_and_session_write() -> None:
+    """Successful OAuth callback queues TWO ops: drop the consumed CSRF
+    state cookie + persist the session token. Both must flush."""
+    state: dict = {}
+    queue_oauth_state_clear(state)
+    queue_cookie_write(state, "tok-login")
+    html = pop_pending_cookie_html(state, 3600)
+    assert html is not None
+    assert OAUTH_STATE_COOKIE in html and "max-age=0" in html
+    assert '"tok-login"' in html and "max-age=3600" in html
+    assert pop_pending_cookie_html(state, 3600) is None  # consumed
+
+
+# === OAuth CSRF state (cookie round-trip) ===
+
+
+def test_oauth_state_cookie_js_short_lived() -> None:
+    js = oauth_state_cookie_js("state-abc")
+    assert OAUTH_STATE_COOKIE in js
+    assert '"state-abc"' in js
+    assert "max-age=600" in js
+
+
+def test_oauth_state_matches() -> None:
+    assert oauth_state_matches("s1", "s1") is True
+    assert oauth_state_matches("s1", "s2") is False
+    assert oauth_state_matches(None, "s1") is False
+    assert oauth_state_matches("s1", None) is False
+    assert oauth_state_matches("", "") is False
 
 
 # === restore_login ===
