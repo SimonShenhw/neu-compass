@@ -72,9 +72,12 @@ class _ClientLike(Protocol):
 DEFAULT_HTTP_TIMEOUT_MS = 120_000
 
 
-@lru_cache(maxsize=1)
-def _build_default_client() -> _ClientLike:
-    """Lazy: import SDK + build Client on first use, cache process-wide."""
+@lru_cache(maxsize=4)
+def _build_client_with_timeout(timeout_ms: int) -> _ClientLike:
+    """Lazy: import SDK + build Client on first use; one cached client per
+    distinct timeout (the SDK sets timeout at client construction, not per
+    call). maxsize=4 — in practice two values exist: the 120s default and
+    the short rescue budget."""
     from google import genai  # noqa: PLC0415
     from google.genai import types  # noqa: PLC0415
 
@@ -82,8 +85,12 @@ def _build_default_client() -> _ClientLike:
 
     return genai.Client(  # type: ignore[return-value]
         api_key=settings.gemini_api_key,
-        http_options=types.HttpOptions(timeout=DEFAULT_HTTP_TIMEOUT_MS),
+        http_options=types.HttpOptions(timeout=timeout_ms),
     )
+
+
+def _build_default_client() -> _ClientLike:
+    return _build_client_with_timeout(DEFAULT_HTTP_TIMEOUT_MS)
 
 
 # Schema keywords Gemini's Schema proto doesn't accept. Pydantic v2's
@@ -304,11 +311,21 @@ def generate_text(
     model_name: str = DEFAULT_MODEL,
     temperature: float = DEFAULT_TEMPERATURE,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    timeout_ms: int | None = None,
 ) -> str:
     """Plain text response (no JSON schema). Use for prompts that don't need
-    structured output — e.g., quick summary or paraphrase tasks."""
+    structured output — e.g., quick summary or paraphrase tasks.
+
+    timeout_ms: per-call HTTP budget override. Latency-sensitive callers
+    (the HyDE rescue sits INSIDE a /search request) must not inherit the
+    120s default — a hung Gemini call would pin a threadpool worker and
+    the user for two minutes."""
     if client is None:
-        client = _build_default_client()
+        client = (
+            _build_client_with_timeout(timeout_ms)
+            if timeout_ms is not None
+            else _build_default_client()
+        )
 
     config = _build_config(
         temperature=temperature,

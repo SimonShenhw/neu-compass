@@ -198,26 +198,16 @@ def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
         with st.expander("🎯 Advanced filters", expanded=False):
             filters: dict[str, object] = state.get("filters", {}) or {}
 
-            term_v = st.text_input(
-                "Term", value=filters.get("term") or "",
-                placeholder="fall 2026", key="filter_term",
-            )
+            # Only CREDITS is offered. Term / delivery_mode / professor
+            # filters exist in the API but their source data is absent
+            # catalog-wide (2026-06 data review: term & delivery_mode
+            # 0/6,469, professor ~3 courses) — exposing them meant every
+            # use returned an empty result set. Re-enable each one when a
+            # pipeline actually populates it (syllabus ingestion for term
+            # /mode, RMP enrichment for professor).
             credits_str = st.text_input(
                 "Credits", value=str(filters.get("credits") or ""),
                 placeholder="3", key="filter_credits",
-            )
-            delivery_v = st.selectbox(
-                "Delivery mode",
-                ["", "in_person", "online", "hybrid", "async"],
-                index=0 if not filters.get("delivery_mode") else
-                ["", "in_person", "online", "hybrid", "async"].index(
-                    str(filters.get("delivery_mode"))
-                ),
-                key="filter_delivery",
-            )
-            prof_v = st.text_input(
-                "Professor", value=filters.get("professor") or "",
-                placeholder="e.g. Smith", key="filter_prof",
             )
 
             try:
@@ -227,10 +217,7 @@ def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
                 credits_v = None
 
             new_filters: dict[str, object] = {
-                "term": term_v or None,
                 "credits": credits_v,
-                "delivery_mode": delivery_v or None,
-                "professor": prof_v or None,
             }
             state["filters"] = new_filters
 
@@ -262,8 +249,7 @@ def _clear_filters_callback() -> None:
     at module top to keep test imports cheap; lazy import here."""
     import streamlit as st  # noqa: PLC0415
     st.session_state["filters"] = {}
-    for k in ("filter_term", "filter_credits", "filter_delivery", "filter_prof"):
-        st.session_state.pop(k, None)
+    st.session_state.pop("filter_credits", None)
 
 
 def render() -> None:
@@ -576,11 +562,43 @@ def render() -> None:
 
             if course.get("professor"):
                 st.markdown("**Professor:** " + ", ".join(course["professor"]))
+
+            # Soft fields (workload / difficulty / grading / skills) — the
+            # product's own sample chips advertise "课业最轻", so when the
+            # data exists it MUST be visible. Sections vanish when absent
+            # (enrichment coverage grows course-by-course).
+            soft_bits: list[str] = []
+            if course.get("workload_hours_per_week") is not None:
+                soft_bits.append(
+                    f"⏱️ 每周约 {course['workload_hours_per_week']:g} 小时"
+                )
+            if course.get("difficulty_score") is not None:
+                soft_bits.append(f"🎚️ 难度 {course['difficulty_score']:g}/5")
+            if soft_bits:
+                st.markdown(" · ".join(soft_bits))
+            if course.get("grading_components"):
+                parts = [
+                    f"{g['name']} {g['weight'] * 100:.0f}%"
+                    if g.get("weight") is not None else str(g["name"])
+                    for g in course["grading_components"]
+                ]
+                st.markdown("**📝 考核构成:** " + " · ".join(parts))
+
             if course.get("topics_covered"):
                 st.markdown("**Topics:**")
                 st.markdown(
                     topic_pills_html(course["topics_covered"]),
                     unsafe_allow_html=True,
+                )
+            if course.get("skill_tags"):
+                st.markdown("**🛠️ 技能标签:**")
+                st.markdown(
+                    topic_pills_html(course["skill_tags"]),
+                    unsafe_allow_html=True,
+                )
+            if course.get("career_relevance"):
+                st.markdown(
+                    "**💼 职业方向:** " + " · ".join(course["career_relevance"])
                 )
 
             # Layer 3 ontology context (UI round 2): where this course sits
@@ -623,8 +641,22 @@ def render() -> None:
                         st.rerun()
 
             if course.get("ai_policy"):
-                with st.expander("AI policy"):
-                    st.json(course["ai_policy"])
+                # Friendly rendering — the raw st.json dump was the last
+                # genuinely embarrassing element in the panel.
+                ap = course["ai_policy"]
+                with st.expander("🤖 AI 使用政策"):
+                    if ap.get("permitted_tools"):
+                        st.markdown(
+                            "✅ **允许:** " + ", ".join(ap["permitted_tools"])
+                        )
+                    if ap.get("banned_tools"):
+                        st.markdown(
+                            "🚫 **禁止:** " + ", ".join(ap["banned_tools"])
+                        )
+                    if ap.get("disclosure_required"):
+                        st.markdown("📣 使用 AI 需声明")
+                    if ap.get("notes"):
+                        st.caption(ap["notes"])
             if course.get("evidence_snippets"):
                 with st.expander(
                     f"Evidence ({len(course['evidence_snippets'])})"

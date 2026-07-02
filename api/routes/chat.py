@@ -4,7 +4,7 @@ Pipeline:
   query
     → query_normalizer → AliasRepository.resolve  (cheap exact path)
     → HybridRetriever.search (k=5 by default)     (semantic fallback)
-    → llm.prompts.chat_v1.build_prompt
+    → llm.prompts.chat_v3.build_prompt (history-aware, content-grounded)
     → Gemini stream (token-by-token)
 
 Wire format: NDJSON. One JSON object per line, chunks of:

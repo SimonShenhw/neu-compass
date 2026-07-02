@@ -228,3 +228,66 @@ def test_enrich_course_works_with_no_rmp_summaries() -> None:
 
     enriched = enrich_course(course, "syllabus content", [], llm_fn=mock_llm)
     assert enriched.course_id == course.course_id
+
+
+# === Merge semantics (2026-06 data-quality fix) ===
+
+
+def test_enrich_merges_soft_fields_and_preserves_hard_facts() -> None:
+    """The LLM only sees raw_text + reviews — hard catalog facts (credits,
+    prereqs) MUST survive enrichment. The old return-wholesale behavior
+    clobbered CS 5800's credits to null and broke the credits filter."""
+    from llm.review_enrichment import enrich_course
+    from schemas.course import Course
+
+    original = Course(
+        course_id="c-cs-5800", primary_code="CS 5800", primary_name="Algorithms",
+        credits=4, prereqs=["CS 5004"],
+    )
+    llm_output = Course(
+        course_id="c-invented", primary_code="CS 5800", primary_name="Algorithms",
+        credits=None, prereqs=[],  # LLM's sources don't contain these
+        topics_covered=["dynamic programming", "graphs"],
+        difficulty_score=4.0,
+        evidence_snippets=[{
+            "field": "difficulty_score", "value": 4.0,
+            "source_id": "rmp_review_1", "quote": "hard", "confidence": 0.8,
+        }, {
+            "field": "topics_covered", "value": ["dynamic programming"],
+            "source_id": "catalog_c-cs-5800", "quote": "DP", "confidence": 0.9,
+        }],
+    )
+
+    enriched = enrich_course(
+        original, "raw text", [], llm_fn=lambda prompt, schema: llm_output,
+    )
+    # Soft fields taken from the LLM...
+    assert enriched.topics_covered == ["dynamic programming", "graphs"]
+    assert enriched.difficulty_score == 4.0
+    # ...hard catalog facts preserved, id kept
+    assert enriched.credits == 4
+    assert enriched.prereqs == ["CS 5004"]
+    assert enriched.course_id == "c-cs-5800"
+
+
+def test_enrich_empty_llm_fields_keep_existing_values() -> None:
+    """None/empty from the LLM never erases previously enriched data."""
+    from llm.review_enrichment import enrich_course
+    from schemas.course import Course
+
+    original = Course(
+        course_id="c-1", primary_code="CS 5200", primary_name="DBMS",
+        topics_covered=["sql", "indexing"],
+        evidence_snippets=[{
+            "field": "topics_covered", "value": ["sql"],
+            "source_id": "catalog_c-1", "quote": "sql", "confidence": 0.9,
+        }],
+    )
+    llm_output = Course(
+        course_id="c-1", primary_code="CS 5200", primary_name="DBMS",
+        topics_covered=[],  # found nothing this run
+    )
+    enriched = enrich_course(
+        original, None, [], llm_fn=lambda prompt, schema: llm_output,
+    )
+    assert enriched.topics_covered == ["sql", "indexing"]

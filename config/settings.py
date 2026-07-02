@@ -23,9 +23,13 @@ class Settings(BaseSettings):
     # === LLM ===
     gemini_api_key: str
 
-    # === Reddit ===
-    reddit_client_id: str
-    reddit_client_secret: str
+    # === Reddit (scraper-only; NEVER runs in the prod containers) ===
+    # Empty defaults on purpose: these previously had no default, which
+    # forced Reddit credentials into the NAS api+ui .env forever just so
+    # `Settings()` could import — the only consumer is scrapers/reddit.py
+    # on the dev box, which validates presence itself.
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
     reddit_user_agent: str = "neu-compass/0.1"
 
     # === Google OAuth (Week 6 才需要) ===
@@ -41,9 +45,11 @@ class Settings(BaseSettings):
     api_base_url: str = "http://localhost:8000"
 
     # === Embedding ===
+    # (No embedding_dim knob here: the real constant is
+    # rag/embedder.py EMBEDDING_DIM — a settings field nobody read was
+    # actively misleading and got removed in the 2026-06 debt sweep.)
     embedding_model: str = "BAAI/bge-m3"
     embedding_device: str = "cuda"
-    embedding_dim: int = 1024  # bge-m3 维度
 
     # === Inference backend ===
     # `pytorch` (default, FlagEmbedding/transformers direct)
@@ -93,6 +99,13 @@ class Settings(BaseSettings):
     # proved flaky exactly there, and the gate was never in doubt.
     rescue_min_probability: float = 0.08
 
+    # Reranker tokenizer truncation length. 512 is the model max, but
+    # catalog raw_text (description-only) rarely needs it — the June
+    # optimization doc predicted 1.5-2x on the rerank pass at 256. Env-
+    # overridable (RERANKER_MAX_LENGTH) so the NAS can A/B without a
+    # redeploy; re-run eval_via_api before locking a lower value in.
+    reranker_max_length: int = Field(default=512, ge=64, le=512)
+
     # ADR-0020: query-time acronym expansion from the corpus-mined glossary
     # (data/acronym_glossary.json). Zero-cost no-op when the file is absent,
     # so True is a safe default everywhere.
@@ -124,9 +137,6 @@ class Settings(BaseSettings):
     # === Logging ===
     log_level: str = "INFO"
     log_format: str = "json"  # json | console
-
-    # === API budget ===
-    api_budget_alarm: float = Field(default=150.0, description="USD/month, 超出触发告警")
 
     # === OAuth domain whitelist ===
     allowed_email_domains: list[str] = ["husky.neu.edu", "northeastern.edu"]

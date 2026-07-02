@@ -50,8 +50,8 @@ ARG SLIM_EXCLUDES="--no-install-package torch --no-install-package triton \
     --no-install-package nvidia-cusparselt-cu12 --no-install-package nvidia-nccl-cu12 \
     --no-install-package nvidia-nvjitlink-cu12 --no-install-package nvidia-nvshmem-cu12 \
     --no-install-package nvidia-nvtx-cu12 \
-    --no-install-package playwright --no-install-package pymupdf \
-    --no-install-package ragas --no-install-package deepeval \
+    --no-install-package pymupdf \
+    --no-install-package ragas \
     --no-install-package datasets"
 # pyarrow is NOT excludable: it's a hard dependency of streamlit itself —
 # st.write_stream imports streamlit/dataframe_util which does

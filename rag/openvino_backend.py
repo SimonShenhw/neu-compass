@@ -36,12 +36,22 @@ Design:
 from __future__ import annotations
 
 import threading
+from collections import OrderedDict
 from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
+import structlog
+
+_log = structlog.get_logger("neu_compass.openvino")
 
 EMBEDDING_DIM = 1024  # bge-m3 dense vector dimension (mirrors rag.embedder)
+
+# Single-query embedding cache size. Repeats are STRUCTURAL, not
+# hypothetical: the UI's hero sample chips and follow-up chips send
+# fixed query strings, so every first-time visitor and every chip click
+# re-embeds the same handful of texts (~50-100ms each on Iris Xe).
+_QUERY_CACHE_SIZE = 256
 
 
 def _build_ov_config(*, cache_dir: str | None) -> dict[str, str]:
@@ -85,6 +95,12 @@ class OvEmbedder:
         # forward passes on the same instance are NOT safe. Sync routes run
         # in FastAPI's threadpool, so serialize inference here.
         self._lock = threading.Lock()
+        # LRU for the single-text (query) case only — document batches
+        # during indexing must not evict query entries or bloat memory.
+        # Guarded by the same lock as inference (dict ops are cheap).
+        self._query_cache: OrderedDict[tuple[str, bool], np.ndarray] = (
+            OrderedDict()
+        )
 
     @classmethod
     def from_path(
@@ -117,6 +133,16 @@ class OvEmbedder:
         if not texts:
             return np.zeros((0, EMBEDDING_DIM), dtype=np.float32)
 
+        # Single-text fast path: query embeddings are deterministic, and
+        # the UI's fixed sample/follow-up chips guarantee verbatim repeats.
+        cache_key = (texts[0], normalize) if len(texts) == 1 else None
+        if cache_key is not None:
+            with self._lock:
+                hit = self._query_cache.get(cache_key)
+                if hit is not None:
+                    self._query_cache.move_to_end(cache_key)
+                    return hit[np.newaxis, :].copy()
+
         # Tokenization INSIDE the lock on purpose: the shared HF fast
         # tokenizer (Rust) raises "Already borrowed" under concurrent
         # truncation/padding re-config — FastAPI's threadpool can run two
@@ -134,6 +160,13 @@ class OvEmbedder:
         cls_emb = outputs.last_hidden_state[:, 0, :].numpy().astype(np.float32)
         if normalize:
             cls_emb = _l2_normalize(cls_emb)
+
+        if cache_key is not None:
+            with self._lock:
+                self._query_cache[cache_key] = cls_emb[0].copy()
+                self._query_cache.move_to_end(cache_key)
+                while len(self._query_cache) > _QUERY_CACHE_SIZE:
+                    self._query_cache.popitem(last=False)
         return cls_emb
 
 
@@ -190,6 +223,15 @@ class OvReranker:
                 truncation=True,
                 max_length=self.max_length,
                 return_tensors="pt",
+            )
+            # Measurement hook for the max_length A/B (RERANKER_MAX_LENGTH):
+            # padded seq len tells us how much of the 512 budget real pools
+            # use. DEBUG level — invisible at the prod INFO default.
+            _log.debug(
+                "reranker.batch",
+                pairs=len(candidates),
+                padded_len=int(encoded["input_ids"].shape[1]),
+                max_length=self.max_length,
             )
             outputs = self._model(**encoded)
         # logits shape (batch, 1) for cross-encoder binary head.

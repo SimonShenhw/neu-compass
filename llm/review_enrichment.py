@@ -110,6 +110,30 @@ def assemble_sources(
     return docs
 
 
+# Fields the LLM extraction is ALLOWED to write. Everything else keeps the
+# incoming course's value. Rationale (data-quality review, 2026-06): the
+# extraction prompt only sees raw_text (description) + reviews, so hard
+# fields the catalog parsed separately (credits from the title line,
+# prereq codes from anchor tags) come back null from the LLM — and the old
+# return-the-LLM-object-wholesale behavior CLOBBERED them on upsert.
+# CS 5800 lost its credits exactly this way, which then broke the
+# credits=4 filter on the flagship demo course.
+ENRICHMENT_FIELDS: tuple[str, ...] = (
+    "professor",
+    "workload_hours_per_week",
+    "difficulty_score",
+    "grading_components",
+    "topics_covered",
+    "skill_tags",
+    "career_relevance",
+    "controversial_signals",
+    "ai_policy",
+    "evidence_snippets",
+    "extraction_confidence",
+    "source_review_ids",
+)
+
+
 def enrich_course(
     course: Course,
     raw_text: str | None,
@@ -117,9 +141,13 @@ def enrich_course(
     *,
     llm_fn: LlmFn = _default_llm_fn,
 ) -> Course:
-    """Run the LLM extraction pipeline on (course, syllabus, RMP reviews) →
-    enriched Course. Preserves the original course_id (the LLM may guess a
-    different one; we override post-hoc).
+    """Run the LLM extraction pipeline on (course, syllabus, RMP reviews)
+    and MERGE the soft fields onto the incoming Course.
+
+    Merge, not replace: only ENRICHMENT_FIELDS are taken from the LLM
+    output (and only when non-empty) — hard catalog facts (credits, term,
+    prereqs, cross-listings, code/name) always keep the incoming values,
+    because the LLM never saw the sources they came from.
 
     Tests pass `llm_fn` to bypass the live Gemini call. Production uses
     the default which delegates to `gemini_client.generate_structured`.
@@ -131,14 +159,26 @@ def enrich_course(
     sources_xml = format_sources(docs)
     prompt = build_prompt(sources_xml)
 
-    enriched = llm_fn(prompt, Course)
-    # Preserve internal id; the LLM may have invented one from the catalog code.
-    enriched.course_id = course.course_id
-    return enriched
+    extracted = llm_fn(prompt, Course)
+
+    updates: dict[str, object] = {}
+    for field in ENRICHMENT_FIELDS:
+        value = getattr(extracted, field)
+        # None / empty list = the LLM found nothing in its sources; keep
+        # whatever the course already had rather than erasing it.
+        if value is None or value == []:
+            continue
+        updates[field] = value
+    # model_copy(update=...) skips validators; re-validate so the
+    # soft-field-requires-evidence invariant still holds on the merge.
+    return Course.model_validate(
+        {**course.model_dump(), **updates},
+    )
 
 
 __all__ = [
     "CATALOG_SOURCE_TYPE",
+    "ENRICHMENT_FIELDS",
     "LlmFn",
     "RMP_SOURCE_ID_PREFIX",
     "RMP_SOURCE_TYPE",

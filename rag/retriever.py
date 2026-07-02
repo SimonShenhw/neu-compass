@@ -82,18 +82,20 @@ class Retriever:
         """ID-only variant of search(): (course_id, score) pairs, no SQLite
         rehydration. HybridRetriever uses this for its vector leg — it only
         needs IDs for RRF fusion and hydrates once on the fused top-k."""
-        candidate_ids = self.filter_ids(hard_filters or {})
-
-        # Empty candidate set after filter -> no results possible
-        if hard_filters and not candidate_ids:
-            return []
+        # Only hit SQLite when filters actually narrow the pool. The old
+        # unconditional call fetched all ~6.5k indexed ids on EVERY
+        # unfiltered search and then threw the list away — pure waste on
+        # the common path.
+        if hard_filters:
+            candidate_ids = self.filter_ids(hard_filters)
+            # Empty candidate set after filter -> no results possible
+            if not candidate_ids:
+                return []
+            candidates: list[str] | None = candidate_ids
+        else:
+            candidates = None  # "search the whole index" — the cheap path
 
         query_vec = self._embedder.encode([query])[0]
-
-        # Pass candidate_ids only when filters narrowed something. None means
-        # "search the whole index" which is the default (and cheaper) path.
-        candidates = candidate_ids if hard_filters else None
-
         return self._index.search(query_vec, k=k, candidate_course_ids=candidates)
 
     # === Hard filter ===

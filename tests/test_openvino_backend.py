@@ -188,3 +188,48 @@ def test_warm_up_dispatches_encode_and_score() -> None:
 
     warm_up([_Enc(), _Scr()])
     assert calls == ["encode", "score"]
+
+
+# === Query embedding LRU (2026-06 optimization round) ===
+
+
+class _CountingFeatureModel(_FakeFeatureModel):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, **kwargs):
+        self.calls += 1
+        return super().__call__(**kwargs)
+
+
+def test_single_query_embedding_cached() -> None:
+    """Verbatim single-text repeats (the UI's fixed sample/follow-up chips)
+    must skip the forward pass; results stay bit-identical."""
+    model = _CountingFeatureModel()
+    emb = OvEmbedder(model=model, tokenizer=_FakeTokenizer())
+
+    first = emb.encode(["machine learning basics"])
+    second = emb.encode(["machine learning basics"])
+    assert model.calls == 1  # second call served from cache
+    np.testing.assert_array_equal(first, second)
+
+    emb.encode(["a different query"])
+    assert model.calls == 2  # distinct text is a miss
+
+
+def test_batch_encode_bypasses_query_cache() -> None:
+    """Document batches (indexing) must not populate or read the cache."""
+    model = _CountingFeatureModel()
+    emb = OvEmbedder(model=model, tokenizer=_FakeTokenizer())
+    emb.encode(["doc a", "doc b"])
+    emb.encode(["doc a", "doc b"])
+    assert model.calls == 2  # no caching for multi-text calls
+
+
+def test_cache_key_includes_normalize_flag() -> None:
+    model = _CountingFeatureModel()
+    emb = OvEmbedder(model=model, tokenizer=_FakeTokenizer())
+    a = emb.encode(["q"], normalize=True)
+    b = emb.encode(["q"], normalize=False)
+    assert model.calls == 2
+    assert not np.allclose(a, b)  # normalized vs raw differ

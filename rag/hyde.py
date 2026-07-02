@@ -83,7 +83,11 @@ def rescue_expand(
     """
     prompt = RESCUE_PROMPT_TEMPLATE.format(query=query)
     if generate_fn is None:
-        out = generate_text(prompt, temperature=temperature)
+        # Short HTTP budget: this call runs INSIDE a /search request; the
+        # 120s default would let one slow Gemini response hold the user
+        # (and a threadpool worker) for two minutes. On timeout the caller
+        # keeps the original rejection — rescue is best-effort by contract.
+        out = generate_text(prompt, temperature=temperature, timeout_ms=8_000)
     else:
         out = generate_fn(prompt)
     text = out.strip()

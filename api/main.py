@@ -274,6 +274,7 @@ def _build_openvino_stack(log: Any) -> tuple[Any, Any]:
         str(reranker_dir),
         device=settings.openvino_device,
         cache_dir=settings.openvino_cache_dir,
+        max_length=settings.reranker_max_length,
     )
     reranker.score("warmup", ["warmup"])
     log.info("api.startup.reranker_warm", backend="openvino", device=settings.openvino_device)

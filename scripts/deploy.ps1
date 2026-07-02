@@ -96,13 +96,17 @@ if (-not $SkipCode -or $SyncData) {
     Write-Host "  OK WSL ssh -> $NasTarget"
 }
 
-# NAS target dirs
-$dirCheck = & ssh "$NasTarget" "test -d '$NasPath' && test -d '$NasPath/runtime-data' && test -d '$NasPath/cloudflared' && echo ok" 2>&1
+# NAS target dirs — writability included: UGOS reboots reset ownership of
+# /volume1/docker/neu-compass to root:root, which makes the tar-pipe fail
+# midway with a confusing error. Catch it here with the fix command.
+$dirCheck = & ssh "$NasTarget" "test -d '$NasPath' && test -d '$NasPath/runtime-data' && test -d '$NasPath/cloudflared' && test -w '$NasPath' && echo ok" 2>&1
 if (($dirCheck -join '') -notmatch 'ok') {
-    Write-Host "  X NAS dirs missing under $NasPath. First-time setup needed (see header comment)" -ForegroundColor Red
+    Write-Host "  X NAS dirs missing or not writable under $NasPath" -ForegroundColor Red
+    Write-Host "    if this follows a NAS reboot, run:" -ForegroundColor DarkGray
+    Write-Host "    ssh -t $NasTarget sudo chown -R ${NasUser}:docker $NasPath" -ForegroundColor DarkGray
     exit 1
 }
-Write-Host "  OK NAS dirs at $NasPath"
+Write-Host "  OK NAS dirs at $NasPath (writable)"
 
 # .env present locally
 if (-not $SkipCode -and -not (Test-Path (Join-Path $ProjectRoot '.env'))) {
@@ -202,7 +206,11 @@ if ($SyncData) {
         # a STALE copy mis-maps int ids -> wrong courses with no error) and
         # every OpenVINO model dir's config.json (from_pretrained refuses to
         # load -> api crash-loops, ui+cloudflared never start).
-        $dataCmd = "cd $WslDataDir && tar --anchored --exclude='./eval_results' --exclude='./*.json' --exclude='./raw' -cf - . 2>/dev/null | ssh $NasTarget 'tar -xf - -C $NasPath/runtime-data/ && echo OK'"
+        # NEVER ship the dev courses.db over production: the NAS copy holds
+        # user-generated rows (users / coop / organic query_log) that exist
+        # NOWHERE else. Index/model artifacts still sync; DB changes travel
+        # via explicit scripts (seed_*, backfill_*) run in the container.
+        $dataCmd = "cd $WslDataDir && tar --anchored --exclude='./eval_results' --exclude='./*.json' --exclude='./raw' --exclude='./courses.db' --exclude='./courses.db-*' -cf - . 2>/dev/null | ssh $NasTarget 'tar -xf - -C $NasPath/runtime-data/ && echo OK'"
         $out = wsl -d $WslDistro -e bash -lc "$dataCmd" 2>&1
         if ($LASTEXITCODE -ne 0 -or ($out -join '') -notmatch 'OK') {
             Write-Host "  X runtime-data tar-pipe failed: $out" -ForegroundColor Red

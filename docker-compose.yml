@@ -24,12 +24,22 @@
 #         noTLSVerify: false
 #     - service: http_status:404
 
+# Bounded container logs: the api emits one JSON line per request and
+# cloudflared is chatty — the default json-file driver grows UNBOUNDED
+# on a 24/7 NAS unless capped here (UGOS ships no daemon.json cap).
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   api:
     build: .
     image: neu-compass:latest
     container_name: neu-compass-api
     restart: unless-stopped
+    logging: *bounded-logging
     env_file: .env
     environment:
       # === Inference: optimum-intel direct OpenVINO IR (Iris Xe iGPU on i5-1235U) ===
@@ -95,6 +105,7 @@ services:
     image: neu-compass:latest
     container_name: neu-compass-ui
     restart: unless-stopped
+    logging: *bounded-logging
     env_file: .env
     environment:
       # Streamlit reaches FastAPI by compose service name, not localhost.
@@ -129,6 +140,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: neu-compass-cloudflared
     restart: unless-stopped
+    logging: *bounded-logging
     command: tunnel --no-autoupdate run neu-compass
     volumes:
       - ./cloudflared:/etc/cloudflared:ro
