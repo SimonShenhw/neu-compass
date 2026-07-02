@@ -165,7 +165,12 @@ if (-not $SkipCode) {
         $est = wsl -d $WslDistro -e bash -lc "cd $WslProject && tar $tarExcludes --totals -czf /dev/null . 2>&1 | grep -i 'Total bytes'"
         Write-Host "  would tar-pipe code: $est"
     } else {
-        $tarCmd = "cd $WslProject && tar $tarExcludes -czf - . | ssh $NasTarget 'tar -xzf - -C $NasPath/ && echo OK'"
+        # -m on extract: don't restore mtimes. WSL's clock habitually runs
+        # a few seconds ahead of the NAS, and the NAS-side tar treated
+        # "time stamp N s in the future" as a fatal warning — every deploy
+        # right after an edit died on it. Extraction time is fine for
+        # mtimes here; nothing consumes them.
+        $tarCmd = "cd $WslProject && tar $tarExcludes -czf - . | ssh $NasTarget 'tar -xzmf - -C $NasPath/ && echo OK'"
         $out = wsl -d $WslDistro -e bash -lc "$tarCmd" 2>&1
         if ($LASTEXITCODE -ne 0 -or ($out -join '') -notmatch 'OK') {
             Write-Host "  X tar-pipe failed: $out" -ForegroundColor Red
@@ -210,7 +215,7 @@ if ($SyncData) {
         # user-generated rows (users / coop / organic query_log) that exist
         # NOWHERE else. Index/model artifacts still sync; DB changes travel
         # via explicit scripts (seed_*, backfill_*) run in the container.
-        $dataCmd = "cd $WslDataDir && tar --anchored --exclude='./eval_results' --exclude='./*.json' --exclude='./raw' --exclude='./courses.db' --exclude='./courses.db-*' -cf - . 2>/dev/null | ssh $NasTarget 'tar -xf - -C $NasPath/runtime-data/ && echo OK'"
+        $dataCmd = "cd $WslDataDir && tar --anchored --exclude='./eval_results' --exclude='./*.json' --exclude='./raw' --exclude='./courses.db' --exclude='./courses.db-*' -cf - . 2>/dev/null | ssh $NasTarget 'tar -xmf - -C $NasPath/runtime-data/ && echo OK'"
         $out = wsl -d $WslDistro -e bash -lc "$dataCmd" 2>&1
         if ($LASTEXITCODE -ne 0 -or ($out -join '') -notmatch 'OK') {
             Write-Host "  X runtime-data tar-pipe failed: $out" -ForegroundColor Red

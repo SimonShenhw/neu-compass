@@ -136,6 +136,23 @@ services:
       api:
         condition: service_healthy
 
+  backup:
+    # Daily SQLite snapshot sidecar (scripts/backup_daemon.py). A compose
+    # service, NOT host cron: UGOS has no Task Scheduler / user crontab,
+    # and host-level config doesn't survive UGOS updates anyway (see the
+    # 2026-07-02 outage notes on cloudflared). Reuses the app image —
+    # zero extra build; restart: always resurrects it with the stack.
+    image: neu-compass:latest
+    container_name: neu-compass-backup
+    restart: always
+    logging: *bounded-logging
+    command: ["python", "scripts/backup_daemon.py"]
+    volumes:
+      - ./runtime-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+
   cloudflared:
     # Digest-pinned (2026-07-02 outage post-mortem): :latest is a drift
     # bomb on a 24/7 box. This is the digest that has run since May.
