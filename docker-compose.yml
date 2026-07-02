@@ -38,7 +38,7 @@ services:
     build: .
     image: neu-compass:latest
     container_name: neu-compass-api
-    restart: unless-stopped
+    restart: always
     logging: *bounded-logging
     env_file: .env
     environment:
@@ -104,7 +104,7 @@ services:
     build: .
     image: neu-compass:latest
     container_name: neu-compass-ui
-    restart: unless-stopped
+    restart: always
     logging: *bounded-logging
     env_file: .env
     environment:
@@ -137,11 +137,24 @@ services:
         condition: service_healthy
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    # Digest-pinned (2026-07-02 outage post-mortem): :latest is a drift
+    # bomb on a 24/7 box. This is the digest that has run since May.
+    image: cloudflare/cloudflared@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0
     container_name: neu-compass-cloudflared
-    restart: unless-stopped
+    # root on purpose: the UGOS Docker update re-applied volume ACLs that
+    # deny non-root reads on /volume1/docker/** — the image's default
+    # nonroot user (65532) could no longer read the tunnel credentials
+    # and the container crash-looped (public 530 for ~5h). Container-
+    # scoped root is acceptable for this single-purpose tunnel client.
+    user: "0"
+    # always (not unless-stopped): the UGOS Docker-package update STOPS
+    # containers explicitly, and unless-stopped then never restarts them.
+    restart: always
     logging: *bounded-logging
-    command: tunnel --no-autoupdate run neu-compass
+    # Tunnel by UUID, not name: name resolution needs cert.pem + an API
+    # round-trip on every cold start; the UUID + credentials-file path
+    # has no such dependency.
+    command: tunnel --no-autoupdate run ce52553f-7fc3-48dc-923d-3dd9ea772f06
     volumes:
       - ./cloudflared:/etc/cloudflared:ro
     depends_on:

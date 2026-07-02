@@ -117,15 +117,50 @@ own top operational finding: the production DB has no backup.
 - API URL versioning, docs_url hardening: single-client MVP, ceremony
   without benefit today.
 
-## Pending on NAS recovery (checklist)
+## NAS recovery + execution log (2026-07-02, all done)
 
-1. `chown` fix if UGOS reset ownership; deploy (rebuild).
-2. Run `backfill_prereq_edges.py --commit` + credits repair in container.
-3. Register `nas_backup.sh` in UGOS Task Scheduler (daily); verify first
-   snapshot exists.
-4. Pin cloudflared to the currently-running tag (read it via docker
-   inspect) instead of :latest.
-5. Reranker length A/B: enable DEBUG once → collect padded_len stats →
-   set RERANKER_MAX_LENGTH=256 → full eval_via_api (baseline R@5 0.8647
-   / MRR ~0.93 / p50 852ms) → keep or revert.
-6. Field-coverage measurement on the PROD DB (dev copy long diverged).
+The "NAS offline" turned out to be a **UGOS Docker-package update** that
+(a) re-applied volume ACLs denying non-root reads under /volume1/docker
+and (b) stopped containers in a way `unless-stopped` doesn't recover
+from. cloudflared (runs as uid 65532) could no longer read its tunnel
+credentials → crash loop → public 530; the tailscale container's boot
+`tailscale up` refused to run because persisted non-default flags
+(--accept-dns=false --advertise-exit-node) weren't re-stated. api/ui
+kept running the whole time (LAN was fine).
+
+Fixes, all encoded in compose now: cloudflared runs as `user: "0"`,
+tunnel by UUID (name resolution needed cert.pem + an API round-trip
+every cold start), image digest-pinned; ALL services `restart: always`;
+tailscale container rebuilt with TS_EXTRA_ARGS carrying its flags.
+Root-owned residue (.deepeval, .streamlit ACLs) cleared via
+container-root chown — the same trick now documented for the UGOS
+reboot case (no sudo needed).
+
+Checklist execution:
+1. ✅ Deployed (after container-root `chown -R 1000:10 /target`).
+2. ✅ `backfill_prereq_edges.py --commit` on prod: **35 → 5,823 edges**
+   (2,509 courses). Credits repaired from the catalog JSONL:
+   CS 5800=4, CS 5200=4, AAI 6600=3 (all were NULL).
+3. ✅ First backup snapshot taken (15MB; script needed `docker exec -i`).
+   UGOS has no user crontab — **daily registration must be done once in
+   UGOS Task Scheduler GUI** (user action):
+   `sh /volume1/docker/neu-compass/scripts/nas_backup.sh`.
+4. ✅ cloudflared digest-pinned in compose.
+5. ✅ **RERANKER 256 A/B: REJECTED by measurement.** Prod-corpus probe:
+   pair token lengths p50=110 / p99=206 / max=239, 0% above 256. The
+   tokenizer uses DYNAMIC padding (to batch max, not to max_length), so
+   the rerank pass already runs at ~110-240 tokens — 512→256 changes
+   nothing (the perf agent's padding assumption was wrong). The real
+   next lever is static-shape compile at (pool, 256), which the probe
+   now justifies sizing. RERANKER_MAX_LENGTH setting stays (useful for
+   that experiment).
+6. Prod field-coverage measurement folded into the data findings above.
+
+**Rescue-timeout incident (caught by the post-deploy eval):** the 8s
+Gemini budget was REJECTED by the API itself ("Minimum allowed deadline
+is 10s", 400) — every rescue died instantly, R@5 dropped 1.25pts
+(q013/q018, the flagship borderline-rescue queries, went to 0). Fixed at
+12s; final eval **R@5 0.8628 / MRR 0.9293 / rejected 10 / p50 851ms** =
+baseline. Two lessons re-learned in one evening: measure before
+optimizing (256), and re-run eval after ANY hot-path change, even a
+"safe" timeout (8s).

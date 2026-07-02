@@ -87,7 +87,10 @@ def rescue_expand(
         # 120s default would let one slow Gemini response hold the user
         # (and a threadpool worker) for two minutes. On timeout the caller
         # keeps the original rejection — rescue is best-effort by contract.
-        out = generate_text(prompt, temperature=temperature, timeout_ms=8_000)
+        # 12s, NOT lower: Gemini rejects deadlines under 10s with a 400
+        # ("Minimum allowed deadline is 10s") — an 8s budget killed every
+        # rescue instantly and cost R@5 1.25pts before eval caught it.
+        out = generate_text(prompt, temperature=temperature, timeout_ms=12_000)
     else:
         out = generate_fn(prompt)
     text = out.strip()

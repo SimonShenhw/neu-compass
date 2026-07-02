@@ -25,7 +25,7 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 
 mkdir -p "$BACKUP_DIR"
 
-docker exec neu-compass-api python - <<PY
+docker exec -i neu-compass-api python - <<PY
 import sqlite3
 src = sqlite3.connect("/data/courses.db")
 dst = sqlite3.connect("/data/backups/courses-${STAMP}.db")
