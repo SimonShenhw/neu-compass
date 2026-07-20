@@ -1,10 +1,18 @@
 """Alipay-inspired visual theme for the Streamlit UI (2026-06 frontend pass).
 
+受支付宝启发的 Streamlit UI 视觉主题（2026-06 前端改版）。
+
 Design language (支付宝风):
   - Primary: Alipay blue #1677FF on a cool-gray canvas #F5F7FA
   - White cards with 14-18px radius and soft layered shadows
   - Pill-shaped chips / badges everywhere; gradient hero banner
   - Quiet borders (#EBEEF5) instead of hard dividers
+
+设计语言（支付宝风）：
+  - 主色：支付宝蓝 #1677FF，衬在冷灰色画布 #F5F7FA 上
+  - 白色卡片，14-18px 圆角，柔和的层叠阴影
+  - 到处都是胶囊形 chips / 徽章；渐变 hero 横幅
+  - 用安静的边框（#EBEEF5）取代生硬的分割线
 
 All builders here are PURE string functions (no streamlit import at module
 top) so tests can cover them without the Streamlit runtime — same pattern
@@ -12,8 +20,16 @@ as state_manager / streamlit_app helpers. `inject_theme(st)` is the single
 side-effecting entry point; page modules call it right after
 st.set_page_config.
 
+这里的所有构造函数都是纯字符串函数（模块顶部不导入 streamlit），因此
+测试无需 Streamlit 运行时即可覆盖它们 —— 与 state_manager /
+streamlit_app 的辅助函数遵循同一套模式。`inject_theme(st)` 是唯一
+有副作用的入口；页面模块在 st.set_page_config 之后立刻调用它。
+
 Dynamic values are html-escaped in every builder — course names scraped
 from the catalog can legally contain `&`, `<`, quotes.
+
+每个构造函数里的动态值都会做 html 转义 —— 从目录抓取来的课程名称
+本身就可能合法地包含 `&`、`<`、引号。
 """
 
 from __future__ import annotations
@@ -25,6 +41,9 @@ ALIPAY_BLUE = "#1677FF"
 # matched_via → (label, background, foreground). Mirrors the API's
 # matched_via vocabulary (api/routes/search.py): alias / hybrid / program /
 # rejected / empty.
+# 中文:matched_via → (标签, 背景色, 前景色)。与 API 的 matched_via
+# 取值集合保持一致（api/routes/search.py）：alias / hybrid / program /
+# rejected / empty。
 _BADGE_STYLES: dict[str, tuple[str, str, str]] = {
     "alias": ("直达 · alias", "#E6F7EE", "#18A058"),
     "hybrid": ("检索 · hybrid", "#E8F1FF", ALIPAY_BLUE),
@@ -313,7 +332,8 @@ h3 { font-weight: 600; color: #26303E; letter-spacing: 0.2px; }
 
 
 def inject_theme(st: object) -> None:
-    """Inject the global stylesheet. Call once, right after set_page_config."""
+    """Inject the global stylesheet. Call once, right after set_page_config.
+    注入全局样式表。只调用一次，且要紧跟在 set_page_config 之后。"""
     st.markdown(f"<style>{GLOBAL_CSS}</style>", unsafe_allow_html=True)
 
 
@@ -327,7 +347,13 @@ def hero_html(
 
     courses_indexed comes from /ready at render time; None (API not
     reachable yet) falls back to wording without a hardcoded number —
-    the previous literal went stale every re-scrape."""
+    the previous literal went stale every re-scrape.
+
+    渐变 hero 横幅 —— 品牌 + 标语 + 状态 pills。
+
+    courses_indexed 在渲染时来自 /ready；为 None 时（API 还不可达）
+    回退到不带硬编码数字的文案 —— 旧版写死的数字每次重新抓取后都会
+    过期。"""
     if logged_in and display_name:
         status_pill = f"👋 {html.escape(display_name)}"
     elif logged_in:
@@ -349,7 +375,8 @@ def hero_html(
 
 
 def guest_banner_html() -> str:
-    """Soft card replacing the default st.info guest notice."""
+    """Soft card replacing the default st.info guest notice.
+    替代默认 st.info 访客提示的柔和卡片。"""
     return (
         '<div class="nc-banner">🔒 当前为游客浏览 — 仅可见 level-0 (preview) '
         "Co-op 数据。用 NEU 邮箱登录（左侧栏）解锁贡献分级内容。</div>"
@@ -359,7 +386,10 @@ def guest_banner_html() -> str:
 def matched_via_badge(matched_via: str) -> str:
     """Colored pill for the API's matched_via field. Unknown values fall
     back to the neutral 'empty' style so a new backend tier can't break
-    the UI."""
+    the UI.
+
+    对应 API 的 matched_via 字段的彩色 pill。未知取值会回退到中性的
+    'empty' 样式，这样新增一个后端分级也不会弄坏 UI。"""
     label, bg, fg = _BADGE_STYLES.get(matched_via, _BADGE_STYLES["empty"])
     return (
         f'<span class="nc-badge" style="background:{bg};color:{fg};">'
@@ -379,7 +409,13 @@ def course_header_html(
 
     Chips with NO value are omitted entirely (was an em-dash placeholder —
     review feedback: a row of '—' broadcasts missing data instead of
-    presenting what we have). All three absent → no chips row at all."""
+    presenting what we have). All three absent → no chips row at all.
+
+    课程详情的头部卡片：蓝色代码 + 名称 + 元信息 chips 行。
+
+    没有值的 chip 会被彻底省略（以前是用 em-dash 占位 —— 评审反馈：
+    一整行 '—' 传递出的是"数据缺失"，而不是"展示我们已有的东西"）。
+    三项都缺失 → 整行 chips 都不显示。"""
     chips = ""
     for label, value in (
         ("Term", term),
@@ -405,7 +441,8 @@ def course_header_html(
 
 
 def topic_pills_html(topics: list[str]) -> str:
-    """Topics as Alipay-style light-blue pills. Empty list → empty string."""
+    """Topics as Alipay-style light-blue pills. Empty list → empty string.
+    把主题渲染成支付宝风格的浅蓝色 pill。空列表 → 空字符串。"""
     if not topics:
         return ""
     pills = "".join(
@@ -421,7 +458,13 @@ def result_card_html(
 
     pct (0-100) is the bar width — caller normalizes against the top hit
     in the SAME result list, so the bar reads as relative confidence
-    within this answer, not a cross-query absolute."""
+    within this answer, not a cross-query absolute.
+
+    一张搜索结果卡片：排名 chip + 代码 + 名称 + 分数条。
+
+    pct（0-100）是分数条的宽度 —— 调用方是相对同一个结果列表里的最高分
+    做归一化的，因此这条分数条表达的是本次回答内部的相对置信度，而不是
+    跨查询可比的绝对值。"""
     pct = max(0, min(100, int(pct)))
     return (
         '<div class="nc-result-card">'
@@ -437,6 +480,8 @@ def result_card_html(
 
 # requirement_type → (中英 label, background, foreground). Mirrors the
 # RequirementType literal in schemas/program.py.
+# 中文:requirement_type → (中英文标签, 背景色, 前景色)。与
+# schemas/program.py 里的 RequirementType 字面量类型保持一致。
 _REQ_BADGE_STYLES: dict[str, tuple[str, str, str]] = {
     "core": ("核心 · core", "#FFF1E6", "#E8731A"),
     "foundation": ("基础 · foundation", "#E8F1FF", ALIPAY_BLUE),
@@ -445,6 +490,7 @@ _REQ_BADGE_STYLES: dict[str, tuple[str, str, str]] = {
 }
 
 # prereq requirement → 中文 label. Mirrors PrereqRequirement.
+# 中文:先修 requirement → 中文标签。与 PrereqRequirement 保持一致。
 _PREREQ_LABELS: dict[str, str] = {
     "required": "必须先修",
     "recommended": "建议先修",
@@ -454,7 +500,10 @@ _PREREQ_LABELS: dict[str, str] = {
 
 def requirement_badge(requirement_type: str) -> str:
     """Colored pill for a program-edge requirement_type. Unknown values
-    fall back to the foundation style (neutral blue)."""
+    fall back to the foundation style (neutral blue).
+
+    培养方案边的 requirement_type 对应的彩色 pill。未知取值回退到
+    foundation 样式（中性蓝色）。"""
     label, bg, fg = _REQ_BADGE_STYLES.get(
         requirement_type, _REQ_BADGE_STYLES["foundation"],
     )
@@ -467,7 +516,11 @@ def requirement_badge(requirement_type: str) -> str:
 def program_context_html(edges: list[dict]) -> str:
     """培养方案 rows for the course-detail panel. Each edge dict carries
     program_name / requirement_type / semester_recommended (the
-    /course/{id} program_context shape). Empty list → empty string."""
+    /course/{id} program_context shape). Empty list → empty string.
+
+    课程详情面板里的培养方案行。每个 edge 字典携带 program_name /
+    requirement_type / semester_recommended（即 /course/{id} 的
+    program_context 形状）。空列表 → 空字符串。"""
     if not edges:
         return ""
     rows = ""
@@ -490,14 +543,18 @@ def prereq_label_md(
     *, code: str | None, name: str | None, course_id: str, requirement: str,
 ) -> str:
     """Markdown line for one prerequisite row (the Open button next to it
-    is a Streamlit widget, so this stays markdown rather than HTML)."""
+    is a Streamlit widget, so this stays markdown rather than HTML).
+
+    一行先修课程的 markdown 文本（它旁边的 Open 按钮是 Streamlit 组件，
+    所以这里保持 markdown 形式而不是 HTML）。"""
     shown = f"**{code}** — {name}" if code and name else f"`{course_id}`"
     req = _PREREQ_LABELS.get(requirement, requirement)
     return f"{shown}  \n*{req}*"
 
 
 def empty_detail_html() -> str:
-    """Friendly empty state for the detail column (replaces st.info)."""
+    """Friendly empty state for the detail column (replaces st.info).
+    详情列的友好空状态展示（替代 st.info）。"""
     return (
         '<div class="nc-empty">'
         '<div class="nc-empty-icon">📘</div>'
@@ -507,7 +564,8 @@ def empty_detail_html() -> str:
 
 
 def sidebar_brand_html() -> str:
-    """Compact brand block pinned at the top of the sidebar."""
+    """Compact brand block pinned at the top of the sidebar.
+    固定在侧边栏顶部的紧凑品牌区块。"""
     return (
         '<div class="nc-side-brand">'
         '<div class="nc-side-brand-logo">🧭</div>'
@@ -518,7 +576,8 @@ def sidebar_brand_html() -> str:
 
 
 def footer_html() -> str:
-    """Page footer disclaimer."""
+    """Page footer disclaimer.
+    页脚免责声明。"""
     return (
         '<div class="nc-footer">'
         "NEU-Compass 为非官方学生工具 · 课程数据可能滞后，选课请以官方目录为准 · "

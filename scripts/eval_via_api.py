@@ -7,7 +7,18 @@ alias tier, Layer 2 prefix extraction, and the deployed backend entirely.
 This script instead drives the deployed API (PC over Tailscale → NAS),
 so R@5 / MRR / latency describe exactly what users get.
 
+为什么需要这个脚本(2026-06 优化冲刺):run_eval.py 在进程内重建整套检索
+栈,这样做 (a) 本地需要装好能跑的 torch,(b) 测的是一条根本不是生产
+路径的流水线 —— 它完全跳过了别名(alias)层、Layer 2 前缀抽取,以及
+实际部署的后端。这个脚本改为直接驱动已部署的 API(PC 通过 Tailscale
+连到 NAS),这样 R@5 / MRR / 延迟描述的就是用户实际拿到的体验。
+
 Usage (from project root, PC side):
+    uv run python scripts/eval_via_api.py --base-url http://simonshen:8000 \
+        --label pool20_fp16
+    uv run python scripts/eval_via_api.py                  # localhost:8000
+
+用法(项目根目录,PC 端):
     uv run python scripts/eval_via_api.py --base-url http://simonshen:8000 \
         --label pool20_fp16
     uv run python scripts/eval_via_api.py                  # localhost:8000
@@ -16,6 +27,11 @@ Output: text summary + eval/api_eval_<label>.json with per-query rows.
 A/B workflow: change NAS config (e.g. RERANK_POOL_SIZE=10 in .env, or
 OPENVINO_MODEL_DIR=/data/openvino_int8), `docker compose up -d api`,
 re-run with a new --label, diff the JSONs.
+
+输出:文本摘要 + eval/api_eval_<label>.json(含逐条查询的明细行)。
+A/B 工作流:改动 NAS 配置(例如 .env 里的 RERANK_POOL_SIZE=10,或者
+OPENVINO_MODEL_DIR=/data/openvino_int8)、执行 `docker compose up -d api`、
+换一个新的 --label 重新跑一遍,然后 diff 两份 JSON。
 """
 
 from __future__ import annotations
@@ -36,10 +52,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Must come after the sys.path.insert above (E402 suppressed accordingly) —
+# eval.run_eval only becomes importable once PROJECT_ROOT is on sys.path.
+# 中文:必须写在上面 sys.path.insert 之后(因此抑制了 E402 告警)——
+# eval.run_eval 只有在 PROJECT_ROOT 被加入 sys.path 之后才能被导入。
 from eval.run_eval import run_eval  # noqa: E402
 
 
 def _percentile(sorted_vals: list[float], pct: float) -> float:
+    # Nearest-rank percentile on an already-sorted list — no interpolation,
+    # good enough for eval reporting and avoids pulling in numpy just for
+    # this one function.
+    # 中文:对已排序列表取"最近秩"(nearest-rank)分位数 —— 不做插值,
+    # 对评测报告而言已经足够,也省得为了这一个函数专门引入 numpy 依赖。
     if not sorted_vals:
         return 0.0
     idx = min(len(sorted_vals) - 1, int(len(sorted_vals) * pct))
@@ -75,6 +100,9 @@ def cli() -> int:
     # X-Eval-Run tags every request in the server's query_log as
     # 'eval:<label>' so eval traffic never pollutes organic-query mining
     # (the v0.5 real-distribution work depends on this split staying clean).
+    # 中文:X-Eval-Run 会把这次的每个请求在服务端 query_log 里标记成
+    # 'eval:<label>',这样评测流量就绝不会污染"真实自然查询"的挖掘工作
+    # (v0.5 的真实分布研究依赖这个切分保持干净)。
     with httpx.Client(
         base_url=base_url, timeout=args.timeout,
         headers={"X-Eval-Run": args.label},
@@ -84,6 +112,8 @@ def cli() -> int:
             print(f"!! {base_url}/ready -> {ready.status_code}; aborting")
             return 1
         # One uncounted warmup so first-hit effects don't skew p95.
+        # 中文:先做一次不计入统计的预热(warmup)请求,避免"第一次调用"
+        # 的额外开销拉偏 p95。
         client.post("/search", json={"query": "warmup query", "k": args.k})
 
         def search_fn(q: str) -> list[str]:

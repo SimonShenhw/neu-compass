@@ -1,14 +1,26 @@
 """FastAPI dependency injection: SQLite conn, repositories, and retrievers.
 
+FastAPI 依赖注入：SQLite 连接、各 Repository 与检索器。
+
 Per-request connection pattern (cheap on SQLite — no pool overhead). Heavy
 state (embedder, FAISS index, BM25 corpus) lives on `app.state` populated
 during lifespan; we read it via `Request.app.state` so tests can override
 by simply assigning to the field.
 
+每请求一个连接的模式（在 SQLite 上代价很低 —— 无需连接池开销）。重量级
+状态（嵌入器、FAISS 索引、BM25 语料）存在 `app.state` 上，由 lifespan
+填充；我们通过 `Request.app.state` 读取它，这样测试只需给字段赋值就能
+覆盖。
+
 Why per-request conn (not a single shared one): SQLite default
 `check_same_thread=True`. FastAPI dispatches sync routes via threadpool;
 sharing a connection across threads would require `check_same_thread=False`
 + external locking. Per-request connect is ~1ms and side-steps the issue.
+
+为什么每请求单开一个连接（而不是共用一个）：SQLite 默认
+`check_same_thread=True`。FastAPI 通过线程池派发同步路由；跨线程共享
+连接需要 `check_same_thread=False` + 外部加锁。每请求单开连接耗时约
+1ms，绕开了这个问题。
 """
 
 from __future__ import annotations
@@ -74,12 +86,16 @@ def get_program_repo(conn: DbConn) -> ProgramRepository:
 
 # LLM streaming function. Override in tests via app.dependency_overrides
 # so /chat tests don't need a real Gemini call.
+# 中文：LLM 流式输出函数。测试里通过 app.dependency_overrides 覆盖，
+# 这样 /chat 测试就不需要真的调用 Gemini。
 def get_chat_stream_fn() -> Callable[[str], _Iter[str]]:
     return generate_text_stream
 
 
 # HyDE rescue expansion (ADR-0019). None when the feature is off — routes
 # skip the rescue entirely. Tests override with a fake to avoid Gemini.
+# 中文（ADR-0019）：HyDE 救援扩写。功能关闭时返回 None —— 路由会完全跳过
+# 救援逻辑。测试用假函数覆盖以避免调用 Gemini。
 def get_hyde_rescue_fn() -> Callable[[str], str | None] | None:
     if not settings.hyde_rescue:
         return None
@@ -94,9 +110,15 @@ def get_hyde_rescue_fn() -> Callable[[str], str | None] | None:
 def get_current_user_id(request: Request) -> str | None:
     """Resolve the caller's identity from `Authorization: Bearer <token>`.
 
+    从 `Authorization: Bearer <token>` 解析调用者身份。
+
     - no Authorization header → None (anonymous — fine for public routes)
     - header present but token invalid/expired → 401 (an explicit credential
       that fails verification is an error, never silent anonymity)
+
+    - 没有 Authorization 请求头 → None（匿名 —— 公开路由可以接受）
+    - 请求头存在但令牌无效/过期 → 401（显式提供的凭证校验失败属于错误，
+      绝不能悄悄降级为匿名）
     """
     from fastapi import HTTPException, status  # noqa: PLC0415
 
@@ -116,6 +138,7 @@ def get_current_user_id(request: Request) -> str | None:
 
 
 # OAuth code-exchange function. Tests override to bypass real Google.
+# 中文：OAuth 授权码兑换函数。测试会覆盖它以绕开真实的 Google 调用。
 def get_oauth_exchange_fn() -> Callable[..., dict[str, Any]]:
     return exchange_code_for_token
 
@@ -148,7 +171,10 @@ def get_reranker(request: Request) -> CrossEncoderReranker | None:
     """Cross-encoder reranker. Returns None when not loaded — callers
     (e.g. /search) treat None as "skip rerank+blend, keep hybrid path"
     so the API still works in degraded environments where the reranker
-    weights aren't present (CI, integration without GPU)."""
+    weights aren't present (CI, integration without GPU).
+    交叉编码器 reranker。未加载时返回 None —— 调用方（如 /search）把 None
+    理解为"跳过 rerank+blend，保留 hybrid 路径"，这样在没有 reranker 权重
+    的降级环境（CI、无 GPU 的集成环境）里 API 依然能用。"""
     return getattr(request.app.state, "reranker", None)
 
 
@@ -173,6 +199,8 @@ def get_hybrid_retriever(
 ) -> HybridRetriever:
     # ADR-0020: acronym expansion feeds the retrieval legs only; it's a
     # no-op (returns the query untouched) when the glossary file is absent.
+    # 中文（ADR-0020）：缩写扩写只喂给检索两路；术语表文件缺失时它是
+    # no-op（原样返回查询）。
     expander = None
     if settings.acronym_expansion:
         from rag.acronyms import expand_query  # noqa: PLC0415

@@ -1,5 +1,7 @@
 """POST /coop — k-anonymity-gated upload. GET /coop — visibility-tier list.
 
+POST /coop —— 受 k-匿名门控的上传。GET /coop —— 按可见性分层的列表。
+
 PII red lines (PLAN §3.4 / §6.3 / ADR §3.4):
   - The (company, role, coop_term) triple must satisfy k=2 anonymity AFTER
     insert: the new row plus existing rows with the same triple total ≥ 2.
@@ -14,6 +16,18 @@ PII red lines (PLAN §3.4 / §6.3 / ADR §3.4):
     Google OAuth round-trip — the old trusted X-User-Id header let anyone
     on the network read salary-tier data or impersonate contributors.
 
+PII 红线（PLAN §3.4 / §6.3 / ADR §3.4）：
+  - (company, role, coop_term) 三元组在插入后必须满足 k=2 匿名性：新记录
+    加上已有的同三元组记录总数 ≥ 2。由服务端 schemas.coop.
+    is_uniquely_identifying 强制执行 —— 客户端无法绕过。
+  - visibility_level 由服务端根据内容是否存在来设定，而不是客户端说了算。
+    salary_range_usd → 2（premium）。interview/technical → 1（detail）。
+    仅有基础字段 → 0（preview）。这防止客户端靠撒谎在 level=0 发布薪资。
+  - 用户身份来自经签名的会话令牌（ADR-0021，`Authorization: Bearer`），
+    只有 Google OAuth 往返完成后由 POST /auth/callback 签发 —— 旧版信任
+    X-User-Id 请求头的做法，让同一网络下任何人都能读取薪资档数据或冒充
+    贡献者。
+
 GET /coop applies the give-to-get gate at FIELD level (PLAN §6.4 tier
 model): every row is listed for everyone, but interview/technical fields
 are stripped below tier 1 and salary below tier 2 (tier = the caller's
@@ -23,6 +37,14 @@ implementation — starved the marketplace: all seed rows carry salary
 give-to-get loop could never bootstrap. visibility_level still reports
 the row's intrinsic tier so the UI can render "contribute to unlock"
 hints for stripped fields.
+
+GET /coop 在字段级别应用"贡献换权限"门控（PLAN §6.4 分层模型）：每一行对
+所有人都可见，但 interview/technical 字段在 tier 1 以下被剥离，salary 在
+tier 2 以下被剥离（tier = 调用者的 contribution_count，封顶为 2）。行级
+过滤 —— 最初的实现 —— 会饿死这个市场：所有种子数据行都带薪资（level 2），
+匿名/新用户看到的会是空列表，"贡献换权限"循环永远无法启动。
+visibility_level 仍会报告该行的本征分层，方便 UI 为被剥离字段渲染
+"贡献以解锁"提示。
 """
 
 from __future__ import annotations
@@ -56,10 +78,17 @@ log = structlog.get_logger("neu_compass.coop")
 def _derive_visibility(req: CoopUploadRequest) -> int:
     """visibility_level is content-driven, not client-chosen.
 
+    visibility_level 由内容驱动，而非客户端指定。
+
     Tier rules (PLAN §6.4):
       2 — salary_range_usd present (premium)
       1 — interview_summary or technical_questions present (detail)
       0 — only public-tier fields (preview)
+
+    分层规则（PLAN §6.4）：
+      2 —— 存在 salary_range_usd（premium）
+      1 —— 存在 interview_summary 或 technical_questions（detail）
+      0 —— 仅有公开层字段（preview）
     """
     if req.salary_range_usd:
         return 2
@@ -117,6 +146,9 @@ def upload_coop(
     # A signed token can outlive its user row (7-day max_age vs. account
     # deletion); without this check the contributor_user_id FK fails as a
     # 500. Same 401 contract as /auth/me — the client clears its session.
+    # 中文：签名令牌的存活时间可能超过用户行本身（7 天 max_age vs. 账号被
+    # 删除）；不做这个检查，contributor_user_id 外键会失败并抛 500。与
+    # /auth/me 相同的 401 约定 —— 客户端清空会话。
     if user_repo.get(x_user_id) is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -146,6 +178,9 @@ def upload_coop(
     # k-anonymity gate. corpus = existing + new (test_coop_schema convention:
     # the new row counts toward k). Block if (company, role, coop_term)
     # appears < 2 times in the combined set.
+    # 中文：k-匿名门。corpus = 已有记录 + 新记录（与 test_coop_schema 的
+    # 约定一致：新记录本身也计入 k）。若 (company, role, coop_term) 在合并
+    # 集合中出现次数 < 2，则拒绝。
     existing = coop_repo.list_all()
     combined_corpus = existing + [new_coop]
     if is_uniquely_identifying(new_coop, combined_corpus, k=2):
@@ -171,8 +206,12 @@ def upload_coop(
     # visibility tiers actually unlock. Same transaction as the insert; the
     # contributor_user_id FK guarantees the users row exists once add()
     # succeeded, so this cannot UserNotFound on any path add() survives.
+    # 中文（PLAN §6.4）：贡献换权限门 —— 给贡献者记一次功，让更高可见性
+    # 分层真正得以解锁。与插入操作在同一事务里；一旦 add() 成功，
+    # contributor_user_id 外键就保证了 users 行必然存在，所以只要 add()
+    # 能存活，这里就不可能出现 UserNotFound。
     user_repo.increment_contribution_count(x_user_id)
-    conn.commit()  # route owns the transaction; repos don't auto-commit
+    conn.commit()  # route owns the transaction; repos don't auto-commit / 路由持有事务，repo 不自动提交
     log.info(
         "coop.accepted",
         coop_id=coop_id,
@@ -229,6 +268,8 @@ def list_coop(
             # Field-level give-to-get gate — redaction happens HERE,
             # server-side; clients never receive what their tier hasn't
             # earned.
+            # 中文：字段级贡献换权限门 —— 脱敏就发生在这里、服务端完成；
+            # 客户端永远收不到其分层还未挣到的内容。
             interview_summary=c.interview_summary if tier >= 1 else None,
             technical_questions=c.technical_questions if tier >= 1 else None,
             salary_range_usd=c.salary_range_usd if tier >= 2 else None,

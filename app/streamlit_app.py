@@ -1,13 +1,23 @@
 """Streamlit user UI: course search + course detail (PLAN v2.3 §3.7).
 
+Streamlit 用户界面：课程搜索 + 课程详情（PLAN v2.3 §3.7）。
+
 Production user-facing frontend until Andy Dong's `compass-frontend` (React)
 repo lands. Streamlit is the canonical user surface in v0.x; team docs +
 public URL `compass.neu-compass.me` point at it. The FastAPI backend (`api.*`)
 is what Andy's React will call once that repo exists.
 
+在 Andy Dong 的 `compass-frontend`（React）仓库落地之前，这里是面向用户的
+生产前端。v0.x 阶段 Streamlit 是官方用户入口；团队文档与公网地址
+`compass.neu-compass.me` 都指向它。FastAPI 后端（`api.*`）即是将来 React
+要调用的那套接口。
+
 Main Streamlit page: chat-style course search + course detail panel +
 sample-query chips for first-time users + advanced-filter expander in
 the sidebar.
+
+Streamlit 主页面：对话式课程搜索 + 课程详情面板 + 首访用户的示例查询
+chips + 侧边栏里的高级筛选折叠面板。
 
 Run:
     uv run streamlit run app/streamlit_app.py
@@ -17,6 +27,11 @@ Layout:
     [ right: selected course detail ]
     sidebar: OAuth login/logout + advanced filters expander
 
+布局：
+    [ 左：hero（仅首次访问）+ 聊天历史 + chat_input ]
+    [ 右：选中课程的详情 ]
+    侧边栏：OAuth 登录/登出 + 高级筛选折叠面板
+
 Pipeline per user message:
   1. add_message(role='user', content=prompt)
   2. ApiClient.chat_stream({"query": prompt, ...filters}) → NDJSON events
@@ -25,11 +40,24 @@ Pipeline per user message:
      incrementally
   5. Final assistant text + evidence persisted to state.messages
 
+每条用户消息的处理流水线：
+  1. add_message(role='user', content=prompt)
+  2. ApiClient.chat_stream({"query": prompt, ...filters}) → NDJSON 事件流
+  3. meta 事件写入 state（驱动证据气泡）
+  4. token 事件流入 st.write_stream —— 助手消息增量渲染
+  5. 最终助手文本 + 证据持久化到 state.messages
+
 Auth: login link / logout button live in the sidebar (render_auth_sidebar).
 ?code= callback handled at the top via handle_oauth_callback.
 
+认证：登录链接 / 登出按钮位于侧边栏（render_auth_sidebar）。
+?code= 回调在页面顶部由 handle_oauth_callback 处理。
+
 PLAN §3.6 red lines: no API key in chat output, no commercial hooks,
 OAuth restricted to NEU domains (server-side).
+
+PLAN §3.6 红线：聊天输出中不得出现 API key、不得加商业化钩子、
+OAuth 仅限 NEU 域名（服务端强制）。
 """
 
 from __future__ import annotations
@@ -39,15 +67,24 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+# `streamlit run app/streamlit_app.py` executes this file as a top-level script,
+# so the repo root must be on sys.path for `app.*` / `config` imports to resolve.
+# `streamlit run` 会把本文件当作顶层脚本执行，须把仓库根目录加入 sys.path，
+# `app.*` / `config` 这类绝对导入才能解析。
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Windows consoles default to a legacy codepage (GBK on zh-CN); without forcing
+# UTF-8, emoji/Chinese in printed output raise UnicodeEncodeError.
+# Windows 控制台默认旧代码页（中文系统为 GBK），不强制 stdout 用 UTF-8 的话，
+# 输出里的 emoji/中文会抛 UnicodeEncodeError。
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 def _format_evidence(results: list[dict]) -> list[dict]:
-    """Pull out the (course_id, code, name) tuple per result for the bubble UI."""
+    """Pull out the (course_id, code, name) tuple per result for the bubble UI.
+    为证据气泡 UI 从每条结果中抽取 (course_id, code, name) 元组。"""
     return [
         {
             "course_id": r["course_id"],
@@ -60,7 +97,8 @@ def _format_evidence(results: list[dict]) -> list[dict]:
 
 
 def _summarize_results(results: list[dict], matched_via: str) -> str:
-    """Plain-text fallback summary used when Gemini stream unavailable."""
+    """Plain-text fallback summary used when Gemini stream unavailable.
+    Gemini 流式输出不可用时使用的纯文本降级摘要。"""
     if not results:
         return "No matching courses. Try different terms or relax filters."
     if matched_via == "alias":
@@ -87,8 +125,15 @@ def stream_assistant(
     yields assistant tokens, and side-effect captures the meta event in
     `state['last_chat_meta']` for the post-stream evidence rendering.
 
+    供 `st.write_stream` 使用的生成器：消费 /chat 的 NDJSON 事件流，逐个
+    产出助手 token，并把 meta 事件旁路存入 `state['last_chat_meta']`，
+    供流结束后渲染证据区使用。
+
     On in-stream error event, yields a user-facing warning + stops. On
     'done', stops. Pure logic; no Streamlit imports.
+
+    流中收到 error 事件时，先产出一条面向用户的警告再停止；收到 'done'
+    即停止。纯逻辑，不导入 Streamlit。
     """
     state["last_chat_meta"] = None
     state["last_chat_error"] = None
@@ -112,7 +157,11 @@ def stream_assistant(
 def _recent_history(messages: list[dict], limit: int = 6) -> list[dict]:
     """Last `limit` turns as the {role, content} shape ChatRequest.history
     expects. Content capped at 4000 chars (the API's ChatTurn bound);
-    assistant answers can exceed it with long evidence-rich replies."""
+    assistant answers can exceed it with long evidence-rich replies.
+
+    取最近 `limit` 轮对话，整理成 ChatRequest.history 期望的
+    {role, content} 形状。内容截断到 4000 字符（API 的 ChatTurn 上限）；
+    带大量证据的助手长回答可能超限，所以必须截断。"""
     return [
         {"role": m["role"], "content": str(m["content"])[:4000]}
         for m in messages[-limit:]
@@ -124,7 +173,11 @@ def _context_course_ids(messages: list[dict], limit: int = 10) -> list[str]:
     """Course ids from the most recent assistant turn that carried
     evidence — the referent set for follow-ups ("这门课..."). The API
     only uses these when its follow-up detector fires, so sending them
-    on every request is harmless."""
+    on every request is harmless.
+
+    取最近一条带证据的助手回复里的课程 id —— 即追问（"这门课..."）的
+    指代集合。API 只在其追问检测器命中时才使用它们，因此每次请求都带上
+    也无副作用。"""
     for m in reversed(messages):
         if m.get("role") == "assistant" and m.get("evidence"):
             return [ev["course_id"] for ev in m["evidence"]][:limit]
@@ -143,7 +196,10 @@ FOLLOWUP_CHIPS_MULTI: list[str] = [
 ]
 """Suggested follow-up chips under the latest answer. Click → injected
 via pending_query, riding the same conversation-continuity path the
-typed version would take."""
+typed version would take.
+
+最新回答下方的追问建议 chips。点击后经 pending_query 注入，与手动输入
+一样，走同一条对话连续性路径。"""
 
 
 SAMPLE_QUERIES: list[tuple[str, str]] = [
@@ -154,7 +210,11 @@ SAMPLE_QUERIES: list[tuple[str, str]] = [
 ]
 """Hero-block sample chips. Shown only on first visit (no chat history yet).
 Two languages because the audience is bilingual NEU graduate students;
-clicking a chip injects the query string verbatim into the chat pipeline."""
+clicking a chip injects the query string verbatim into the chat pipeline.
+
+Hero 区示例查询 chips，仅在首次访问（尚无聊天历史）时展示。之所以中英
+双语，是因为受众是中英双语的 NEU 研究生；点击 chip 会把查询串原样注入
+聊天流水线。"""
 
 
 def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> None:
@@ -162,7 +222,12 @@ def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> 
     score bar, with a 查看 button per row. Bar widths normalize against
     the top score WITHIN this list (relative confidence, not absolute).
     Shared by chat history and the live response path so the two can't
-    drift apart visually."""
+    drift apart visually.
+
+    渲染一组证据的结果卡片：名次 + 课程代码 + 名称 + 相对分数条，每行带
+    一个查看按钮。分数条宽度按本列表内的最高分归一化（表达的是相对置信
+    度，不是绝对值）。聊天历史与实时响应两条路径共用此函数，两处的视觉
+    呈现才不会各自漂移。"""
     from app.state_manager import select_course  # noqa: PLC0415
     from app.ui_theme import result_card_html  # noqa: PLC0415
 
@@ -177,7 +242,7 @@ def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> 
                 code=ev["primary_code"],
                 name=ev["primary_name"],
                 score=score,
-                pct=max(pct, 8),  # keep a visible sliver for low scores
+                pct=max(pct, 8),  # keep a visible sliver for low scores / 低分也保留可见细条
             ),
             unsafe_allow_html=True,
         )
@@ -192,6 +257,9 @@ def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> 
 def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
     """Sidebar 'Advanced filters' expander. Returns the active filters dict
     (already in session_state, returned for convenience). No-side-effect read.
+
+    侧边栏「高级筛选」折叠面板。返回当前生效的 filters 字典（其实已存于
+    session_state，返回只是方便调用方）。读取无副作用。
     """
     with st.sidebar:
         st.divider()
@@ -205,6 +273,11 @@ def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
             # use returned an empty result set. Re-enable each one when a
             # pipeline actually populates it (syllabus ingestion for term
             # /mode, RMP enrichment for professor).
+            # 只开放 CREDITS 一项。term / delivery_mode / professor 过滤在
+            # API 里存在，但全目录范围源数据缺失（2026-06 数据盘点：term 与
+            # delivery_mode 为 0/6,469，professor 仅约 3 门课）——一旦开放，
+            # 用一次就是一次空结果。等相应管线真正填充数据后再逐项恢复
+            # （term/mode 靠 syllabus 摄取，professor 靠 RMP 增强）。
             credits_str = st.text_input(
                 "Credits", value=str(filters.get("credits") or ""),
                 placeholder="3", key="filter_credits",
@@ -232,6 +305,12 @@ def _render_filters_sidebar(st: object, state: object) -> dict[str, object]:
                 # a callback BEFORE the next rerun, while mutation is legal.
                 # `pop` (vs setting "") is what the docs recommend for
                 # clearing widget-bound state cleanly.
+                # 用 on_click 回调而不是在 if 块里直接改 state：本轮渲染中
+                # 组件实例化之后再写 st.session_state[<widget_key>] 会抛
+                # StreamlitAPIException —— 而此按钮上方的筛选组件已经创建。
+                # on_click 在下一次 rerun 之前的回调阶段执行，那时改写才
+                # 合法。用 `pop`（而非置 ""）清理组件绑定状态是官方文档的
+                # 推荐做法。
                 st.button(
                     "Clear all",
                     use_container_width=True,
@@ -246,7 +325,12 @@ def _clear_filters_callback() -> None:
     callback phase, so mutating widget-bound session_state keys is allowed
     (the alternative — setting state[k]="" inline after the widgets render
     — raises StreamlitAPIException). Caller should not import streamlit
-    at module top to keep test imports cheap; lazy import here."""
+    at module top to keep test imports cheap; lazy import here.
+
+    「Clear all」筛选按钮的 on_click 回调。它运行在回调阶段，因此允许改写
+    组件绑定的 session_state 键（另一种写法 —— 组件渲染后内联置
+    state[k]="" —— 会抛 StreamlitAPIException）。为了让测试导入保持轻量，
+    模块顶层不导入 streamlit，这里用惰性导入。"""
     import streamlit as st  # noqa: PLC0415
     st.session_state["filters"] = {}
     st.session_state.pop("filter_credits", None)
@@ -254,7 +338,10 @@ def _clear_filters_callback() -> None:
 
 def render() -> None:
     """Render the chat UI. Imported lazily so `import app.streamlit_app`
-    in tests doesn't trigger Streamlit's session machinery."""
+    in tests doesn't trigger Streamlit's session machinery.
+
+    渲染聊天 UI。内部依赖全部惰性导入，测试里 `import app.streamlit_app`
+    不会触发 Streamlit 的会话机制。"""
     import streamlit as st  # noqa: PLC0415
 
     from app.api_client import ApiClient, ApiError  # noqa: PLC0415
@@ -293,11 +380,15 @@ def render() -> None:
     init_state(st.session_state)
 
     # Process ?code= callback BEFORE rendering anything else (it may rerun).
+    # 先处理 ?code= 回调再渲染其他内容（回调可能触发 rerun）。
     handle_oauth_callback()
 
     # Cookie session (refresh-survival): restore first so a failed restore
     # can queue a cookie clear, then flush — the flush also renders writes
     # queued by the OAuth callback / logout on the previous pass.
+    # Cookie 会话（刷新不掉线）：先恢复登录，这样失败的恢复能把「清 cookie」
+    # 排入队列；随后统一 flush —— flush 同时会把上一轮 OAuth 回调 / 登出
+    # 排队的写操作真正下发给浏览器。
     from app.cookie_session import (  # noqa: PLC0415
         flush_pending_cookie,
         restore_login_from_cookie,
@@ -313,6 +404,8 @@ def render() -> None:
     # Corpus size for the hero pill — one /ready call per browser tab,
     # cached in session_state. Failure (API warming) degrades to the
     # number-free wording inside hero_html.
+    # hero 徽标里的课程总数 —— 每个浏览器标签页只调一次 /ready，缓存在
+    # session_state。失败（API 预热中）时降级为 hero_html 里不带数字的文案。
     if "_ready_info" not in st.session_state:
         try:
             with ApiClient(timeout=5.0) as api:
@@ -336,12 +429,17 @@ def render() -> None:
 
     # Sidebar nav (not st.tabs): chat_input must stay bottom-pinned on the
     # search page, which tabs would break. Pages: search / programs / co-op.
+    # 侧边栏导航（不用 st.tabs）：搜索页的 chat_input 必须固定在页面底部，
+    # tabs 会破坏这一点。页面：搜索 / 培养方案 / Co-op。
     pages = ["🔍 课程搜索 · Search", "🎓 培养方案 · Programs", "💼 Co-op 经验"]
 
     # Cross-page hand-offs (discover chips, curriculum 查看 buttons) queue
     # a pending_nav_* flag + st.rerun(); we consume it HERE, before the
     # radio instantiates — writing a widget-bound key after the widget
     # rendered raises StreamlitAPIException (see filter-clear note).
+    # 跨页面跳转（发现区 chips、课程表查看按钮）先写入 pending_nav_* 标志再
+    # st.rerun()；必须在 radio 实例化之前、也就是这里消费掉 —— 组件渲染后
+    # 再写其绑定键会抛 StreamlitAPIException（见 filter-clear 处的说明）。
     if st.session_state.pop("pending_nav_to_programs", None):
         st.session_state["nav_page"] = pages[1]
     if st.session_state.pop("pending_nav_to_coop", None):
@@ -365,6 +463,8 @@ def render() -> None:
 
     # 5:3 (was 3:2): the chat stream is the primary surface — review
     # feedback flagged ~35% wasted horizontal space with the old ratio.
+    # 5:3（原 3:2）：聊天流才是主界面 —— 评审反馈指出旧比例约有 35% 的
+    # 横向空间被浪费。
     chat_col, detail_col = st.columns([5, 3])
 
     with chat_col:
@@ -374,6 +474,9 @@ def render() -> None:
         # yet). Round-3 fix for the cold-start blank screen: the landing
         # now offers browsable CONTENT (programs / starter courses / co-op
         # teaser), not just an empty chat box with example queries.
+        # 发现区 + 示例 chips —— 仅首次访问（尚无聊天历史）时展示。第三轮
+        # 针对冷启动白屏的修复：落地页现在提供可浏览的真实内容（培养方案 /
+        # 入门课程 / Co-op 预览），而不只是一个带示例查询的空聊天框。
         if not get_messages(st.session_state):
             from app.discover_view import render_discover  # noqa: PLC0415
 
@@ -401,6 +504,10 @@ def render() -> None:
         # blocks (common when user asks repeatedly about a topic) collides
         # on f"open-{role}-{course_id}" and Streamlit raises
         # DuplicateWidgetID, blowing up the entire chat history.
+        # 渲染已有的对话历史。用 enumerate(messages) 是为了让「查看」按钮的
+        # key 带上消息序号 —— 否则同一门课出现在两条消息的证据块里（用户
+        # 反复追问同一主题时很常见）会在 f"open-{role}-{course_id}" 上撞
+        # key，Streamlit 抛 DuplicateWidgetID，整个聊天历史直接崩掉。
         messages = get_messages(st.session_state)
         for msg_idx, msg in enumerate(messages):
             with st.chat_message(
@@ -426,6 +533,8 @@ def render() -> None:
             # Follow-up suggestion chips under the LATEST answer only —
             # they ride the conversation-continuity path (context tier),
             # so a click answers about the course(s) just discussed.
+            # 追问建议 chips 只挂在最新一条回答下面 —— 它们走对话连续性
+            # 路径（context 档），点击即是在追问刚讨论过的那（几）门课。
             is_last = msg_idx == len(messages) - 1
             if (
                 is_last

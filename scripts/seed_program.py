@@ -3,7 +3,14 @@
 Loads `data/program_seed/<program_id>.json` and upserts via ProgramRepository.
 Idempotent — safe to re-run; updates existing rows in place.
 
+从 `data/program_seed/<program_id>.json` 加载数据,通过 ProgramRepository
+执行 upsert。幂等 —— 可以安全地重复运行;已存在的行会被原地更新。
+
 Usage:
+  uv run python scripts/seed_program.py --file data/program_seed/aai_ms.json
+  uv run python scripts/seed_program.py --file data/program_seed/aai_ms.json --commit
+
+用法:
   uv run python scripts/seed_program.py --file data/program_seed/aai_ms.json
   uv run python scripts/seed_program.py --file data/program_seed/aai_ms.json --commit
 """
@@ -22,6 +29,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# These imports must come after the sys.path.insert above (E402 suppressed
+# accordingly) — they resolve local packages that only become importable
+# once PROJECT_ROOT is on sys.path.
+# 中文:这几个 import 必须写在上面 sys.path.insert 之后(因此抑制了 E402
+# 告警)—— 它们解析的是本地包,只有 PROJECT_ROOT 被加入 sys.path 之后
+# 才能被导入。
 from config import settings  # noqa: E402
 from db.program_repository import ProgramRepository  # noqa: E402
 from schemas.program import (  # noqa: E402
@@ -33,7 +46,11 @@ from schemas.program import (  # noqa: E402
 
 def _validate_courses_exist(conn: sqlite3.Connection, course_ids: set[str]) -> set[str]:
     """Return the set of course_ids in `course_ids` that don't exist in
-    courses table — caller decides whether to abort or continue."""
+    courses table — caller decides whether to abort or continue.
+
+    中文:返回 `course_ids` 中在 courses 表里不存在的那部分 course_id ——
+    要中止还是继续,由调用方决定。
+    """
     placeholders = ",".join("?" * len(course_ids))
     rows = conn.execute(
         f"SELECT course_id FROM courses WHERE course_id IN ({placeholders})",
@@ -77,6 +94,7 @@ def cli() -> int:
 
     try:
         # Validate referenced courses exist before writing FK rows.
+        # 中文:在写入带外键的行之前,先校验被引用的课程都存在。
         referenced = (
             {r.course_id for r in required}
             | {p.course_id for p in prereqs}
@@ -104,6 +122,7 @@ def cli() -> int:
 
         print(f"=> committed.")
         # Sanity recap
+        # 中文:健全性检查小结
         for sem in (1, 2, 3, 4):
             n = len(repo.list_required_courses(program.program_id, semester=sem))
             print(f"   semester {sem}: {n} courses")
