@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     # 中文:API 基础 URL(第 6 周起,Streamlit -> FastAPI 之间的跳转地址)。
     api_base_url: str = "http://localhost:8000"
 
+    # === Public UI origin (deep-link sharing) ===
+    # Where a student's browser reaches the UI — NOT api_base_url (that's the
+    # container-internal hop) and NOT google_oauth_redirect_uri (same value
+    # today by coincidence; it has already moved once, see postmortem_week7).
+    # Only ever used to BUILD copyable ?course= / ?program= share links.
+    # 中文:学生浏览器访问 UI 的地址 —— 不是 api_base_url(那是容器内部的
+    # 跳转地址),也不是 google_oauth_redirect_uri(今天恰好同值而已;它已经
+    # 改过一次,见 postmortem_week7)。仅用于拼出可复制的 ?course= /
+    # ?program= 分享链接。
+    public_base_url: str = "http://localhost:8501"
+
     # === Embedding ===
     # 中文:嵌入模型相关配置。
     # (No embedding_dim knob here: the real constant is

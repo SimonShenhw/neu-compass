@@ -81,6 +81,37 @@ def test_get_course_uses_path() -> None:
     assert body["course_id"] == "c-cs-5800"
 
 
+def test_resolve_course_sends_ref_as_query_param() -> None:
+    """The ref goes in the QUERY string, not the path — deep-link refs are
+    user-controlled and may contain characters a path segment would eat."""
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["ref"] = request.url.params.get("ref")
+        return httpx.Response(200, json={"ref": "CS-5800", "matches": []})
+
+    with _client(handler) as api:
+        api.resolve_course("CS-5800")
+
+    assert seen["path"] == "/resolve/course"
+    assert seen["ref"] == "CS-5800"
+
+
+def test_resolve_course_encodes_awkward_ref() -> None:
+    """A hand-typed ref can carry a slash or a space; both must survive."""
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["ref"] = request.url.params.get("ref")
+        return httpx.Response(200, json={"ref": "x", "matches": []})
+
+    with _client(handler) as api:
+        api.resolve_course("CS/5800 应用")
+
+    assert seen["ref"] == "CS/5800 应用"
+
+
 # === Auth header ===
 
 

@@ -112,6 +112,11 @@ services:
       API_BASE_URL: http://api:8000
       # Keep byte-identical to the api service value (see comment there).
       GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/
+      # Where a STUDENT's browser reaches the UI. Same string as the OAuth
+      # redirect today, but tracked separately on purpose: this one only
+      # builds shareable ?course= / ?program= links, and the redirect URI
+      # has already moved once (postmortem_week7).
+      PUBLIC_BASE_URL: https://compass.neu-compass.me
     command:
       - streamlit
       - run

@@ -18,6 +18,15 @@ Three extraction patterns:
   1. 完整代码 'CS 5800' / 'AAI6600'(正则归一化为规范形式)
   2. 裸 4 位数字 '5800'(课程号的口语说法)
   3. 整个查询精确匹配(用于 'Applied AI'、'Algo'、'应用 AI')
+
+`resolve_course_ref` is the deep-link (`?course=`) sibling of the query
+path: same alias tier, but the input is a SHARED REFERENCE rather than a
+sentence, so it tries the internal course_id first and undoes the
+separator mangling a URL inflicts on a code.
+
+`resolve_course_ref` 是查询路径在深链(`?course=`)场景下的兄弟函数:
+用的是同一套别名层,但输入是一个被分享出去的引用而非一句话,因此它
+先试内部 course_id,并还原 URL 对课程代码造成的分隔符改写。
 """
 
 from __future__ import annotations
@@ -25,6 +34,7 @@ from __future__ import annotations
 import re
 
 from db.alias_repository import AliasRepository
+from db.repository import CourseRepository
 
 # Same as schemas.course COURSE_CODE_PATTERN but case-insensitive + free in text.
 # `re.ASCII` makes \b respect ASCII word boundaries only — without it Python 3
@@ -42,6 +52,21 @@ _NUMERIC_CODE_RE = re.compile(r"\b(\d{4})\b", re.ASCII)
 # Cap candidate-text length so we don't try to resolve "the entire essay" against aliases.
 # 中文:限制候选文本长度,避免把"整篇作文"都拿去和别名做匹配。
 MAX_WHOLE_QUERY_LEN = 30
+
+# Separators a URL leaves where a course code has a space. '+' is the
+# form-encoded space; '-' and '_' are what a human types when hand-writing a
+# link. Undone before the alias tier sees the ref (v_course_lookup stores
+# the canonical 'CS 5800', so 'CS-5800' would miss).
+# 中文:URL 里代替课程代码中空格的分隔符。'+' 是表单编码的空格;'-' 和 '_'
+# 是人手写链接时的习惯写法。在别名层看到这个 ref 之前先还原它们
+# (v_course_lookup 存的是规范形式 'CS 5800',所以 'CS-5800' 会查不到)。
+_REF_SEPARATOR_RE = re.compile(r"[-_+]+")
+
+# Deep-link refs are codes/slang, not prose. Longer than this and it's junk
+# (or someone probing) — reject before touching the DB.
+# 中文:深链 ref 是代码或俗称,不是散文。超过这个长度就是垃圾输入
+# (或有人在探测)—— 碰数据库之前直接拒掉。
+MAX_COURSE_REF_LEN = 64
 
 
 def normalize_query_to_course_ids(
@@ -118,4 +143,74 @@ def _extract_candidates(query: str) -> list[str]:
     return candidates
 
 
-__all__ = ["MAX_WHOLE_QUERY_LEN", "normalize_query_to_course_ids"]
+def resolve_course_ref(
+    ref: str,
+    *,
+    alias_repo: AliasRepository,
+    course_repo: CourseRepository,
+) -> list[str]:
+    """Resolve a deep-link `?course=` reference to course_ids.
+
+    Two tiers, most-specific first:
+      0. The ref IS an internal course_id ('neu-cs-5800') — someone copied
+         it out of an API response or a log. Catalog ids are lowercase, so
+         a ref that only differs in case still lands.
+      1. The alias tier, same v_course_lookup the query path uses. Handles
+         'CS-5800' / 'CS_5800' / 'cs5800' / 'CS 5800' via separator
+         normalization, and slang ('Algo') via the whole-query candidate.
+
+    Returns [] for junk, over-length, and never-matched refs — a bad deep
+    link is an ordinary outcome the caller renders as a notice, not an
+    error. Multiple ids come back as a list (a ref can be ambiguous, e.g.
+    a slang term shared by two cross-listed courses); the caller decides
+    whether to auto-pick the first or disambiguate.
+
+    中文:把深链 `?course=` 的引用解析为 course_id。
+
+    两层,从最具体开始:
+      0. ref 本身就是内部 course_id('neu-cs-5800')—— 有人从 API 响应或
+         日志里复制出来的。目录里的 id 都是小写,所以只是大小写不同的
+         ref 依然能命中。
+      1. 别名层,与查询路径用的是同一个 v_course_lookup。通过分隔符归一化
+         覆盖 'CS-5800' / 'CS_5800' / 'cs5800' / 'CS 5800',通过整串候选
+         覆盖俗称('Algo')。
+
+    垃圾输入、超长、以及查无此项的 ref 都返回 [] —— 一条失效的深链是很
+    普通的结果,调用方渲染成一句提示即可,不是错误。命中多个 id 时按列表
+    返回(ref 可能有歧义,例如两门交叉列课共用的俗称);由调用方决定是
+    自动选第一个还是让用户消歧。
+    """
+    cleaned = (ref or "").strip()
+    if not cleaned or len(cleaned) > MAX_COURSE_REF_LEN:
+        return []
+
+    # Tier 0 — raw internal id.
+    # 中文:第 0 层 —— 原始内部 id。
+    for candidate in (cleaned, cleaned.lower()):
+        if course_repo.exists(candidate):
+            return [candidate]
+
+    # Tier 1 — alias tier. The de-separated form is tried first; the raw
+    # form is a fallback for aliases that legitimately contain a hyphen.
+    # 中文:第 1 层 —— 别名层。先试去分隔符的形式;原始形式作为兜底,
+    # 用于那些本身就含连字符的别名。
+    for candidate in _ref_candidates(cleaned):
+        ids = normalize_query_to_course_ids(candidate, alias_repo=alias_repo)
+        if ids:
+            return ids
+    return []
+
+
+def _ref_candidates(cleaned: str) -> list[str]:
+    """Ordered alias-tier probes for a deep-link ref (de-separated first).
+    中文:深链 ref 在别名层的候选探测串(去分隔符的形式排在前面)。"""
+    spaced = _REF_SEPARATOR_RE.sub(" ", cleaned).strip()
+    return [spaced] if spaced == cleaned else [spaced, cleaned]
+
+
+__all__ = [
+    "MAX_COURSE_REF_LEN",
+    "MAX_WHOLE_QUERY_LEN",
+    "normalize_query_to_course_ids",
+    "resolve_course_ref",
+]

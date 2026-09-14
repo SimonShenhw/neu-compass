@@ -108,6 +108,37 @@ class CourseDetailOut(Course):
     prerequisites: list[CoursePrereqOut] = Field(default_factory=list)
 
 
+# === /resolve/course ===
+
+
+class ResolvedCourseOut(BaseModel):
+    """One course a deep-link ref resolved to. Code + name ride along with
+    the id so an ambiguous ref can be disambiguated in the UI without N
+    follow-up /course calls.
+    深链 ref 解析出的一门课程。code + name 与 id 一起返回，这样 UI 在遇到
+    有歧义的 ref 时无需再发 N 次 /course 请求就能做消歧。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    course_id: str
+    primary_code: str
+    primary_name: str
+
+
+class ResolveCourseResponse(BaseModel):
+    """`matches` is empty when nothing resolved — a dead deep link is a
+    normal outcome, not a 404. Clients treat ApiError as "API is down",
+    so surfacing "no such course" as an exception would misreport it.
+    没解析出任何结果时 `matches` 为空 —— 失效的深链是正常结果，不是 404。
+    客户端把 ApiError 一律理解为「API 挂了」，若把「查无此课」抛成异常
+    就会误报。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref: str
+    matches: list[ResolvedCourseOut]
+
+
 # === /chat ===
 
 
@@ -292,6 +323,8 @@ __all__ = [
     "OAuthCallbackRequest",
     "OAuthCallbackResponse",
     "ReadyResponse",
+    "ResolveCourseResponse",
+    "ResolvedCourseOut",
     "SearchHitOut",
     "SearchRequest",
     "SearchResponse",

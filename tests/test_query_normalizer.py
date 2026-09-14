@@ -8,7 +8,11 @@ import pytest
 
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
-from rag.query_normalizer import normalize_query_to_course_ids
+from rag.query_normalizer import (
+    MAX_COURSE_REF_LEN,
+    normalize_query_to_course_ids,
+    resolve_course_ref,
+)
 from schemas.alias import Alias, AliasReviewStatus, AliasSource, AliasType
 from schemas.course import Course
 
@@ -190,3 +194,121 @@ def test_unknown_full_code_returns_empty(alias_repo: AliasRepository) -> None:
     assert normalize_query_to_course_ids(
         "AAI 9999 怎么样", alias_repo=alias_repo,
     ) == []
+
+
+# ===========================================================================
+# resolve_course_ref — the deep-link (?course=) sibling
+# ===========================================================================
+
+
+@pytest.fixture
+def course_repo(empty_db: sqlite3.Connection) -> CourseRepository:
+    """Same connection the alias_repo fixture seeds; request BOTH fixtures
+    in a test so the courses exist before the repo is used."""
+    return CourseRepository(empty_db)
+
+
+# === Tier 0: the ref is already an internal course_id ===
+
+def test_ref_accepts_raw_internal_course_id(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    assert resolve_course_ref(
+        "neu-cs-5800", alias_repo=alias_repo, course_repo=course_repo,
+    ) == ["neu-cs-5800"]
+
+
+def test_ref_internal_course_id_is_case_insensitive(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    """Catalog ids are lowercase; a ref shouted in a chat message still lands."""
+    assert resolve_course_ref(
+        "NEU-CS-5800", alias_repo=alias_repo, course_repo=course_repo,
+    ) == ["neu-cs-5800"]
+
+
+# === Tier 1: URL separators standing in for the code's space ===
+
+@pytest.mark.parametrize(
+    "ref",
+    ["CS-5800", "CS_5800", "CS+5800", "CS 5800", "cs5800", "cs-5800"],
+)
+def test_ref_url_separator_forms_all_resolve(
+    ref: str, alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    """v_course_lookup stores the canonical 'CS 5800' — every spelling a URL
+    (or a human hand-writing a link) produces has to normalize back onto it."""
+    assert resolve_course_ref(
+        ref, alias_repo=alias_repo, course_repo=course_repo,
+    ) == ["neu-cs-5800"]
+
+
+def test_ref_resolves_slang_alias(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    """?course=Algo is a legal share — the alias tier is the whole point."""
+    assert resolve_course_ref(
+        "Algo", alias_repo=alias_repo, course_repo=course_repo,
+    ) == ["neu-cs-5800"]
+
+
+def test_ref_resolves_cjk_slang_alias(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    assert resolve_course_ref(
+        "应用 AI", alias_repo=alias_repo, course_repo=course_repo,
+    ) == ["neu-aai-6600"]
+
+
+# === Non-matches are ordinary, not errors ===
+
+@pytest.mark.parametrize("ref", ["", "   ", "-", "---", "CS-9999", "neu-cs-9999"])
+def test_ref_junk_returns_empty(
+    ref: str, alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    assert resolve_course_ref(
+        ref, alias_repo=alias_repo, course_repo=course_repo,
+    ) == []
+
+
+def test_ref_over_length_rejected_before_db(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    """Padding a valid code past the cap must NOT resolve — otherwise the
+    length guard is decorative and arbitrarily long refs reach SQLite."""
+    ref = "CS-5800" + "x" * MAX_COURSE_REF_LEN
+    assert len(ref) > MAX_COURSE_REF_LEN
+    assert resolve_course_ref(
+        ref, alias_repo=alias_repo, course_repo=course_repo,
+    ) == []
+
+
+def test_ref_pending_alias_does_not_leak(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    """A shared link must not be a side door around alias review."""
+    alias_repo.add(Alias(
+        alias_text="unreviewed-guess", alias_type=AliasType.SLANG,
+        primary_course_id="neu-aai-6600",
+        source=AliasSource.LLM_INFERRED,
+        review_status=AliasReviewStatus.PENDING,
+    ))
+    assert resolve_course_ref(
+        "unreviewed-guess", alias_repo=alias_repo, course_repo=course_repo,
+    ) == []
+
+
+def test_ref_with_hyphen_in_alias_text_resolves(
+    alias_repo: AliasRepository, course_repo: CourseRepository,
+) -> None:
+    """The raw form is tried after the de-separated one, so an alias whose
+    text genuinely contains a hyphen is still reachable."""
+    alias_repo.add(Alias(
+        alias_text="e-commerce", alias_type=AliasType.SLANG,
+        primary_course_id="neu-cs-5800",
+        source=AliasSource.MANUAL,
+        review_status=AliasReviewStatus.APPROVED,
+    ))
+    assert resolve_course_ref(
+        "e-commerce", alias_repo=alias_repo, course_repo=course_repo,
+    ) == ["neu-cs-5800"]

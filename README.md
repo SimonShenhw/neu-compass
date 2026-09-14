@@ -3,7 +3,7 @@
 > 用结构化检索 + LLM 抽取破除 Northeastern 研究生**选课信息黑箱**。
 > Course RAG 做流量入口,Co-op 数据做留存飞轮。
 
-**Status**: Weeks 1-10 工程主线 ship 完毕 + v3.1 RAG quality 3-layer 上线 · **739 tests / 14s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me`(origin 已搬到 UGREEN DXP 6800 Pro NAS,PC 可关机)· 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。v3.1 把 chat 路径从"hybrid 凑合"升级成 alias → program ontology → hybrid+reranker+reject 三层 + chat_v2 prompt(详见 [v3_1_rag_quality.md](docs/v3_1_rag_quality.md))。Week 10 把整套 stack 容器化迁到 NAS + 接通 Iris Xe iGPU(`optimum-intel` 直接 OpenVINO IR 路径,NAS 上 /search p50 **8s → 2.3s**,api RAM **17GB → 4.9GB**)。
+**Status**: Weeks 1-10 工程主线 ship 完毕 + v3.1 RAG quality 3-layer 上线 · **991 tests / 19s on WSL2** · 全 NEU catalog **6469 课**已 ingested + indexed · **公网软启动**: `https://api.neu-compass.me` + `https://compass.neu-compass.me`(origin 已搬到 UGREEN DXP 6800 Pro NAS,PC 可关机)· 项目相位 = `operational + signal-driven`(active sprint:[PLAN v3.0](docs/PLAN_v3.0.md))。Week 9 加做 ONNX Runtime backend 实测,startup 70s → 6s(详见 [perf_week9_results.md](docs/perf_week9_results.md))。v3.1 把 chat 路径从"hybrid 凑合"升级成 alias → program ontology → hybrid+reranker+reject 三层 + chat_v2 prompt(详见 [v3_1_rag_quality.md](docs/v3_1_rag_quality.md))。Week 10 把整套 stack 容器化迁到 NAS + 接通 Iris Xe iGPU(`optimum-intel` 直接 OpenVINO IR 路径,NAS 上 /search p50 **8s → 2.3s**,api RAM **17GB → 4.9GB**)。
 **Hardware tested on**: RTX 5090 + Ubuntu 24.04 + cu130 + torch 2.11
 **English**: [README.en.md](README.en.md)
 
@@ -13,7 +13,7 @@
 
 | 维度 | 实测数字 |
 |---|---:|
-| 测试套件 — v3.1 RAG quality 后 | **739 tests / ~14 s** |
+| 测试套件 — ADR-0029 deep links 后 | **991 tests / ~19 s** |
 | `/search` p50 latency — PyTorch baseline (实测 RTX 5090) | **43.82 ms** |
 | `/search` p50 latency — ONNX + CUDA EP (实测 RTX 5090) ⭐ | **40.09 ms** (-8.5%) |
 | `/search` p99 latency PyTorch / ONNX | 117.97 / **54.74 ms** (-53.6%) |

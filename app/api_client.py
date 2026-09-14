@@ -122,6 +122,19 @@ class ApiClient:
     def get_course(self, course_id: str) -> dict[str, Any]:
         return self._get(f"/course/{course_id}")
 
+    def resolve_course(self, ref: str) -> dict[str, Any]:
+        """Deep-link `?course=` ref → `{"ref", "matches": [...]}`.
+
+        Never raises for "no such course" — an unresolvable ref comes back
+        as an empty `matches` list, so ApiError here still means the API
+        itself is unhappy.
+
+        深链 `?course=` 的引用 → `{"ref", "matches": [...]}`。
+
+        「查无此课」不会抛异常 —— 解析不出来时 `matches` 为空列表，因此
+        这里抛出的 ApiError 依然只代表 API 本身出了问题。"""
+        return self._get("/resolve/course", params={"ref": ref})
+
     def list_programs(self) -> list[dict[str, Any]]:
         return self._get("/programs")
 
@@ -219,9 +232,9 @@ class ApiClient:
     # === Internal ===
     # 中文:内部实现
 
-    def _get(self, path: str) -> Any:
+    def _get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         try:
-            return self._unwrap(self._client.get(path))
+            return self._unwrap(self._client.get(path, params=params))
         except httpx.TimeoutException as e:
             raise ApiError(504, f"API timed out: {type(e).__name__}") from e
         except httpx.HTTPError as e:

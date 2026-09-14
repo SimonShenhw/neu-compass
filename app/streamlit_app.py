@@ -447,6 +447,16 @@ def render() -> None:
     if st.session_state.pop("pending_nav_to_search", None):
         st.session_state["nav_page"] = pages[0]
 
+    # Deep links (?course= / ?program=) route the same way, and must land in
+    # this same window: after handle_oauth_callback (which clears
+    # query_params on every exit path) and before the radio instantiates.
+    # 深链（?course= / ?program=）走同一套路由，且必须落在同一个窗口里：
+    # 在 handle_oauth_callback 之后（它每条退出路径都会清空 query_params），
+    # 在 radio 实例化之前。
+    from app.deep_links import apply_deep_link  # noqa: PLC0415
+
+    apply_deep_link(st, pages=pages)
+
     nav = st.sidebar.radio("页面 / Pages", pages, key="nav_page")
     if nav.startswith("🎓"):
         from app.program_view import render_program_browser  # noqa: PLC0415
@@ -775,6 +785,23 @@ def render() -> None:
                             f"> *{ev['quote']}* — `{ev['source_id']}` "
                             f"(confidence {ev['confidence']:.2f})"
                         )
+
+            # Share link — the produce half of deep links. st.code gets a
+            # hover copy button for free, which is the entire interaction.
+            # 分享链接 —— 深链的生产半边。st.code 自带 hover 复制按钮，
+            # 交互就这么多。
+            from app.deep_links import course_share_ref, share_url  # noqa: PLC0415
+            from config import settings  # noqa: PLC0415
+
+            with st.expander("🔗 分享这门课 · Share"):
+                st.code(
+                    share_url(
+                        settings.public_base_url,
+                        course=course_share_ref(course["primary_code"]),
+                    ),
+                    language=None,
+                )
+                st.caption("把链接发给同学，他们打开就直接看到这门课。")
 
     st.markdown(footer_html(), unsafe_allow_html=True)
 

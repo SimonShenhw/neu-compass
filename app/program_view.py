@@ -256,6 +256,21 @@ def _render_curriculum(st, program_id: str) -> None:
     if cur.get("notes"):
         st.caption(cur["notes"])
 
+    # Share link (deep-link produce half). program_id is already the URL
+    # form, so no ref normalization is needed here — unlike course codes,
+    # which carry a space.
+    # 分享链接（深链的生产半边）。program_id 本身就是 URL 形态，这里不需要
+    # 做 ref 归一化 —— 不像课程代码那样含空格。
+    from app.deep_links import share_url  # noqa: PLC0415
+    from config import settings  # noqa: PLC0415
+
+    with st.expander("🔗 分享这个培养方案 · Share"):
+        st.code(
+            share_url(settings.public_base_url, program=program_id),
+            language=None,
+        )
+        st.caption("把链接发给同学，他们打开就直接看到这份课程表。")
+
     semesters = cur.get("semesters", [])
     if not semesters:
         st.info("该培养方案还没有课程数据。")
