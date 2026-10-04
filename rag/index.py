@@ -30,6 +30,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import tempfile
 from typing import Any
@@ -40,12 +41,21 @@ import numpy as np
 from rag.embedder import EMBEDDING_DIM
 
 
+_SHA256_RE = re.compile(r"[0-9a-f]{64}")
+
+
 def _sha256_file(path: Path) -> str:
     hasher = hashlib.sha256()
     with open(path, "rb") as f:
         while chunk := f.read(65536):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def text_fingerprint(text: str) -> str:
+    """SHA-256 of the exact text a vector is computed from (UTF-8).
+    中文:生成向量所用原文的 SHA-256(UTF-8)。"""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 class FaissIndex:
@@ -66,12 +76,28 @@ class FaissIndex:
         self._index = faiss.IndexIDMap(base)
         self._id_to_course: dict[int, str] = {}
         self._course_to_id: dict[str, int] = {}
+        # course_id -> SHA-256 of the text its vector was computed from.
+        # Lets an incremental rebuild tell an unchanged course from one whose
+        # raw_text changed (same id, stale vector). Empty for legacy builds.
+        # 中文:course_id -> 生成该向量所用文本的 SHA-256。增量重建靠它区分
+        # "没变的课程"和"raw_text 改过、向量已过期的课程"。旧构建为空。
+        self._fingerprints: dict[str, str] = {}
         self._next_int_id = 0
         self._manifest: dict[str, Any] | None = None
 
     @property
     def manifest(self) -> dict[str, Any] | None:
         return self._manifest
+
+    @property
+    def course_ids(self) -> frozenset[str]:
+        return frozenset(self._course_to_id)
+
+    def fingerprint(self, course_id: str) -> str | None:
+        """Text fingerprint recorded when this course's vector was added;
+        None when the build that added it did not record one.
+        中文:添加该课程向量时记录的文本指纹;添加它的那次构建没记录时为 None。"""
+        return self._fingerprints.get(course_id)
 
     @property
     def dim(self) -> int:
@@ -87,16 +113,31 @@ class FaissIndex:
     # === Mutation ===
     # 中文:=== 写操作 ===
 
-    def add(self, vectors: np.ndarray, course_ids: list[str]) -> None:
+    def add(
+        self,
+        vectors: np.ndarray,
+        course_ids: list[str],
+        *,
+        fingerprints: list[str] | None = None,
+    ) -> None:
         """Add vectors. Caller must ensure vectors are L2-normalized for IP.
 
+        `fingerprints` (optional, one SHA-256 hex per course) records which
+        text each vector came from, for incremental staleness detection.
+
         中文:添加向量。调用方必须确保向量已经 L2 归一化,这样内积(IP)
-        才等价于余弦相似度。
+        才等价于余弦相似度。`fingerprints`(可选,每门课一个 SHA-256 十六进制
+        串)记录每个向量来自哪段文本,供增量重建判断向量是否过期。
         """
         if len(vectors) != len(course_ids):
             raise ValueError(
                 f"Vector count {len(vectors)} != course_id count {len(course_ids)}"
             )
+        if fingerprints is not None and (
+            len(fingerprints) != len(course_ids)
+            or not all(isinstance(f, str) and _SHA256_RE.fullmatch(f) for f in fingerprints)
+        ):
+            raise ValueError("fingerprints must be one SHA-256 hex string per course_id")
         if vectors.size == 0:
             return
         if vectors.shape[1] != self._dim:
@@ -121,6 +162,8 @@ class FaissIndex:
             np.ascontiguousarray(vectors.astype(np.float32)),
             np.asarray(int_ids, dtype=np.int64),
         )
+        if fingerprints is not None:
+            self._fingerprints.update(zip(course_ids, fingerprints, strict=True))
 
     def remove(self, course_ids: list[str]) -> int:
         """Remove course_ids from index. Returns count actually removed.
@@ -140,6 +183,7 @@ class FaissIndex:
             int_id = self._course_to_id.pop(cid, None)
             if int_id is not None:
                 self._id_to_course.pop(int_id, None)
+            self._fingerprints.pop(cid, None)
 
         return int(removed)
 
@@ -148,6 +192,7 @@ class FaissIndex:
         self._index = faiss.IndexIDMap(base)
         self._id_to_course.clear()
         self._course_to_id.clear()
+        self._fingerprints.clear()
         self._next_int_id = 0
         self._manifest = None
 
@@ -228,82 +273,73 @@ class FaissIndex:
         model_name: str = DEFAULT_MODEL_NAME,
         atomic: bool = True,
     ) -> dict[str, Any]:
-        """Persist index binary, id_map, and metadata manifest.
+        """Persist index binary, id_map (+fingerprints), and the manifest.
 
-        If atomic=True, writes to a temporary staging directory in the parent
-        folder and replaces files in target directory.
-        Returns the generated manifest dictionary.
+        atomic=True stages all three files in a sibling temp dir, then
+        publishes them with one os.replace EACH — data files first, manifest
+        LAST. That is per-file atomic, NOT a transactional swap of the set: a
+        crash between replaces leaves e.g. new index + old id_map/manifest.
+        Such a torn set is DETECTABLE, because the manifest pins both data
+        checksums — load(verify_checksums=True) refuses it (the API lifespan
+        loads that way). Returns the manifest.
+
+        中文:atomic=True 时先把三个文件写到同级临时目录,再逐个 os.replace
+        发布 —— 数据文件在前、清单最后。这是"单文件原子",不是整组事务替换:
+        两次 replace 之间崩溃会留下"新索引 + 旧 id_map/旧清单"之类的撕裂状态。
+        但这种撕裂可以被发现:清单钉住了两个数据文件的校验和,
+        load(verify_checksums=True) 会拒绝它(API 启动时就是这样加载的)。
         """
         target_dir = Path(dir_path)
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        meta = {
+        meta: dict[str, Any] = {
             "dim": self._dim,
             "next_int_id": self._next_int_id,
+            # JSON object keys must be strings; int_id becomes a string here
+            # and is cast back to int in load().
+            # 中文:JSON 对象的键必须是字符串;这里把 int_id 转成字符串,
+            # 加载时(见 load())再转回 int。
             "id_map": {str(k): v for k, v in self._id_to_course.items()},
         }
+        if self._fingerprints:
+            meta["fingerprints"] = dict(sorted(self._fingerprints.items()))
         id_map_str = json.dumps(meta, indent=2, ensure_ascii=False)
 
-        if atomic:
-            # Stage in a sibling directory for atomic file replace
+        if not atomic:
+            manifest = self._write_set(target_dir, id_map_str, model_name)
+        else:
             staging_dir = Path(tempfile.mkdtemp(prefix=".tmp_faiss_", dir=str(target_dir.parent)))
             try:
-                staging_index = staging_dir / self.INDEX_FILE
-                staging_id_map = staging_dir / self.ID_MAP_FILE
-                staging_manifest = staging_dir / self.MANIFEST_FILE
-
-                faiss.write_index(self._index, str(staging_index))
-                staging_id_map.write_text(id_map_str, encoding="utf-8")
-
-                idx_hash = _sha256_file(staging_index)
-                id_map_hash = _sha256_file(staging_id_map)
-
-                manifest = {
-                    "manifest_version": self.MANIFEST_VERSION,
-                    "embedding_model": str(model_name),
-                    "dimension": self._dim,
-                    "count": self.count,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "index_file": self.INDEX_FILE,
-                    "index_sha256": idx_hash,
-                    "id_map_file": self.ID_MAP_FILE,
-                    "id_map_sha256": id_map_hash,
-                }
-                staging_manifest.write_text(
-                    json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-                )
-
+                manifest = self._write_set(staging_dir, id_map_str, model_name)
                 for fn in (self.INDEX_FILE, self.ID_MAP_FILE, self.MANIFEST_FILE):
                     os.replace(staging_dir / fn, target_dir / fn)
             finally:
                 shutil.rmtree(staging_dir, ignore_errors=True)
-        else:
-            index_path = target_dir / self.INDEX_FILE
-            id_map_path = target_dir / self.ID_MAP_FILE
-            manifest_path = target_dir / self.MANIFEST_FILE
-
-            faiss.write_index(self._index, str(index_path))
-            id_map_path.write_text(id_map_str, encoding="utf-8")
-
-            idx_hash = _sha256_file(index_path)
-            id_map_hash = _sha256_file(id_map_path)
-
-            manifest = {
-                "manifest_version": self.MANIFEST_VERSION,
-                "embedding_model": str(model_name),
-                "dimension": self._dim,
-                "count": self.count,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "index_file": self.INDEX_FILE,
-                "index_sha256": idx_hash,
-                "id_map_file": self.ID_MAP_FILE,
-                "id_map_sha256": id_map_hash,
-            }
-            manifest_path.write_text(
-                json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
 
         self._manifest = manifest
+        return manifest
+
+    def _write_set(self, directory: Path, id_map_str: str, model_name: str) -> dict[str, Any]:
+        """Write index + id_map into `directory`, then the manifest pinning both.
+        中文:把索引和 id_map 写进 `directory`,再写出钉住两者校验和的清单。"""
+        index_path = directory / self.INDEX_FILE
+        id_map_path = directory / self.ID_MAP_FILE
+        faiss.write_index(self._index, str(index_path))
+        id_map_path.write_text(id_map_str, encoding="utf-8")
+        manifest = {
+            "manifest_version": self.MANIFEST_VERSION,
+            "embedding_model": str(model_name),
+            "dimension": self._dim,
+            "count": self.count,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "index_file": self.INDEX_FILE,
+            "index_sha256": _sha256_file(index_path),
+            "id_map_file": self.ID_MAP_FILE,
+            "id_map_sha256": _sha256_file(id_map_path),
+        }
+        (directory / self.MANIFEST_FILE).write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return manifest
 
     @classmethod
@@ -329,6 +365,8 @@ class FaissIndex:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             except Exception as exc:
                 raise ValueError(f"Invalid FAISS index manifest in {path}: {exc}") from exc
+            if not isinstance(manifest, dict):
+                raise ValueError(f"Invalid FAISS index manifest in {path}: not a JSON object")
 
             if expected_model is not None and manifest.get("embedding_model") != expected_model:
                 raise ValueError(
@@ -336,18 +374,20 @@ class FaissIndex:
                 )
 
             if verify_checksums:
-                actual_idx_hash = _sha256_file(index_path)
-                expected_idx_hash = manifest.get("index_sha256")
-                if expected_idx_hash and actual_idx_hash != expected_idx_hash:
-                    raise ValueError(
-                        f"Checksum mismatch for {cls.INDEX_FILE}: expected {expected_idx_hash}, got {actual_idx_hash}"
-                    )
-                actual_id_hash = _sha256_file(meta_path)
-                expected_id_hash = manifest.get("id_map_sha256")
-                if expected_id_hash and actual_id_hash != expected_id_hash:
-                    raise ValueError(
-                        f"Checksum mismatch for {cls.ID_MAP_FILE}: expected {expected_id_hash}, got {actual_id_hash}"
-                    )
+                # Strict: a manifest that cannot pin BOTH data files is not
+                # evidence of integrity (and could hide a torn publish).
+                # 中文:严格模式 —— 清单若不能同时钉住两个数据文件,就不能
+                # 作为完整性证据(还可能掩盖一次撕裂的发布)。
+                for file_path, key, name in (
+                    (index_path, "index_sha256", cls.INDEX_FILE),
+                    (meta_path, "id_map_sha256", cls.ID_MAP_FILE),
+                ):
+                    expected_hash = manifest.get(key)
+                    actual_hash = _sha256_file(file_path)
+                    if not expected_hash or actual_hash != expected_hash:
+                        raise ValueError(
+                            f"Checksum mismatch for {name}: expected {expected_hash}, got {actual_hash}"
+                        )
 
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         instance = cls(dim=meta["dim"])
@@ -360,6 +400,13 @@ class FaissIndex:
             int_id = int(str_int)
             instance._id_to_course[int_id] = course_id
             instance._course_to_id[course_id] = int_id
+        # Fingerprints only for ids actually in the map; malformed entries are
+        # dropped (the course then just looks "unfingerprinted").
+        # 中文:只保留映射里确实存在的 id 的指纹;格式不对的条目直接丢弃
+        # (该课程只会被视为"没有指纹")。
+        for course_id, digest in (meta.get("fingerprints") or {}).items():
+            if course_id in instance._course_to_id and isinstance(digest, str) and _SHA256_RE.fullmatch(digest):
+                instance._fingerprints[course_id] = digest
 
         if manifest is not None:
             if manifest.get("dimension") != instance.dim:
@@ -408,6 +455,8 @@ class FaissIndex:
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
         except Exception as exc:
             return {"valid": False, "error": f"corrupted_manifest: {exc}"}
+        if not isinstance(manifest, dict):
+            return {"valid": False, "error": "corrupted_manifest: not a JSON object"}
 
         idx_hash = _sha256_file(index_file)
         id_hash = _sha256_file(id_map_file)
@@ -426,4 +475,4 @@ class FaissIndex:
 
 
 
-__all__ = ["FaissIndex"]
+__all__ = ["FaissIndex", "text_fingerprint"]

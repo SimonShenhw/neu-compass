@@ -17,13 +17,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from db.program_plan_repository import ProgramPlanRepository, content_hash  # noqa: E402
+from db.schema_blocks import begin_schema_migration, schema_block  # noqa: E402
 from schemas.program_plan import ProgramPlan  # noqa: E402
 from schemas.program_source import verify_archived_source  # noqa: E402
 
 
 def migration_sql() -> str:
-    sql = (PROJECT_ROOT / "db/init.sql").read_text(encoding="utf-8")
-    return sql.split("-- BEGIN PROGRAM_PLANS_V1_5", 1)[1].split("-- END PROGRAM_PLANS_V1_5", 1)[0]
+    return schema_block("PROGRAM_PLANS_V1_5")
 
 
 def sync_plans(db_path: str | Path, plan_file: str | Path, *, commit: bool = False, source_dir: str | Path | None = None) -> dict:
@@ -47,9 +47,7 @@ def sync_plans(db_path: str | Path, plan_file: str | Path, *, commit: bool = Fal
         if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='programs'").fetchone():
             raise ValueError("Existing program schema required")
         if commit:
-            conn.execute("PRAGMA foreign_keys=ON")
-            conn.execute("PRAGMA busy_timeout=5000")
-            conn.executescript("BEGIN IMMEDIATE;\n" + migration_sql())
+            begin_schema_migration(conn, migration_sql())
         for plan in plans:
             if not conn.execute("SELECT 1 FROM programs WHERE program_id=?", (plan.program_id,)).fetchone():
                 raise ValueError("Plan references an unseeded program")

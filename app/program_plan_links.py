@@ -19,6 +19,9 @@ QUERY_FIELDS = {
 }
 PENDING_KEY = '_program_plan_link_pending'
 APPLIED_KEY = '_program_plan_link_applied'
+# Token of a link whose verification hit a transient failure (warned once).
+# 中文：核对时遇到暂时性失败的链接 token（只提示一次）。
+RETRY_KEY = '_program_plan_link_retrying'
 MESSAGES = {
     'invalid': '🔗 方案分享参数缺失、重复或冲突；未选择任何方案，请从项目列表手动选择。',
     'missing': '🔗 分享的确切方案已不可用；未改选同范围或同家族的其他版本。',

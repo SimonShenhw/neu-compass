@@ -15,6 +15,15 @@ jobs:
   test:
     name: Test & Integrity Checks
     runs-on: ubuntu-latest
+    env:
+      # config.settings requires GEMINI_API_KEY at import time and CI has no
+      # .env (gitignored). A non-secret placeholder lets Settings() construct;
+      # offline tests stub every model/LLM call and `-m "not live"` skips the
+      # network suite, so this value is never sent anywhere.
+      # 中文：config.settings 导入时要求 GEMINI_API_KEY，而 CI 没有 .env（已
+      # gitignore）。占位值只为让 Settings() 能构造；离线测试替身了所有模型/LLM
+      # 调用，live 用例被 -m "not live" 排除，这个值不会被发往任何地方。
+      GEMINI_API_KEY: ci-placeholder-not-a-secret
 
     steps:
       - name: Checkout repository

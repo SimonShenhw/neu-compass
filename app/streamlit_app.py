@@ -370,7 +370,6 @@ def render() -> None:
         init_state,
         is_logged_in,
         record_search,
-        select_course,
     )
     from app.streamlit_auth_ui import (  # noqa: PLC0415
         handle_oauth_callback,
@@ -384,7 +383,6 @@ def render() -> None:
         hero_html,
         inject_theme,
         matched_via_badge,
-        prereq_label_md,
         program_context_html,
         sidebar_brand_html,
         topic_pills_html,
@@ -551,6 +549,9 @@ def render() -> None:
                 avatar="🎓" if msg["role"] == "user" else "🧭",
             ):
                 st.markdown(msg["content"])
+                from app.answer_evidence_view import render_retrieval_notices  # noqa: PLC0415
+
+                render_retrieval_notices(st, msg.get("notices"))
                 if msg.get("evidence"):
                     n_ev = len(msg["evidence"])
                     with st.expander(
@@ -646,7 +647,13 @@ def render() -> None:
                         stream = stream_assistant(api, chat_body, st.session_state)
                         final_text = st.write_stream(stream) or ""
                 except ApiError as e:
-                    final_text = f"⚠️ Chat failed: {e.detail}"
+                    # 409 = the API needs the student to clarify the program
+                    # (ambiguous prefix / selection conflict), not a failure.
+                    # 中文：409 表示需要学生明确项目（前缀歧义或选择冲突），不是故障。
+                    final_text = (
+                        f"🧭 {e.detail}" if e.status_code == 409
+                        else f"⚠️ Chat failed: {e.detail}"
+                    )
                     st.markdown(final_text)
 
                 meta = st.session_state.get("last_chat_meta") or {}
@@ -678,6 +685,7 @@ def render() -> None:
                 evidence=_format_evidence(results),
                 matched_via=matched_via,
                 feedback=st.session_state.get('last_chat_feedback'),
+                notices=meta.get("notices"),
             )
             # Rerun immediately so the message renders via the HISTORY path.
             # The live evidence block above only exists inside `if prompt:`;
@@ -767,40 +775,11 @@ def render() -> None:
                     program_context_html(course["program_context"]),
                     unsafe_allow_html=True,
                 )
-            from app.course_requisite_view import legacy_graph_allowed, render_course_requisites  # noqa: PLC0415
+            from app.course_requisite_view import render_course_requisites, render_prerequisite_links  # noqa: PLC0415
             requisite_bundle = course.get("course_requisites")
             render_course_requisites(st, requisite_bundle, course_id=course["course_id"],
                 course_code=course["primary_code"], course_name=course["primary_name"], key=f"course-requisites-{cid}")
-            if course.get("prerequisites") and legacy_graph_allowed(requisite_bundle):
-                st.markdown("**🧱 旧平铺先修关系（未核验，仅供导航）**")
-                st.caption("旧边不表达 AND/OR、最低成绩或共修；不能用它判断哪些课全部必修或能否注册。")
-                # Mini prereq graph (round-3 review's "killer feature" ask):
-                # st.graphviz_chart renders the DOT source client-side —
-                # no graphviz runtime in the image.
-                from rag.prereq_graph import build_prereq_dot  # noqa: PLC0415
-
-                dot = build_prereq_dot(
-                    course["primary_code"], course["prerequisites"],
-                )
-                if dot:
-                    st.graphviz_chart(dot)
-                for p in course["prerequisites"]:
-                    cols = st.columns([4, 1])
-                    cols[0].markdown(
-                        prereq_label_md(
-                            code=p.get("primary_code"),
-                            name=p.get("primary_name"),
-                            course_id=p["course_id"],
-                            requirement=p["requirement"],
-                        )
-                    )
-                    # Only navigable when the prereq exists in the catalog.
-                    if p.get("primary_code") and cols[1].button(
-                        "查看", key=f"prereq-{p['course_id']}",
-                        use_container_width=True,
-                    ):
-                        select_course(st.session_state, p["course_id"])
-                        st.rerun()
+            render_prerequisite_links(st, course, requisite_bundle)
 
             if course.get("ai_policy"):
                 # Friendly rendering — the raw st.json dump was the last

@@ -378,3 +378,112 @@ def test_verify_integrity(tmp_path: Path) -> None:
     assert status["valid"] is False
     assert "corrupted_manifest" in status["error"]
 
+
+# === Fingerprints, torn publishes, strict verification (review 2026-10-03) ===
+
+_FP_A, _FP_B = "a" * 64, "b" * 64
+
+
+def test_fingerprints_persist_through_save_load_and_drop_on_remove(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(np.vstack([_vec(1), _vec(2)]), ["c1", "c2"], fingerprints=[_FP_A, _FP_B])
+    idx.save(tmp_path)
+    loaded = FaissIndex.load(tmp_path, verify_checksums=True)
+    assert loaded.fingerprint("c1") == _FP_A and loaded.fingerprint("c2") == _FP_B
+    assert loaded.course_ids == frozenset({"c1", "c2"})
+    loaded.remove(["c1"])
+    assert loaded.fingerprint("c1") is None
+    loaded.save(tmp_path)
+    assert FaissIndex.load(tmp_path).fingerprint("c1") is None
+
+
+@pytest.mark.parametrize("bad", [["short"], [_FP_A, _FP_B], ["A" * 64], [7]])
+def test_add_rejects_malformed_fingerprints(bad) -> None:
+    with pytest.raises(ValueError):
+        FaissIndex().add(_vec(1), ["c1"], fingerprints=bad)
+
+
+def test_unfingerprinted_legacy_vectors_report_none(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+    assert FaissIndex.load(tmp_path).fingerprint("c1") is None
+
+
+def test_torn_publish_is_refused_by_verified_load(tmp_path: Path) -> None:
+    """Crash after the FIRST os.replace: new index.faiss next to the OLD id_map
+    and manifest, same vector count. An unverified load would silently map
+    vectors to the wrong courses; the verified load (what the API uses) must
+    refuse the set."""
+    old, new = tmp_path / "old", tmp_path / "new"
+    a = FaissIndex()
+    a.add(np.vstack([_vec(1), _vec(2)]), ["c1", "c2"])
+    a.save(old)
+    b = FaissIndex()
+    b.add(np.vstack([_vec(3), _vec(4)]), ["c2", "c1"])  # same count, different mapping
+    b.save(new)
+    (old / FaissIndex.INDEX_FILE).write_bytes((new / FaissIndex.INDEX_FILE).read_bytes())
+    with pytest.raises(ValueError, match="Checksum mismatch for index.faiss"):
+        FaissIndex.load(old, verify_checksums=True)
+
+
+def test_verified_load_requires_both_checksums_in_manifest(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+    manifest_file = tmp_path / FaissIndex.MANIFEST_FILE
+    data = json.loads(manifest_file.read_text(encoding="utf-8"))
+    del data["id_map_sha256"]
+    manifest_file.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="Checksum mismatch for id_map.json"):
+        FaissIndex.load(tmp_path, verify_checksums=True)
+
+
+def test_non_object_manifest_is_invalid_not_a_crash(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+    (tmp_path / FaissIndex.MANIFEST_FILE).write_text("[1, 2]", encoding="utf-8")
+    with pytest.raises(ValueError, match="not a JSON object"):
+        FaissIndex.load(tmp_path)
+    assert FaissIndex.verify_integrity(tmp_path)["valid"] is False
+
+
+def test_atomic_and_plain_save_emit_identical_manifest_fields(tmp_path: Path) -> None:
+    """Both branches share one writer now; the manifests must not drift."""
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"], fingerprints=[_FP_A])
+    m1 = idx.save(tmp_path / "a", atomic=True)
+    m2 = idx.save(tmp_path / "b", atomic=False)
+    assert {k: v for k, v in m1.items() if k != "created_at"} == {k: v for k, v in m2.items() if k != "created_at"}
+    assert not list(tmp_path.glob(".tmp_faiss_*"))  # staging always cleaned up
+
+
+def test_api_lifespan_enforces_model_and_checksums(monkeypatch) -> None:
+    """The manifest only protects production if the startup load uses it."""
+    import asyncio  # noqa: PLC0415
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from fastapi import FastAPI  # noqa: PLC0415
+
+    import api.main as main  # noqa: PLC0415
+    from config import settings  # noqa: PLC0415
+
+    seen: dict = {}
+
+    def fake_load(path, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(count=1, manifest={"embedding_model": settings.embedding_model})
+
+    monkeypatch.setattr(main.FaissIndex, "load", staticmethod(fake_load))
+    monkeypatch.setattr(main, "connect", lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr(main.BM25Corpus, "from_db", classmethod(lambda cls, conn: SimpleNamespace(count=1)))
+    monkeypatch.setattr(main, "_build_inference_stack", lambda log: (object(), None))
+
+    async def run() -> None:
+        async with main.lifespan(FastAPI()):
+            pass
+
+    asyncio.run(run())
+    assert seen == {"expected_model": settings.embedding_model, "verify_checksums": True}
+

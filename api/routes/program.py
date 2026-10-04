@@ -133,7 +133,7 @@ class ProgramPlansOut(BaseModel):
         200: {"description": "Program list (possibly empty before seeding)."},
     },
 )
-async def list_programs(
+def list_programs(
     conn: DbConn,
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
 ) -> list[ProgramSummaryOut]:
@@ -177,7 +177,7 @@ async def list_programs(
         404: {"description": "program_id not in `programs` table."},
     },
 )
-async def get_program_curriculum(
+def get_program_curriculum(
     program_id: str,
     conn: DbConn,
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
@@ -235,7 +235,7 @@ async def get_program_curriculum(
 
 @router.get("/{program_id}/plans", response_model=ProgramPlansOut,
             summary="Version-scoped requirement documents (not eligibility decisions)")
-async def get_program_plans(
+def get_program_plans(
     program_id: str, conn: DbConn,
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
     campus: Annotated[str | None, Query(pattern=r"^[a-z][a-z0-9-]{0,39}$")] = None,
@@ -259,7 +259,7 @@ async def get_program_plans(
     summary="Read-only evidence for one exact current plan, not eligibility",
     description="Missing, stale or unusable policy sources return explicit states with no usable fragments. "
                 "No latest-edition fallback, auto-fetch, DB writes or merged policy decisions.")
-async def get_selected_program_policies(
+def get_selected_program_policies(
     program_id: str, plan_id: str, conn: DbConn, response: Response,
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
     policy_reader: Annotated[ProgramPolicyReader, Depends(get_program_policy_reader)],

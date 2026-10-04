@@ -50,6 +50,20 @@ def evidence(*, catalog=False):
     return course_answer_evidence(record, snapshot).model_dump(mode="json")
 
 
+def test_retrieval_notices_render_known_codes_only():
+    """A known code becomes the fixed Chinese notice; unknown or hostile values
+    (an older/compromised API) are dropped, never echoed as markdown."""
+    from app.answer_evidence_view import RETRIEVAL_NOTICE_LABELS, render_retrieval_notices  # noqa: PLC0415
+
+    surface = FakeSurface()
+    render_retrieval_notices(surface, ["program_schedule_unverified", "[x](https://evil.example)", 3])
+    assert surface.captions == ["ℹ️ " + RETRIEVAL_NOTICE_LABELS["program_schedule_unverified"]]
+    for bad in (None, "program_schedule_unverified", {"a": 1}):
+        quiet = FakeSurface()
+        render_retrieval_notices(quiet, bad)
+        assert quiet.captions == []
+
+
 def test_absent_source_and_missing_fields_are_explicit():
     lines = evidence_summary(evidence())
     assert "未附可追溯" in lines[0]

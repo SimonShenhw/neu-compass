@@ -9,7 +9,7 @@ import pytest
 
 from db.program_plan_repository import ProgramPlanRepository
 from db.program_repository import ProgramRepository
-from schemas.program import Program
+from schemas.program import Program, ProgramRequiredCourse
 from schemas.program_plan import ProgramPlan
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,6 +21,28 @@ def seed_plan(conn):
     plan = ProgramPlan.model_validate(data)
     ProgramPlanRepository(conn).store(plan)
     return plan
+
+
+def seed_legacy_first_semester_edge(conn):
+    """A guessed semester-1 edge that stored scoped rules must keep switched off."""
+    ProgramRepository(conn).upsert_required_course(ProgramRequiredCourse(
+        program_id="cs-ms", course_id="c-cs-5800", requirement_type="core", semester_recommended=1))
+
+
+def stub_chat(api_client, prompts=None):
+    """No real LLM: record the prompt (optional) and stream one token."""
+    from api.dependencies import get_chat_stream_fn  # noqa: PLC0415
+
+    def fake_stream(prompt):
+        if prompts is not None:
+            prompts.append(prompt)
+        return iter(["ok"])
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: fake_stream
+
+
+def chat_meta(response):
+    assert response.status_code == 200, response.text
+    return json.loads(response.text.splitlines()[0])
 
 
 def test_legacy_curriculum_identifies_unknown_scope_and_unverified_seed(api_client, empty_db):
@@ -96,10 +118,41 @@ def test_bad_source_document_not_returned_or_linked(api_client, empty_db):
 
 
 def test_versioned_rule_fragment_does_not_enable_guessed_first_semester(api_client, empty_db):
+    """Scoped rules carry no verified schedule: the legacy guessed semester-1
+    sequence stays OFF (no "program" route even though a semester-1 edge
+    exists), but the student still gets an answer plus an explicit notice —
+    never a 409 error turn for the most common onboarding question."""
     seed_plan(empty_db)
-    response = api_client.post("/chat", json={"query": "CS first semester", "program_id": "cs-ms"})
-    assert response.status_code == 409
-    assert "no verified semester schedule" in response.json()["detail"]
+    seed_legacy_first_semester_edge(empty_db)
+    stub_chat(api_client)
+    meta = chat_meta(api_client.post("/chat", json={"query": "CS first semester", "program_id": "cs-ms"}))
+    assert meta["matched_via"] != "program"
+    assert meta["notices"] == ["program_schedule_unverified"]
+
+
+@pytest.mark.parametrize("query", ["CS 专业第一学期选什么课", "CS 有没有基础一点的课", "CS 入门课推荐"])
+def test_unverified_schedule_reaches_prompt_and_query_log(api_client, empty_db, query):
+    """The three onboarding phrasings that used to 409: answered, notice in the
+    prompt (so the model says it), and the organic query is still logged."""
+    from db.query_log_repository import QueryLogRepository  # noqa: PLC0415
+
+    seed_plan(empty_db)
+    prompts = []
+    stub_chat(api_client, prompts)
+    meta = chat_meta(api_client.post("/chat", json={"query": query}))
+    assert meta["notices"] == ["program_schedule_unverified"]
+    assert '"program_schedule_unverified"' in prompts[0]
+    assert QueryLogRepository(empty_db).list_recent()[0]["query"] == query
+
+
+def test_legacy_only_family_keeps_shortcut_without_notice(api_client, empty_db):
+    """No scoped records: the unverified legacy semester-1 shortcut is unchanged."""
+    ProgramRepository(empty_db).add_program(Program(program_id="cs-ms", full_name="CS", prefix="CS"))
+    seed_legacy_first_semester_edge(empty_db)
+    stub_chat(api_client)
+    meta = chat_meta(api_client.post("/chat", json={"query": "CS first semester"}))
+    assert meta["matched_via"] == "program"
+    assert "notices" not in meta
 
 
 def test_unknown_explicit_program_is_404(api_client):
@@ -112,9 +165,12 @@ def test_program_plans_unknown_family_is_404(api_client):
 
 def test_invalid_scoped_document_cannot_reactivate_legacy_guessed_schedule(api_client, empty_db):
     seed_plan(empty_db)
+    seed_legacy_first_semester_edge(empty_db)
     empty_db.execute("UPDATE program_plans SET document='{}'")
-    response = api_client.post("/chat", json={"query": "CS first semester"})
-    assert response.status_code == 409
+    stub_chat(api_client)
+    meta = chat_meta(api_client.post("/chat", json={"query": "CS first semester"}))
+    assert meta["matched_via"] != "program"
+    assert meta["notices"] == ["program_schedule_unverified"]
 
 
 def test_explicit_family_and_query_prefix_conflict_requires_clarification(api_client, empty_db):

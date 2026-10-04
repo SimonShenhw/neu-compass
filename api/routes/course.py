@@ -82,7 +82,7 @@ router = APIRouter(prefix="/course", tags=["course"])
         404: {"description": "course_id not in `courses` table."},
     },
 )
-async def get_course(
+def get_course(
     course_id: str,
     conn: DbConn,
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
@@ -133,7 +133,7 @@ async def get_course(
 
 @router.get("/{course_id}/requisites", response_model=CourseRequisiteListing,
             summary="Read year-scoped prerequisite/corequisite clauses (not eligibility)")
-async def get_course_requisites(
+def get_course_requisites(
     course_id: str, conn: DbConn,
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     catalog_year: Annotated[str | None, Query(pattern=r"^\d{4}-\d{4}$")] = None,

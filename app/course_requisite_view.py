@@ -66,6 +66,63 @@ def render_program_context(st, context: CourseProgramContext | None, *, key: str
         st.text(plan.source_excerpt)
 
 
+def render_prerequisite_links(st, course: dict, requisite_bundle: dict | None) -> None:
+    """Legacy prerequisite edges as NAVIGATION, under the structured rules.
+
+    Without structured records: the old flat graph + labelled rows (unverified).
+    With them: the flat graph stays hidden (it would contradict AND/OR), but
+    the 查看 jump buttons remain as plain links — hiding them too stranded the
+    student on a page with no way to the prerequisite courses.
+
+    中文：把旧先修边作为导航显示在结构化规则下方。没有结构化记录时：旧平铺图 +
+    带标注的行（未核验）。有结构化记录时：平铺图继续隐藏（会与 AND/OR 矛盾），
+    但"查看"跳转按钮作为纯链接保留 —— 连按钮一起隐藏会让学生无法去看先修课。
+    """
+    from app.state_manager import select_course  # noqa: PLC0415
+    from app.ui_theme import prereq_label_md  # noqa: PLC0415
+
+    prereqs = course.get("prerequisites") or []
+    if not prereqs:
+        return
+    graph_allowed = legacy_graph_allowed(requisite_bundle)
+    if graph_allowed:
+        st.markdown("**🧱 旧平铺先修关系（未核验，仅供导航）**")
+        st.caption("旧边不表达 AND/OR、最低成绩或共修；不能用它判断哪些课全部必修或能否注册。")
+        # Mini prereq graph (round-3 review's "killer feature" ask):
+        # st.graphviz_chart renders the DOT source client-side — no graphviz
+        # runtime in the image.
+        # 中文：迷你先修图（第三轮评审要的"杀手功能"）：st.graphviz_chart 在
+        # 客户端渲染 DOT 源码 —— 镜像里不需要 graphviz 运行时。
+        from rag.prereq_graph import build_prereq_dot  # noqa: PLC0415
+
+        dot = build_prereq_dot(course["primary_code"], prereqs)
+        if dot:
+            st.graphviz_chart(dot)
+    else:
+        st.markdown("**🔗 相关先修课程跳转（仅导航）**")
+        st.caption("只用于跳转查看；不表达 AND/OR、最低成绩或是否必修，以上方的结构化规则为准。")
+    for p in prereqs:
+        cols = st.columns([4, 1])
+        if graph_allowed:
+            cols[0].markdown(prereq_label_md(
+                code=p.get("primary_code"), name=p.get("primary_name"),
+                course_id=p["course_id"], requirement=p["requirement"],
+            ))
+        else:
+            # No required/recommended label next to structured rules; plain text.
+            # 中文：结构化规则旁不标注"必修/建议"；纯文本显示。
+            cols[0].text(" · ".join(
+                part for part in (p.get("primary_code"), p.get("primary_name")) if part
+            ) or p["course_id"])
+        # Only navigable when the prereq exists in the catalog.
+        # 中文：只有先修课存在于目录中时才可跳转。
+        if p.get("primary_code") and cols[1].button(
+            "查看", key=f"prereq-{p['course_id']}", use_container_width=True,
+        ):
+            select_course(st.session_state, p["course_id"])
+            st.rerun()
+
+
 def legacy_graph_allowed(data: dict | None) -> bool:
     """Any raw structured record blocks fallback, including corrupt records."""
     if data is None:  # Older API: retain legacy navigation, with explicit warning.
@@ -130,10 +187,23 @@ def render_course_requisites(st, data: dict | None, *, course_id: str, course_co
     allowed = {None, *by_year}
     if st.session_state.get(key) not in allowed:
         st.session_state.pop(key, None)
+    # Several editions: the student must choose (never default to the latest).
+    # Exactly one: there is no choice to make — show it by default (still
+    # labelled "path not declared"); the student can still clear it.
+    # 中文：有多个年度时必须由学生选择（绝不默认最新）。只有一个年度时没有可选
+    # 的余地 —— 默认展开它（仍标注"路径未声明"），学生依然可以清空。
+    single = len(by_year) == 1
+    if single and key not in st.session_state:
+        # Initialise ONCE (first render of this course's widget). A student who
+        # then picks the blank option keeps None — it's never re-forced.
+        # 中文：只在首次渲染时初始化一次。学生之后选空选项会保持 None，不再强制。
+        st.session_state[key] = next(iter(by_year))
     chosen = st.selectbox("选择先修规则 Catalog 年度（不默认最新版本）", [None, *by_year], key=key,
         format_func=lambda year: "请明确选择适用年度" if year is None else f"Catalog {year} · 校区/个人路径未声明")
     if chosen is None:
         return
+    if single:
+        st.caption("目前只记录了这一个 Catalog 年度，已默认展开；它不代表你的适用年度。")
     document: CourseRequisiteDocument = by_year[chosen]
     st.caption(f"Catalog {document.catalog_year} · 院系页面未声明校区或个人路径 · 不是完整政策")
     st.markdown("**目录标题学分（独立来源证据）**")

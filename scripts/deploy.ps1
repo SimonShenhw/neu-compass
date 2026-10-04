@@ -281,6 +281,15 @@ if ($DryRun) {
                 throw 'Co-op listing unavailable; confirm the v1.3 moderation migration'
             }
             $null = $coop.Content | ConvertFrom-Json -ErrorAction Stop
+            # The public list now degrades to seeds instead of 503 before the
+            # v1.3 migration, so read the schema state from the header.
+            # PS5 headers map to strings, PS7 to string arrays: compare all.
+            # 中文：迁移前公开列表会降级为只有种子而不是 503，所以改读响应头。
+            $moderation = @($coop.Headers.Keys | Where-Object { $_ -ieq 'X-Coop-Moderation' } |
+                ForEach-Object { $coop.Headers[$_] })
+            if ($moderation -notcontains 'available') {
+                throw 'Co-op moderation schema missing on the server; apply the v1.3 migration (public list is seeds-only until then)'
+            }
 
             $ok = $true
             break

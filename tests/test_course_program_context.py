@@ -242,8 +242,10 @@ def test_free_text_program_scope_notes_and_rule_labels_are_not_markup():
 
 def test_real_widget_separate_year_and_path_selection_plain_text_no_old_graph():
     app = AppTest.from_string(app_source(ui_bundle())).run(timeout=45)
-    assert not app.exception and app.selectbox[0].value is None
-    assert len(app.selectbox) == 1
+    # One recorded edition is shown by default (review 2026-10-03); the program
+    # path below it still requires an explicit choice.
+    assert not app.exception and app.selectbox[0].value == "2026-2027"
+    assert len(app.selectbox) == 2 and app.selectbox[1].value is None
     app.selectbox[0].set_value("2026-2027").run(timeout=45)
     assert not app.exception and len(app.selectbox) == 2 and app.selectbox[1].value is None
     assert any("<script>" in item.value for item in app.text)

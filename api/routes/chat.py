@@ -79,7 +79,7 @@ from llm.query_filter_extractor import extract_filters_adaptive
 from rag.followup import is_followup_query
 from rag.answer_evidence import build_answer_evidence
 from rag.hybrid import HybridRetriever
-from rag.query_normalizer import normalize_query_to_course_ids
+from rag.query_normalizer import asks_for_alternatives, normalize_query_to_course_ids
 from rag.rejection import build_gate_fn
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from rag.retriever import SearchHit
@@ -115,8 +115,11 @@ log = structlog.get_logger("neu_compass.chat")
         "newline. Object types in order:\n\n"
         "1. `{\"type\": \"meta\", \"matched_via\": \"alias|hybrid|empty\", "
         "\"retrieval_ms\": float, \"results\": [{course_id, primary_code, "
-        "primary_name, score, answer_evidence}, ...], prompt_version}` — emitted first so the client can "
-        "render evidence bubbles before tokens land.\n"
+        "primary_name, score, answer_evidence}, ...], prompt_version, notices?}` — emitted first so the client can "
+        "render evidence bubbles before tokens land. `notices` appears only when "
+        "non-empty, e.g. `program_schedule_unverified`: a first-semester/foundational "
+        "question for a family whose version-scoped rules carry no verified schedule "
+        "was answered from hybrid retrieval instead of a guessed sequence.\n"
         "2. `{\"type\": \"token\", \"text\": \"...\"}` — zero or more, "
         "Gemini stream chunks.\n"
         "3. `{\"type\": \"error\", \"detail\": \"...\"}` — only on Gemini "
@@ -138,7 +141,7 @@ log = structlog.get_logger("neu_compass.chat")
             "content": {"application/x-ndjson": {}},
         },
         422: {"description": "Invalid query / k / delivery_mode."},
-        409: {"description": "Program selection is ambiguous or a verified semester schedule is unavailable."},
+        409: {"description": "Program selection is ambiguous or conflicts with the query's program prefix."},
     },
 )
 def chat(
@@ -200,11 +203,17 @@ def chat(
         except ProgramNotFound as exc:
             raise HTTPException(status_code=404, detail="Selected program_id not found") from exc
     try:
-        hits, matched_via, hard_filters = _retrieve(
+        hits, matched_via, hard_filters, notices = _retrieve(
             req, alias_repo, course_repo, hybrid, reranker, program_repo, conn,
         )
     except ProgramAmbiguous as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # The UI shows `detail` verbatim to the student — lead with Chinese.
+        # 中文：UI 会把 detail 原样展示给学生，所以中文在前。
+        choices = ", ".join(p.program_id for p in exc.programs)
+        raise HTTPException(status_code=409, detail=(
+            f"这个专业前缀对应多个项目，请先在上方「对话项目」里选择：{choices}。"
+            f" ({exc})"
+        )) from exc
     retrieval_ms = (time.perf_counter() - started) * 1000
 
     # Prefixes scope candidates, not relevance; keep the /search gate policy.
@@ -289,7 +298,7 @@ def chat(
     prompt = build_prompt(
         req.query, hits,
         history=[t.model_dump() for t in req.history],
-        evidence=answer_evidence, retrieval_mode=matched_via,
+        evidence=answer_evidence, retrieval_mode=matched_via, notices=notices,
     )
 
     def event_stream() -> Iterator[bytes]:
@@ -314,6 +323,10 @@ def chat(
         }
         if rejection_reason is not None:
             meta_payload["rejection_reason"] = rejection_reason
+        # Only present when non-empty, so the legacy meta shape is unchanged.
+        # 中文：仅在非空时出现，旧的 meta 形状保持不变。
+        if notices:
+            meta_payload["notices"] = list(notices)
         yield (json.dumps(meta_payload) + "\n").encode("utf-8")
 
         # Bound memory and issue a receipt only after normal upstream completion.
@@ -398,10 +411,10 @@ def _retrieve(
     reranker: CrossEncoderReranker | None,
     program_repo: ProgramRepository,
     conn: sqlite3.Connection,
-) -> tuple[list[SearchHit], str, dict[str, object]]:
-    """Multi-tier retrieval, returning hits, route, and effective hard filters.
+) -> tuple[list[SearchHit], str, dict[str, object], list[str]]:
+    """Multi-tier retrieval: hits, route, effective hard filters, notices.
 
-    多层级检索，返回命中、路由和实际生效的硬筛选条件。
+    多层级检索，返回命中、路由、实际生效的硬筛选条件和提示码。
 
     Tier order (most-specific first; first hit wins):
 
@@ -409,9 +422,12 @@ def _retrieve(
       1. **alias** — explicit course-code or slang resolution via
          v_course_lookup. Cheapest path; bypasses hybrid + reranker.
       2. **program** (Layer 3) — prefix or explicit program_id plus
-         "first-semester / foundational" intent. Ambiguity requires selection;
-         stored version-scoped rules without a verified schedule return 409.
-         Only legacy-only families retain the unverified semester=1 shortcut.
+         "first-semester / foundational" intent. Ambiguity requires selection
+         (409). A family with stored version-scoped rules but no verified
+         schedule falls through to hybrid with the
+         `program_schedule_unverified` notice — never the legacy guessed
+         sequence, never an error. Only legacy-only families retain the
+         unverified semester=1 shortcut.
       3. **hybrid** — BM25 + vector fusion over the indexed corpus, with
          Layer 2 program-prefix pre-filter applied at the SQLite layer.
          Caller runs reranker reject on this output.
@@ -423,8 +439,9 @@ def _retrieve(
       1. **alias** —— 经 v_course_lookup 显式解析课程代码或俗称。代价最低
          的路径；完全绕开 hybrid + reranker。
       2. **program**（Layer 3）—— 前缀或显式项目加"第一学期/基础课"意图。
-         歧义需选择；已有版本化规则却无核验学期安排时返回 409。
-         仅旧 seed 项目保留未核验的 semester=1 捷径，不代表注册资格。
+         歧义需选择（409）；已有版本化规则却无核验学期安排时，带
+         `program_schedule_unverified` 提示码落到 hybrid —— 不用旧猜测顺序，
+         也不报错。仅旧 seed 项目保留未核验的 semester=1 捷径，不代表注册资格。
       3. **hybrid** —— 在已索引语料上融合 BM25 + 向量，并在 SQLite 层
          应用 Layer 2 的专业前缀预过滤。调用方会对这一路输出跑 reranker
          拒答检查。
@@ -454,6 +471,7 @@ def _retrieve(
     # 噪声，用户在刚讨论完某门课后却收到"找不到匹配课程"。score=1.0 与
     # 别名层一样：所指对象已经明确，不需要跑排序或拒答门。
     hard_filters = build_hard_filters(req)
+    notices: list[str] = []
     if req.context_course_ids and is_followup_query(req.query):
         ctx_courses = course_repo.get_batch(req.context_course_ids)
         if ctx_courses:
@@ -462,7 +480,7 @@ def _retrieve(
             ], hard_filters)
             ctx_hits = [SearchHit(course=course, score=1.0) for course in courses[: req.k]]
             log.info("chat.context_path", query=req.query[:80], count=len(ctx_hits))
-            return ctx_hits, ("context" if ctx_hits else "empty"), hard_filters
+            return ctx_hits, ("context" if ctx_hits else "empty"), hard_filters, notices
 
     # Exact references obey filters without becoming unrelated semantic searches.
     # 中文：精确课程引用也遵守筛选，不将排除的课程替换成语义检索结果。
@@ -474,7 +492,13 @@ def _retrieve(
                 alias_courses[cid] for cid in alias_ids if cid in alias_courses
             ], hard_filters)
             hits = [SearchHit(course=course, score=1.0) for course in courses[: req.k]]
-            return hits, ("alias" if hits else "empty"), hard_filters
+            # Anchor exception, same rule as /search: "courses like X" whose X
+            # the filters exclude is a question about OTHER courses -> hybrid.
+            # 中文：锚点例外，与 /search 同规则：问"类似 X 的课"而 X 被筛掉时，
+            # 问的是其他课程 -> 走 hybrid。
+            if hits or not (hard_filters and asks_for_alternatives(req.query)):
+                return hits, ("alias" if hits else "empty"), hard_filters, notices
+            log.info("chat.alias_anchor_filtered_fallback", query=req.query[:80])
 
     # Layer 2 + Layer 3: extract program prefix from query (regex first).
     # 中文：Layer 2 + Layer 3：从查询中抽取专业前缀（优先走正则）。
@@ -492,35 +516,44 @@ def _retrieve(
                    else program_repo.find_by_prefix(extracted.program_prefix))
         if program is not None:
             if req.program_id and extracted.program_prefix and program.prefix.upper() != extracted.program_prefix.upper():
-                raise HTTPException(status_code=409, detail="Selected program_id conflicts with the detected program prefix; clarify the intended project.")
-            if ProgramPlanRepository(conn).has_records_for_program(program.program_id):
                 raise HTTPException(status_code=409, detail=(
-                    f"Stored version-scoped documents exist for {program.program_id}, but no verified semester schedule is available. "
-                    f"Browse /programs/{program.program_id}/plans; the legacy guessed sequence is not used."
+                    "上方选择的对话项目与问题里的专业前缀不一致；请清空项目选择或改写问题。"
+                    " (Selected program_id conflicts with the detected program prefix.)"
                 ))
-            edges = program_repo.list_required_courses(
-                program.program_id, semester=1,
-            )
-            program_courses = course_repo.get_batch([edge.course_id for edge in edges])
-            for edge in edges:
-                if edge.course_id not in program_courses:
-                    log.warning(
-                        "chat.program_dangling", program_id=program.program_id,
-                        course_id=edge.course_id,
-                    )
-            if program_courses:
-                courses = filter_courses(conn, [
-                    program_courses[edge.course_id] for edge in edges
-                    if edge.course_id in program_courses
-                ], hard_filters)
-                program_hits = [
-                    SearchHit(course=course, score=1.0) for course in courses[: req.k]
-                ]
-                log.info(
-                    "chat.program_path", program_id=program.program_id,
-                    prefix=program.prefix, count=len(program_hits),
+            if ProgramPlanRepository(conn).has_records_for_program(program.program_id):
+                # Version-scoped rules exist but no verified schedule does. The
+                # legacy guessed sequence must stay off — but this is the most
+                # common onboarding question, so answer it (hybrid, below) and
+                # say plainly that no verified schedule exists, never a 409.
+                # 中文：已有版本化规则、但没有核验过的学期安排。旧的猜测顺序仍然
+                # 不用 —— 但这是新生最常问的问题，所以走下面的 hybrid 照常回答，
+                # 并明确说明没有核验的学期安排，而不是返回 409。
+                notices.append("program_schedule_unverified")
+                log.info("chat.program_schedule_unverified", program_id=program.program_id)
+            else:
+                edges = program_repo.list_required_courses(
+                    program.program_id, semester=1,
                 )
-                return program_hits, ("program" if program_hits else "empty"), hard_filters
+                program_courses = course_repo.get_batch([edge.course_id for edge in edges])
+                for edge in edges:
+                    if edge.course_id not in program_courses:
+                        log.warning(
+                            "chat.program_dangling", program_id=program.program_id,
+                            course_id=edge.course_id,
+                        )
+                if program_courses:
+                    courses = filter_courses(conn, [
+                        program_courses[edge.course_id] for edge in edges
+                        if edge.course_id in program_courses
+                    ], hard_filters)
+                    program_hits = [
+                        SearchHit(course=course, score=1.0) for course in courses[: req.k]
+                    ]
+                    log.info(
+                        "chat.program_path", program_id=program.program_id,
+                        prefix=program.prefix, count=len(program_hits),
+                    )
+                    return program_hits, ("program" if program_hits else "empty"), hard_filters, notices
 
     # Tier 3: hybrid with Layer 2 prefix pre-filter.
     # 中文：Tier 3：带 Layer 2 前缀预过滤的 hybrid。
@@ -539,4 +572,4 @@ def _retrieve(
     )
     pool_size = max(req.k, RERANK_POOL_SIZE) if reranker is not None else req.k
     hits = hybrid.search(retrieval_query, hard_filters=hard_filters or None, k=pool_size)
-    return hits, ("hybrid" if hits else "empty"), hard_filters
+    return hits, ("hybrid" if hits else "empty"), hard_filters, notices

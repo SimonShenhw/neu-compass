@@ -18,13 +18,13 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from db.course_requisite_repository import CourseRequisiteRepository  # noqa: E402
+from db.schema_blocks import begin_schema_migration, schema_block  # noqa: E402
 from schemas.course_requisite_document import CourseRequisiteDocument  # noqa: E402
 from scripts.audit_course_requisites import build_report  # noqa: E402
 
 
 def migration_sql() -> str:
-    sql = (ROOT / "db/init.sql").read_text(encoding="utf-8")
-    return sql.split("-- BEGIN COURSE_REQUISITES_V1_6", 1)[1].split("-- END COURSE_REQUISITES_V1_6", 1)[0]
+    return schema_block("COURSE_REQUISITES_V1_6")
 
 
 def sync_requisites(db_path: str | Path, manifest_file: str | Path, source_dir: str | Path,
@@ -51,9 +51,7 @@ def sync_requisites(db_path: str | Path, manifest_file: str | Path, source_dir: 
             documents.append(document)
             report["would_store"] += int(repo.needs_store(document))
         if commit:
-            conn.execute("PRAGMA foreign_keys=ON")
-            conn.execute("PRAGMA busy_timeout=5000")
-            conn.executescript("BEGIN IMMEDIATE;\n" + migration_sql())
+            begin_schema_migration(conn, migration_sql())
             for document in documents:
                 report["stored"] += int(repo.store(document))
             conn.commit()

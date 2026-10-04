@@ -122,6 +122,7 @@ def add_message(
     evidence: list[dict] | None = None,
     matched_via: str | None = None,
     feedback: dict | None = None,
+    notices: list[str] | None = None,
 ) -> None:
     if role not in {"user", "assistant"}:
         raise ValueError(f"role must be 'user' or 'assistant', got {role!r}")
@@ -133,6 +134,15 @@ def add_message(
             "matched_via": matched_via,
         }
     )
+    # Server retrieval notices (e.g. program_schedule_unverified) ride along
+    # with the answer so the history re-render shows them too. Bounded plain
+    # codes only; the view maps known codes to text and ignores the rest.
+    # 中文：服务端检索提示码随回答一起存进历史，重渲染时同样显示。只存有界
+    # 的纯代码；由视图把已知代码映射成文字，未知代码一律忽略。
+    if role == "assistant" and notices:
+        codes = [n for n in notices if isinstance(n, str) and 0 < len(n) <= 64][:10]
+        if codes:
+            state["messages"][-1]["notices"] = codes
     if role == 'assistant' and feedback is not None:
         from app.answer_feedback_view import bind_feedback_receipt
         target = bind_feedback_receipt(feedback, content)

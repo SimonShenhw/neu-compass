@@ -227,3 +227,54 @@ def test_high_confidence_prefix_rejection_skips_hyde(api_client, monkeypatch, ro
     body = _response(api_client, route, {"query": "CS banana monkey yellow nonsense"})
     assert body["matched_via"] == "rejected"
     assert body["results"] == []
+
+
+@pytest.fixture
+def anchor_client(empty_db, monkeypatch):
+    """Seed + one extra 3-credit CS course, indexed BEFORE the app builds its
+    BM25/FAISS (courses added later are not retrievable in the fixture app)."""
+    from schemas.course import Course  # noqa: PLC0415
+    from tests.conftest import build_test_app, seed_minimal_corpus  # noqa: PLC0415
+
+    monkeypatch.setattr(settings, "rejection_mode", "threshold")
+    monkeypatch.setattr(settings, "hyde_rescue", False)
+    seed_minimal_corpus(empty_db)
+    repo = CourseRepository(empty_db)
+    repo.insert(Course(course_id="c-cs-5200", primary_code="CS 5200",
+                       primary_name="Database Management Systems", credits=3),
+                raw_text="database systems SQL query planning")
+    repo.mark_indexed("c-cs-5200")
+    app = build_test_app(empty_db, seed=False)
+    app.dependency_overrides[get_chat_stream_fn] = lambda: lambda prompt: iter([])
+    with TestClient(app) as client:
+        yield client
+
+
+@pytest.mark.parametrize("route", ["/chat", "/search"])
+def test_filtered_out_anchor_of_alternatives_question_falls_back_to_hybrid(anchor_client, route) -> None:
+    """Review 2026-10-03: "courses like CS 5800" with a 3-credit filter used to
+    return EMPTY because the alias tier resolved the 4-credit anchor and the
+    filter removed it. The question is about OTHER courses: hybrid answers it
+    under the same filter (and the excluded anchor never comes back)."""
+    body = _response(anchor_client, route, {"query": "planning courses like CS 5800", "credits": 3})
+    assert body["matched_via"] == "hybrid"
+    assert [hit["course_id"] for hit in body["results"]] == ["c-cs-5200"]
+
+
+@pytest.mark.parametrize("route", ["/chat", "/search"])
+def test_direct_reference_still_reports_filtered_out_course_as_empty(anchor_client, route) -> None:
+    """Asking ABOUT the course (no alternatives cue) keeps the batch-02 rule:
+    an excluded referent is empty, never replaced by unrelated courses."""
+    body = _response(anchor_client, route, {"query": "CS 5800 planning", "credits": 3})
+    assert body["matched_via"] == "empty" and body["results"] == []
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("courses like CS 5800", True), ("和 CS 5800 类似的课", True), ("CS 5800 的替代课", True),
+    ("other than CS 5800", True), ("CS 5800 怎么样", False), ("CS 5800", False),
+    ("is CS 5800 hard", False), ("likely", False),
+])
+def test_alternatives_cue_detection(query, expected) -> None:
+    from rag.query_normalizer import asks_for_alternatives  # noqa: PLC0415
+
+    assert asks_for_alternatives(query) is expected

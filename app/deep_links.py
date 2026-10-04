@@ -212,47 +212,75 @@ def apply_deep_link(st, *, pages: list[str]) -> None:
 
 def _apply_plan_ref(st, *, pages: list[str]) -> None:
     from app.api_client import ApiClient, ApiError
-    from app.program_plan_links import (APPLIED_KEY, PENDING_KEY, MESSAGES,
+    from app.program_plan_links import (APPLIED_KEY, PENDING_KEY, MESSAGES, RETRY_KEY,
         clear_plan_link_selection, plan_query_token, read_plan_link, resolve_plan_link)
 
     token = plan_query_token(st.query_params)
     if st.session_state.get(APPLIED_KEY) == token:
         return
-    # This runs before nav/plan widgets; never retain another link's selection.
-    clear_plan_link_selection(st.session_state)
-    st.session_state['nav_page'] = pages[1]
+
+    def settle(message: str | None) -> None:
+        # Terminal outcome for this link (applied or definitively unusable):
+        # route to Programs ONCE, never retain another link's selection, and
+        # never re-fetch this token. Runs before the nav/plan widgets exist.
+        # 中文：这条链接的终态（已应用或确定不可用）：只路由到培养方案页一次，
+        # 不保留其他链接的选择，此 token 不再重复请求。运行在导航/方案组件之前。
+        clear_plan_link_selection(st.session_state)
+        st.session_state['nav_page'] = pages[1]
+        st.session_state[APPLIED_KEY] = token
+        st.session_state[APPLIED_FLAG] = True
+        if message is not None:
+            st.warning(message)
+
     try:
         target = read_plan_link(st.query_params)
     except ValueError:
-        st.warning(MESSAGES['invalid'])
-    else:
-        st.session_state.pop(f'program-plan-{target.program_id}', None)
-        cache = st.session_state.get('_curriculum_cache')
-        if not isinstance(cache, dict):
-            cache = {}
-            st.session_state['_curriculum_cache'] = cache
-        cache.pop(target.program_id, None)
-        try:
-            # Fresh GET, not the session curriculum cache: pin current revision.
-            with ApiClient(session_token=st.session_state.get('session_token'), timeout=8.0) as api:
-                body = api.get_program_curriculum(target.program_id)
-        except ApiError as exc:
-            if exc.status_code in {408, 429} or exc.status_code >= 500:
-                st.warning('🔗 方案链接暂时无法核对，稍后重试；未保留旧方案选择。')
-                return
-            st.warning(MESSAGES['unavailable'])
-        except ValueError:
-            st.warning(MESSAGES['unusable'])
-        else:
-            status, plan = resolve_plan_link(target, body)
-            if plan is None:
-                st.warning(MESSAGES[status])
-            else:
-                cache[target.program_id] = body
-                st.session_state['selected_program_id'] = target.program_id
-                st.session_state[PENDING_KEY] = target.model_dump(mode='json')
-    st.session_state[APPLIED_KEY] = token
-    st.session_state[APPLIED_FLAG] = True
+        settle(MESSAGES['invalid'])
+        return
+    try:
+        # Fresh GET, not the session curriculum cache: pin current revision.
+        with ApiClient(session_token=st.session_state.get('session_token'), timeout=8.0) as api:
+            body = api.get_program_curriculum(target.program_id)
+    except ApiError as exc:
+        if exc.status_code in {408, 429} or exc.status_code >= 500:
+            # Transient: retried on a later rerun WITHOUT touching navigation
+            # or the current program selection — doing that on every rerun of
+            # an outage pinned the student to the Programs page. Only the
+            # linked family's stale plan choice is dropped, once per link.
+            # 中文：暂时性失败：之后的 rerun 再重试，但不动导航和当前项目选择
+            # —— 以前每次 rerun 都这么做，故障期间学生会被钉在培养方案页。
+            # 只在每条链接第一次时清掉该项目旧的方案选择。
+            if st.session_state.get(RETRY_KEY) != token:
+                st.session_state.pop(f'program-plan-{target.program_id}', None)
+                st.session_state[RETRY_KEY] = token
+                st.warning('🔗 方案链接暂时无法核对，稍后会自动重试；在此之前不会改动你当前的页面。')
+            return
+        settle(MESSAGES['unavailable'])
+        _evict_family(st, target.program_id)
+        return
+    except ValueError:
+        settle(MESSAGES['unusable'])
+        _evict_family(st, target.program_id)
+        return
+    status, plan = resolve_plan_link(target, body)
+    settle(None if plan is not None else MESSAGES[status])
+    cache = _evict_family(st, target.program_id)
+    if plan is not None:
+        cache[target.program_id] = body
+        st.session_state['selected_program_id'] = target.program_id
+        st.session_state[PENDING_KEY] = target.model_dump(mode='json')
+
+
+def _evict_family(st, program_id: str) -> dict:
+    """Drop the family's plan widget choice and cached curriculum; return the cache.
+    中文：丢弃该项目的方案组件选择和缓存的课程表；返回缓存字典。"""
+    st.session_state.pop(f'program-plan-{program_id}', None)
+    cache = st.session_state.get('_curriculum_cache')
+    if not isinstance(cache, dict):
+        cache = {}
+        st.session_state['_curriculum_cache'] = cache
+    cache.pop(program_id, None)
+    return cache
 
 
 def _ref_label(ref: str) -> str:

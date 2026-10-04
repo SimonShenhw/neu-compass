@@ -127,6 +127,22 @@ def test_add_message_rejects_invalid_role() -> None:
         add_message(state, role="system", content="oops")
 
 
+def test_assistant_notices_persist_bounded_and_legacy_shape_unchanged() -> None:
+    """Retrieval notices ride into history (so the re-render shows them), as
+    bounded plain codes only; messages without notices keep the old shape."""
+    state: dict = {}
+    init_state(state)
+    add_message(state, role="assistant", content="a", notices=["program_schedule_unverified"])
+    add_message(state, role="assistant", content="b", notices=["x" * 65, 7, "", "ok"])
+    add_message(state, role="assistant", content="c")
+    add_message(state, role="user", content="d", notices=["program_schedule_unverified"])
+    msgs = get_messages(state)
+    assert msgs[0]["notices"] == ["program_schedule_unverified"]
+    assert msgs[1]["notices"] == ["ok"]
+    assert "notices" not in msgs[2]
+    assert "notices" not in msgs[3]  # user turns never carry server notices
+
+
 def test_clear_conversation_keeps_user_identity() -> None:
     state: dict = {}
     init_state(state)

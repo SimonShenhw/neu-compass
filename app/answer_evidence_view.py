@@ -26,6 +26,26 @@ WARNING_LABELS = {
     "field_evidence_value_conflict": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
     "synthetic_record_not_real_course": "此记录为合成测试数据，不是实际课程推荐。",
 }
+# Per-answer retrieval notices from /chat meta. Only KNOWN codes render;
+# anything else is dropped (never echoed as markdown).
+# 中文：/chat meta 里的回答级检索提示码。只渲染已知代码；其余一律丢弃
+# （绝不作为 markdown 原样回显）。
+RETRIEVAL_NOTICE_LABELS = {
+    "program_schedule_unverified": (
+        "该项目已有版本化培养方案规则，但没有经过核验的学期安排；以上只是检索到的相关课程，"
+        "不是官方的第一学期/基础课方案。具体规则请到「培养方案」页查看。"
+    ),
+}
+
+
+def render_retrieval_notices(st, notices) -> None:
+    if not isinstance(notices, list):
+        return
+    for code in notices:
+        if code in RETRIEVAL_NOTICE_LABELS:
+            st.caption("ℹ️ " + RETRIEVAL_NOTICE_LABELS[code])
+
+
 COMPACT_WARNINGS = {
     "catalog_metadata_conflict", "field_evidence_value_conflict", "program_seed_unverified",
     "synthetic_record_not_real_course", "prerequisite_logic_unavailable",

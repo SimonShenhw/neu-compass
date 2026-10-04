@@ -13,6 +13,7 @@ from pathlib import Path
 import sqlite3
 
 from db.repository import CourseRepository
+from db.schema_blocks import schema_before_block
 from schemas.course import Course
 from scrapers.neu_catalog import _parse_dept_html
 from scripts.release_preflight import ROOT, _existing
@@ -108,7 +109,7 @@ def build_inputs(workspace: Path) -> RehearsalInputs:
     conn = sqlite3.connect(db)
     try:
         conn.row_factory = sqlite3.Row
-        base_sql = (ROOT / 'db/init.sql').read_text(encoding='utf-8-sig').split('-- BEGIN COOP_MODERATION_V1_3', 1)[0]
+        base_sql = schema_before_block('COOP_MODERATION_V1_3', init_sql=ROOT / 'db/init.sql')
         conn.executescript(base_sql)
         conn.execute('PRAGMA journal_mode=DELETE')
         conn.execute('PRAGMA foreign_keys=ON')

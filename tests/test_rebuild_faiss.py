@@ -269,8 +269,89 @@ def test_rebuild_incremental_corrupted_index_fallback(seeded_db: Path, tmp_path:
         incremental=True,
     )
     assert counts["fallback_full"] is True
+    assert counts["fallback_reason"] == "unreadable_or_corrupt_index"
     assert counts["embedded"] == 2
 
     loaded = FaissIndex.load(out_dir, verify_checksums=True)
     assert loaded.count == 2
+
+
+# === Review 2026-10-03: staleness + model safety of --incremental ===
+
+
+def _set_raw_text(db: Path, course_id: str, text: str) -> None:
+    conn = sqlite3.connect(str(db))
+    conn.execute("UPDATE courses SET raw_text=? WHERE course_id=?", (text, course_id))
+    conn.commit()
+    conn.close()
+
+
+def test_incremental_reembeds_courses_whose_raw_text_changed(seeded_db: Path, tmp_path: Path) -> None:
+    """A catalog re-scrape keeps ids but rewrites descriptions. The old
+    incremental mode kept every such vector (retained=2, embedded=0)."""
+    out_dir = tmp_path / "faiss_idx"
+    embedder = _DeterministicEmbedder()
+    rebuild(db_path=seeded_db, index_path=out_dir, embedder=embedder)
+    _set_raw_text(seeded_db, "c-1", "COMPLETELY NEW description")
+
+    counts = rebuild(db_path=seeded_db, index_path=out_dir, embedder=embedder, incremental=True)
+    assert counts["fallback_full"] is False
+    assert counts["reembedded_changed"] == 1
+    assert counts["embedded"] == 1
+    assert counts["retained"] == 1 and counts["removed"] == 0
+
+    loaded = FaissIndex.load(out_dir, verify_checksums=True)
+    fresh = embedder.encode(["COMPLETELY NEW description"])[0]
+    top_id, top_score = loaded.search(fresh, k=1)[0]
+    assert top_id == "c-1" and top_score == pytest.approx(1.0, abs=1e-5)
+
+
+def test_incremental_unchanged_text_embeds_nothing(seeded_db: Path, tmp_path: Path) -> None:
+    out_dir = tmp_path / "faiss_idx"
+    rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder())
+    counts = rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder(), incremental=True)
+    assert counts["embedded"] == 0 and counts["retained"] == 2 and counts["fallback_full"] is False
+
+
+def test_incremental_model_change_rebuilds_everything(seeded_db: Path, tmp_path: Path) -> None:
+    """Never mix two models' vectors under one manifest label."""
+    out_dir = tmp_path / "faiss_idx"
+    rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder(), model_name="model-A")
+    counts = rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder(),
+                     model_name="model-B", incremental=True)
+    assert counts["fallback_full"] is True and counts["fallback_reason"] == "model_changed"
+    assert counts["embedded"] == 2
+    assert FaissIndex.load(out_dir, expected_model="model-B", verify_checksums=True).count == 2
+
+
+def test_incremental_legacy_index_without_fingerprints_rebuilds(seeded_db: Path, tmp_path: Path) -> None:
+    out_dir = tmp_path / "faiss_idx"
+    legacy = FaissIndex()
+    emb = _DeterministicEmbedder()
+    legacy.add(emb.encode(["syllabus body about algorithms", "syllabus body about applied AI"]), ["c-1", "c-2"])
+    legacy.save(out_dir)  # manifest yes, fingerprints no (pre-fingerprint build)
+    counts = rebuild(db_path=seeded_db, index_path=out_dir, embedder=emb, incremental=True)
+    assert counts["fallback_full"] is True and counts["fallback_reason"] == "missing_fingerprints"
+    loaded = FaissIndex.load(out_dir)
+    assert loaded.fingerprint("c-1") is not None and loaded.fingerprint("c-2") is not None
+
+
+def test_incremental_without_manifest_rebuilds(seeded_db: Path, tmp_path: Path) -> None:
+    out_dir = tmp_path / "faiss_idx"
+    rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder())
+    (out_dir / FaissIndex.MANIFEST_FILE).unlink()
+    counts = rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder(), incremental=True)
+    assert counts["fallback_full"] is True and counts["fallback_reason"] == "no_manifest_unknown_model"
+
+
+def test_incremental_torn_index_set_rebuilds(seeded_db: Path, tmp_path: Path) -> None:
+    out_dir = tmp_path / "faiss_idx"
+    rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder())
+    other = FaissIndex()
+    other.add(_DeterministicEmbedder().encode(["x", "y"]), ["c-2", "c-1"])
+    other.save(tmp_path / "other")
+    (out_dir / FaissIndex.INDEX_FILE).write_bytes((tmp_path / "other" / FaissIndex.INDEX_FILE).read_bytes())
+    counts = rebuild(db_path=seeded_db, index_path=out_dir, embedder=_DeterministicEmbedder(), incremental=True)
+    assert counts["fallback_full"] is True and counts["fallback_reason"] == "unreadable_or_corrupt_index"
+    assert FaissIndex.load(out_dir, verify_checksums=True).count == 2
 

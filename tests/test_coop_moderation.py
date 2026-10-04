@@ -113,17 +113,42 @@ def test_moderation_state_cannot_be_set_by_client(api_client_unseeded, empty_db)
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("route", ["upload", "list"])
-def test_missing_moderation_schema_fails_closed(api_client_unseeded, empty_db, route):
+def _drop_moderation_schema(conn):
+    conn.execute("DROP TABLE coop_contribution_credits")
+    conn.execute("DROP TABLE coop_submissions")
+    conn.commit()
+
+
+def test_missing_moderation_schema_upload_fails_closed(api_client_unseeded, empty_db):
     auth = seed_user(empty_db, "u1")
-    empty_db.execute("DROP TABLE coop_contribution_credits")
-    empty_db.execute("DROP TABLE coop_submissions")
-    empty_db.commit()
-    response = api_client_unseeded.get("/coop") if route == "list" else api_client_unseeded.post(
+    _drop_moderation_schema(empty_db)
+    response = api_client_unseeded.post(
         "/coop", headers=auth, json={"company": "Fidelity", "role": "Quant Dev"},
     )
     assert response.status_code == 503
     assert "migration" in response.json()["detail"]
+
+
+def test_missing_moderation_schema_list_degrades_to_seeds(api_client_unseeded, empty_db):
+    """Deploy-before-migrate used to 503 the whole public Co-op page. Reading
+    must not depend on the private write queue: seeds stay browsable, legacy
+    unreviewed UGC stays hidden, and the header carries the migration state."""
+    repo = CoopRepository(empty_db)
+    seed_user(empty_db, "u-legacy")
+    repo.add(CoopExperience(coop_id="seed-1", company="State Street", role="Quant Dev", is_seed_data=True))
+    repo.add(CoopExperience(coop_id="legacy-ugc", company="Acme", role="Analyst",
+                            contributor_user_id="u-legacy", is_seed_data=False))
+    _drop_moderation_schema(empty_db)
+    response = api_client_unseeded.get("/coop")
+    assert response.status_code == 200
+    assert [row["coop_id"] for row in response.json()] == ["seed-1"]
+    assert response.headers["x-coop-moderation"] == "missing"
+
+
+def test_list_reports_available_moderation_schema(api_client_unseeded):
+    response = api_client_unseeded.get("/coop")
+    assert response.status_code == 200
+    assert response.headers["x-coop-moderation"] == "available"
 
 
 def test_private_queue_has_no_public_endpoint(api_client_unseeded):

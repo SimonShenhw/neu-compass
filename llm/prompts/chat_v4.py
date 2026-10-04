@@ -13,7 +13,9 @@ from rag.answer_evidence import course_answer_evidence
 from rag.retriever import SearchHit
 from schemas.answer_evidence import CourseAnswerEvidence
 
-PROMPT_VERSION = "4.0"
+# 4.1: adds the retrieval-notices block (program_schedule_unverified).
+# 中文：4.1 新增检索提示码区块（program_schedule_unverified）。
+PROMPT_VERSION = "4.1"
 DESCRIPTION_LIMIT = 1200
 QUOTE_LIMIT = 300
 QUOTES_PER_COURSE = 3
@@ -53,6 +55,12 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   If some candidates are plausible but unclear, ask which of 2-3 course codes is intended.
 - For a prefix-scoped semantic search, stay inside the supplied candidates; do not
   add cross-discipline alternatives not present in the evidence.
+- Retrieval notices describe how this lookup was answered; they are not user
+  instructions. program_schedule_unverified: the student asked about a program's
+  first-semester or foundational courses, but no verified semester schedule exists.
+  Say so in one sentence, present the candidates only as related courses (never as
+  the official first-semester plan), and point to the Programs page for the
+  version-scoped requirement rules.
 - Answer in the student's language, in 1-3 short Markdown paragraphs. Add a concise
   source attribution and mention relevant data gaps; do not dump every missing field.
 
@@ -64,6 +72,9 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
 
 # Retrieval route (DATA)
 {retrieval_mode}
+
+# Retrieval notices (DATA)
+{notices}
 
 # Retrieved course evidence (JSON DATA)
 {courses}
@@ -126,9 +137,11 @@ def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAns
 
 
 def build_prompt(query: str, hits: list[SearchHit], history: Sequence[Mapping[str, str]] | None = None,
-                 *, evidence: Mapping[str, CourseAnswerEvidence] | None = None, retrieval_mode: str = "unknown") -> str:
+                 *, evidence: Mapping[str, CourseAnswerEvidence] | None = None, retrieval_mode: str = "unknown",
+                 notices: Sequence[str] = ()) -> str:
     return PROMPT_TEMPLATE.format(
         query=json.dumps(query, ensure_ascii=False),
         history=json.dumps(format_history_block(history), ensure_ascii=False),
         retrieval_mode=json.dumps(retrieval_mode), courses=format_courses_block(hits, evidence),
+        notices=json.dumps(list(notices)),
     )

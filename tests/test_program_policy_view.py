@@ -19,7 +19,16 @@ from schemas.program_policy import paragraph_hash
 from schemas.program_policy_view import ProgramPolicyView
 from tests.test_program_policy_evidence import fixture_bundle
 from tests.test_program_plan_view import FakeSurface
-from tests.test_program_plan_contract import seed_plan
+from tests.test_program_plan_contract import chat_meta, seed_plan, stub_chat
+
+
+def assert_no_guessed_schedule(api_client):
+    """Scoped rules never reactivate the legacy guessed sequence; the student
+    gets an answer with the explicit unverified-schedule notice instead."""
+    stub_chat(api_client)
+    meta = chat_meta(api_client.post("/chat", json={"query": "CS first semester", "program_id": "cs-ms"}))
+    assert meta["matched_via"] != "program"
+    assert meta["notices"] == ["program_schedule_unverified"]
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -45,7 +54,7 @@ def test_selected_policy_route_exists_without_reactivating_legacy_guesses(api_cl
     assert response.status_code == 200
     assert response.json()["status"] == "stale"
     assert response.json()["policies"] == []
-    assert api_client.post("/chat", json={"query": "CS first semester", "program_id": "cs-ms"}).status_code == 409
+    assert_no_guessed_schedule(api_client)
 
 
 def setup_reader(tmp_path):
@@ -301,7 +310,7 @@ def test_api_selected_evidence_is_readonly_no_store_and_keeps_existing_contracts
     assert all(not statement.lstrip().split()[0].lower() in {"insert", "update", "delete", "create", "drop", "alter"} for statement in sql)
     assert api_client.get("/programs/cs-ms").json()["plans"] == [plan.model_dump(mode="json")]
     assert api_client.get("/programs/cs-ms/plans").json()["plans"] == [plan.model_dump(mode="json")]
-    assert api_client.post("/chat", json={"query": "CS first semester", "program_id": "cs-ms"}).status_code == 409
+    assert_no_guessed_schedule(api_client)
     next(reader.policy_source_dir.glob("*.html")).unlink()
     failed = api_client.get(f"/programs/{plan.program_id}/plans/{plan.plan_id}/policies")
     assert failed.status_code == 200 and failed.json()["status"] == "unavailable" and failed.json()["policies"] == []

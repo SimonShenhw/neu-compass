@@ -115,7 +115,13 @@ def test_duplicate_edition_is_not_first_match_and_old_selected_year_is_cleared()
     st = FakeSt()
     st.session_state["test-year"] = "2024-2025"
     render(st, bundle(document()))
-    assert "test-year" not in st.session_state
+    # The stale year is cleared; with ONE recorded edition the slot is then
+    # initialised to that edition (review 2026-10-03), never to the stale one.
+    assert st.session_state.get("test-year") == "2026-2027"
+    st = FakeSt()
+    st.session_state["test-year"] = "2024-2025"
+    render(st, bundle(document("2026-2027"), document("2025-2026")))
+    assert "test-year" not in st.session_state  # several editions: still no default
 
 
 def app_source(data):
@@ -144,6 +150,53 @@ def test_real_widget_explicit_selection_and_clear_preserve_and_or_and_no_legacy_
     assert not app.exception and not any("最低成绩：B-" in item.value for item in app.text)
     app.selectbox[0].set_value(None).run(timeout=45)
     assert not app.exception and len(app.text) == 0 and len(app.get("graphviz_chart")) == 0
+
+
+def test_real_widget_single_edition_is_shown_by_default_and_still_clearable():
+    """Review 2026-10-03: with ONE recorded edition there is no choice to make;
+    the old default (None) showed no prerequisite information at all."""
+    app = AppTest.from_string(app_source(bundle(document()))).run(timeout=45)
+    assert not app.exception and app.selectbox[0].value == "2026-2027"
+    text = "\n".join(item.value for item in app.text)
+    assert "全部分支（AND）" in text and "最低成绩：B-" in text
+    assert any("只记录了这一个 Catalog 年度" in item.value for item in app.caption)
+    app.selectbox[0].set_value(None).run(timeout=45)
+    assert not app.exception and len(app.text) == 0
+
+
+def links_source(course, data):
+    return f'''
+import json
+import streamlit as st
+from app.course_requisite_view import render_prerequisite_links
+render_prerequisite_links(st, json.loads({json.dumps(course)!r}), json.loads({json.dumps(data)!r}))
+'''
+
+
+PREREQ_COURSE = {"course_id": "design", "primary_code": "CS 5004", "primary_name": "Design", "prerequisites": [
+    {"course_id": "c-5001", "primary_code": "CS 5001", "primary_name": "Foundations", "requirement": "required"},
+    {"course_id": "c-ghost", "primary_code": None, "primary_name": None, "requirement": "required"},
+]}
+
+
+def test_structured_records_keep_navigation_but_not_the_flat_graph():
+    """The flat graph would contradict AND/OR, but the jump buttons are pure
+    navigation; hiding both stranded the student."""
+    app = AppTest.from_string(links_source(PREREQ_COURSE, bundle(document()))).run(timeout=45)
+    assert not app.exception
+    assert len(app.get("graphviz_chart")) == 0
+    assert [b.label for b in app.button] == ["查看"]  # catalog course only, ghost not navigable
+    assert any(item.value == "CS 5001 · Foundations" for item in app.text)
+    assert not any("required" in item.value or "必修" in item.value for item in app.text)
+    assert any("仅导航" in item.value for item in app.markdown)
+
+
+def test_without_structured_records_the_legacy_graph_and_rows_remain():
+    app = AppTest.from_string(links_source(PREREQ_COURSE, None)).run(timeout=45)
+    assert not app.exception
+    assert len(app.get("graphviz_chart")) == 1
+    assert [b.label for b in app.button] == ["查看"]
+    assert any("旧平铺先修关系" in item.value for item in app.markdown)
 
 
 def test_real_widget_unparsed_clause_is_visible_without_partial_rule_or_markup():

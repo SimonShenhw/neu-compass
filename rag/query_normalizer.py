@@ -63,6 +63,26 @@ MAX_WHOLE_QUERY_LEN = 30
 # (v_course_lookup 存的是规范形式 'CS 5800',所以 'CS-5800' 会查不到)。
 _REF_SEPARATOR_RE = re.compile(r"[-_+]+")
 
+# "courses like CS 5800" / "和 CS 5800 类似的课": the code is an ANCHOR for
+# OTHER courses, not the course being asked about. Used to stop an explicit
+# filter that excludes the anchor from turning such a question into an empty
+# answer (the retrieval routes fall back to hybrid instead).
+# 中文:"courses like CS 5800" / "和 CS 5800 类似的课":这里的课号是寻找
+# 其他课程的锚点,而不是被询问的那门课。用来避免"显式筛选恰好排除了锚点课"
+# 时把这类问题变成空结果(检索路由会改为回退到 hybrid)。
+_ALTERNATIVES_RE = re.compile(
+    r"\blike\b|\bsimilar\b|\balternatives?\b|\binstead of\b|\bbesides\b|\bother than\b|\bexcept\b|"
+    r"类似|相似|相近|差不多|替代|代替|平替|除了|别的|其他|其它|同类",
+    re.IGNORECASE | re.ASCII,
+)
+
+
+def asks_for_alternatives(query: str) -> bool:
+    """True when a mentioned course is an anchor for OTHER courses.
+    中文:提到的课程是用来找"其他课程"的锚点时返回 True。"""
+    return bool(_ALTERNATIVES_RE.search(query or ""))
+
+
 # Deep-link refs are codes/slang, not prose. Longer than this and it's junk
 # (or someone probing) — reject before touching the DB.
 # 中文:深链 ref 是代码或俗称,不是散文。超过这个长度就是垃圾输入
@@ -213,6 +233,7 @@ def _ref_candidates(cleaned: str) -> list[str]:
 __all__ = [
     "MAX_COURSE_REF_LEN",
     "MAX_WHOLE_QUERY_LEN",
+    "asks_for_alternatives",
     "normalize_query_to_course_ids",
     "resolve_course_ref",
 ]

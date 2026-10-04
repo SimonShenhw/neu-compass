@@ -9,7 +9,7 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from api.dependencies import DbConn, get_coop_repo, get_coop_submission_repo, get_current_user_id, get_user_repo
 from api.models import CoopOut, CoopUploadRequest, CoopUploadResponse
@@ -115,19 +115,29 @@ def upload_coop(
         "presence), so clients can render 'contribute to unlock' hints for "
         "redacted fields.\n\n"
         "Each row is sanitized: `contributor_user_id` and `redaction_audit` "
-        "are server-internal and NOT returned."
+        "are server-internal and NOT returned.\n\n"
+        "Before the v1.3 moderation migration the list degrades to curated "
+        "seeds (public browsing never 503s); the `X-Coop-Moderation` header "
+        "reports `available` or `missing` so deploy checks can still detect "
+        "an unapplied migration. Uploads still require the schema."
     ),
     responses={
         200: {"description": "Eligible public Co-op records (redacted per tier)."},
-        503: {"description": "Moderation schema has not been migrated."},
     },
 )
 def list_coop(
+    response: Response,
     coop_repo: Annotated[CoopRepository, Depends(get_coop_repo)],
-    submissions: Annotated[CoopSubmissionRepository, Depends(get_coop_submission_repo)],
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
     x_user_id: Annotated[str | None, Depends(get_current_user_id)] = None,
 ) -> list[CoopOut]:
+    # A public READ must not depend on the private write queue's schema; the
+    # header keeps the unapplied-migration signal for operators/deploy.
+    # 中文：公开的读接口不能依赖私有写队列的表结构；用响应头保留"迁移未执行"
+    # 这个信号，给运维和部署脚本用。
+    response.headers["X-Coop-Moderation"] = (
+        "available" if coop_repo.moderation_schema_available() else "missing"
+    )
     tier = 0
     if x_user_id:
         user = user_repo.get(x_user_id)

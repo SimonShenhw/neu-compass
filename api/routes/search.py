@@ -72,7 +72,7 @@ from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
 from llm.query_filter_extractor import extract_filters_adaptive
 from rag.hybrid import HybridRetriever
-from rag.query_normalizer import normalize_query_to_course_ids
+from rag.query_normalizer import asks_for_alternatives, normalize_query_to_course_ids
 from rag.rejection import build_gate_fn
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from schemas.course import DeliveryMode
@@ -204,8 +204,13 @@ def search(
 
     # Exact references remain cheap but must obey the same metadata filters.
     # Filter before top-k; a filtered-out reference is empty, not a new search.
+    # Exception: when the code is only an ANCHOR ("courses like CS 5800") and
+    # the filters exclude it, the question was about OTHER courses — fall
+    # through to hybrid (which applies the same filters) instead of "empty".
     # All-dangling resolution still falls through to hybrid.
     # 中文：精确引用先筛选再截断；排除的课程返回空结果，不另找无关课程替代。
+    # 例外：课号只是锚点（"类似 CS 5800 的课"）且被筛选排除时，问的本来就是
+    # 其他课程 —— 落到 hybrid（同样施加筛选），而不是返回空结果。
     hard_filters = build_hard_filters(req)
     alias_ids = normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
     if alias_ids:
@@ -213,10 +218,14 @@ def search(
         for cid in alias_ids:
             if cid not in alias_courses:
                 log.warning("search.alias_dangling", course_id=cid)
-        if alias_courses:
-            courses = filter_courses(conn, [
-                alias_courses[cid] for cid in alias_ids if cid in alias_courses
-            ], hard_filters)
+        courses = filter_courses(conn, [
+            alias_courses[cid] for cid in alias_ids if cid in alias_courses
+        ], hard_filters)
+        anchor_excluded = bool(alias_courses) and not courses and bool(hard_filters) \
+            and asks_for_alternatives(req.query)
+        if anchor_excluded:
+            log.info("search.alias_anchor_filtered_fallback", query=req.query)
+        if alias_courses and not anchor_excluded:
             results = [
                 SearchHitOut(
                     course_id=course.course_id, primary_code=course.primary_code,

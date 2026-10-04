@@ -9,15 +9,19 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from db.schema_blocks import begin_schema_migration, schema_block  # noqa: E402
+
 TABLES = {"coop_submissions", "coop_contribution_credits"}
 
 
 def migration_sql() -> str:
-    sql = (PROJECT_ROOT / "db" / "init.sql").read_text(encoding="utf-8")
-    return sql.split("-- BEGIN COOP_MODERATION_V1_3", 1)[1].split("-- END COOP_MODERATION_V1_3", 1)[0]
+    return schema_block("COOP_MODERATION_V1_3")
 
 
 def migrate(db_path: str | Path, *, commit: bool = False) -> list[str]:
@@ -30,10 +34,9 @@ def migrate(db_path: str | Path, *, commit: bool = False) -> list[str]:
             raise ValueError("Apply the existing runtime schema before this additive migration")
         missing = sorted(TABLES - existing)
         if commit:
-            conn.execute("PRAGMA foreign_keys=ON")
-            conn.execute("PRAGMA busy_timeout=5000")
             try:
-                conn.executescript("BEGIN IMMEDIATE;\n" + migration_sql() + "\nCOMMIT;")
+                begin_schema_migration(conn, migration_sql())
+                conn.commit()
             except Exception:
                 conn.rollback()
                 raise

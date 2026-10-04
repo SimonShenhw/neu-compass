@@ -93,8 +93,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # 1) FAISS — cheap (read from disk).
     # 中文：1）FAISS —— 代价很低（从磁盘读取）。
-    faiss_index = FaissIndex.load(settings.faiss_index_path)
-    log.info("api.startup.faiss_loaded", count=faiss_index.count)
+    # Enforce the manifest (08A): a vector set built with another embedding
+    # model, or a torn publish (new index + old id_map), must refuse to serve
+    # instead of returning silently wrong neighbours. Legacy manifest-less
+    # indexes still load, with a warning.
+    # 中文：强制校验清单（08A）：用别的嵌入模型建的向量集、或一次撕裂的发布
+    # （新索引 + 旧 id_map），必须拒绝服务，而不是静默返回错误的近邻。
+    # 没有清单的旧索引照常加载，但记一条警告。
+    faiss_index = FaissIndex.load(
+        settings.faiss_index_path,
+        expected_model=settings.embedding_model,
+        verify_checksums=True,
+    )
+    log.info(
+        "api.startup.faiss_loaded",
+        count=faiss_index.count,
+        manifest_verified=faiss_index.manifest is not None,
+    )
+    if faiss_index.manifest is None:
+        log.warning("api.startup.faiss_manifest_missing", detail="legacy index; model and integrity unverified")
 
     # 2) BM25 corpus from SQLite snapshot — cheap (≤1k docs in ~10ms).
     # 中文：2）从 SQLite 快照构建 BM25 语料 —— 代价很低（≤1000 篇文档约 10ms）。

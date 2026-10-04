@@ -86,7 +86,10 @@ function Invoke-WebRequest {
             'coop_wrong_shape' { '{}' }
             default { '[]' }
         }
-        return [pscustomobject]@{StatusCode=$httpStatus; Content=$body}
+        # Lower-case name on purpose (ASGI sends lower-case header names).
+        $moderation = if ($global:reviewScenario -eq 'coop_unmigrated') { 'missing' } else { 'available' }
+        $headers = if ($global:reviewScenario -eq 'coop_no_header') { @{} } else { @{'x-coop-moderation' = $moderation} }
+        return [pscustomobject]@{StatusCode=$httpStatus; Content=$body; Headers=$headers}
     }
     throw "Unexpected HTTP operation in offline test: $Uri"
 }
@@ -140,6 +143,8 @@ def test_deploy_requires_all_readonly_acceptance_probes(scenario: str) -> None:
         "compose_failure", "warming", "empty_index", "empty_bm25", "invalid_json",
         "api_unavailable", "network_failure", "ui_unhealthy", "resolver_missing", "resolver_empty",
         "coop_unavailable", "coop_invalid_json", "coop_wrong_shape",
+        # Public list degrades to seeds before v1.3; the header must still fail the deploy.
+        "coop_unmigrated", "coop_no_header",
     ],
 )
 def test_deploy_fails_closed(scenario: str) -> None:
@@ -162,6 +167,6 @@ def test_deploy_acceptance_with_windows_powershell_5(monkeypatch: pytest.MonkeyP
     for scenario in (
         "compose_failure", "warming", "empty_index", "empty_bm25", "invalid_json",
         "api_unavailable", "network_failure", "ui_unhealthy", "resolver_missing", "resolver_empty",
-        "coop_unavailable", "coop_invalid_json", "coop_wrong_shape",
+        "coop_unavailable", "coop_invalid_json", "coop_wrong_shape", "coop_unmigrated", "coop_no_header",
     ):
         test_deploy_fails_closed(scenario)

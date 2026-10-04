@@ -146,8 +146,14 @@ def test_api_pathway_filters_do_not_fall_back_to_standard(api_client, empty_db, 
     assert api_client.get(f"/programs/{family}/plans", params={"pathway": other}).json()["plans"] == []
     assert [item["pathway"] for item in api_client.get(f"/programs/{family}/plans", params={"pathway": "standard"}).json()["plans"]] == ["standard"]
     assert api_client.get(f"/programs/{family}").json()["semesters"] == []
+    from api.dependencies import get_chat_stream_fn  # noqa: PLC0415
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: (lambda prompt: iter(["ok"]))
     response = api_client.post("/chat", json={"query": "first semester", "program_id": family})
-    assert response.status_code == 409  # Never turn bridge groups into a schedule.
+    assert response.status_code == 200
+    meta = json.loads(response.text.splitlines()[0])
+    # Never turn bridge groups into a schedule: no program route, explicit notice.
+    assert meta["matched_via"] != "program"
+    assert meta["notices"] == ["program_schedule_unverified"]
 
 
 def test_pathway_real_cli_is_additive_readonly_and_idempotent(tmp_path):

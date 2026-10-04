@@ -81,6 +81,43 @@ def test_dockerfile_production_pinning_and_exclusions() -> None:
     )
 
 
+def _out_of_lock_installs(content: str) -> str:
+    """Every `uv pip install` command, with backslash continuations joined."""
+    commands = re.findall(r"uv pip install(?:[^\n]*\\\n)*[^\n]*", content)
+    assert commands, "Dockerfile must install the out-of-lock inference stack"
+    return "\n".join(commands)
+
+
+def test_out_of_lock_runtime_packages_are_pinned_exactly() -> None:
+    """`uv sync --frozen` only covers uv.lock. CPU torch, optimum and
+    optimum-intel are installed AFTER it, and every --build deploy re-runs
+    those layers — a range there re-resolves on every deploy (the 2026-06-12
+    crash-loop). They must be exact `==` pins to declared ARG versions."""
+    content = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    pins = dict(re.findall(
+        r"^ARG (TORCH_CPU_VERSION|OPTIMUM_VERSION|OPTIMUM_INTEL_VERSION)=(\S+)$",
+        content, re.MULTILINE,
+    ))
+    assert set(pins) == {"TORCH_CPU_VERSION", "OPTIMUM_VERSION", "OPTIMUM_INTEL_VERSION"}
+    for name, value in pins.items():
+        assert re.fullmatch(r"\d+(\.\d+)+", value), f"{name} must be an exact version, got {value!r}"
+
+    installs = _out_of_lock_installs(content)
+    assert '"torch==${TORCH_CPU_VERSION}"' in installs
+    assert '"optimum-intel[openvino]==${OPTIMUM_INTEL_VERSION}"' in installs
+    assert '"optimum==${OPTIMUM_VERSION}"' in installs
+    for loose in (">=", "<=", "~=", "!=", "<", ">"):
+        assert loose not in installs, f"out-of-lock install uses a range ({loose!r})"
+
+
+def test_build_records_the_resolved_out_of_lock_set() -> None:
+    """The openvino extra's transitive packages still resolve at build time;
+    the image must record what it actually got so the next pin is copied,
+    not guessed."""
+    content = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "uv pip freeze > /app/runtime-freeze.txt" in content
+
+
 @pytest.mark.parametrize(
     "module_name",
     [

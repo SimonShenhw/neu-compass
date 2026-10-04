@@ -17,13 +17,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from db.catalog_source_repository import CatalogSourceRepository  # noqa: E402
+from db.schema_blocks import begin_schema_migration, schema_block  # noqa: E402
 from schemas.answer_evidence import CatalogSnapshot  # noqa: E402
 from scrapers.neu_catalog import CatalogEntry  # noqa: E402
 
 
 def migration_sql() -> str:
-    sql = (PROJECT_ROOT / "db" / "init.sql").read_text(encoding="utf-8")
-    return sql.split("-- BEGIN CATALOG_SOURCES_V1_4", 1)[1].split("-- END CATALOG_SOURCES_V1_4", 1)[0]
+    return schema_block("CATALOG_SOURCES_V1_4")
 
 
 def sync_sources(db_path: str | Path, catalog_dir: str | Path, *, commit: bool = False) -> dict:
@@ -54,10 +54,8 @@ def sync_sources(db_path: str | Path, catalog_dir: str | Path, *, commit: bool =
                   "skipped_title_mismatch": 0, "unchanged": 0, "stored": 0,
                   "schema_missing": schema_missing, "committed": commit}
         if commit:
-            conn.execute("PRAGMA foreign_keys=ON")
-            conn.execute("PRAGMA busy_timeout=5000")
             # Keep DDL open in the same transaction as all subsequent stores.
-            conn.executescript("BEGIN IMMEDIATE;\n" + migration_sql())
+            begin_schema_migration(conn, migration_sql())
         planned = []
         for snapshot in snapshots.values():
             matches = conn.execute(

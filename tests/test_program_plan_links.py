@@ -189,6 +189,32 @@ def test_transient_failures_retry_without_old_selection(monkeypatch, code):
     assert st.session_state['_program_plan_link_pending']['plan_id'] == plan().plan_id
 
 
+@pytest.mark.parametrize('code', [503, 504])
+def test_transient_failure_never_pins_the_student_to_programs(monkeypatch, code):
+    """Review 2026-10-03 repro: while the API is down (restart / cold start),
+    every rerun used to force nav_page=Programs and clear the selection, so
+    the student could not leave the Programs page. Now an unsettled link
+    leaves navigation alone, warns once, and applies after recovery."""
+    from app.api_client import ApiError
+    calls = fake_api(monkeypatch, ApiError(code, 'unreachable'))
+    st = Surface(params())
+    apply_deep_link(st, pages=PAGES)
+    assert 'nav_page' not in st.session_state and 'selected_program_id' not in st.session_state
+    for _ in range(3):  # the student navigates away; every click is a rerun
+        st.session_state['nav_page'] = PAGES[0]
+        st.session_state['selected_program_id'] = 'ds-ms'
+        apply_deep_link(st, pages=PAGES)
+        assert st.session_state['nav_page'] == PAGES[0]
+        assert st.session_state['selected_program_id'] == 'ds-ms'
+    assert len(st.warnings) == 1  # warned once, not on every rerun
+    assert len(calls) == 4  # still retried each rerun
+    fake_api(monkeypatch, body())
+    apply_deep_link(st, pages=PAGES)  # API back: the link applies exactly once
+    assert st.session_state['nav_page'] == PAGES[1]
+    assert st.session_state['selected_program_id'] == plan().program_id
+    assert st.session_state['_program_plan_link_pending']['plan_id'] == plan().plan_id
+
+
 def test_dead_target_settles_and_does_not_repeatedly_fetch(monkeypatch):
     from app.api_client import ApiError
     calls = fake_api(monkeypatch, ApiError(404, 'not found'))

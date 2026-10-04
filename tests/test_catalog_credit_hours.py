@@ -319,7 +319,9 @@ def test_ui_unknown_range_and_fraction_are_distinct_and_no_fixed_guess(raw, expe
 def test_real_widget_range_is_shown_only_after_edition_choice_with_unknown_section_credit():
     data = bundle(with_hours(document(course_id="design"), "1-4 Hours"))
     app = AppTest.from_string(app_source(data)).run(timeout=45)
-    assert not app.exception and app.selectbox[0].value is None and len(app.text) == 0
+    # One recorded edition is shown by default since review 2026-10-03; the
+    # range semantics below are unchanged, and clearing still hides everything.
+    assert not app.exception and app.selectbox[0].value == "2026-2027"
     app.selectbox[0].set_value("2026-2027").run(timeout=45)
     assert not app.exception and any("目录范围：1–4" in item.value for item in app.text)
     assert any("实际班次学分未声明" in item.value for item in app.text)

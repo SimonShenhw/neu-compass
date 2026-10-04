@@ -20,8 +20,18 @@ def course(**updates):
 
 
 def test_version_and_empty_candidates():
-    assert PROMPT_VERSION == "4.0"
+    assert PROMPT_VERSION == "4.1"
     assert "no matches found in catalog" in build_prompt("unknown", [])
+
+
+def test_retrieval_notices_are_quoted_data_with_an_explicit_rule():
+    """4.1: the unverified-schedule notice reaches the model as DATA, and the
+    template tells the model what it means (never present a guessed plan)."""
+    assert "# Retrieval notices (DATA)\n[]" in build_prompt("x", [])
+    prompt = build_prompt("CS first semester", [], notices=["program_schedule_unverified"])
+    assert '# Retrieval notices (DATA)\n["program_schedule_unverified"]' in prompt
+    assert "program_schedule_unverified: the student asked" in PROMPT_TEMPLATE
+    assert "never as\n  the official first-semester plan" in PROMPT_TEMPLATE
 
 
 def test_catalog_and_quote_excerpts_are_bounded_and_marked():

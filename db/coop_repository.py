@@ -151,13 +151,26 @@ class CoopRepository:
         ).fetchall()
         return [self._row_to_coop(r) for r in rows]
 
+    def moderation_schema_available(self) -> bool:
+        """Whether the v1.3 private review queue exists in this database.
+        中文：本数据库是否已有 v1.3 私有审核队列表。"""
+        return self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coop_submissions'",
+        ).fetchone() is not None
+
     def list_public(self) -> list[CoopExperience]:
         """Curator seeds OR reviewed UGC with a CURRENT distinct-contributor cohort.
 
         Pending/rejected/legacy unreviewed UGC is never returned. Rechecking the
         cohort prevents account deletion from leaving a singleton publicly visible.
+        Before the v1.3 migration no reviewed UGC can exist, so the public list
+        is the curated seeds — browsing degrades instead of failing outright.
         中文：策展种子或当前仍满足不同贡献者门槛的已审核 UGC；删除账号后重新检查。
+        v1.3 迁移之前不可能存在已审核 UGC，因此公开列表只有策展种子 —— 浏览功能
+        降级而不是直接失败。
         """
+        if not self.moderation_schema_available():
+            return self.list_seed()
         rows = self._conn.execute(
             "SELECT c.* FROM coop_experiences c WHERE c.is_seed_data=1 OR EXISTS ("
             "SELECT 1 FROM coop_submissions s WHERE s.coop_id=c.coop_id "
