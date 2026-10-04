@@ -25,13 +25,27 @@ Empty path is fine for tests; in production we'd point at
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import tempfile
+from typing import Any
 
 import faiss
 import numpy as np
 
 from rag.embedder import EMBEDDING_DIM
+
+
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(65536):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 class FaissIndex:
@@ -42,6 +56,9 @@ class FaissIndex:
 
     INDEX_FILE = "index.faiss"
     ID_MAP_FILE = "id_map.json"
+    MANIFEST_FILE = "index_manifest.json"
+    DEFAULT_MODEL_NAME = "BAAI/bge-m3"
+    MANIFEST_VERSION = "1.0"
 
     def __init__(self, *, dim: int = EMBEDDING_DIM) -> None:
         self._dim = dim
@@ -50,6 +67,11 @@ class FaissIndex:
         self._id_to_course: dict[int, str] = {}
         self._course_to_id: dict[str, int] = {}
         self._next_int_id = 0
+        self._manifest: dict[str, Any] | None = None
+
+    @property
+    def manifest(self) -> dict[str, Any] | None:
+        return self._manifest
 
     @property
     def dim(self) -> int:
@@ -127,6 +149,7 @@ class FaissIndex:
         self._id_to_course.clear()
         self._course_to_id.clear()
         self._next_int_id = 0
+        self._manifest = None
 
     # === Query ===
     # 中文:=== 查询 ===
@@ -193,28 +216,104 @@ class FaissIndex:
             results.append((cid, float(dist)))
         return results
 
+
+
     # === Persistence ===
     # 中文:=== 持久化 ===
 
-    def save(self, dir_path: str | Path) -> None:
-        path = Path(dir_path)
-        path.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(self._index, str(path / self.INDEX_FILE))
+    def save(
+        self,
+        dir_path: str | Path,
+        *,
+        model_name: str = DEFAULT_MODEL_NAME,
+        atomic: bool = True,
+    ) -> dict[str, Any]:
+        """Persist index binary, id_map, and metadata manifest.
+
+        If atomic=True, writes to a temporary staging directory in the parent
+        folder and replaces files in target directory.
+        Returns the generated manifest dictionary.
+        """
+        target_dir = Path(dir_path)
+        target_dir.mkdir(parents=True, exist_ok=True)
+
         meta = {
             "dim": self._dim,
             "next_int_id": self._next_int_id,
-            # JSON object keys must be strings; int_id becomes a string here
-            # and is cast back to int in load().
-            # 中文:JSON 对象的键必须是字符串;这里把 int_id 转成字符串,
-            # 加载时(见 load())再转回 int。
             "id_map": {str(k): v for k, v in self._id_to_course.items()},
         }
-        (path / self.ID_MAP_FILE).write_text(
-            json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        id_map_str = json.dumps(meta, indent=2, ensure_ascii=False)
+
+        if atomic:
+            # Stage in a sibling directory for atomic file replace
+            staging_dir = Path(tempfile.mkdtemp(prefix=".tmp_faiss_", dir=str(target_dir.parent)))
+            try:
+                staging_index = staging_dir / self.INDEX_FILE
+                staging_id_map = staging_dir / self.ID_MAP_FILE
+                staging_manifest = staging_dir / self.MANIFEST_FILE
+
+                faiss.write_index(self._index, str(staging_index))
+                staging_id_map.write_text(id_map_str, encoding="utf-8")
+
+                idx_hash = _sha256_file(staging_index)
+                id_map_hash = _sha256_file(staging_id_map)
+
+                manifest = {
+                    "manifest_version": self.MANIFEST_VERSION,
+                    "embedding_model": str(model_name),
+                    "dimension": self._dim,
+                    "count": self.count,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "index_file": self.INDEX_FILE,
+                    "index_sha256": idx_hash,
+                    "id_map_file": self.ID_MAP_FILE,
+                    "id_map_sha256": id_map_hash,
+                }
+                staging_manifest.write_text(
+                    json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+
+                for fn in (self.INDEX_FILE, self.ID_MAP_FILE, self.MANIFEST_FILE):
+                    os.replace(staging_dir / fn, target_dir / fn)
+            finally:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+        else:
+            index_path = target_dir / self.INDEX_FILE
+            id_map_path = target_dir / self.ID_MAP_FILE
+            manifest_path = target_dir / self.MANIFEST_FILE
+
+            faiss.write_index(self._index, str(index_path))
+            id_map_path.write_text(id_map_str, encoding="utf-8")
+
+            idx_hash = _sha256_file(index_path)
+            id_map_hash = _sha256_file(id_map_path)
+
+            manifest = {
+                "manifest_version": self.MANIFEST_VERSION,
+                "embedding_model": str(model_name),
+                "dimension": self._dim,
+                "count": self.count,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "index_file": self.INDEX_FILE,
+                "index_sha256": idx_hash,
+                "id_map_file": self.ID_MAP_FILE,
+                "id_map_sha256": id_map_hash,
+            }
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+
+        self._manifest = manifest
+        return manifest
 
     @classmethod
-    def load(cls, dir_path: str | Path) -> "FaissIndex":
+    def load(
+        cls,
+        dir_path: str | Path,
+        *,
+        expected_model: str | None = None,
+        verify_checksums: bool = False,
+    ) -> "FaissIndex":
         path = Path(dir_path)
         index_path = path / cls.INDEX_FILE
         meta_path = path / cls.ID_MAP_FILE
@@ -222,6 +321,33 @@ class FaissIndex:
             raise FileNotFoundError(
                 f"Missing FAISS index files in {path}. Run rebuild_faiss.py."
             )
+
+        manifest_path = path / cls.MANIFEST_FILE
+        manifest: dict[str, Any] | None = None
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                raise ValueError(f"Invalid FAISS index manifest in {path}: {exc}") from exc
+
+            if expected_model is not None and manifest.get("embedding_model") != expected_model:
+                raise ValueError(
+                    f"Embedding model mismatch: expected {expected_model!r}, index has {manifest.get('embedding_model')!r}"
+                )
+
+            if verify_checksums:
+                actual_idx_hash = _sha256_file(index_path)
+                expected_idx_hash = manifest.get("index_sha256")
+                if expected_idx_hash and actual_idx_hash != expected_idx_hash:
+                    raise ValueError(
+                        f"Checksum mismatch for {cls.INDEX_FILE}: expected {expected_idx_hash}, got {actual_idx_hash}"
+                    )
+                actual_id_hash = _sha256_file(meta_path)
+                expected_id_hash = manifest.get("id_map_sha256")
+                if expected_id_hash and actual_id_hash != expected_id_hash:
+                    raise ValueError(
+                        f"Checksum mismatch for {cls.ID_MAP_FILE}: expected {expected_id_hash}, got {actual_id_hash}"
+                    )
 
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         instance = cls(dim=meta["dim"])
@@ -234,7 +360,70 @@ class FaissIndex:
             int_id = int(str_int)
             instance._id_to_course[int_id] = course_id
             instance._course_to_id[course_id] = int_id
+
+        if manifest is not None:
+            if manifest.get("dimension") != instance.dim:
+                raise ValueError(
+                    f"Manifest dimension mismatch: manifest={manifest.get('dimension')}, index={instance.dim}"
+                )
+            if manifest.get("count") != instance.count:
+                raise ValueError(
+                    f"Manifest count mismatch: manifest={manifest.get('count')}, index={instance.count}"
+                )
+
+        instance._manifest = manifest
         return instance
+
+    @classmethod
+    def get_manifest(cls, dir_path: str | Path) -> dict[str, Any] | None:
+        """Inspect and return the index manifest without loading binary vectors into memory."""
+        path = Path(dir_path) / cls.MANIFEST_FILE
+        if not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    @classmethod
+    def verify_integrity(cls, dir_path: str | Path) -> dict[str, Any]:
+        """Check presence of index files and checksum integrity against manifest."""
+        path = Path(dir_path)
+        index_file = path / cls.INDEX_FILE
+        id_map_file = path / cls.ID_MAP_FILE
+        manifest_file = path / cls.MANIFEST_FILE
+
+        if not index_file.exists() or not id_map_file.exists():
+            return {
+                "valid": False,
+                "error": "missing_required_files",
+                "missing": [f.name for f in (index_file, id_map_file) if not f.exists()],
+            }
+
+        if not manifest_file.exists():
+            return {
+                "valid": True,
+                "has_manifest": False,
+                "warning": "legacy_index_without_manifest",
+            }
+
+        try:
+            manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {"valid": False, "error": f"corrupted_manifest: {exc}"}
+
+        idx_hash = _sha256_file(index_file)
+        id_hash = _sha256_file(id_map_file)
+
+        idx_ok = idx_hash == manifest.get("index_sha256")
+        id_ok = id_hash == manifest.get("id_map_sha256")
+
+        return {
+            "valid": bool(idx_ok and id_ok),
+            "has_manifest": True,
+            "manifest": manifest,
+            "checksums_match": bool(idx_ok and id_ok),
+            "index_sha256_match": idx_ok,
+            "id_map_sha256_match": id_ok,
+        }
+
 
 
 __all__ = ["FaissIndex"]

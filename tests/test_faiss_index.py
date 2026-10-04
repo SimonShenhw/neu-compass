@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import numpy as np
 import pytest
@@ -212,3 +213,168 @@ def test_save_load_preserves_next_int_id(tmp_path: Path) -> None:
     loaded.add(_vec(3), ["c"])
     assert loaded.count == 3
     assert "a" in loaded and "b" in loaded and "c" in loaded
+
+# === Manifest and 08A tests ===
+
+def test_save_creates_manifest_metadata(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["course-1"])
+    idx.add(_vec(2), ["course-2"])
+    manifest = idx.save(tmp_path, model_name="BAAI/bge-m3", atomic=True)
+
+    manifest_file = tmp_path / FaissIndex.MANIFEST_FILE
+    assert manifest_file.exists()
+    assert idx.manifest == manifest
+
+    data = json.loads(manifest_file.read_text(encoding="utf-8"))
+    assert data["manifest_version"] == FaissIndex.MANIFEST_VERSION
+    assert data["embedding_model"] == "BAAI/bge-m3"
+    assert data["dimension"] == EMBEDDING_DIM
+    assert data["count"] == 2
+    assert "created_at" in data
+    assert data["index_file"] == FaissIndex.INDEX_FILE
+    assert data["id_map_file"] == FaissIndex.ID_MAP_FILE
+    assert len(data["index_sha256"]) == 64
+    assert len(data["id_map_sha256"]) == 64
+
+
+def test_save_atomic_false(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["course-1"])
+    idx.save(tmp_path, atomic=False)
+
+    manifest_file = tmp_path / FaissIndex.MANIFEST_FILE
+    assert manifest_file.exists()
+    loaded = FaissIndex.load(tmp_path)
+    assert loaded.count == 1
+    assert "course-1" in loaded
+
+
+def test_load_with_expected_model_matching_and_mismatch(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path, model_name="custom/bge-v2")
+
+    # Matching model passes
+    loaded = FaissIndex.load(tmp_path, expected_model="custom/bge-v2")
+    assert loaded.count == 1
+    assert loaded.manifest is not None
+    assert loaded.manifest["embedding_model"] == "custom/bge-v2"
+
+    # Mismatched model raises ValueError
+    with pytest.raises(ValueError, match="Embedding model mismatch"):
+        FaissIndex.load(tmp_path, expected_model="other/model")
+
+
+def test_load_manifest_dimension_or_count_mismatch(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+
+    manifest_file = tmp_path / FaissIndex.MANIFEST_FILE
+    data = json.loads(manifest_file.read_text(encoding="utf-8"))
+
+    # Dimension mismatch
+    bad_dim_data = dict(data, dimension=128)
+    manifest_file.write_text(json.dumps(bad_dim_data), encoding="utf-8")
+    with pytest.raises(ValueError, match="Manifest dimension mismatch"):
+        FaissIndex.load(tmp_path)
+
+    # Count mismatch
+    bad_count_data = dict(data, count=999)
+    manifest_file.write_text(json.dumps(bad_count_data), encoding="utf-8")
+    with pytest.raises(ValueError, match="Manifest count mismatch"):
+        FaissIndex.load(tmp_path)
+
+
+def test_load_corrupted_manifest_json_raises(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+
+    (tmp_path / FaissIndex.MANIFEST_FILE).write_text("{broken json", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid FAISS index manifest"):
+        FaissIndex.load(tmp_path)
+
+
+def test_load_verify_checksums_pass_and_tampered(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+
+    # Clean verification passes
+    loaded = FaissIndex.load(tmp_path, verify_checksums=True)
+    assert loaded.count == 1
+
+    # Tampering index.faiss raises
+    (tmp_path / FaissIndex.INDEX_FILE).write_bytes(b"corrupt")
+    with pytest.raises(ValueError, match="Checksum mismatch for index.faiss"):
+        FaissIndex.load(tmp_path, verify_checksums=True)
+
+
+def test_load_verify_checksums_tampered_id_map(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+
+    # Re-write id_map with different formatting/content
+    (tmp_path / FaissIndex.ID_MAP_FILE).write_text(
+        json.dumps({"dim": EMBEDDING_DIM, "next_int_id": 1, "id_map": {"0": "c1"}, "extra": True}),
+        encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="Checksum mismatch for id_map.json"):
+        FaissIndex.load(tmp_path, verify_checksums=True)
+
+
+def test_load_legacy_without_manifest(tmp_path: Path) -> None:
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+
+    (tmp_path / FaissIndex.MANIFEST_FILE).unlink()
+    loaded = FaissIndex.load(tmp_path)
+    assert loaded.count == 1
+    assert loaded.manifest is None
+
+
+def test_get_manifest(tmp_path: Path) -> None:
+    assert FaissIndex.get_manifest(tmp_path) is None
+
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path, model_name="test-model")
+
+    manifest = FaissIndex.get_manifest(tmp_path)
+    assert manifest is not None
+    assert manifest["embedding_model"] == "test-model"
+
+
+def test_verify_integrity(tmp_path: Path) -> None:
+    # Directory with missing files
+    status = FaissIndex.verify_integrity(tmp_path)
+    assert status["valid"] is False
+    assert status["error"] == "missing_required_files"
+
+    # Save cleanly
+    idx = FaissIndex()
+    idx.add(_vec(1), ["c1"])
+    idx.save(tmp_path)
+
+    status = FaissIndex.verify_integrity(tmp_path)
+    assert status["valid"] is True
+    assert status["has_manifest"] is True
+    assert status["checksums_match"] is True
+
+    # Legacy (no manifest)
+    (tmp_path / FaissIndex.MANIFEST_FILE).unlink()
+    status = FaissIndex.verify_integrity(tmp_path)
+    assert status["valid"] is True
+    assert status["has_manifest"] is False
+    assert status["warning"] == "legacy_index_without_manifest"
+
+    # Corrupt manifest
+    (tmp_path / FaissIndex.MANIFEST_FILE).write_text("invalid json", encoding="utf-8")
+    status = FaissIndex.verify_integrity(tmp_path)
+    assert status["valid"] is False
+    assert "corrupted_manifest" in status["error"]
+

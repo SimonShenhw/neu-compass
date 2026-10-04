@@ -43,10 +43,13 @@ class QueryResult:
     retrieved: list[str]
     recall_at_5: float
     reciprocal_rank: float
+    k: int = 5
+    capped_recall_at_k: float | None = None
+    standard_recall_at_k: float | None = None
 
     @property
     def hit(self) -> bool:
-        return self.recall_at_5 > 0
+        return (self.capped_recall_at_k if self.capped_recall_at_k is not None else self.recall_at_5) > 0
 
 
 @dataclass
@@ -57,6 +60,11 @@ class EvalReport:
     recall_at_5: float = 0.0
     mrr: float = 0.0
     queries_with_expected: int = 0  # excludes adversarial empty-expected queries
+    k: int = 5
+    capped_recall_at_k: float | None = None
+    standard_recall_at_k: float | None = None
+    negative_queries: int = 0
+    correct_rejections: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -65,6 +73,20 @@ class EvalReport:
                 "queries_with_expected": self.queries_with_expected,
                 "recall_at_5": round(self.recall_at_5, 4),
                 "mrr": round(self.mrr, 4),
+                "k": self.k,
+                "capped_recall_at_k": self.capped_recall_at_k,
+                "standard_recall_at_k": self.standard_recall_at_k,
+                "quality_status": "positive_queries_evaluated" if self.queries_with_expected else "no_positive_queries",
+                "negative_queries": self.negative_queries,
+                "correct_rejections": self.correct_rejections,
+                "false_positives": self.negative_queries - self.correct_rejections,
+                "rejection_accuracy": self.correct_rejections / self.negative_queries if self.negative_queries else None,
+                "metric_definitions": {
+                    "recall_at_5": "legacy_capped_coverage_at_5",
+                    "capped_recall_at_k": "unique_hits_at_k_over_min_label_count_k",
+                    "standard_recall_at_k": "unique_hits_at_k_over_label_count",
+                    "mrr": "first_relevant_rank_in_full_returned_list",
+                },
             },
             "per_query": [
                 {
@@ -74,6 +96,9 @@ class EvalReport:
                     "retrieved": q.retrieved,
                     "recall_at_5": round(q.recall_at_5, 4),
                     "reciprocal_rank": round(q.reciprocal_rank, 4),
+                    "k": q.k,
+                    "capped_recall_at_k": q.capped_recall_at_k,
+                    "standard_recall_at_k": q.standard_recall_at_k,
                 }
                 for q in self.per_query
             ],
@@ -82,7 +107,8 @@ class EvalReport:
 
 def recall_at_k(retrieved: list[str], expected: list[str], k: int = 5) -> float:
     """Fraction of expected items present in top-k retrieved, with the
-    denominator capped at k (R-precision convention).
+    denominator capped at k (the project's historical capped coverage,
+    NOT standard recall or R-precision). Duplicate labels cannot add hits.
 
     The cap matters for multi-label ground truth (test_set v0.4+): a query
     with 8 relevant courses can show at most 5 in the top-5 — uncapped
@@ -93,10 +119,13 @@ def recall_at_k(retrieved: list[str], expected: list[str], k: int = 5) -> float:
     For empty-expected queries (adversarial: 'AAI 9999'), recall is undefined;
     we return 1.0 if retrieved is also empty (correct rejection), else 0.0.
     """
+    if type(k) is not int or k < 1:
+        raise ValueError('invalid_eval_k')
+    expected = set(expected)
     if not expected:
         return 1.0 if not retrieved else 0.0
     top_k = set(retrieved[:k])
-    hits = sum(1 for e in expected if e in top_k)
+    hits = len(expected & top_k)
     return hits / min(len(expected), k)
 
 
@@ -115,6 +144,31 @@ def reciprocal_rank(retrieved: list[str], expected: list[str]) -> float:
     return 0.0
 
 
+def validate_test_set(test_set: dict, *, k: int = 5) -> list[dict]:
+    """Validate ALL labels before a callable can cause I/O or query writes."""
+    if type(k) is not int or not 1 <= k <= 100:
+        raise ValueError('invalid_eval_k')
+    if not isinstance(test_set, dict) or not isinstance(test_set.get('queries'), list):
+        raise ValueError('invalid_eval_queries')
+    if len(test_set['queries']) > 10_000:
+        raise ValueError('eval_query_count_budget')
+    ids, entries = set(), []
+    for entry in test_set['queries']:
+        if not isinstance(entry, dict):
+            raise ValueError('invalid_eval_entry')
+        qid, query, labels = (entry.get(key) for key in ('query_id', 'query', 'expected_course_ids'))
+        if (not isinstance(qid, str) or not qid.strip() or qid in ids
+                or not isinstance(query, str) or not query.strip()
+                or not isinstance(labels, list)
+                or any(not isinstance(value, str) or not value.strip() for value in labels)):
+            raise ValueError('invalid_eval_identity_or_labels')
+        if len(labels) != len(set(labels)):
+            raise ValueError('duplicate_eval_labels')
+        ids.add(qid)
+        entries.append({**entry, 'expected_course_ids': list(labels)})
+    return entries
+
+
 def run_eval(
     test_set: dict,
     search_fn: Callable[[str], list[str]],
@@ -122,10 +176,16 @@ def run_eval(
     k: int = 5,
 ) -> EvalReport:
     """Run search_fn on every query, compute per-query + aggregate metrics."""
-    report = EvalReport()
-    for entry in test_set["queries"]:
+    entries = validate_test_set(test_set, k=k)
+    report = EvalReport(k=k)
+    for entry in entries:
         retrieved = search_fn(entry["query"])
-        expected = entry.get("expected_course_ids", [])
+        if (not isinstance(retrieved, list)
+                or any(not isinstance(value, str) or not value.strip() for value in retrieved)
+                or len(retrieved) != len(set(retrieved))):
+            raise ValueError('invalid_eval_retrieved_ids')
+        retrieved = list(retrieved)
+        expected = entry['expected_course_ids']
 
         recall = recall_at_k(retrieved, expected, k=k)
         rr = reciprocal_rank(retrieved, expected)
@@ -135,8 +195,10 @@ def run_eval(
             query=entry["query"],
             expected=expected,
             retrieved=retrieved,
-            recall_at_5=recall,
+            recall_at_5=recall_at_k(retrieved, expected, k=5),
             reciprocal_rank=rr,
+            k=k, capped_recall_at_k=recall,
+            standard_recall_at_k=len(set(retrieved[:k]) & set(expected)) / len(expected) if expected else None,
         ))
 
     # Aggregate. Adversarial empty-expected queries have a separate semantic
@@ -147,6 +209,11 @@ def run_eval(
     if real_queries:
         report.recall_at_5 = statistics.mean(q.recall_at_5 for q in real_queries)
         report.mrr = statistics.mean(q.reciprocal_rank for q in real_queries)
+        report.capped_recall_at_k = statistics.mean(q.capped_recall_at_k for q in real_queries)
+        report.standard_recall_at_k = statistics.mean(q.standard_recall_at_k for q in real_queries)
+    negatives = [q for q in report.per_query if not q.expected]
+    report.negative_queries = len(negatives)
+    report.correct_rejections = sum(not q.retrieved for q in negatives)
 
     return report
 
@@ -154,10 +221,13 @@ def run_eval(
 def render_text(report: EvalReport) -> str:
     lines = [
         "=" * 60,
-        f"Recall@5: {report.recall_at_5:.3f}   "
+        f"Legacy capped coverage@5: {report.recall_at_5:.3f}   "
         f"MRR: {report.mrr:.3f}   "
         f"({report.queries_with_expected}/{len(report.per_query)} queries with expected)",
         "=" * 60,
+        f"Requested k={report.k}; capped coverage={report.capped_recall_at_k}; "
+        f"standard recall={report.standard_recall_at_k}; "
+        f"correct rejections={report.correct_rejections}/{report.negative_queries}",
     ]
     for q in report.per_query:
         marker = "✓" if q.hit else "✗"
@@ -227,6 +297,7 @@ def cli() -> int:
         args.rerank = True
 
     test_set = json.loads(Path(args.test_set).read_text(encoding="utf-8"))
+    validate_test_set(test_set, k=args.k)  # Before config/model/DB setup.
 
     if args.db_path is None:
         from config import settings  # noqa: PLC0415
@@ -373,4 +444,5 @@ __all__ = [
     "reciprocal_rank",
     "render_text",
     "run_eval",
+    "validate_test_set",
 ]

@@ -164,3 +164,28 @@ is 10s", 400) — every rescue died instantly, R@5 dropped 1.25pts
 baseline. Two lessons re-learned in one evening: measure before
 optimizing (256), and re-run eval after ANY hot-path change, even a
 "safe" timeout (8s).
+
+## 2026-10-02 follow-through — 06B local answer feedback
+
+The feedback item above now has a local implementation; historical NAS,
+organic-count and eval results in this ADR are not refreshed deployment
+evidence. `log_query` returns only the committed row ID (None on failure),
+but we deliberately do **not** expose a bare `log_id` in meta as voting
+authority. Retrieval meta arrives before a usable answer exists and row
+numbers are guessable. Instead, a normal completed, bounded, non-empty
+answer gets a random capability in `done.feedback`, bound to its exact
+answer ID/hash and original query. Private storage keeps only the token
+hash. Error/partial streams, old schemas and capture failures remain usable
+chat without a receipt.
+
+`POST /feedback` accepts only the receipt plus up/down, and upserts one
+latest rating per answer. Explicit history-panel buttons use the receipt
+only after matching the displayed text. Reruns do not vote; corrections
+do not add query traffic. Eval/organic tagging comes from the original
+query, not the feedback caller. A NULL marker is not proof of a human.
+No free-text comment, public answer/log export, automatic eval truth,
+real-account test or production migration was added. New private answer
+storage requires retention/notice/redaction decisions before deployment;
+seven-day token expiry is not automatic data deletion. See the
+[feedback contract](../answer-feedback.md) and
+[single development log](../development-change-log.md).

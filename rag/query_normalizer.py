@@ -35,6 +35,7 @@ import re
 
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
+from rag.profiling import profiled
 
 # Same as schemas.course COURSE_CODE_PATTERN but case-insensitive + free in text.
 # `re.ASCII` makes \b respect ASCII word boundaries only — without it Python 3
@@ -69,6 +70,7 @@ _REF_SEPARATOR_RE = re.compile(r"[-_+]+")
 MAX_COURSE_REF_LEN = 64
 
 
+@profiled('alias_resolution')
 def normalize_query_to_course_ids(
     query: str,
     *,

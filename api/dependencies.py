@@ -26,6 +26,7 @@ sharing a connection across threads would require `check_same_thread=False`
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
 
@@ -35,6 +36,7 @@ from config import settings
 from db.alias_repository import AliasRepository
 from db.connection import connect
 from db.coop_repository import CoopRepository
+from db.coop_submission_repository import CoopSubmissionRepository
 from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
 from db.user_repository import UserRepository
@@ -76,12 +78,34 @@ def get_coop_repo(conn: DbConn) -> CoopRepository:
     return CoopRepository(conn)
 
 
+def get_coop_submission_repo(conn: DbConn) -> CoopSubmissionRepository:
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    tables = {row["name"] for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name IN ('coop_submissions','coop_contribution_credits')",
+    )}
+    if len(tables) != 2:
+        raise HTTPException(status_code=503, detail="Co-op moderation schema unavailable; apply the v1.3 migration")
+    return CoopSubmissionRepository(conn)
+
+
 def get_user_repo(conn: DbConn) -> UserRepository:
     return UserRepository(conn)
 
 
 def get_program_repo(conn: DbConn) -> ProgramRepository:
     return ProgramRepository(conn)
+
+
+def get_program_policy_reader():
+    """No file reads until the selected-plan endpoint calls read()."""
+    from rag.program_policy_evidence import ProgramPolicyReader  # noqa: PLC0415
+
+    data_root = Path(settings.sqlite_path).expanduser().resolve().parent
+    return ProgramPolicyReader(settings.program_policy_bundle_path,
+        settings.program_policy_source_dir or data_root / "raw/program_policy_catalog",
+        settings.program_catalog_source_dir or data_root / "raw/program_catalog")
 
 
 # LLM streaming function. Override in tests via app.dependency_overrides
@@ -228,6 +252,7 @@ __all__ = [
     "get_hyde_rescue_fn",
     "get_oauth_exchange_fn",
     "get_program_repo",
+    "get_program_policy_reader",
     "get_reranker",
     "get_retriever",
     "get_user_repo",

@@ -1,0 +1,1054 @@
+{
+  "format_version": 1,
+  "coverage": "selected_fragments_only",
+  "review_status": "source_checked",
+  "checked_by": "codex-source-crosscheck",
+  "checked_on": "2026-10-02",
+  "policies": [
+    {
+      "policy_id": "university-minimum-gpa",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/minimum-gpa/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T14:42:02.900332Z",
+        "sha256": "793ae22b4f6816763a2b87cb9a6cc6d748818ca0b8927c2af8812bac5a25779c",
+        "byte_count": 29138,
+        "page_title": "Minimum Cumulative GPA"
+      },
+      "fragments": [
+        {
+          "fragment_id": "degree-gpa-and-extra-restrictions",
+          "paragraph_index": 0,
+          "paragraph_sha256": "97d5edbd4160b91b1ed71d4b9c6766f635c7e96564f8e61edc22d1762ad6f298",
+          "summary": "用于研究生学位／高级研究证书要求的成绩须达到累计 GPA 3.000；学院或项目可以另设限制。",
+          "limitation": "不是每门课都必须 B，不替代项目 core GPA、单课最低成绩或学院 academic standing。"
+        },
+        {
+          "fragment_id": "general-probation",
+          "paragraph_index": 1,
+          "paragraph_sha256": "cc831545ce8f41facc7a86d5212639b7cce5dd415519dc5fe749b0f713ecb65c",
+          "summary": "学校通用说明：低于 3.000 进入 probation；持续两个学期时可能被终止项目。",
+          "limitation": "保留 may，不宣判自动退学；不能把这段期限覆盖到学院自己的更具体规定。"
+        },
+        {
+          "fragment_id": "general-repeat-and-last-grade",
+          "paragraph_index": 2,
+          "paragraph_sha256": "a727507e6ddf910b884e3c4c7ab68a06482c32760e7102576cfaddbc450cadad",
+          "summary": "用于满足学位要求的重修上限表述为两门课或 6 semester hours，取较大者；这些重修课最后一次成绩用于累计 GPA。",
+          "limitation": "与学校 Retaking、Khoury／Engineering 重修片段分开展示；All Graduate Degree Programs 另写最多两门 nonrepeatable、单课最多重修一次，与此处及 Khoury 表述不一致，适用范围须向学术部门确认。不合并上限、自动决定优先级或计算个人 GPA。"
+        }
+      ]
+    },
+    {
+      "policy_id": "khoury-academic-standing",
+      "authority": "khoury",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/computer-information-science/academic-policies-procedures/academic-probation-and-dismissal/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T14:42:03.092479Z",
+        "sha256": "c4b1abbe93a26eb068ac2386e575c2177b8365a07f9c2be4e0cea48231c97dfb",
+        "byte_count": 25158,
+        "page_title": "Academic Probation and Dismissal"
+      },
+      "fragments": [
+        {
+          "fragment_id": "probation-and-bridge-gpa",
+          "paragraph_index": 0,
+          "heading": "Academic Probation and Dismissal",
+          "paragraph_sha256": "26ab76179fdae150a36d5428f6aa8ea0d0caf3f49f33f7283f9309863eb1731c",
+          "summary": "Khoury overall GPA 低于 3.000 自动进入 probation；一个 academic semester 内（不含 summer）恢复 3.000，否则达到可被 dismissal 的状态。要求 prerequisite 或 Align bridge 的项目，这些课计入 academic standing GPA。",
+          "limitation": "eligible for dismissal 不是必然 dismissal；计入 standing GPA 不等于计入学位学分，不把 bridge 单课成绩要求替换成这条累计要求。"
+        },
+        {
+          "fragment_id": "program-core-gpa-separate",
+          "paragraph_index": 1,
+          "heading": "Academic Probation and Dismissal",
+          "paragraph_sha256": "6f9d415e5475035dfd1f4208a938ecc5810e5af986b2f3c8be1cc242a8ec4b73",
+          "summary": "适用的 core GPA 另查项目 requirements 页。",
+          "limitation": "学院 overall GPA、项目 core GPA 与课程先修最低成绩分开保存，不取最大值或合并课程池。"
+        }
+      ]
+    },
+    {
+      "policy_id": "camd-masters",
+      "authority": "camd",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/arts-media-design/academic-policies-procedures/masters-degrees/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T14:42:03.156598Z",
+        "sha256": "a3b90c2bc6c2c2b437a65844bc5e6e75daa950cc1b06b556e4c89a6f80406574",
+        "byte_count": 28459,
+        "page_title": "Master’s Degree Policies"
+      },
+      "fragments": [
+        {
+          "fragment_id": "college-minimum-not-program-total",
+          "paragraph_index": 1,
+          "paragraph_sha256": "e68190ef05f93c5f7b33c038bb5bfa1fcce023bc3fe2adb694c54c4faeda4b80",
+          "summary": "CAMD 硕士学院层最低 30 semester hours 研究生课程，并完成所属部门的其他要求；累计 GPA 最低 3.000，按学期计算；进展不满足部门要求时可能终止项目。",
+          "limitation": "不是把 MSDS 的 32 学分降到 30；这只是学院底线，具体项目要求及其他政策仍需分别核对。"
+        },
+        {
+          "fragment_id": "outside-college-electives",
+          "paragraph_index": 4,
+          "heading": "Electives",
+          "paragraph_sha256": "bb365c1129b4a1c44cdb8514595ee7e68e2a9d6c578958af5e04ffc82fe49202",
+          "summary": "CAMD 通用选修政策：项目 director／coordinator 批准后可修至多 8 semester hours 院外 electives；额外院外 elective hours 不计入学位。",
+          "limitation": "MSDS 属跨学院项目，本批未确认具体课程的学院归属、项目例外或个人批准，不按课程前缀认定院外，也不裁剪项目候选池。"
+        },
+        {
+          "fragment_id": "leave-not-automatic-time-extension",
+          "paragraph_index": 8,
+          "heading": "Leave of Absence",
+          "paragraph_sha256": "0acb427b933d99215a0bea0ee73c795dde418e6f8c2b945cdc241ff075886155",
+          "summary": "CAMD 全日制学生一段时间没有学术活动时须经部门向 student services petition leave，不接受追溯申请；medical leave 联系 UHCS，通常每次不超过一年；国际学生咨询 OGS；离校做 thesis 不适用此 leave。除 medical leaves 外，获批 leave 不延长 degree completion 或 incomplete grades 补完的允许时间。",
+          "limitation": "保留整段适用条件；medical 例外不代表自动批准 leave 或自动增加特定期限。本批不提供个人医疗／移民判断，不计算 leave 或毕业截止日。"
+        },
+        {
+          "fragment_id": "college-credit-validity",
+          "paragraph_index": 9,
+          "heading": "Time Limitation",
+          "paragraph_sha256": "8e7c8ff0b089c2687a38748cdd5fa07c4ad6b8e911fe5ffa879b44fc8db50a6c",
+          "summary": "CAMD 硕士研究生项目内取得的课程学分最长有效七年。",
+          "limitation": "这是学院课程学分有效期表述；个人起算日、有效性与延期均未核验，不推算毕业截止日。"
+        },
+        {
+          "fragment_id": "extension-petition-certification-recommendation",
+          "paragraph_index": 10,
+          "heading": "Time Limitation",
+          "paragraph_sha256": "95b0e3875784f618c53c96ad4da9bbf753a5573813564d4e0021b48158b80f66",
+          "summary": "申请延期须向所属部门提交 petition，附所有剩余学位要求的详细完成计划；硕士 coursework 延期须由部门确认每门课内容自修完以来未变；认为适当时，部门向 CAMD graduate studies 建议批准。",
+          "limitation": "部门建议不是最终获批；不能省略逐门课程内容确认或完成计划，也不自动延长学分有效期或个人截止日。"
+        },
+        {
+          "fragment_id": "catalog-change-needs-application",
+          "paragraph_index": 11,
+          "heading": "Changes in Requirements",
+          "paragraph_sha256": "3dfd1ab500fad1fb1b5a23b88ea4d254deb52f7367663fa9a9e5bcebcbba1b32",
+          "summary": "CAMD 描述在不造成 hardship 且设施允许时鼓励采用较新要求，但需要申请变更 catalog term；advisor 可协助；可证明 substantial hardship 时适用 matriculation 年要求。",
+          "limitation": "当前目录不是个人自动适用年度；未确认个人 catalog term、入学年、变更审批与 hardship，不能只按春／秋入学或抓取日期选版本。"
+        }
+      ]
+    },
+    {
+      "policy_id": "engineering-academic-standing",
+      "authority": "engineering",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/engineering/academic-policies-procedures/academic-standing-policy/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T14:42:03.225281Z",
+        "sha256": "27992712441c6f72e0c085294322976fe8d2466448cc549afbcac8fc08227274",
+        "byte_count": 28227,
+        "page_title": "Academic Standing Policy"
+      },
+      "fragments": [
+        {
+          "fragment_id": "full-time-gpa-and-eight-hours",
+          "paragraph_index": 3,
+          "heading": "Full-time Students",
+          "paragraph_sha256": "8567e4df7661e84b5b863673fab1a56b1c1bc8e715f479930ecd7f039a681b01",
+          "summary": "Engineering full-time：完成至少 8 semester hours 后，累计 GPA 低于 3.000 的学期进入 probation；再完成至少 8 semester hours 后须恢复到 3.000 或以上。",
+          "limitation": "完整 progression／appeal 列表本批未结构化；不自动判断学生状态、8 学分计数或 dismissal，也不套用 Khoury 的夏季排除期限。"
+        },
+        {
+          "fragment_id": "part-time-gpa-and-eight-hours",
+          "paragraph_index": 5,
+          "heading": "Part-time Students",
+          "paragraph_sha256": "f5d4114f5b7520c94dba5cca3ed790bfb634c702a48c07b58e42439d382f25ec",
+          "summary": "Engineering 官方 part-time 状态：完成至少 8 semester hours 后 GPA 低于 3.000 进入 probation；再完成至少 8 semester hours 后须恢复到 3.000 或以上。",
+          "limitation": "未获取个人官方 part-time 状态或完整成绩，不从课表学分推断身份，不自动适用到 full-time。"
+        },
+        {
+          "fragment_id": "summer-review-timing",
+          "paragraph_index": 7,
+          "heading": "Summer Term",
+          "paragraph_sha256": "ba456e851357c0078e1e351b33b2c837cfe6ecef4218a68b9b148d91856a1ff6",
+          "summary": "Engineering 夏季 standing 在 Summer Session B 结束时统一评估；夏季合计不足 8 semester hours 时，在完成至少 8 semester hours 后评估。",
+          "limitation": "只保留院级时点原意，不推算个人期限、summer 分段计数或申诉结果。"
+        }
+      ]
+    },
+    {
+      "policy_id": "engineering-course-selection",
+      "authority": "engineering",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/engineering/academic-policies-procedures/course-selection/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T14:42:03.289571Z",
+        "sha256": "e8b3a1784fcbd4e6d63fa3cb8cbda636453c246105e87e0476e062690c387104",
+        "byte_count": 26641,
+        "page_title": "Course Selection"
+      },
+      "fragments": [
+        {
+          "fragment_id": "advisor-and-course-availability",
+          "paragraph_index": 0,
+          "paragraph_sha256": "09ec63c4371dac398584339ecb9bfd386c72a473fc02b6661143e7c00ce8c6d0",
+          "summary": "入项初期在 fall／spring orientation 与 assigned faculty advisor 制定 POS；选修开设受需求和师资影响，课程不保证每年开设，应保留替代方案。",
+          "limitation": "fall／spring orientation 不证明所有项目每年只在这两个季节招生；目录候选课程也不等于当前或未来 section availability。"
+        },
+        {
+          "fragment_id": "prerequisite-and-undergraduate-credit",
+          "paragraph_index": 1,
+          "heading": "Prerequisite Courses/Undergraduate Courses",
+          "paragraph_sha256": "c9210d4a3628caedb90227c261cb87d356e6d723324443e458e1e36f20dda4ef",
+          "summary": "Engineering prerequisite 课程通常不计研究生学位学分，除非所属学术部门明确说明；advisor 可能允许修本科课，但本科课不计研究生学位，也不计研究生 full-time course load。",
+          "limitation": "不能据此扣掉 INFO Bridge 培养方案列明的课；本批未判断课程属性、部门明确例外或个人 load，也不提供 financial-aid 资格结论。"
+        },
+        {
+          "fragment_id": "changes-and-exceptions-petition",
+          "paragraph_index": 4,
+          "heading": "Petitions",
+          "paragraph_sha256": "1df8b5f18a0019e63446f37200a6a247616a4c7d1a6094f525cc243478c3e7ce",
+          "summary": "向 Graduate School of Engineering 请求变更或例外于当前项目／学生状态时，需要 petition 以保留完整记录。",
+          "limitation": "有申请途径不是已获批准；未收集个人 petition，不自动授权替代、免修或跨路径计入。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-retaking",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/retaking-courses/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:36.989351Z",
+        "sha256": "07d46564dc0e6dd92142d0168ce83b6b1b40a2a12f336d9ba907f47b792cf157",
+        "byte_count": 28983,
+        "page_title": "Retaking Courses"
+      },
+      "fragments": [
+        {
+          "fragment_id": "nonrepeatable-latest-grade-and-record",
+          "paragraph_index": 0,
+          "paragraph_sha256": "633a5863a3813b2575f9d32a8e0c179a472c6c3804e78257fa15b74016abee26",
+          "summary": "课程可用时可重修 nonrepeatable 课改善成绩；overall GPA 用最近一次（不是最高）成绩，旧成绩仍留在 transcript 并标 E，新成绩标 I；应先咨询 advisor，正常缴纳重修学费。",
+          "limitation": "不是抹去旧记录或新增学位学分；另查 Minimum GPA 上限、学院批准及项目要求，不计算个人成绩。"
+        },
+        {
+          "fragment_id": "repeatable-registration-term-description",
+          "paragraph_index": 1,
+          "paragraph_sha256": "2a1d1115c17f5cbd8d5987d0e4d2c3b6f93dcc3754df81dd508e0d2a11c1619f",
+          "summary": "若学生注册学期的 course description 允许重复完成，在其上限内每次完成均保留记录并计入 overall GPA。",
+          "limitation": "repeatable 多次完成不同于 nonrepeatable 重修替换成绩；本批未取得个人注册学期描述、完成次数或共享计入批准。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-substitutions",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/course-substitutions/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.060161Z",
+        "sha256": "12fb7db6e1ae3fa07780e28bc275af8590ee6e16280e94365c40c70686425599",
+        "byte_count": 29120,
+        "page_title": "Course Substitutions"
+      },
+      "fragments": [
+        {
+          "fragment_id": "replacement-only-if-approved",
+          "paragraph_index": 0,
+          "paragraph_sha256": "34a6ea77f3c5ed411a5d6638fa5ed59241de98709383396064baebb5e9010f55",
+          "summary": "可申请以一门课替代另一门课满足项目要求；只有批准后替代课才取代原指定课。",
+          "limitation": "不是预先批准或两门课重复计入；通用项目要求替代不等于学院 probation 下的成绩替代，两种用途不自动合并。"
+        },
+        {
+          "fragment_id": "massachusetts-advisor-process",
+          "paragraph_index": 1,
+          "heading": "For Programs in Massachusetts, California, Maine, and Washington",
+          "paragraph_sha256": "d96e87f406196a8cae1518f566e6c0b176f51da73dca0ca8ec2e938fb20f7da2",
+          "summary": "Boston 位于 Massachusetts：该地区项目的替代申请由 academic advisor 与项目 director、原课程所属部门协商审核，批准后由 advisor 处理。",
+          "limitation": "不套用页面另一地区的 Provost 流程；不把申请渠道当已批准，不覆盖学院额外条件或判断任意其他校区。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-transfer",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/transfer-other-advanced-standing-credit/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.129742Z",
+        "sha256": "2f50632d2fa0f49c7dcc281eaba93e9a181f36f473cc0f9f49dba87e91344aa7",
+        "byte_count": 30700,
+        "page_title": "Transfer and Other Advanced Standing Credit"
+      },
+      "fragments": [
+        {
+          "fragment_id": "destination-discretion",
+          "paragraph_index": 0,
+          "paragraph_sha256": "a36eb36bb347ffd44d4e979879fbfe8d616ebb18ef72b55ca19214d1bf1a2b35",
+          "summary": "外校或 Northeastern 其他项目转学分由目标 academic unit 及所属学院酌情接受，并须满足后续限制。",
+          "limitation": "不是达数值门槛就必然转入；所属项目／学院、实际课程和批准仍须确认。"
+        },
+        {
+          "fragment_id": "masters-constraints-and-advanced-standing",
+          "source_kind": "list",
+          "paragraph_index": 0,
+          "paragraph_sha256": "aaec05fdeec4cdf4ace3324423c37947a628bb2f66ab6300bea2abb78a87f705",
+          "summary": "硕士外校转入最多学位学分的 30%，须为研究生层级／学分、成绩至少 3.000、认证机构，且未用于外校任何本科／高级学位或证书。Advanced standing 由学院制定并与 Registrar 实施；与转学分合计最多 30%，先前经验／非院校学习最多 25%；PlusOne 完成的研究生学位不能用 transfer credit。",
+          "limitation": "保留整个外层列表含嵌套条件；列表也有证书规定，不能套成硕士上限。不是可直接转入的整数额度，不确定个人路径、认可或例外，不与共享政策求最小值。"
+        },
+        {
+          "fragment_id": "five-academic-years-at-matriculation",
+          "paragraph_index": 1,
+          "paragraph_sha256": "b9ec5198776ce8e5a2cf503d881da4f0171be89ede2750d8ab576ce5df41528b",
+          "summary": "转入学分须在目标 Northeastern 项目 matriculation 日期前五个 academic years 内取得。",
+          "limitation": "起算点不同于 Khoury 转入时五年，也不同于共享学分七年；不换算个人截止日或把所有期限归一。"
+        },
+        {
+          "fragment_id": "transfer-not-overall-gpa",
+          "paragraph_index": 2,
+          "paragraph_sha256": "d3fe962a5a6947fcff667972c85b55213847d2d271cde95f8a80126cae0dad62",
+          "summary": "转入课成绩不计 Northeastern overall GPA，transcript 以 T 标示。",
+          "limitation": "不等于未获学分或无需批准，也不自行推导项目 core GPA／先修最低成绩。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-credit-sharing",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/course-credit-sharing/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.197448Z",
+        "sha256": "2b483f79cce5bda617afdebadc9bee8de3c17f37bb8b7b94047f2c023d5878d1",
+        "byte_count": 31342,
+        "page_title": "Course Credit Sharing"
+      },
+      "fragments": [
+        {
+          "fragment_id": "sharing-distinct-credentials-not-groups",
+          "paragraph_index": 0,
+          "paragraph_sha256": "117ebbd3dee387f7c74c46e99ab43d95d6fbdf9bf385881f5b1c9b88d7eedb8d",
+          "summary": "本页共享指 Northeastern 多个 degree／certificate credential 使用课程学分；与另一机构共享由 articulation agreement 规定，不由本页管辖。",
+          "limitation": "不同 credential 共享不是同一培养方案内 core／breadth／elective 跨组重复计入；本批没有核验后者，不据此解除候选池排除。"
+        },
+        {
+          "fragment_id": "both-colleges-approval",
+          "paragraph_index": 1,
+          "heading": "General Credit Sharing Policies",
+          "paragraph_sha256": "b65b290ef240906edd0d9b77ca75903d71d4a637a453b3a33437c4db58072220",
+          "summary": "两个 credential 之间共享学分须由授予两者的学院批准。",
+          "limitation": "学院批准未知；同一学院也不是自动批准，不从共享课程前缀识别批准方。"
+        },
+        {
+          "fragment_id": "seven-years-before-credential-start",
+          "paragraph_index": 2,
+          "heading": "General Credit Sharing Policies",
+          "paragraph_sha256": "2b6c1abf06c1c13b09d2586dfdcdd60f0c8bf549b97907f384d361bba84f2290",
+          "summary": "要与 credential 共享，学分须在该 credential 开始前不超过七年取得。",
+          "limitation": "不是学校外校转学分五 academic years 的期限；没有个人开始日期，不生成到期判断。"
+        },
+        {
+          "fragment_id": "credential-specific-list-with-exceptions",
+          "source_kind": "list",
+          "paragraph_index": 0,
+          "heading": "Specific Credit Sharing Policies",
+          "paragraph_sha256": "b6fe4bd98694d29478f0dcb362356b29e109d0156bf1f2f35c21599e988281e9",
+          "summary": "具体规则最多共享给两个 credential；两个研究生证书最多一门／4 学分；硕士用于另一硕士或 CAGS 最多后者 50%。同领域证书与学位 concentration 不能复用同组课，除非证书在学位 matriculation 前完成。PlusOne 本科／硕士共享最多四门或 16 semester hours，取较大者，例外须治理流程批准。",
+          "limitation": "保留整个列表的其他 credential 及例外供原文核对，摘要非全表。50% 不替代 Khoury completed-degree 40%／录取门槛，也不是同一方案内跨组重用许可；本批不判断 PlusOne、CAGS 或博士资格。"
+        }
+      ]
+    },
+    {
+      "policy_id": "khoury-retaking",
+      "authority": "khoury",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/computer-information-science/academic-policies-procedures/repeating-courses/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.262625Z",
+        "sha256": "ba5032ab44d2f7ff73beb852c5b4005f959a5148809feccd159e7ba7290f4551",
+        "byte_count": 24481,
+        "page_title": "Retaking Courses"
+      },
+      "fragments": [
+        {
+          "fragment_id": "nonrepeatable-two-retakes-advisor",
+          "paragraph_index": 0,
+          "paragraph_sha256": "8ac3453e9760a195454d822c33185429f93d34e552d98994e5da2a9352118bb1",
+          "summary": "Khoury：课可用时 nonrepeatable 课最多重修两次，须 academic advisor 批准。Overall GPA 用最近一次成绩，先前成绩保留并标 E，新成绩标 I；重修正常缴学费。",
+          "limitation": "两次重修不是两门课总额度，也不是三次重修；All Graduate Degree Programs 另写同一 nonrepeatable 课最多重修一次，表述不一致须由学术部门确认适用范围。不与学校两门／6 学分上限合并，不自动决定优先级或放宽 Align bridge 单课要求。"
+        },
+        {
+          "fragment_id": "repeatable-distinct-completions",
+          "paragraph_index": 1,
+          "paragraph_sha256": "2a1d1115c17f5cbd8d5987d0e4d2c3b6f93dcc3754df81dd508e0d2a11c1619f",
+          "summary": "注册学期描述若允许 repeatable 课多次完成，在其次数上限内每次成绩都计 overall GPA。",
+          "limitation": "不按课程名称猜 repeatable，也不当作 nonrepeatable 最近一次成绩规则或自动多次取得学位学分。"
+        }
+      ]
+    },
+    {
+      "policy_id": "khoury-transfer",
+      "authority": "khoury",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/computer-information-science/academic-policies-procedures/transferring-to-ccis/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.328685Z",
+        "sha256": "a170ee43abddc605e43654198b8c0c763ea6e2c2f5ae1f66dbbd780c81643ba2",
+        "byte_count": 25288,
+        "page_title": "Transfer of Credit"
+      },
+      "fragments": [
+        {
+          "fragment_id": "before-enrollment-nine-hour-ceiling",
+          "paragraph_index": 0,
+          "heading": "Transfer of Credit Taken Before Enrollment at Khoury College",
+          "paragraph_sha256": "c74b6aeda311d8468da0a15229ae2bdea6fc7d68996f796cb45a26317e94c163",
+          "summary": "Khoury 入学前取得的外校学分，满足随后条件时最多可接受 9 semester hours。",
+          "limitation": "保留 may；不是录取前即可提交或自动转入，不替代学校硕士 30%／advanced-standing 条件。"
+        },
+        {
+          "fragment_id": "before-enrollment-complete-criteria",
+          "source_kind": "list",
+          "paragraph_index": 0,
+          "heading": "Transfer of Credit Taken Before Enrollment at Khoury College",
+          "paragraph_sha256": "5e64044bf402b998c8fa392fb40c6f8b1945d1c105e19a7e312ef0b6b2afdd50",
+          "summary": "上述外校课须研究生层级／学分、成绩至少 3.000、来自认证机构、未用于其他学位，且转入时不超过五年。",
+          "limitation": "五年起点为 time of transfer，不改写为学校 matriculation 前五 academic years；课程／成绩／时间及审核均未知。"
+        },
+        {
+          "fragment_id": "request-after-start-match-and-committee",
+          "paragraph_index": 1,
+          "heading": "Transfer of Credit Taken Before Enrollment at Khoury College",
+          "paragraph_sha256": "63b3a916b59766b7d5f2132e9bc249bb3ef647bb7f485752618021c08405046c",
+          "summary": "开始在 Khoury 修课后可通过 advisor 提交；转入课须匹配 Northeastern 开设的课并获 graduate committee 批准。",
+          "limitation": "匹配不是代码／标题相近即可；未经批准的申请不改变任何方案叶子、先修或已修记录。"
+        },
+        {
+          "fragment_id": "outside-college-clause-needs-context",
+          "paragraph_index": 2,
+          "heading": "Transfer of Credit Taken Before Enrollment at Khoury College",
+          "paragraph_sha256": "2b50074f5bf749994aa62804df46ad0e466ba087c7214adb5b85b1156914ce28",
+          "summary": "本节另表述：已在 Khoury degree program 的学生不得以院外课满足学位要求，除非课程在 enrollment 前完成。",
+          "limitation": "此句与下节 prior-approval 流程及跨学院项目列明课程的关系尚需学院解释；保留原文／上下文，不据此删除 DS-CS electives 或按前缀排除课程。"
+        },
+        {
+          "fragment_id": "during-enrollment-northeastern-expectation",
+          "paragraph_index": 3,
+          "heading": "Transfer of Credit Taken During Enrollment at Khoury College",
+          "paragraph_sha256": "7e97fd679fd1cda2c2b182613bb940eeb1c2f8088b3fe3147565a069932bd956",
+          "summary": "开始 Khoury 研究生项目后，预期在 Northeastern 完成学位全部 coursework。",
+          "limitation": "不脱离随后外校预先批准段落独立宣判，也不将学校内跨学院选修自动视为外校转学分。"
+        },
+        {
+          "fragment_id": "during-enrollment-prior-approval",
+          "paragraph_index": 4,
+          "heading": "Transfer of Credit Taken During Enrollment at Khoury College",
+          "paragraph_sha256": "e45769b993b8fd980e9e6bcfc607078977a7179166724b295f4632c91ae45e3b",
+          "summary": "在读期间拟在其他机构修课并转入，须先获学院批准；online／asynchronous 也包含在内。",
+          "limitation": "不是课修完后再申请即可，不承诺批准；此前院外条款的适用关系待解释，不自动解冲突。"
+        },
+        {
+          "fragment_id": "during-enrollment-load-approval-condition",
+          "paragraph_index": 5,
+          "heading": "Transfer of Credit Taken During Enrollment at Khoury College",
+          "paragraph_sha256": "7a5cf0953b93055109f559db24999dd7196216ae065bc1833a47aae03f9a240a",
+          "summary": "批准依照非项目课程的批准政策；计入使该学期超过 full-time load 或已批准 overload 时，课程可能不被批准。",
+          "limitation": "不从个人课表猜身份、计算 load／overload 或推导签证／资助结论；完整批准规则未结构化。"
+        }
+      ]
+    },
+    {
+      "policy_id": "khoury-credit-sharing",
+      "authority": "khoury",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/computer-information-science/academic-policies-procedures/credit-sharing/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.393496Z",
+        "sha256": "50f7ed9a52ed8875092bf3aafaca9907e14a1a9cc33f1b40badc91cd7446f0dc",
+        "byte_count": 25751,
+        "page_title": "Credit Sharing"
+      },
+      "fragments": [
+        {
+          "fragment_id": "completed-neu-degree-scope",
+          "paragraph_index": 0,
+          "heading": "Khoury College Policy for Counting Courses",
+          "paragraph_sha256": "1f8ad2c68935d7e892e39e8c235425f834ed03ac6961428a8f8ddc03357ec02e",
+          "summary": "本页专门针对已计入 Northeastern 已完成学位的研究生课，讨论用于新 Khoury 硕士的 double counting。",
+          "limitation": "不是外校转学分或同一方案内跨组计入；未完成学位、证书／PlusOne 和个人此前路径不自动视为满足范围。"
+        },
+        {
+          "fragment_id": "second-khoury-masters-admission-threshold",
+          "paragraph_index": 1,
+          "heading": "Admissions",
+          "paragraph_sha256": "d9de7763cb358ff7d801f26e0b0147725f27607f1dd2cfbe124fda464675c446",
+          "summary": "已完成 Khoury 硕士再申请另一 Khoury 硕士：若此前已完成硕士包括拟申请项目至少 50% 的课程，页面声明不具录取资格。",
+          "limitation": "这是课程比例的录取条件，不是 40% 学分共享额度；不据未经核对个人课程或项目匹配作拒录判断。"
+        },
+        {
+          "fragment_id": "enrollment-year-curriculum",
+          "paragraph_index": 2,
+          "heading": "Double Counting Graduate Credits",
+          "paragraph_sha256": "bdbda838986414bca0df270bb4134cb78b89f69abfc2a1a2c94903eb70465693",
+          "summary": "须依入学年度 graduate catalog 中 Khoury 项目课程要求。",
+          "limitation": "当前 2026–2027 样本不能自动认作个人适用年度；仍须确认个人 catalog term／POS。"
+        },
+        {
+          "fragment_id": "new-masters-possible-not-automatic",
+          "paragraph_index": 3,
+          "heading": "Double Counting Graduate Credits",
+          "paragraph_sha256": "3f0ade08f7c69576de6f9481e438560bfbee0c763e7d1d719ebf8508d01514e3",
+          "summary": "已完成 Northeastern 学位、其中含研究生 Khoury 课程，现就读新 Khoury 硕士时，可能获准 double count 这些课。",
+          "limitation": "保留 may be allowed；不是已批准或所有旧学分自动进入新项目，须另看完整限制及个人记录。"
+        },
+        {
+          "fragment_id": "forty-percent-and-seven-year-exception",
+          "source_kind": "list",
+          "paragraph_index": 0,
+          "heading": "Double Counting Graduate Credits",
+          "paragraph_sha256": "fff2531f2c2e0e1ea60d8a6b77e810a56c934cf1260af87323d0d59b33929c17",
+          "summary": "仅考虑符合新项目的课；double-count 学分最多新项目总学分的 40%，页面例子为 32 学分项目至多计入 12 学分；原完成项目的合格学分最多有效七年，除非 relevant graduate office 准予延期。",
+          "limitation": "保留官方例子和延期条件，不用 32×40% 自动四舍五入成 13 或保证 12；不与学校 50% 共用额度，也不推算个人有效日期。"
+        },
+        {
+          "fragment_id": "additional-waiver-without-transferred-credit",
+          "paragraph_index": 5,
+          "heading": "Double Counting Graduate Credits",
+          "paragraph_sha256": "71b13ebce49bee0312d5a54454fc9071077ec43324f32cda6fa3e0e9b0d76400",
+          "summary": "超出上述 40% 的既修课可个案申请免修，但不转入学分；由 program directors 与 faculty／advisors 协商决定。",
+          "limitation": "免修不等于获得学分或降低所需总学分；不替学生取得批准或改变原规则树。"
+        },
+        {
+          "fragment_id": "transfer-kept-separate",
+          "paragraph_index": 6,
+          "heading": "Transfer Credit Policy",
+          "paragraph_sha256": "14a4a03ffefbbf493809070f42a3e618e970ee88909dd8ed9841df6edca82626",
+          "summary": "其他机构转入及大学内未纳入新硕士的课程，继续按学校与 Khoury transfer credit 政策考虑。",
+          "limitation": "此交叉引用不自行批准转入；共享、transfer、waiver 和 GPA 用途仍分开，不统一合并限额。"
+        }
+      ]
+    },
+    {
+      "policy_id": "engineering-retake-substitution",
+      "authority": "engineering",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/engineering/academic-policies-procedures/course-repeat-substitution-policy/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:33:37.457623Z",
+        "sha256": "93da25b452fd33c7c97e8e318509f0e15900e4de9bd222bd1a703de855345032",
+        "byte_count": 26559,
+        "page_title": "Course Retake / Course Substitution Policy"
+      },
+      "fragments": [
+        {
+          "fragment_id": "good-standing-eight-hours-once",
+          "paragraph_index": 0,
+          "heading": "Students in Good Academic Standing",
+          "paragraph_sha256": "44fb5d8146ed93adece76c876692afbc295ddd931e237c179d9edb9214a31e1d",
+          "summary": "Engineering good academic standing 可重修最多 8 semester hours 改善成绩，每门课只可重修一次。",
+          "limitation": "不适用到 Khoury 两次重修；个人 standing、此前额度及其他限制未知，不计算可用学分。"
+        },
+        {
+          "fragment_id": "probation-extra-eight-hours",
+          "paragraph_index": 1,
+          "heading": "Students on Academic Probation",
+          "paragraph_sha256": "40183a28d1c3eb9dfa92b766fe6ac2e0b91ce8a55f2f83b9499fcd31babd4354",
+          "summary": "Engineering probation 为达到累计 GPA 3.000，可在最低学位要求外重修或替代合计最多 8 semester hours。",
+          "limitation": "不同 standing 的用途独立；不是重修和替代各 8，不保证新增课计学位学分或自动恢复状态。"
+        },
+        {
+          "fragment_id": "retake-once-prior-approval-and-exclusion",
+          "paragraph_index": 2,
+          "heading": "Course Retake",
+          "paragraph_sha256": "ed49aa8bc82bf585b0761a1c1ab865fa6c25e5ad0cbcb85a7902df91615668fe",
+          "summary": "课可用时可重修一次；GPA 用最近成绩，旧成绩仍留 transcript 但从 GPA 和 earned credit 排除；重修前须 advisor 及 Graduate School of Engineering 批准，正常缴学费并另遵学校规定。",
+          "limitation": "不是选最高成绩或删除旧记录；先获批准不等于申请即可，不自行算 GPA／earned credits。"
+        },
+        {
+          "fragment_id": "core-below-c-program-exceptions",
+          "paragraph_index": 3,
+          "heading": "Course Retake",
+          "paragraph_sha256": "b53ba2c892d9ffcf443f161eb380002d68eb6567885df6493f75b6bc24412db0",
+          "summary": "在上述额外／重修限制内，required core 低于 C 时须重修；具体项目可另有要求。",
+          "limitation": "不把每门课或先修最低成绩改为 C，不覆盖项目更具体条件或算个人补救路径。"
+        },
+        {
+          "fragment_id": "substitution-only-if-retake-impossible-not-core",
+          "paragraph_index": 4,
+          "heading": "Course Substitution",
+          "paragraph_sha256": "17b87143edb5d137077674228420dec9e042e46d42af4e3316237e1496785ad6",
+          "summary": "无法重修时可 petition，以内容显著相似且非 required core 的课替代已修课。",
+          "limitation": "这是本页成绩补救用途，不自动等同大学的通用项目要求替代；不能替代 core，也不按名字相近认定相似。"
+        },
+        {
+          "fragment_id": "substitution-department-school-registrar",
+          "paragraph_index": 5,
+          "heading": "Course Substitution",
+          "paragraph_sha256": "04112c38de1782a003ec5751c21a94f358f47bd15e5ac67ff3063bb7466e09ab",
+          "summary": "替代须 department、graduate school 与 Registrar 联合批准，且另遵学校 Course Substitutions 批准要求。",
+          "limitation": "不能仅凭 advisor 同意视为所有批准齐全，Boston 的通用流程也不抹去此院级条件。"
+        },
+        {
+          "fragment_id": "approved-substitution-record-and-tuition",
+          "paragraph_index": 6,
+          "heading": "Course Substitution",
+          "paragraph_sha256": "14c131980015ca48cd97583cb58a319573029a8811ad94fb2e1ec436a61d3b1b",
+          "summary": "批准后新课成绩计 GPA，旧课保留记录但从 GPA 和 earned credit 排除；替代课正常缴学费。",
+          "limitation": "不是批准前生效或自动双份学分，不计算个人成绩／总学分或改历史记录。"
+        },
+        {
+          "fragment_id": "no-substitution-in-good-standing",
+          "paragraph_index": 7,
+          "heading": "Course Substitution",
+          "paragraph_sha256": "851b6a707d50cc3be3220b063d275c64682f561b8d24a8d49930ea03eafc5bf7",
+          "summary": "本页的 course substitution 不供 good academic standing 学生使用。",
+          "limitation": "保留本页用途，不能扩成所有项目要求替代都禁止；个人 standing 与通用／项目替代关系须另核，不自动解冲突。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-credit-validity",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/time-limit-for-course-credit/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:47:25.439688Z",
+        "sha256": "cae10dcb7c11aedda4e1edeacbe6662a17696e1c5d7f6e2bc594ef3959540ed9",
+        "byte_count": 28246,
+        "page_title": "Time Limit for Course Credit"
+      },
+      "fragments": [
+        {
+          "fragment_id": "seven-years-extension-not-deadline",
+          "paragraph_index": 0,
+          "paragraph_sha256": "c2f5054a1c1ebd4f7e36da82797da351f4cfd8bc1acfee1a53ee93cf8addbe5d",
+          "summary": "研究生项目内取得或获准转入的课程学分最长有效七年，除非相关 graduate office 批准延期。",
+          "limitation": "这是学分有效期，不是个人毕业截止日计算器；原句没有给出个人起算日或获批延期。不能与转学分受理的五年课程窗口、学位／证书共享的七年限制混为同一规则。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-masters-regulations",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/regulations-masters-programs/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:47:35.414349Z",
+        "sha256": "d3924a515b76e3cff83dd86ac39365e5c35d2e4077a209874af0b26991c2c2d0",
+        "byte_count": 30149,
+        "page_title": "Regulations and Requirements for the Master's Degree"
+      },
+      "fragments": [
+        {
+          "fragment_id": "approved-program-requirements",
+          "paragraph_index": 1,
+          "heading": "Course Requirements",
+          "paragraph_sha256": "2f75f74c19f88673a2fc864039840206b3de765211ebba698c0654948eff83d7",
+          "summary": "硕士候选人须满意完成经批准的培养方案，符合其注册 graduate school、部门或项目的要求。",
+          "limitation": "不是仅达到总学分就自动毕业；未核验个人注册范围、完整要求或批准状态。"
+        },
+        {
+          "fragment_id": "minimum-thirty-not-program-total",
+          "paragraph_index": 2,
+          "heading": "Course Requirements",
+          "paragraph_sha256": "f7c2eaf64fe027cc7b11e2e724553ccdfd243a8be5976234171e38c419f89d9a",
+          "summary": "大学层硕士最低要求为学士之后 30 semester hours；本科层级 coursework 不被接受用于满足硕士要求。",
+          "limitation": "通用最低值不替换 CS／DS 的 32 学分或 Align／Bridge 的项目结构；不能靠课程编号或入学桥接阶段推断层级并删除项目课程。"
+        },
+        {
+          "fragment_id": "neu-earned-unapplied-credit",
+          "paragraph_index": 3,
+          "heading": "Application of Graduate Credits",
+          "paragraph_sha256": "420d5ad020c306eef1171db60368d9a0cde083b4e25637e71cff22d4bf7e7458",
+          "summary": "在 Northeastern 取得、尚未计入 Northeastern 学位的学分可能被接受用于正在攻读的硕士，即使也已用于其他机构的学位或证书；使用仍须符合学分有效期。",
+          "limitation": "条件是学分在 Northeastern 取得且尚未用于 Northeastern 学位，并非放宽外校取得学分的 transfer 政策；可能接受不等于自动批准，个人来源、既往使用与时间均未核验。"
+        },
+        {
+          "fragment_id": "exam-is-conditional",
+          "paragraph_index": 4,
+          "heading": "Comprehensive Examination",
+          "paragraph_sha256": "9746774357452d74c2f586b889082aeac1a0aea43071f9814773bdd11359ee98",
+          "summary": "负责学位项目的委员会可能要求最终书面或口头综合考试，作为部分学位要求。",
+          "limitation": "may 是条件性授权，不表示所有 CS／DS／INFO 方案都必须参加该考试。"
+        },
+        {
+          "fragment_id": "thesis-if-required-approval",
+          "paragraph_index": 5,
+          "heading": "Thesis",
+          "paragraph_sha256": "31b45375bbcbc21ecb69adedf33067ed43388642402ab76facafaa6791931912",
+          "summary": "若学位要求包含 thesis，须展示部分基于原创材料的独立工作，获得 thesis committee 批准；项目委员会负责提供准备要求。",
+          "limitation": "不把条件性 thesis 条款套给 course-only 路径，也不从现有学分规则判定论文已获批准。"
+        },
+        {
+          "fragment_id": "thesis-submission-office-schedule",
+          "paragraph_index": 6,
+          "heading": "Thesis",
+          "paragraph_sha256": "be493581c0063ea69ddb03f040af817fdc344130000b6022e82e1f1278cf9f1d",
+          "summary": "须按相关 graduate office 给出的日程向 ProQuest 或大学认可的后继系统提交 thesis；归档信息由相关办公室提供。",
+          "limitation": "本批没有办公室日程或个人提交记录，不推算个人截止日，不代为提交论文。"
+        }
+      ]
+    },
+    {
+      "policy_id": "university-program-regulations",
+      "authority": "university",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/regulations-degree-programs/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:47:35.640615Z",
+        "sha256": "289eac1485784271193dcfc97198b3f32d8079c1c94b655de8f4217a30b2c9e0",
+        "byte_count": 40994,
+        "page_title": "Regulations and Requirements for All Graduate Degree Programs"
+      },
+      "fragments": [
+        {
+          "fragment_id": "major-concentration-same-catalog-year",
+          "paragraph_index": 14,
+          "heading": "Catalog Year Policy for Majors and Concentrations",
+          "paragraph_sha256": "5394f7befb6656cf2bdad85848468f6d0d2dfb5ed15fed6c10e2aa536e968264",
+          "summary": "concentration 属于 major 的组成部分，两者须遵循同一 Catalog 年度；不能将某年度 major 要求与另一年度 concentration 要求拼接。",
+          "limitation": "年度一致性不是个人适用年度的证明，也不能将三个 DS 方向合并成一个候选池。"
+        },
+        {
+          "fragment_id": "later-concentration-full-transition",
+          "paragraph_index": 15,
+          "heading": "Catalog Year Policy for Majors and Concentrations",
+          "paragraph_sha256": "f0de480bd9b130eb4fb09f43d5c20e9c83941fbd8dd6a84738c7f390d9fd79a5",
+          "summary": "想选后续 Catalog 年度新推出的 concentration，须整体转到该年度，同时采用更新的 major 与 concentration 要求；保留原年度者只能选该年度已有方向。",
+          "limitation": "不自动切换到最新年度，也不证明个人已申请或获准变更；仍需确认个人 catalog term、pathway 与 concentration。"
+        },
+        {
+          "fragment_id": "nonrepeatable-limits-unresolved-wording",
+          "paragraph_index": 24,
+          "heading": "Academic Progression",
+          "paragraph_sha256": "1015c21210bf18ec3defef20dfc29f42df3e15c5cc55915fa2230a852a7dbadc",
+          "summary": "此章节规定最多重修两门 nonrepeatable 课程以满足学位课程要求，同一门最多重修一次，累计 GPA 使用最近一次成绩；带 repeatable 属性的课程按指定上限重复修读，每次成绩均计入 GPA。",
+          "limitation": "与 Minimum Cumulative GPA 的两门或六学分取较大者、Khoury 的同一课程可重修两次存在表述不一致，具体范围和优先级须向学术部门确认；本系统不自动选择宽／严规则，也不计算个人重修或毕业资格。"
+        }
+      ]
+    },
+    {
+      "policy_id": "engineering-program-completion",
+      "authority": "engineering",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/engineering/academic-policies-procedures/program-completion/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:47:35.829713Z",
+        "sha256": "b86665e12a213f9116a4d220a601b72af0ded003fe3b6d8f5d6cbfc8dc8bc0d0",
+        "byte_count": 24444,
+        "page_title": "Program Completion"
+      },
+      "fragments": [
+        {
+          "fragment_id": "all-program-department-requirements",
+          "paragraph_index": 0,
+          "paragraph_sha256": "62cde003f1b707abf786609ba454a132015f82a5ba401547673a129a4323908f",
+          "summary": "获得所注册 Engineering 研究生学位须满意完成所有项目和部门要求。",
+          "limitation": "当前方案与政策证据均为部分覆盖，未核验所有要求或个人完成情况。"
+        },
+        {
+          "fragment_id": "degree-applied-gpa-core-separate",
+          "paragraph_index": 1,
+          "paragraph_sha256": "52c05684196c8c2fc40d8a8b8f5857d543bf194f81a4b86849071da34d5ab9a2",
+          "summary": "计入该学位的全部课程累计 GPA 须至少 3.000；全部 required core courses 须至少 C；各项目可能另有额外要求。",
+          "limitation": "学位计入课程的 GPA、学术 standing、core 成绩和先修条件分别核对；不把 core 的 C 门槛改成所有课程的通用通过线，也不计算个人毕业资格。"
+        }
+      ]
+    },
+    {
+      "policy_id": "engineering-certificate-sharing",
+      "authority": "engineering",
+      "source": {
+        "format_version": 1,
+        "url": "https://catalog.northeastern.edu/graduate/engineering/academic-policies-procedures/certificates-policies-procedures/",
+        "catalog_year": "2026-2027",
+        "captured_at": "2026-10-02T19:48:13.876430Z",
+        "sha256": "7d3afd1374323b13d53086128031d40eb08156bdf771229b05b1cf103771a83d",
+        "byte_count": 33971,
+        "page_title": "Certificate Policies and Procedures"
+      },
+      "fragments": [
+        {
+          "fragment_id": "current-student-admission-conditions",
+          "source_kind": "list",
+          "paragraph_index": 0,
+          "heading": "Current GSE Degree-Seeking Students",
+          "paragraph_sha256": "4e3a79fa2343e922b606fb8587c3643d883562edc3832ef7815ea262bf37f3f1",
+          "summary": "当前 GSE degree-seeking 学生须处于 good standing，academic probation 者不获 certificate admission；须在 fall 或 spring、且 final term 之前申请，summer 或 final term 请求不受理，即使课程已完成；当前 COE PhD 学生还须导师批准。",
+          "limitation": "这是在读 GSE 学生申请证书的条件，不是所有学位入学季或自动颁证规则；保留博士分支但不套给硕士。个人身份、实际校区与申请记录未核验。"
+        },
+        {
+          "fragment_id": "completion-before-or-with-degree",
+          "source_kind": "list",
+          "paragraph_index": 2,
+          "heading": "GSE Certificate Policies",
+          "paragraph_sha256": "6b1c3a820b36b24579bd499ce7e459a660912ebcf08568be88d2941028bf243c",
+          "summary": "证书 coursework 必须在主学位 coursework 完成之前或同一学期完成。",
+          "limitation": "约束课程完成时间，不等于两种 credential 同时授予，也不推算个人毕业日期。"
+        },
+        {
+          "fragment_id": "certificate-application-not-approval",
+          "paragraph_index": 5,
+          "heading": "Application Procedures",
+          "paragraph_sha256": "969ccb42fbb65edb694da66094d427321838d73558505a13808e676019e4289e",
+          "summary": "当前 COE 研究生通过指定 certificate application 申请；GSE continuing students 不必重新提交 admission documents 或支付 application fee，流程问题联系 GSE admissions。",
+          "limitation": "申请步骤不等于获批或自动授予证书；本批不发送申请，不操作个人账号。"
+        },
+        {
+          "fragment_id": "certificate-standing-and-coursework",
+          "paragraph_index": 6,
+          "heading": "Academic Standing",
+          "paragraph_sha256": "f2cc7fc7321ef6c0d969e490d5d60f3192662d770c60e0af00d7385e26f4beff",
+          "summary": "证书学生须满足 GSE 的 3.000 GPA good standing 要求；只有完成 required coursework 且维持 good standing 才具备被授予证书的条件。",
+          "limitation": "不将证书 standing 与学位计入课程 GPA 合并，也不证明个人已经具备或获得证书。"
+        },
+        {
+          "fragment_id": "approved-sharing-two-factors",
+          "paragraph_index": 7,
+          "heading": "Certificate Coursework Credit Sharing with GSE Degrees",
+          "paragraph_sha256": "4f61ee2e84b64fcc1c2a5418e574e6a78f2e18479bc340b770e2c2f412a220f4",
+          "summary": "经批准的情况下，证书课程可能用于 Engineering 研究生学位；须考虑课程适用性和允许同时计入学位与证书的课程数量。",
+          "limitation": "may 和 approved circumstances 必须保留，不能只看额度就自动双计。"
+        },
+        {
+          "fragment_id": "eligible-course-and-petition",
+          "paragraph_index": 8,
+          "heading": "Course Eligibility",
+          "paragraph_sha256": "1d16f891c68099123e569c29bf4cab27de4885835161e380f2c75d69d1727bf6",
+          "summary": "GSE 证书课程只有在学位项目要求允许时才能计入 Engineering 学位；除通过 petition 外不能替换证书课程。",
+          "limitation": "仍需核对具体项目要求、课程适用性和 petition 审批；提出请求不表示已经批准。"
+        },
+        {
+          "fragment_id": "disciplinary-eight-with-listed-exceptions",
+          "paragraph_index": 9,
+          "heading": "Course Double Counting",
+          "paragraph_sha256": "9c68b6ca2ca739db043b1e82abf357ea369762587f64c264e76f8e11334d37b4",
+          "summary": "多数 disciplinary degrees 可双计最多 8 semester hours 的合格课程；随后完整列出的特定 disciplinary degree 例外可到 16，课程须获 academic advisor 批准。",
+          "limitation": "额度仅用于对应类别的合格课程，不套给所有 Engineering／DS 方向；须与完整项目例外列表及个人证书／课程批准一起核对。"
+        },
+        {
+          "fragment_id": "disciplinary-exception-list",
+          "source_kind": "list",
+          "paragraph_index": 5,
+          "heading": "Course Double Counting",
+          "paragraph_sha256": "5706a5b26bdd7d75e0cd8b0af70d82fefb841ba20f493c0812ac47ffd9fb1779",
+          "summary": "16 学分 disciplinary 例外列表包含：civil and environmental engineering 项目攻读 climate and engineering／sustainability engineering 指定证书；Energy Systems、Engineering Management、Industrial Engineering、Operations Research；Mechanical Engineering 仅 General Mechanical Engineering concentration。",
+          "limitation": "完整列表没有将 DS engineering direction 直接列作该例外，不靠课程前缀或学院归属推断个人适用；指定证书、方向和 advisor 对课程的批准仍需核验。"
+        },
+        {
+          "fragment_id": "seis-sixteen-not-universal",
+          "paragraph_index": 10,
+          "heading": "Course Double Counting",
+          "paragraph_sha256": "ddfc4c0a7dc21aae2e91855096c6cdf2395fc02aa964c7e6450f451967bf37ac",
+          "summary": "全部 multidisciplinary degree（SEIS）项目可将最多 16 semester hours 的合格课程同时用于 graduate degree 与 graduate certificate。",
+          "limitation": "不是所有 Engineering degree 都是 SEIS，也不根据 INFO／DS 名称或前缀自动分型；本批未确认个人所选证书、课程适用性或批准。"
+        },
+        {
+          "fragment_id": "no-certificate-double-counting",
+          "paragraph_index": 11,
+          "heading": "Double Counting Across Certificates",
+          "paragraph_sha256": "8f050166fd85d4390285af8980cfe75f42f7fedb6623538c2eca9dad6daecbcd",
+          "summary": "Engineering 研究生课程不能跨多个研究生证书（graduate certificates）双计。",
+          "limitation": "这是 Engineering 证书之间的限制；大学通用 credential 规则与 Khoury 的规则另列，不自动合并或覆盖。"
+        },
+        {
+          "fragment_id": "no-triple-counting-plusone",
+          "paragraph_index": 12,
+          "heading": "PlusOne Programs",
+          "paragraph_sha256": "d12f4360b00a70a817441bc2d3b476f023a8f266381ed9dc816db72e0d905c93",
+          "summary": "Engineering 研究生课程不能在证书／学位项目间三重计入；已同时用于本科与硕士学位的课程（例如 PlusOne）不能再计入 graduate certificate。",
+          "limitation": "个人课程过去如何应用尚未核验，不能仅凭课程成绩或研究生层级认定可共享。"
+        },
+        {
+          "fragment_id": "undergraduate-applied-versus-excess",
+          "paragraph_index": 13,
+          "heading": "Graduate Courses Applied to an Undergraduate Degree",
+          "paragraph_sha256": "42ebd618907bd917009ba34260b854a733b897f4478ef77ca2b7439df3fac62a",
+          "summary": "已用于本科学位的研究生课程不能双计 graduate certificate；本科期间修读、超出本科学位要求的额外研究生课程可能计入证书。",
+          "limitation": "区分已用于本科学位和额外课程，may 不是自动接受；不据此增加个人可共享额度。"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "plan_id": "cs-ms-boston-2026-2027-standard",
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": null,
+      "plan_content_sha256": "b72cc118be9859f8e13641ebfd95a69d7dd865589f99627b849db6fe1fc7f30c",
+      "home_college": "khoury",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "khoury-academic-standing",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "khoury-retaking",
+        "khoury-transfer",
+        "khoury-credit-sharing",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations"
+      ]
+    },
+    {
+      "plan_id": "ds-ms-boston-2026-2027-standard-computer-science",
+      "program_id": "ds-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": "computer-science",
+      "plan_content_sha256": "c8e40708efb04f7a37e6f8e6f000f9d7483d16b7a3d1f8f7078a69efdb455fc9",
+      "home_college": "khoury",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "khoury-academic-standing",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "khoury-retaking",
+        "khoury-transfer",
+        "khoury-credit-sharing",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations"
+      ]
+    },
+    {
+      "plan_id": "ds-ms-boston-2026-2027-standard-data-design-visualization",
+      "program_id": "ds-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": "data-design-visualization",
+      "plan_content_sha256": "795cdeafb758af310a8f8dbfd0fbe664bced54c55406ec274d40d77c83264754",
+      "home_college": "camd",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "camd-masters",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations"
+      ]
+    },
+    {
+      "plan_id": "ds-ms-boston-2026-2027-standard-engineering-theory-modeling",
+      "program_id": "ds-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": "engineering-theory-modeling",
+      "plan_content_sha256": "0fffacb22ca081003d386d2268a2e3b19733862a3e76a8ac914a6fe8166ceebf",
+      "home_college": "engineering",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "engineering-academic-standing",
+        "engineering-course-selection",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "engineering-retake-substitution",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations",
+        "engineering-program-completion",
+        "engineering-certificate-sharing"
+      ]
+    },
+    {
+      "plan_id": "info-ms-boston-2026-2027-standard-general",
+      "program_id": "info-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": "general",
+      "plan_content_sha256": "113f3360a08967d2810587eec5fef7b1ecb98752848c24a469f84550812db8da",
+      "home_college": "engineering",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "engineering-academic-standing",
+        "engineering-course-selection",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "engineering-retake-substitution",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations",
+        "engineering-program-completion",
+        "engineering-certificate-sharing"
+      ]
+    },
+    {
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": null,
+      "plan_content_sha256": "357b4e58ed370f5100cf7e0ba0554d1da145c260b64ae9ff6189c00ba119b184",
+      "home_college": "khoury",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "khoury-academic-standing",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "khoury-retaking",
+        "khoury-transfer",
+        "khoury-credit-sharing",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations"
+      ]
+    },
+    {
+      "plan_id": "info-ms-boston-2026-2027-bridge",
+      "program_id": "info-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "bridge",
+      "concentration": null,
+      "plan_content_sha256": "c3e02655b090b80838694e2aa0d1d3231c0ddf354e80f33e211b331a20c92978",
+      "home_college": "engineering",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "engineering-academic-standing",
+        "engineering-course-selection",
+        "university-retaking",
+        "university-substitutions",
+        "university-transfer",
+        "university-credit-sharing",
+        "engineering-retake-substitution",
+        "university-credit-validity",
+        "university-masters-regulations",
+        "university-program-regulations",
+        "engineering-program-completion",
+        "engineering-certificate-sharing"
+      ]
+    }
+  ]
+}

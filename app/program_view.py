@@ -142,6 +142,11 @@ def _program_header_html(*, prefix: str, full_name: str) -> str:
     )
 
 
+def _semester_heading(semester: int | None) -> str:
+    return (f"旧 seed：第 {semester} 学期建议（未核验）" if semester is not None
+            else "未提供推荐学期（不等于任意学期都可修）")
+
+
 def _course_row_html(
     *, code: str, name: str, requirement_type: str, notes: str | None,
 ) -> str:
@@ -190,11 +195,12 @@ def render_program_browser(st) -> None:
     from app.api_client import ApiError  # noqa: PLC0415
 
     st.subheader("🎓 培养方案 · Programs")
-    st.caption("按学期浏览每个 program 的课程表 · 点击课程查看详情")
+    st.caption("版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核")
 
     selected = st.session_state.get("selected_program_id")
     if selected:
         if st.button("← 所有培养方案", key="prog-back"):
+            st.session_state.pop('_program_plan_link_pending', None)
             st.session_state["selected_program_id"] = None
             st.rerun()
         _render_curriculum(st, selected)
@@ -221,10 +227,12 @@ def render_program_browser(st) -> None:
                 ),
                 unsafe_allow_html=True,
             )
+            st.caption(f"旧 seed 标签未核验 · 可用版本化规则 {int(p.get('plan_count', 0))} 份")
             if st.button(
                 "查看课程表", key=f"prog-{p['program_id']}",
                 use_container_width=True,
             ):
+                st.session_state.pop('_program_plan_link_pending', None)
                 st.session_state["selected_program_id"] = p["program_id"]
                 st.rerun()
 
@@ -240,6 +248,14 @@ def _render_curriculum(st, program_id: str) -> None:
     在这里再复制一份会让 UI 分叉。"""
     from app.api_client import ApiError  # noqa: PLC0415
 
+    # Refresh before rendering the bound scope widget. A changed revision
+    # must be selected explicitly again; never silently reapply the old choice.
+    # 中文：仅清除当前家族缓存与方案选择，不保存或复用政策响应。
+    if st.button("刷新方案及政策证据", key=f"prog-refresh-{program_id}"):
+        st.session_state.pop('_program_plan_link_pending', None)
+        cache = st.session_state.get("_curriculum_cache", {})
+        cache.pop(program_id, None)
+        st.session_state.pop(f"program-plan-{program_id}", None)
     try:
         cur = get_curriculum_cached(st, program_id)
     except ApiError as e:
@@ -255,6 +271,12 @@ def _render_curriculum(st, program_id: str) -> None:
     )
     if cur.get("notes"):
         st.caption(cur["notes"])
+    from app.program_plan_view import render_program_plans  # noqa: PLC0415
+    plan = render_program_plans(st, cur.get("plans", []), key=f"program-plan-{program_id}", program_id=program_id)
+    if plan is not None:
+        from app.program_policy_view import load_selected_program_policy_evidence  # noqa: PLC0415
+        load_selected_program_policy_evidence(st, plan)
+    st.caption("以下是旧 seed 的课程分类与学期建议，未经官方核验；校区/年度/路径未知。")
 
     # Share link (deep-link produce half). program_id is already the URL
     # form, so no ref normalization is needed here — unlike course codes,
@@ -266,10 +288,14 @@ def _render_curriculum(st, program_id: str) -> None:
 
     with st.expander("🔗 分享这个培养方案 · Share"):
         st.code(
-            share_url(settings.public_base_url, program=program_id),
+            share_url(settings.public_base_url, program=program_id,
+                plan=plan if plan is not None and plan.review_status == 'source_checked' else None),
             language=None,
         )
-        st.caption("把链接发给同学，他们打开就直接看到这份课程表。")
+        if plan is not None and plan.review_status == 'source_checked':
+            st.caption('链接定位已选方案的完整范围和当前内容版本；不是个人适用性或资格证明。')
+        else:
+            st.caption('这里只分享项目入口，不携带方案年度／路径；对方仍需明确选择版本。')
 
     semesters = cur.get("semesters", [])
     if not semesters:
@@ -278,7 +304,7 @@ def _render_curriculum(st, program_id: str) -> None:
 
     for group in semesters:
         sem = group.get("semester")
-        st.markdown(f"**第 {int(sem)} 学期推荐**" if sem else "**任意学期**")
+        st.markdown(f"**{_semester_heading(sem)}**")
         for c in group.get("courses", []):
             row_cols = st.columns([5, 1])
             row_cols[0].markdown(

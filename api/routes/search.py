@@ -64,6 +64,7 @@ from api.routes.common import (
     attempt_hyde_rescue,
     build_hard_filters,
     fetch_texts,
+    filter_courses,
     log_query,
 )
 from config import settings
@@ -201,68 +202,43 @@ def search(
                 detail=f"Invalid delivery_mode: {req.delivery_mode!r}",
             ) from e
 
-    # 1) Alias path — cheap. If the user typed a code or known slang, resolve
-    #    directly and skip the embedder/BM25 entirely. Two guards:
-    #    - Explicit request filters (term/credits/mode/professor) bypass the
-    #      alias shortcut entirely: the alias tier can't apply them, and
-    #      returning an unfiltered hit would silently contradict the request.
-    #      The hybrid path enforces filters at the SQLite layer.
-    #    - All-dangling alias resolution falls THROUGH to hybrid instead of
-    #      returning matched_via="alias" with empty results (/chat already
-    #      behaved this way; the routes had diverged).
-    # 中文：1）别名路径 —— 代价很低。用户输入课程代码或已知俗称时，直接解析
-    #    命中，完全跳过嵌入器/BM25。两条保护：
-    #    - 请求带显式过滤条件（term/credits/mode/professor）时，完全绕开别名
-    #      捷径：别名层无法施加这些过滤，若返回未过滤的命中会悄悄违背请求
-    #      本意。过滤条件由混合路径在 SQLite 层强制执行。
-    #    - 若别名全部指向已消失的课程，直接落入（fall through）混合路径，
-    #      而不是返回 matched_via="alias" 但结果为空（/chat 那边本就是这样
-    #      处理的；两条路由此前已经出现分叉）。
+    # Exact references remain cheap but must obey the same metadata filters.
+    # Filter before top-k; a filtered-out reference is empty, not a new search.
+    # All-dangling resolution still falls through to hybrid.
+    # 中文：精确引用先筛选再截断；排除的课程返回空结果，不另找无关课程替代。
     hard_filters = build_hard_filters(req)
-    alias_ids = (
-        []
-        if hard_filters
-        else normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
-    )
+    alias_ids = normalize_query_to_course_ids(req.query, alias_repo=alias_repo)
     if alias_ids:
-        results: list[SearchHitOut] = []
-        for cid in alias_ids[: req.k]:
-            try:
-                course = course_repo.get(cid)
-            except LookupError:
-                # Alias points at a course_id that's vanished — log and skip
-                # 中文：别名指向的 course_id 已不存在 —— 记录日志并跳过
+        alias_courses = course_repo.get_batch(alias_ids)
+        for cid in alias_ids:
+            if cid not in alias_courses:
                 log.warning("search.alias_dangling", course_id=cid)
-                continue
-            results.append(
+        if alias_courses:
+            courses = filter_courses(conn, [
+                alias_courses[cid] for cid in alias_ids if cid in alias_courses
+            ], hard_filters)
+            results = [
                 SearchHitOut(
-                    course_id=course.course_id,
-                    primary_code=course.primary_code,
-                    primary_name=course.primary_name,
-                    score=1.0,
-                    matched_via="alias",
+                    course_id=course.course_id, primary_code=course.primary_code,
+                    primary_name=course.primary_name, score=1.0, matched_via="alias",
                 )
-            )
-        if results:
+                for course in courses[: req.k]
+            ]
+            matched_via = "alias" if results else "empty"
             elapsed_ms = _elapsed_ms(started)
             log.info(
-                "search.alias_hit",
-                query=req.query,
-                count=len(results),
-                duration_ms=elapsed_ms,
+                "search.alias_hit" if results else "search.alias_filtered_empty",
+                query=req.query, count=len(results), duration_ms=elapsed_ms,
             )
             log_query(
-                conn, route="search", query=req.query, matched_via="alias",
+                conn, route="search", query=req.query, matched_via=matched_via,
                 k=req.k, latency_ms=elapsed_ms,
-                result_course_ids=[r.course_id for r in results],
+                result_course_ids=[result.course_id for result in results],
                 user_id=telemetry_user,
             )
             return SearchResponse(
-                query=req.query,
-                k=req.k,
-                matched_via="alias",
-                results=results,
-                latency_ms=elapsed_ms,
+                query=req.query, k=req.k, matched_via=matched_via,
+                results=results, latency_ms=elapsed_ms,
             )
 
     # 2) Hybrid path — embedder + BM25 + RRF over a wider candidate pool

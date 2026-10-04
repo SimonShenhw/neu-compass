@@ -8,7 +8,7 @@ Hard rule: everyone uses their own independent API key — never shared.
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -20,11 +20,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     # === LLM ===
     # 中文:大语言模型(LLM)相关配置。
-    gemini_api_key: str
+    gemini_api_key: str = Field(repr=False)
 
     # === Reddit (scraper-only; NEVER runs in the prod containers) ===
     # 中文:Reddit 配置(仅供爬虫脚本使用,绝不在生产容器中运行)。
@@ -36,20 +37,45 @@ class Settings(BaseSettings):
     # api+ui 的 .env 里永远得塞着 Reddit 凭证,仅仅是为了让 `Settings()`
     # 能被 import —— 而唯一的使用方是开发机上的 scrapers/reddit.py,
     # 它自己会校验这些字段是否真的存在。
-    reddit_client_id: str = ""
-    reddit_client_secret: str = ""
+    reddit_client_id: str = Field(default="", repr=False)
+    reddit_client_secret: str = Field(default="", repr=False)
     reddit_user_agent: str = "neu-compass/0.1"
 
     # === Google OAuth (Week 6 才需要) ===
     # 中文:Google OAuth 配置(从第 6 周开始才需要)。
-    google_oauth_client_id: str = ""
-    google_oauth_client_secret: str = ""
+    google_oauth_client_id: str = Field(default="", repr=False)
+    google_oauth_client_secret: str = Field(default="", repr=False)
     google_oauth_redirect_uri: str = "http://localhost:8501/oauth/callback"
 
     # === Storage ===
     # 中文:存储路径配置。
     sqlite_path: str = str(PROJECT_ROOT / "data" / "courses.db")
     faiss_index_path: str = str(PROJECT_ROOT / "data" / "faiss_index")
+
+    # Release kill switch: table migration alone never enables private capture.
+    # 中文：默认关闭；启用前确认告知、留存／备份与访问控制，重启 API/UI。
+    answer_feedback_enabled: bool = False
+
+    # Single-process search/chat admission, OFF until target/capacity review.
+    # 中文：仅单进程总量保护，默认关闭；不是身份／多 worker／费用配额。
+    request_guard_enabled: bool = False
+    request_guard_capacity: int = Field(default=8, ge=1, le=10_000)
+    request_guard_refill_per_second: float = Field(default=1., ge=.01, le=1000., allow_inf_nan=False)
+    request_guard_max_inflight: int = Field(default=2, ge=1, le=100)
+
+    @field_validator('request_guard_capacity', 'request_guard_refill_per_second',
+                     'request_guard_max_inflight', mode='before')
+    @classmethod
+    def guard_numbers_are_not_booleans(cls, value):
+        if isinstance(value, bool):
+            raise ValueError('invalid_request_guard_number')
+        return value
+
+    # Read-only policy evidence; private archives are never auto-fetched.
+    # 中文：默认 raw 路径相对 SQLite 所在目录；缺失时仅提示不可用。
+    program_policy_bundle_path: Path = PROJECT_ROOT / "data/program_policy_seed/boston_2026_2027_evidence.json"
+    program_policy_source_dir: Path | None = None
+    program_catalog_source_dir: Path | None = None
 
     # === API base URL (Streamlit -> FastAPI hop, Week 6) ===
     # 中文:API 基础 URL(第 6 周起,Streamlit -> FastAPI 之间的跳转地址)。
@@ -235,7 +261,7 @@ class Settings(BaseSettings):
     # secret 为空字符串 = 该机制关闭(仅支持匿名),这样刚 checkout 出来的
     # 代码也能直接跑起来。生成方式:
     # python -c "import secrets; print(secrets.token_urlsafe(48))"
-    session_secret: str = ""
+    session_secret: str = Field(default="", repr=False)
     session_max_age_seconds: int = 604800  # 7 days
     # 中文:7 天
 

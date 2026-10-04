@@ -62,6 +62,7 @@ from rank_bm25 import BM25Okapi
 
 from db.repository import CourseRepository
 from rag.retriever import ELIGIBLE_STATUS, SearchHit
+from rag.profiling import profiled, stage
 
 DEFAULT_RRF_K = 60
 
@@ -211,6 +212,7 @@ class BM25Corpus:
         rows = conn.execute(sql, params).fetchall()
         return cls({r["course_id"]: r["raw_text"] for r in rows})
 
+    @profiled('bm25_search')
     def search(
         self,
         query: str,
@@ -276,6 +278,7 @@ class BM25Corpus:
         return len(self._course_ids)
 
 
+@profiled('fusion')
 def reciprocal_rank_fusion(
     rankings: list[list[str]],
     *,
@@ -295,6 +298,7 @@ def reciprocal_rank_fusion(
     return fused
 
 
+@profiled('fusion')
 def convex_combination(
     vec_pairs: list[tuple[str, float]],
     bm25_pairs: list[tuple[str, float]],
@@ -453,9 +457,10 @@ class HybridRetriever:
         allowed: set[str] | None = None
         if hard_filters:
             filter_ids = getattr(self._vector, "filter_ids", None)
-            allowed = (
-                set(filter_ids(hard_filters)) if callable(filter_ids) else set(vec_ids)
-            )
+            with stage('hybrid_filter'):
+                allowed = (
+                    set(filter_ids(hard_filters)) if callable(filter_ids) else set(vec_ids)
+                )
         bm25_hits = self._bm25.search(query, k=candidate_k, allowed_ids=allowed)
         bm25_ids = [cid for cid, _ in bm25_hits]
 
@@ -490,7 +495,8 @@ class HybridRetriever:
             return []
         # Batch fetch — avoids N+1 (was k SELECTs in a list comprehension).
         # 中文:批量取课 —— 避免 N+1 查询(旧版在列表推导里发 k 条 SELECT)。
-        courses = self._course_repo.get_batch(top_k)
+        with stage('hybrid_hydrate'):
+            courses = self._course_repo.get_batch(top_k)
         return [
             SearchHit(course=courses[cid], score=fused[cid])
             for cid in top_k

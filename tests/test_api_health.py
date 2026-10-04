@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
+from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.conftest import build_test_app
@@ -34,10 +36,44 @@ def test_ready_warming_when_state_missing(empty_db: sqlite3.Connection) -> None:
     # Don't populate state; mimic a process that's still in lifespan.
     with TestClient(app) as client:
         r = client.get("/ready")
-    assert r.status_code == 200
+    assert r.status_code == 503
     assert r.json()["status"] == "warming"
     assert r.json()["courses_indexed"] == 0
     assert r.json()["bm25_corpus"] == 0
+
+
+@pytest.mark.parametrize(
+    ("component", "value"),
+    [
+        ("ready", False),
+        ("embedder", None),
+        ("faiss_index", None),
+        ("bm25_corpus", None),
+        ("faiss_index", SimpleNamespace(count=0)),
+        ("bm25_corpus", SimpleNamespace(count=0)),
+    ],
+)
+def test_ready_rejects_incomplete_state(
+    api_client: TestClient, component: str, value: object,
+) -> None:
+    """A live process with an incomplete retrieval stack is not ready."""
+    setattr(api_client.app.state, component, value)
+    response = api_client.get("/ready")
+    assert response.status_code == 503
+    assert response.json()["status"] == "warming"
+    assert api_client.get("/health").status_code == 200
+
+
+def test_ready_allows_optional_reranker_degraded_mode(api_client: TestClient) -> None:
+    api_client.app.state.reranker = None
+    response = api_client.get("/ready")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+
+
+def test_ready_documents_unavailable_response(api_client: TestClient) -> None:
+    responses = api_client.get("/openapi.json").json()["paths"]["/ready"]["get"]["responses"]
+    assert "503" in responses
 
 
 def test_request_id_header_round_trip(api_client: TestClient) -> None:

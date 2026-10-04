@@ -35,6 +35,7 @@ from config import settings  # noqa: E402
 from db.alias_repository import AliasRepository  # noqa: E402
 from db.connection import connect  # noqa: E402
 from db.repository import CourseRepository  # noqa: E402
+from db.catalog_source_repository import CatalogSourceRepository  # noqa: E402
 from schemas.alias import (  # noqa: E402
     Alias,
     AliasReviewStatus,
@@ -68,9 +69,13 @@ def upsert_one(
     entry: CatalogEntry,
     *,
     course_repo: CourseRepository,
+    catalog_repo: CatalogSourceRepository,
 ) -> str:
     """Pass 1: upsert one CatalogEntry as a Course. Returns the course_id."""
-    cid = course_id_for(entry.course_code)
+    if not catalog_repo.available():
+        raise ValueError("Catalog source schema missing; run sync_catalog_sources.py on a DB copy first")
+    snapshot = CatalogSourceRepository.snapshot(entry)
+    cid = course_id_for(snapshot.course_code)
     course = Course(
         course_id=cid,
         primary_code=entry.course_code,
@@ -80,6 +85,7 @@ def upsert_one(
     )
     # raw_text: feed the catalog description; the embedder will see this.
     course_repo.upsert(course, raw_text=entry.description)
+    catalog_repo.store(cid, snapshot)
     return cid
 
 
@@ -152,6 +158,7 @@ def main() -> int:
 
     conn = connect(settings.sqlite_path)
     course_repo = CourseRepository(conn)
+    catalog_repo = CatalogSourceRepository(conn)
     alias_repo = AliasRepository(conn)
 
     try:
@@ -160,7 +167,7 @@ def main() -> int:
         for f in files:
             entries = load_jsonl(f)
             for e in entries:
-                cid = upsert_one(e, course_repo=course_repo)
+                cid = upsert_one(e, course_repo=course_repo, catalog_repo=catalog_repo)
                 all_entries.append((e, cid))
             print(f"  pass1 {f.name}: {len(entries)} upserted")
 

@@ -1,0 +1,20 @@
+[
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science/computer-science-mscs-align/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T21:53:01.309591Z",
+    "sha256": "f5bf1d96fdfd95c295b6a61d4b52cd98ab48350d8e8b5accb3f675c1680f834c",
+    "byte_count": 48856,
+    "page_title": "Computer Science, MSCS—Align (Boston)"
+  },
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/graduate/engineering/multidisciplinary/information-systems-msis-bridge/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T21:53:01.519261Z",
+    "sha256": "e82242610fc0c64f894371403c5a7c8c10f1bbc4654b3c89e5a7f275922a3f31",
+    "byte_count": 40194,
+    "page_title": "Information Systems, MSIS—Bridge (Boston)"
+  }
+]

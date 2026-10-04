@@ -17,6 +17,8 @@ def _coop(**overrides: Any) -> CoopExperience:
         "role": "Quant Dev",
     }
     base.update(overrides)
+    if "coop_id" in overrides and "contributor_user_id" not in overrides:
+        base["contributor_user_id"] = overrides["coop_id"]
     return CoopExperience(**base)
 
 
@@ -127,3 +129,25 @@ def test_higher_k_threshold() -> None:
     assert is_uniquely_identifying(a, [a, b], k=3) is True
     c = _coop(coop_id="c", company="X", role="Y", coop_term="Z")
     assert is_uniquely_identifying(a, [a, b, c], k=3) is False
+
+
+@pytest.mark.parametrize("second", [
+    {"contributor_user_id": "u1"},
+    {"contributor_user_id": None},
+    {"contributor_user_id": "u2", "is_seed_data": True},
+])
+def test_rows_are_not_distinct_contributor_evidence(second) -> None:
+    a = _coop(coop_id="a", contributor_user_id="u1")
+    b = _coop(coop_id="b", **second)
+    assert is_uniquely_identifying(a, [a, b]) is True
+
+
+def test_normalized_triples_share_a_cohort() -> None:
+    a = _coop(coop_id="a", company="State Street", role="Quant Dev", coop_term=None)
+    b = _coop(coop_id="b", company=" ＳＴＡＴＥ  ＳＴＲＥＥＴ ", role="Quant   Dev", coop_term=" ")
+    assert is_uniquely_identifying(a, [a, b]) is False
+
+
+def test_nonpositive_k_is_invalid() -> None:
+    with pytest.raises(ValueError):
+        is_uniquely_identifying(_coop(), [], k=0)

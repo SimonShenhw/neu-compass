@@ -106,6 +106,8 @@ def logout(state: SessionState) -> None:
     state["messages"] = []
     state["search_results"] = []
     state["selected_course_id"] = None
+    for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in']:
+        state.pop(key, None)
 
 
 # === Conversation ===
@@ -119,6 +121,7 @@ def add_message(
     content: str,
     evidence: list[dict] | None = None,
     matched_via: str | None = None,
+    feedback: dict | None = None,
 ) -> None:
     if role not in {"user", "assistant"}:
         raise ValueError(f"role must be 'user' or 'assistant', got {role!r}")
@@ -130,6 +133,11 @@ def add_message(
             "matched_via": matched_via,
         }
     )
+    if role == 'assistant' and feedback is not None:
+        from app.answer_feedback_view import bind_feedback_receipt
+        target = bind_feedback_receipt(feedback, content)
+        if target is not None:
+            state['messages'][-1]['feedback'] = target
 
 
 def get_messages(state: SessionState) -> list[dict]:
@@ -141,6 +149,8 @@ def clear_conversation(state: SessionState) -> None:
     state["last_query"] = None
     state["search_results"] = []
     state["selected_course_id"] = None
+    for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in']:
+        state.pop(key, None)
 
 
 # === Search context ===

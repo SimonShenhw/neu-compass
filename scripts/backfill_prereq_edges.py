@@ -17,7 +17,9 @@ scripts/seed_program.py 会写 course_prerequisites 边,所以详情面板的
 Caveats encoded in the rows themselves:
   - The scraper flattens AND/OR prerequisite groups, so every edge is
     written as requirement='required' with a note flagging the flattening.
-    A future parser can upgrade OR-groups to 'recommended' alternatives.
+    An OR-group is NOT a set of 'recommended' edges. Only a separate
+    scoped logic document can preserve alternatives/grades/corequisites;
+    this legacy backfill does not perform that upgrade.
   - Codes whose course isn't in the catalog (retired/not-scraped) are
     skipped — the FK would reject them and the UI tolerates absence.
   - Hand-seeded program edges are preserved: the upsert only INSERTs
@@ -26,8 +28,9 @@ Caveats encoded in the rows themselves:
 
 写入行本身所携带的注意事项:
   - 爬虫会把 AND/OR 先修分组拍平(flatten),所以每条边都写成
-    requirement='required',并在 notes 里标注"已拍平"。未来的解析器
-    可以把 OR 分组升级为 'recommended' 的替代选项。
+    requirement='required',并在 notes 里标注"已拍平"。OR 分组不等于
+    'recommended' 边；需独立规则文档保留任选、成绩和共修条件，
+    本旧回填命令不执行这种升级。
   - 课程不在目录里(已下架 / 未爬到)的代码会被跳过 —— 外键会拒绝
     它们,UI 也能容忍缺失。
   - 手工 seed 的专业边会被保留:这里的 upsert 只 INSERT 缺失的

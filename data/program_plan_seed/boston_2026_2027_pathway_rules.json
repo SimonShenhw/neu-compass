@@ -1,0 +1,93 @@
+[
+  {
+    "plan_id": "cs-ms-boston-2026-2027-align", "program_id": "cs-ms",
+    "campus": "boston", "catalog_year": "2026-2027", "pathway": "align",
+    "coverage": "partial", "review_status": "source_checked",
+    "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science/computer-science-mscs-align/",
+    "source_title": "Computer Science, MSCS—Align (Boston), 2026-2027 Edition",
+    "source_catalog_year": "2026-2027", "captured_on": "2026-10-01",
+    "source_html_sha256": "f5bf1d96fdfd95c295b6a61d4b52cd98ab48350d8e8b5accb3f675c1680f834c",
+    "source_excerpt": "CS 5001\nand CS 5003\n…\nCS 5800",
+    "notes": "独立的 Boston CS Align 路径，不是普通 MSCS。桥接课程除非项目另行决定须完成，每门 B 或以上；是否减免、总学分范围内的个人要求由项目核实。没有把两学期 introductory sequence 改写成具体排课或先修边。",
+    "requirements": {"kind": "all_of", "label": "CS Align 目录规则（非完整资格判定）", "children": [
+      {"kind": "all_of", "label": "Align Bridge Coursework：除非项目另行决定，不是学生自由任选", "children": [
+        {"kind": "all_of", "label": "Fundamentals 主课与配套 recitation（组合 4 学分）", "children": [
+          {"kind": "course", "label": "Intensive Foundations", "course_code": "CS 5001"},
+          {"kind": "course", "label": "Recitation for CS 5001", "course_code": "CS 5003"}
+        ]},
+        {"kind": "course", "label": "Discrete Structures（4 学分）", "course_code": "CS 5002"},
+        {"kind": "all_of", "label": "Object-Oriented Design 主课与配套 recitation（组合 4 学分）", "children": [
+          {"kind": "course", "label": "Object-Oriented Design", "course_code": "CS 5004"},
+          {"kind": "course", "label": "Recitation for CS 5004", "course_code": "CS 5005"}
+        ]},
+        {"kind": "all_of", "label": "Additional Align 主课与配套 recitation（组合 4 学分）", "children": [
+          {"kind": "course", "label": "Data Structures and Algorithms", "course_code": "CS 5008"},
+          {"kind": "course", "label": "Recitation for CS 5008", "course_code": "CS 5009"}
+        ]},
+        {"kind": "condition", "label": "桥接课程每门 B 或以上；例外/减免必须由项目确定，系统不根据背景自动免修或判定学分。"}
+      ]},
+      {"kind": "course", "label": "Core Algorithms（4 学分）；本路径不复制普通 MSCS 的 CS 5010/5011 core", "course_code": "CS 5800"},
+      {"kind": "select", "label": "广度：3 门、12 学分，覆盖至少 2 个领域", "min_courses": 3, "min_credits": 12, "min_areas": 2,
+        "course_codes": ["CS 5100", "CS 5150", "CS 5200", "CS 5330", "CS 6120", "CS 6140", "CS 6200", "CS 6220", "CS 6240", "CS 7140", "CS 5400", "CS 5500", "CS 5520", "CS 5600", "CS 5610", "CS 5700", "CS 5850", "CS 6410", "CS 6510", "CS 6620", "CS 6650", "CS 6760", "CS 7805", "CY 5770", "CY 6740"],
+        "areas": {
+          "Artificial Intelligence and Data Science": ["CS 5100", "CS 5150", "CS 5200", "CS 5330", "CS 6120", "CS 6140", "CS 6200", "CS 6220", "CS 6240", "CS 7140"],
+          "Systems and Software": ["CS 5400", "CS 5500", "CS 5520", "CS 5600", "CS 5610", "CS 5700", "CS 5850", "CS 6410", "CS 6510", "CS 6620", "CS 6650"],
+          "Theory and Security": ["CS 6760", "CS 7805", "CY 5770", "CY 6740"]
+        }
+      },
+      {"kind": "select", "label": "另完成 12 学分选修；重叠候选不是广度重复计入许可", "min_credits": 12,
+        "course_ranges": [{"start": "CS 5100", "end": "CS 7980"}],
+        "course_codes": ["CS 5097", "CS 7990", "CS 8674", "CS 8982", "CY 5001", "CY 5010", "CY 5130", "CY 5210", "CY 6120", "DADS 7305", "DS 5110", "DS 5230"]
+      },
+      {"kind": "condition", "label": "目录总要求是 36–44 semester hours、最低 GPA 3.000；不能据此直接算个人减免后的总学分。"},
+      {"kind": "optional", "label": "Thesis 委员会", "activate_when": "选择 thesis 时；不是所有 Align 学生必须完成 thesis", "children": [
+        {"kind": "condition", "label": "至少 3 人含导师；至少 2 人来自或关联 Khoury；至少 1 人与论文工作保持独立且不是共同导师；外部成员可有但非必需，额外 reader 不替代最低要求。"}
+      ]},
+      {"kind": "unmodeled", "label": "项目减免/转学分、完整学院政策、跨组计入与批准、个人桥接成绩、真实先修/共修和开课学期未核验。"}
+    ]}
+  },
+  {
+    "plan_id": "info-ms-boston-2026-2027-bridge", "program_id": "info-ms",
+    "campus": "boston", "catalog_year": "2026-2027", "pathway": "bridge",
+    "coverage": "partial", "review_status": "source_checked",
+    "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/engineering/multidisciplinary/information-systems-msis-bridge/",
+    "source_title": "Information Systems, MSIS—Bridge (Boston), 2026-2027 Edition",
+    "source_catalog_year": "2026-2027", "captured_on": "2026-10-01",
+    "source_html_sha256": "e82242610fc0c64f894371403c5a7c8c10f1bbc4654b3c89e5a7f275922a3f31",
+    "source_excerpt": "INFO 5001\n…\nINFO 5100\nand INFO 5101\n…\nINFO 6215",
+    "notes": "独立的 Boston MSIS Bridge 路径，不能复制普通 MSIS 三个毕业出口或 general/medical core 替代。有限 restricted 列表与开放 electives 分开；课程代码/前缀规则不是个人注册资格或开课证明。",
+    "requirements": {"kind": "all_of", "label": "MSIS Bridge 目录规则（非完整资格判定）", "children": [
+      {"kind": "all_of", "label": "Core：12 学分；包含配套 lab", "children": [
+        {"kind": "course", "label": "Application Modeling and Design（4 学分）", "course_code": "INFO 5001"},
+        {"kind": "all_of", "label": "Application Engineering 主课与 lab（组合 4 学分）", "children": [
+          {"kind": "course", "label": "Application Engineering", "course_code": "INFO 5100"},
+          {"kind": "course", "label": "配套 Lab for INFO 5100，不能因 0 学分删去", "course_code": "INFO 5101"}
+        ]},
+        {"kind": "course", "label": "Business Analysis and Information Engineering（4 学分）", "course_code": "INFO 6215"},
+        {"kind": "condition", "label": "required core 每门须 C 或以上；单门课程的先修条件可能要求更高成绩。系统未评估个人成绩或先修。"}
+      ]},
+      {"kind": "select", "label": "Restricted electives：从明确候选完成 12 学分，不是每门都必修", "min_credits": 12,
+        "course_codes": ["DAMG 6210", "INFO 6150", "INFO 6205", "INFO 6245", "INFO 6255", "INFO 6350", "INFO 7245", "INFO 7385"]
+      },
+      {"kind": "select", "label": "Electives：另 12 学分；不照搬普通 MSIS 的 INFO 5200 排除项", "min_credits": 12,
+        "subject_codes": ["CSYE", "DAMG", "INFO", "TELE"],
+        "course_codes": ["MUST 5510", "MUST 5520", "MUST 6603"], "excluded_course_codes": ["CSYE 6220"]
+      },
+      {"kind": "condition", "label": "目录总要求 36 学分，选 Co-op 时 37 学分，最低 GPA 3.000；跨组选修重叠不是重复计入许可。INFO 5200 在该页未列为排除，不等于已确认个人可注册/计入。"},
+      {"kind": "optional", "label": "Co-op", "activate_when": "选择 Co-op 且符合个人资格时；必须完成 ENCP 6000", "children": [
+        {"kind": "all_of", "label": "1 学分准备课程与一项工作经历", "children": [
+          {"kind": "course", "label": "Career Management for Engineers（1 学分）", "course_code": "ENCP 6000"},
+          {"kind": "any_of", "label": "工作经历四选一（目录列 0 学分经历）", "children": [
+            {"kind": "course", "label": "Work Experience", "course_code": "ENCP 6964"},
+            {"kind": "course", "label": "Half-Time", "course_code": "ENCP 6954"},
+            {"kind": "course", "label": "Abroad Half-Time", "course_code": "ENCP 6955"},
+            {"kind": "course", "label": "Abroad", "course_code": "ENCP 6965"}
+          ]}
+        ]}
+      ]},
+      {"kind": "unmodeled", "label": "完整 Engineering/大学政策、课程级别/跨组计入/审批、真实先修/共修更高门槛、个人 Co-op 资格与开课学期未核验。"}
+    ]}
+  }
+]

@@ -1,34 +1,20 @@
-"""Co-op experience schema (PLAN §1.4 / §6).
+"""Co-op experience domain model and distinct-contributor publication helpers.
 
-One row per UGC submission. PII redaction (PLAN §6.3) is the contributor's
-+ curator's responsibility BEFORE write — the schema doesn't redact, it just
-records the audit trail in `redaction_audit`.
-
-每条 UGC(用户生成内容)提交对应一行。PII 脱敏(PLAN §6.3)是贡献者 +
-审核员在写入之前的责任 —— 这个 schema 本身不做脱敏,只是在
-`redaction_audit` 里记录审计轨迹。
-
-Visibility tiers (PLAN §6.4):
-  0 — preview tier (公司 + 岗位 + 时长, fully public)
-  1 — detail tier (interview flow + technical questions; user needs ≥1 contribution)
-  2 — premium tier (NEU alumni placement; user needs ≥2 contributions + 1 invite)
-
-可见性分级(PLAN §6.4):
-  0 —— 预览层(公司 + 岗位 + 时长,完全公开)
-  1 —— 详情层(面试流程 + 技术问题;用户需要 ≥1 次贡献)
-  2 —— 高级层(NEU 校友去向;用户需要 ≥2 次贡献 + 1 次邀请)
-
-The row's `visibility_level` is the MINIMUM contribution count required to
-view this row. Frontend checks `users.contribution_count >= visibility_level`.
-
-这一行的 `visibility_level` 是查看该行所需的最低贡献次数。前端检查的是
-`users.contribution_count >= visibility_level`。
+Curated seeds are a separate provenance class. UGC is collected privately and
+reviewed before publication; visibility_level describes the content field tier,
+not a moderation decision. Two different authenticated accounts are necessary
+but not sufficient for privacy: free text still requires human redaction.
+中文：种子策展与 UGC 分开；私有收集后先审核，内容分层不能替代审核。
+不同登录账号是门槛，不保证自然人不同或自由文本已完全匿名。
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+import hashlib
+import json
+import unicodedata
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -101,7 +87,7 @@ class CoopExperience(BaseModel):
     # 中文:高级层(visibility_level >= 2)
     # 中文:区间桶,如 '$30-35/hr' —— 绝不存储精确数字
     salary_range_usd: str | None = Field(
-        default=None,
+        default=None, max_length=10_000,
         description="Bucket like '$30-35/hr' — never store exact figure",
     )
 
@@ -133,37 +119,42 @@ def is_uniquely_identifying(
     *,
     k: int = 2,
 ) -> bool:
-    """Check if (company, role, coop_term) triple in `coop` appears <k times
-    across `corpus`. PLAN §6.3 / v1.3 PII k-anonymity rule.
+    """Count distinct non-seed contributors in the FINAL reviewed corpus.
 
-    Use BEFORE inserting a new Co-op row: if returns True, the row is
-    uniquely identifying (only one person at NEU did this combo) and must
-    be further generalized (e.g. company → industry bucket) before publish.
-
-    中文(WHAT,做什么):检查 `coop` 里的 (company, role, coop_term) 三元组
-    在 `corpus` 中出现的次数是否 <k。这是 PLAN §6.3 / v1.3 的 PII
-    k-匿名(k-anonymity)规则。
-
-    中文(WHY/怎么用):必须在插入一条新 Co-op 记录之前调用。若返回
-    True,说明这一行具有唯一识别性(全 NEU 只有一个人做过这个
-    公司+岗位+学期的组合),发布前必须先做进一步泛化(例如把
-    company 换成更粗粒度的 industry 分桶)。
+    Include the target itself when evaluating publication. Unknown contributors
+    and curator seeds cannot establish anonymity; repeated rows from one user
+    count once. The caller is responsible for supplying only reviewed records.
+    中文：传入含目标的最终已审核集合；按不同贡献者计数，种子/空身份不计数。
     """
-    key = (coop.company, coop.role, coop.coop_term)
-    matching = sum(
-        1 for c in corpus
-        if (c.company, c.role, c.coop_term) == key
-    )
-    # k-anonymity check: True (unsafe to publish) iff fewer than k rows in
-    # the corpus share this exact triple, INCLUDING `coop` itself if it's
-    # already part of `corpus` — a brand-new row being checked pre-insert
-    # only "matches" prior rows, so callers should pass the corpus BEFORE
-    # this row is added.
-    # 中文:k-匿名检查 —— 语料库中与该三元组完全相同的行数少于 k 时返回
-    # True(不宜发布),这里的计数包含 `coop` 自身(如果它已经在 `corpus`
-    # 里的话);对于插入前的新行检查,它只会匹配到之前已存在的行,所以
-    # 调用方应当传入"加入这一行之前"的语料库。
-    return matching < k
+    if k < 1:
+        raise ValueError("k must be positive")
+    key = coop_group_key(coop.company, coop.role, coop.coop_term)
+    contributors = {
+        c.contributor_user_id for c in corpus
+        if c.contributor_user_id and not c.is_seed_data
+        and coop_group_key(c.company, c.role, c.coop_term) == key
+    }
+    return len(contributors) < k
 
 
-__all__ = ["CoopExperience", "Industry", "is_uniquely_identifying"]
+def coop_group_key(company: str, role: str, coop_term: str | None) -> str:
+    """Stable logical-experience key; case/spacing/Unicode variants are not new credit.
+
+    中文：同公司、岗位、学期的逻辑经历使用稳定键，大小写/空格变体不另记功。
+    """
+    parts = [
+        " ".join(unicodedata.normalize("NFKC", value or "").casefold().split())
+        for value in (company, role, coop_term)
+    ]
+    return hashlib.sha256(json.dumps(parts, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def derive_visibility(*, interview_summary: str | None, technical_questions: str | None,
+                      salary_range_usd: str | None) -> int:
+    """Content-derived field tier, shared by submission and curator review."""
+    if salary_range_usd:
+        return 2
+    return int(bool(interview_summary or technical_questions))
+
+
+__all__ = ["CoopExperience", "Industry", "coop_group_key", "derive_visibility", "is_uniquely_identifying"]

@@ -41,7 +41,8 @@ def test_all_expected_tables_exist(db: sqlite3.Connection) -> None:
     ).fetchall()
     names = {r["name"] for r in rows}
     expected = {"courses", "course_aliases", "users", "user_unlocks",
-                "coop_experiences", "user_courses", "schema_versions"}
+                "coop_experiences", "coop_submissions", "coop_contribution_credits",
+                "user_courses", "schema_versions", "course_catalog_sources", "program_plans", "course_requisite_documents"}
     assert expected.issubset(names), f"Missing: {expected - names}"
 
 
@@ -54,6 +55,11 @@ def test_schema_version_seeded(db: sqlite3.Connection) -> None:
     versions = {r["version"] for r in db.execute("SELECT version FROM schema_versions")}
     assert "1.0" in versions
     assert "1.1" in versions  # PLAN v2.2 §3.6 — user_courses added
+    assert "1.3" in versions  # private Co-op moderation and credit ledger
+    assert "1.4" in versions  # separate answer provenance
+    assert "1.5" in versions  # scoped rule documents, not upgraded legacy seeds
+    assert "1.6" in versions  # course/year clauses, not eligibility rules
+    assert '1.7' in versions  # completed chat answers and scoped latest feedback
 
 
 def test_idempotent_re_run(db: sqlite3.Connection) -> None:

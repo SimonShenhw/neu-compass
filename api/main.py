@@ -38,9 +38,10 @@ from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 
+from api.admission import AdmissionGuard, AdmissionMiddleware, AdmissionPolicy
 from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
-from api.routes import auth, chat, coop, course, health, program, resolve, search
+from api.routes import auth, chat, coop, course, feedback, health, program, resolve, search
 from config import settings
 from db.connection import connect
 from rag.embedder import BGEM3Embedder
@@ -346,7 +347,7 @@ def _build_openvino_stack(log: Any) -> tuple[Any, Any]:
     return embedder, reranker
 
 
-def create_app(*, run_startup: bool = True) -> FastAPI:
+def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | None = None) -> FastAPI:
     """Build the FastAPI app. `run_startup=False` skips lifespan for tests
     that populate app.state with fakes.
     构建 FastAPI 应用。`run_startup=False` 会跳过 lifespan，供那些手动往
@@ -358,6 +359,17 @@ def create_app(*, run_startup: bool = True) -> FastAPI:
         lifespan=lifespan if run_startup else None,
     )
 
+    if admission_guard is None and settings.request_guard_enabled:
+        admission_guard = AdmissionGuard(AdmissionPolicy(
+            capacity=settings.request_guard_capacity,
+            refill_per_second=settings.request_guard_refill_per_second,
+            max_inflight=settings.request_guard_max_inflight,
+        ))
+    app.state.admission_guard = admission_guard
+    if admission_guard is not None:
+        app.add_middleware(AdmissionMiddleware, guard=admission_guard)
+    # Access logging is outermost so denied requests also get x-request-id.
+    # 中文：日志包住门禁，拒绝响应也有既有 request-id；不新增 query_log。
     app.add_middleware(RequestLogMiddleware)
     register_exception_handlers(app)
 
@@ -366,6 +378,7 @@ def create_app(*, run_startup: bool = True) -> FastAPI:
     app.include_router(course.router)
     app.include_router(coop.router)
     app.include_router(chat.router)
+    app.include_router(feedback.router)
     app.include_router(auth.router)
     app.include_router(program.router)
     app.include_router(resolve.router)

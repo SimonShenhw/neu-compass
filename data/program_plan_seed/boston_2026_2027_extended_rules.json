@@ -1,0 +1,212 @@
+[
+  {
+    "plan_id": "cs-ms-boston-2026-2027-standard",
+    "program_id": "cs-ms", "campus": "boston", "catalog_year": "2026-2027", "pathway": "standard",
+    "coverage": "partial", "review_status": "source_checked",
+    "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science/computer-science-mscs/",
+    "source_title": "Computer Science, MSCS (Boston), 2026-2027 Edition", "source_catalog_year": "2026-2027",
+    "source_excerpt": "CS 5010\nand CS 5011\n…\nCS 5800",
+    "source_html_sha256": "9209d0dc6e988d49830af136defb933c32f5d507ed843dff99a4ba97cc5f76b3",
+    "captured_on": "2026-10-01",
+    "notes": "普通 MSCS 的 core、广度与选修目录规则；不是 Align、个人 Plan of Study 或学期安排。编号范围不是实际课程/开课清单；完整院校政策及选修重复计入仍待核验。",
+    "requirements": {
+      "kind": "all_of", "label": "普通 MSCS 目录规则（仍非完整资格判定）", "children": [
+        {"kind": "all_of", "label": "Core：8 学分；配套组合不是先修顺序", "children": [
+          {"kind": "course", "label": "Programming 主课", "course_code": "CS 5010"},
+          {"kind": "course", "label": "配套 recitation", "course_code": "CS 5011"},
+          {"kind": "course", "label": "Algorithms", "course_code": "CS 5800"}
+        ]},
+        {"kind": "select", "label": "广度：3 门、12 学分，至少覆盖 2 个领域；5500/5600 是候选，不是共同 core",
+          "min_courses": 3, "min_credits": 12, "min_areas": 2,
+          "course_codes": ["CS 5100", "CS 5150", "CS 5200", "CS 5330", "CS 6120", "CS 6140", "CS 6200", "CS 6220", "CS 6240", "CS 7140", "CS 5400", "CS 5500", "CS 5520", "CS 5600", "CS 5610", "CS 5700", "CS 5850", "CS 6410", "CS 6510", "CS 6620", "CS 6650", "CS 6760", "CS 7805", "CY 5770", "CY 6740"],
+          "areas": {
+            "Artificial Intelligence and Data Science": ["CS 5100", "CS 5150", "CS 5200", "CS 5330", "CS 6120", "CS 6140", "CS 6200", "CS 6220", "CS 6240", "CS 7140"],
+            "Systems and Software": ["CS 5400", "CS 5500", "CS 5520", "CS 5600", "CS 5610", "CS 5700", "CS 5850", "CS 6410", "CS 6510", "CS 6620", "CS 6650"],
+            "Theory and Security": ["CS 6760", "CS 7805", "CY 5770", "CY 6740"]
+          }
+        },
+        {"kind": "select", "label": "另完成 12 学分选修；重叠候选不代表可与广度双重计入", "min_credits": 12,
+          "course_ranges": [{"start": "CS 5100", "end": "CS 7980"}],
+          "course_codes": ["CS 5097", "CS 7990", "CS 8674", "CS 8982", "CY 5001", "CY 5010", "CY 5130", "CY 5210", "CY 6120", "DADS 7305", "DS 5110", "DS 5230"]
+        },
+        {"kind": "condition", "label": "目录总要求：32 semester hours，最低 GPA 3.000；系统未计算重复计入、免修或个人成绩。"},
+        {"kind": "optional", "label": "Thesis 委员会规则", "activate_when": "选择 thesis 时；不是人人必做 thesis", "children": [
+          {"kind": "condition", "label": "委员会至少 3 人含导师；至少 2 人来自或关联 Khoury；至少 1 人与论文工作保持独立且不是共同导师。外部成员可有但非必需，额外 reader 不替代最低要求。"}
+        ]},
+        {"kind": "optional", "label": "Engineering Leadership 联读选项", "activate_when": "同时就读 Graduate Certificate in Engineering Leadership 时", "children": [
+          {"kind": "condition", "label": "目录允许 8 学分证书课程用于本项目选修要求；不表示自动录取、审批或额外学分均可计入。"}
+        ]},
+        {"kind": "unmodeled", "label": "完整学院/学校政策、选修重用与批准、具体课程先修/共修、实际开课学期、个人转学分和免修未完成核验。"}
+      ]
+    }
+  },
+  {
+    "plan_id": "ds-ms-boston-2026-2027-standard-computer-science",
+    "program_id": "ds-ms", "campus": "boston", "catalog_year": "2026-2027", "pathway": "standard", "concentration": "computer-science",
+    "coverage": "partial", "review_status": "source_checked", "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/university-interdisciplinary-programs/science-data-ms-bos/",
+    "source_title": "Data Science, MS (Boston), 2026-2027 Edition", "source_catalog_year": "2026-2027",
+    "source_excerpt": "DS 5110\n…\nCS 5800\n…\nor EECE 7205\n…\nCS 6140\n…\nor EECE 5644\n…\nDS 5500",
+    "source_html_sha256": "0b03d0f4eebb05e16a97d6d5efda520e363314b86e6657c44121184545c080dc", "captured_on": "2026-10-01",
+    "notes": "普通 MSDS 的 Computer Science concentration，归属 Khoury；不混入 CAMD/Engineering 的选修要求，不是 Align。该页列出的 thesis/project 是选修候选，不是共同必修。",
+    "requirements": {"kind": "all_of", "label": "MSDS — Computer Science 目录规则", "children": [
+      {"kind": "all_of", "label": "共享 core：16 学分；两处 OR 保留", "children": [
+        {"kind": "course", "label": "Programming with Data", "course_code": "DS 5110"},
+        {"kind": "any_of", "label": "Algorithms 二选一", "children": [
+          {"kind": "course", "label": "Algorithms", "course_code": "CS 5800"},
+          {"kind": "course", "label": "Fundamentals of Computer Engineering", "course_code": "EECE 7205"}
+        ]},
+        {"kind": "any_of", "label": "Machine Learning 二选一", "children": [
+          {"kind": "course", "label": "Machine Learning", "course_code": "CS 6140"},
+          {"kind": "course", "label": "Machine Learning and Pattern Recognition", "course_code": "EECE 5644"}
+        ]},
+        {"kind": "course", "label": "Interdisciplinary Capstone", "course_code": "DS 5500"}
+      ]},
+      {"kind": "select", "label": "Computer Science concentration：从以下候选完成 16 学分", "min_credits": 16,
+        "course_codes": ["CS 5100", "CS 5180", "CS 5200", "CS 5330", "CS 5340", "CS 5610", "CS 6120", "CS 6200", "CS 6220", "CS 6240", "CS 6350", "CS 6620", "CS 6650", "CS 7140", "CS 7150", "CS 7180", "CS 7200", "CS 7250", "CS 7280", "CS 7290", "CS 7990", "CS 8674", "DS 7995"]
+      },
+      {"kind": "condition", "label": "共享 core 累计 GPA 至少 3.000；项目总要求 32 学分、最低 GPA 3.000，遵守所属 Khoury 学院政策。"},
+      {"kind": "condition", "label": "目录脚注：选择不足 4 学分的选修时，应同学期搭配 DS 7995 并与教师设计配套项目取得附加学分；不是所有选修都强制增加 project。具体计入与资格未自动判定。"},
+      {"kind": "optional", "label": "Khoury Co-op", "activate_when": "自愿选择 Co-op 且符合学院资格时", "children": [
+        {"kind": "any_of", "label": "四种 Co-op 形式任选其一（目录列 0 学分工作经历）", "children": [
+          {"kind": "course", "label": "Work Experience", "course_code": "CS 6964"},
+          {"kind": "course", "label": "Half-Time", "course_code": "CS 6954"},
+          {"kind": "course", "label": "Abroad Half-Time", "course_code": "CS 6955"},
+          {"kind": "course", "label": "Abroad", "course_code": "CS 6965"}
+        ]}
+      ]},
+      {"kind": "unmodeled", "label": "完整 Khoury/大学政策、选修与项目学分计入/审批、Co-op 个人资格、真实先修/共修和开课学期仍未核验。"}
+    ]}
+  },
+  {
+    "plan_id": "ds-ms-boston-2026-2027-standard-data-design-visualization",
+    "program_id": "ds-ms", "campus": "boston", "catalog_year": "2026-2027", "pathway": "standard", "concentration": "data-design-visualization",
+    "coverage": "partial", "review_status": "source_checked", "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/university-interdisciplinary-programs/science-data-ms-bos/",
+    "source_title": "Data Science, MS (Boston), 2026-2027 Edition", "source_catalog_year": "2026-2027",
+    "source_excerpt": "DS 5110\n…\nCS 5800\n…\nor EECE 7205\n…\nCS 6140\n…\nor EECE 5644\n…\nDS 5500",
+    "source_html_sha256": "0b03d0f4eebb05e16a97d6d5efda520e363314b86e6657c44121184545c080dc", "captured_on": "2026-10-01",
+    "notes": "普通 MSDS 的 Data Design and Visualization concentration，归属 CAMD。两个 8 学分选修组分别保留，不合并为随意凑 16 学分；不表示当前全部课程开课。",
+    "requirements": {"kind": "all_of", "label": "MSDS — Data Design and Visualization 目录规则", "children": [
+      {"kind": "all_of", "label": "共享 core：16 学分", "children": [
+        {"kind": "course", "label": "Programming with Data", "course_code": "DS 5110"},
+        {"kind": "any_of", "label": "Algorithms 二选一", "children": [
+          {"kind": "course", "label": "Algorithms", "course_code": "CS 5800"},
+          {"kind": "course", "label": "Computer Engineering", "course_code": "EECE 7205"}
+        ]},
+        {"kind": "any_of", "label": "Machine Learning 二选一", "children": [
+          {"kind": "course", "label": "Machine Learning", "course_code": "CS 6140"},
+          {"kind": "course", "label": "Pattern Recognition", "course_code": "EECE 5644"}
+        ]},
+        {"kind": "course", "label": "Capstone", "course_code": "DS 5500"}
+      ]},
+      {"kind": "select", "label": "第一个选修组：8 学分", "min_credits": 8, "course_codes": ["ARTG 5150", "ARTG 5151", "ARTG 5330"]},
+      {"kind": "select", "label": "第二个选修组：另 8 学分", "min_credits": 8,
+        "course_codes": ["ARTG 5110", "ARTG 5130", "ARTG 5310", "ARTG 5430", "ARTG 6110", "ARTG 6330", "CS 5340", "CS 5610", "CS 7250", "EECE 5642", "GSND 6340", "GSND 6350", "IE 6600"]
+      },
+      {"kind": "condition", "label": "共享 core 累计 GPA 至少 3.000；总要求 32 学分、最低 GPA 3.000；遵守所属 CAMD 学院政策。"},
+      {"kind": "condition", "label": "目录脚注提及不足 4 学分选修应同学期搭配 DS 7995、与教师设计配套项目取得附加学分；具体对本组选课的适用与计入仍需学院核实。"},
+      {"kind": "optional", "label": "CAMD Co-op", "activate_when": "选择 Co-op 且符合所属学院资格时", "children": [
+        {"kind": "any_of", "label": "Co-op 形式任选其一；不是所有工作经历均须完成", "children": [
+          {"kind": "course", "label": "Work Experience（目录列 0 学分）", "course_code": "EEAM 6964"},
+          {"kind": "course", "label": "Half-Time", "course_code": "EEAM 6954"},
+          {"kind": "course", "label": "Abroad Half-Time", "course_code": "EEAM 6955"},
+          {"kind": "course", "label": "Abroad", "course_code": "EEAM 6965"}
+        ]}
+      ]},
+      {"kind": "unmodeled", "label": "完整 CAMD/大学政策、附加项目与选修学分计入、Co-op 资格、具体先修/共修、个人适用性与开课学期未核验。"}
+    ]}
+  },
+  {
+    "plan_id": "ds-ms-boston-2026-2027-standard-engineering-theory-modeling",
+    "program_id": "ds-ms", "campus": "boston", "catalog_year": "2026-2027", "pathway": "standard", "concentration": "engineering-theory-modeling",
+    "coverage": "partial", "review_status": "source_checked", "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/university-interdisciplinary-programs/science-data-ms-bos/",
+    "source_title": "Data Science, MS (Boston), 2026-2027 Edition", "source_catalog_year": "2026-2027",
+    "source_excerpt": "DS 5110\n…\nCS 5800\n…\nor EECE 7205\n…\nCS 6140\n…\nor EECE 5644\n…\nDS 5500",
+    "source_html_sha256": "0b03d0f4eebb05e16a97d6d5efda520e363314b86e6657c44121184545c080dc", "captured_on": "2026-10-01",
+    "notes": "普通 MSDS 的 Engineering Theory and Modeling concentration，归属 College of Engineering；基础组 4 学分与后续组 12 学分分别保留，跨组重叠代码不是重复计入许可。",
+    "requirements": {"kind": "all_of", "label": "MSDS — Engineering Theory and Modeling 目录规则", "children": [
+      {"kind": "all_of", "label": "共享 core：16 学分", "children": [
+        {"kind": "course", "label": "Programming with Data", "course_code": "DS 5110"},
+        {"kind": "any_of", "label": "Algorithms 二选一", "children": [
+          {"kind": "course", "label": "Algorithms", "course_code": "CS 5800"},
+          {"kind": "course", "label": "Computer Engineering", "course_code": "EECE 7205"}
+        ]},
+        {"kind": "any_of", "label": "Machine Learning 二选一", "children": [
+          {"kind": "course", "label": "Machine Learning", "course_code": "CS 6140"},
+          {"kind": "course", "label": "Pattern Recognition", "course_code": "EECE 5644"}
+        ]},
+        {"kind": "course", "label": "Capstone", "course_code": "DS 5500"}
+      ]},
+      {"kind": "select", "label": "Foundational：4 学分", "min_credits": 4,
+        "course_codes": ["DS 7995", "EECE 5360", "EECE 5612", "EECE 7204", "EECE 7323", "EECE 7337", "EECE 7346", "IE 6400", "IE 7275", "IE 7280"]
+      },
+      {"kind": "select", "label": "Translational and Advanced：剩余 12 学分", "min_credits": 12,
+        "course_codes": ["BIOE 5750", "BIOE 5880", "BIOE 6200", "CHME 5137", "CHME 5649", "CIVE 7100", "CIVE 7150", "EECE 5360", "EECE 5612", "EECE 5614", "EECE 5626", "EECE 5639", "EECE 5640", "EECE 5642", "EECE 5645", "EECE 5668", "EECE 7204", "EECE 7215", "EECE 7223", "EECE 7323", "EECE 7337", "EECE 7345", "EECE 7346", "EECE 7370", "EECE 7397", "EECE 7945", "IE 5137", "IE 5390", "IE 5630", "IE 5640", "IE 6400", "IE 6600", "IE 6700", "IE 6750", "IE 7270", "IE 7275", "IE 7280", "IE 7295", "IE 7300", "IE 7500", "IE 7615"]
+      },
+      {"kind": "condition", "label": "共享 core 累计 GPA 至少 3.000；总要求 32 学分、最低 GPA 3.000；Co-op 可有额外学分，遵守所属 Engineering 学院政策。"},
+      {"kind": "condition", "label": "目录脚注：不足 4 学分选修应同学期搭配 DS 7995，与教师设计符合选修及 core 目标的配套项目取得附加学分；不自动计算重用或所有项目学分。"},
+      {"kind": "optional", "label": "Engineering Co-op", "activate_when": "选择 Co-op 时；目录要求先完成 ENCP 6100，个人资格仍需核实", "children": [
+        {"kind": "all_of", "label": "准备课程与工作经历；不是共同必修", "children": [
+          {"kind": "course", "label": "Co-op 准备（1 学分，可能超出基础 32 学分）", "course_code": "ENCP 6100"},
+          {"kind": "any_of", "label": "工作经历四选一", "children": [
+            {"kind": "course", "label": "Work Experience（目录列 0 学分）", "course_code": "ENCP 6964"},
+            {"kind": "course", "label": "Half-Time", "course_code": "ENCP 6954"},
+            {"kind": "course", "label": "Abroad Half-Time", "course_code": "ENCP 6955"},
+            {"kind": "course", "label": "Abroad", "course_code": "ENCP 6965"}
+          ]}
+        ]}
+      ]},
+      {"kind": "unmodeled", "label": "完整 Engineering/大学政策、选修组重用与项目学分审批、Co-op 全部资格、真实先修/共修、开课学期和个人适用性未核验。"}
+    ]}
+  },
+  {
+    "plan_id": "info-ms-boston-2026-2027-standard-general",
+    "program_id": "info-ms", "campus": "boston", "catalog_year": "2026-2027", "pathway": "standard", "concentration": "general",
+    "coverage": "partial", "review_status": "source_checked", "checked_by": "codex-source-crosscheck", "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/engineering/multidisciplinary/information-systems-msis/",
+    "source_title": "Information Systems, MSIS (Boston), 2026-2027 Edition", "source_catalog_year": "2026-2027",
+    "source_excerpt": "INFO 5100\n…\nINFO 5101",
+    "source_html_sha256": "3e57ff50dcb8bdd5674f1df509aa5bb0cf964ef1fb953723799b862930c01f01", "captured_on": "2026-10-01",
+    "notes": "通用普通 MSIS（本地 general 标识，不是官方 concentration 名称）。不覆盖 Bridge、Medical concentration 替代或 Engineering Leadership 联读；三种毕业出口是任选其一，不是共同必修。",
+    "requirements": {"kind": "all_of", "label": "通用 MSIS 目录规则", "children": [
+      {"kind": "all_of", "label": "Core：主课 4 学分与 0 学分配套 lab", "children": [
+        {"kind": "course", "label": "Application Engineering", "course_code": "INFO 5100"},
+        {"kind": "course", "label": "配套 lab，0 学分不等于可省略", "course_code": "INFO 5101"}
+      ]},
+      {"kind": "any_of", "label": "毕业出口：Coursework / Project / Thesis 三选一", "children": [
+        {"kind": "all_of", "label": "Coursework Option", "children": [
+          {"kind": "select", "label": "Restricted electives：16 学分", "min_credits": 16, "subject_codes": ["INFO"], "excluded_course_codes": ["INFO 5200"]},
+          {"kind": "select", "label": "Other electives：12 学分", "min_credits": 12, "subject_codes": ["CSYE", "DAMG", "INFO", "TELE"], "course_codes": ["MUST 5510", "MUST 5520", "MUST 6603"], "excluded_course_codes": ["CSYE 6220", "INFO 5200"]}
+        ]},
+        {"kind": "all_of", "label": "Project Option", "children": [
+          {"kind": "course", "label": "Master's Project：4 学分", "course_code": "INFO 7945"},
+          {"kind": "select", "label": "Restricted electives：12 学分", "min_credits": 12, "subject_codes": ["INFO"], "excluded_course_codes": ["INFO 5200"]},
+          {"kind": "select", "label": "Other electives：12 学分", "min_credits": 12, "subject_codes": ["CSYE", "DAMG", "INFO", "TELE"], "course_codes": ["MUST 5510", "MUST 5520", "MUST 6603"], "excluded_course_codes": ["CSYE 6220", "INFO 5200"]}
+        ]},
+        {"kind": "all_of", "label": "Thesis Option", "children": [
+          {"kind": "course", "label": "Master's Project：4 学分", "course_code": "INFO 7945"},
+          {"kind": "course", "label": "Thesis：4 学分", "course_code": "INFO 7990"},
+          {"kind": "select", "label": "Restricted electives：8 学分", "min_credits": 8, "subject_codes": ["INFO"], "excluded_course_codes": ["INFO 5200"]},
+          {"kind": "select", "label": "Other electives：12 学分", "min_credits": 12, "subject_codes": ["CSYE", "DAMG", "INFO", "TELE"], "course_codes": ["MUST 5510", "MUST 5520", "MUST 6603"], "excluded_course_codes": ["CSYE 6220", "INFO 5200"]},
+          {"kind": "condition", "label": "还需完成 thesis 提交流程，包括委员会与 Graduate School of Engineering 签字，并向 ProQuest 提交电子版；修完 thesis 课程不等于流程完成。"}
+        ]}
+      ]},
+      {"kind": "condition", "label": "required core 每门须 C 或以上；基础总要求 32 学分，最低 GPA 3.000。选修重叠不意味着一门课可在不同组双重计入。"},
+      {"kind": "optional", "label": "Co-op", "activate_when": "选择 Co-op 时（总要求 33 学分）；必须完成 ENCP 6000，个人资格另核实", "children": [
+        {"kind": "all_of", "label": "准备课程与一项工作经历", "children": [
+          {"kind": "course", "label": "Career Management for Engineers：1 学分", "course_code": "ENCP 6000"},
+          {"kind": "any_of", "label": "工作经历四选一", "children": [
+            {"kind": "course", "label": "Work Experience（目录列 0 学分）", "course_code": "ENCP 6964"},
+            {"kind": "course", "label": "Half-Time", "course_code": "ENCP 6954"},
+            {"kind": "course", "label": "Abroad Half-Time", "course_code": "ENCP 6955"},
+            {"kind": "course", "label": "Abroad", "course_code": "ENCP 6965"}
+          ]}
+        ]}
+      ]},
+      {"kind": "unmodeled", "label": "Medical concentration 的 core 替代、Engineering Leadership 联读、Bridge 不在本 scope；完整院校政策、课程级别/重用/审批、先修/共修和个人适用性未核验。"}
+    ]}
+  }
+]

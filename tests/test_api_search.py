@@ -194,13 +194,11 @@ def test_search_rejection_reason_omitted_on_alias_path(api_client: TestClient) -
 # === 2026-06 review sweep: alias tier vs explicit filters ===
 
 
-def test_search_filters_bypass_alias_tier(api_client) -> None:
-    """An alias-shaped query WITH explicit filters must not short-circuit
-    to the (filter-blind) alias tier — the hybrid path enforces filters at
-    the SQLite layer. Previously 'CS 5800' + delivery_mode=online returned
-    the in-person course unconditionally."""
+def test_search_alias_tier_applies_explicit_filters(api_client) -> None:
+    """A matching exact reference stays cheap without bypassing its filters."""
     r = api_client.post(
         "/search", json={"query": "CS 5800", "k": 3, "credits": 4},
     )
     assert r.status_code == 200
-    assert r.json()["matched_via"] != "alias"
+    assert r.json()["matched_via"] == "alias"
+    assert [hit["course_id"] for hit in r.json()["results"]] == ["c-cs-5800"]

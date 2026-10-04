@@ -16,10 +16,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from schemas.coop import Industry
 from schemas.course import Course
+from schemas.answer_evidence import CourseAnswerEvidence
+from schemas.course_requisite_document import CourseRequisiteListing
 
 
 # === /search ===
@@ -106,6 +108,8 @@ class CourseDetailOut(Course):
 
     program_context: list[CourseProgramEdgeOut] = Field(default_factory=list)
     prerequisites: list[CoursePrereqOut] = Field(default_factory=list)
+    answer_evidence: CourseAnswerEvidence = Field(default_factory=CourseAnswerEvidence)
+    course_requisites: CourseRequisiteListing = Field(default_factory=CourseRequisiteListing)
 
 
 # === /resolve/course ===
@@ -180,6 +184,11 @@ class ChatRequest(BaseModel):
     professor: str | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=12)
     context_course_ids: list[str] = Field(default_factory=list, max_length=10)
+    program_id: str | None = Field(default=None, min_length=1, max_length=64)
+
+    # Only a JSON boolean; omitted/false preserves legacy no-answer-storage.
+    # 中文：技术保存许可，不是身份／法律同意凭证；不得将字符串转成 true。
+    allow_feedback_capture: bool = Field(default=False, strict=True)
 
 
 # === /coop ===
@@ -202,7 +211,17 @@ class CoopUploadRequest(BaseModel):
     related_courses: list[str] = Field(default_factory=list)
     interview_summary: str | None = Field(default=None, max_length=10_000)
     technical_questions: str | None = Field(default=None, max_length=10_000)
-    salary_range_usd: str | None = None
+    salary_range_usd: str | None = Field(default=None, max_length=10_000)
+
+    @field_validator("company", "role", mode="before")
+    @classmethod
+    def strip_required_fields(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("coop_term", "interview_summary", "technical_questions", "salary_range_usd", mode="before")
+    @classmethod
+    def strip_optional_fields(cls, value):
+        return (value.strip() or None) if isinstance(value, str) else value
 
 
 class CoopUploadResponse(BaseModel):
@@ -211,6 +230,10 @@ class CoopUploadResponse(BaseModel):
     coop_id: str
     accepted: bool
     visibility_level: int
+    status: Literal["pending", "approved", "rejected", "published"]
+    duplicate: bool
+    contribution_credited: bool
+    contribution_count: int
 
 
 class CoopOut(BaseModel):

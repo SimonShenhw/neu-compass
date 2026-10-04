@@ -21,12 +21,24 @@ Usage from a Streamlit page:
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
 from config import settings
+
+
+def _retry_seconds(value):
+    """Bounded delta-seconds hint only; dates/invalid headers remain unknown.
+    中文：提示而非倒计时或重试指令；不自动 sleep、补发或接受任意数值。
+    """
+    if isinstance(value, str) and re.fullmatch(r'[0-9]{1,4}', value.strip()):
+        seconds = int(value.strip())
+        return seconds if seconds <= 3600 else None
+    return None
 
 
 class ApiError(RuntimeError):
@@ -36,10 +48,24 @@ class ApiError(RuntimeError):
     API 返回的非 2xx 响应。暴露 .status_code + .detail，供 UI 渲染出
     有意义的提示信息。"""
 
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(f"API {status_code}: {detail}")
+    def __init__(self, status_code: int, detail: str, *, error_type: str | None = None,
+                 retry_after_seconds: int | None = None) -> None:
         self.status_code = status_code
+        self.error_type = (error_type if isinstance(error_type, str)
+                           and re.fullmatch(r'[a-z_]{1,64}', error_type) else None)
+        self.retry_after_seconds = (retry_after_seconds if type(retry_after_seconds) is int
+                                    and 0 <= retry_after_seconds <= 3600 else None)
+        later = (f'{self.retry_after_seconds} 秒后' if self.retry_after_seconds else '稍后')
+        # Transient failures never reflect proxy HTML / exception / request data.
+        # 中文：状态明确的暂时故障不展示服务端原文，不自动重发写请求。
+        if status_code == 429:
+            detail = f'请求过于频繁，请{later}手动重试。'
+        elif status_code == 503:
+            detail = f'服务正忙，请{later}手动重试。' if self.error_type == 'service_busy' else f'服务暂不可用，请{later}手动重试。'
+        elif status_code in {408, 504}:
+            detail = '请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。'
         self.detail = detail
+        super().__init__(f"API {status_code}: {detail}")
 
 
 class ApiClient:
@@ -66,6 +92,7 @@ class ApiClient:
             headers=headers,
             timeout=timeout,
             transport=transport,
+            follow_redirects=False,
         )
 
     # === Context manager so callers can `with ApiClient() as api:` ===
@@ -138,6 +165,10 @@ class ApiClient:
     def list_programs(self) -> list[dict[str, Any]]:
         return self._get("/programs")
 
+    def get_program_policies(self, program_id: str, plan_id: str) -> dict[str, Any]:
+        """Fetch the explicitly selected plan only; callers must not cache evidence."""
+        return self._get(f"/programs/{quote(program_id, safe='')}/plans/{quote(plan_id, safe='')}/policies")
+
     def get_program_curriculum(self, program_id: str) -> dict[str, Any]:
         return self._get(f"/programs/{program_id}")
 
@@ -146,6 +177,9 @@ class ApiClient:
 
     def upload_coop(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/coop", payload)
+
+    def submit_answer_feedback(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post('/feedback', payload)
 
     def auth_me(self) -> dict[str, Any]:
         """Identity behind the current session token (GET /auth/me).
@@ -198,6 +232,7 @@ class ApiClient:
         流式过程中途的错误表现为流内的 `error` 事件，而不是异常 ——
         这样调用方依然能拿到已产出的部分内容。
         """
+        completed = False
         try:
             with self._client.stream("POST", "/chat", json=body) as resp:
                 if resp.status_code >= 400:
@@ -210,11 +245,17 @@ class ApiClient:
                     if not line:
                         continue
                     try:
-                        yield json.loads(line)
+                        event = json.loads(line)
                     except json.JSONDecodeError:
                         # Malformed line — skip rather than break the stream.
                         # 中文:格式错误的行 —— 跳过而不是打断整个流。
                         continue
+                    if not isinstance(event, dict):
+                        continue
+                    yield event
+                    if event.get('type') in ('done', 'error'):
+                        completed = True
+                        return
         except httpx.HTTPError as e:
             # Mid-stream transport failure (read timeout between chunks,
             # API container restart). Degrade to an in-stream error event —
@@ -226,8 +267,13 @@ class ApiClient:
             # 异常直接搞崩溃。
             yield {
                 "type": "error",
-                "detail": f"Connection to API lost mid-stream: {type(e).__name__}",
+                "detail": "Connection to API lost. 仅保留部分回答，未完整结束；请稍后手动重试。",
+                "error_type": 'transport_timeout' if isinstance(e, httpx.TimeoutException) else 'transport_error',
             }
+            return
+        if not completed:
+            yield {'type': 'error', 'error_type': 'incomplete_stream',
+                   'detail': '回答流未完整结束；仅保留部分内容，请稍后手动重试。'}
 
     # === Internal ===
     # 中文:内部实现
@@ -235,9 +281,9 @@ class ApiClient:
     def _get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         try:
             return self._unwrap(self._client.get(path, params=params))
-        except httpx.TimeoutException as e:
-            raise ApiError(504, f"API timed out: {type(e).__name__}") from e
-        except httpx.HTTPError as e:
+        except httpx.TimeoutException:
+            raise ApiError(504, 'timeout', error_type='transport_timeout') from None
+        except httpx.HTTPError:
             # ConnectError (API container down/restarting), ReadError /
             # RemoteProtocolError (died mid-response), ... — without this
             # wrap they propagate raw and crash the whole Streamlit page,
@@ -246,24 +292,28 @@ class ApiClient:
             # RemoteProtocolError（响应途中断掉）等等 —— 没有这层包装，
             # 它们会原样传播，把整个 Streamlit 页面搞崩溃，因为每个 UI
             # 调用点都只捕获 ApiError。
-            raise ApiError(503, f"API unreachable: {type(e).__name__}") from e
+            raise ApiError(503, 'unreachable', error_type='transport_error') from None
 
     def _post(self, path: str, body: dict[str, Any]) -> Any:
         try:
             return self._unwrap(self._client.post(path, json=body))
-        except httpx.TimeoutException as e:
-            raise ApiError(504, f"API timed out: {type(e).__name__}") from e
-        except httpx.HTTPError as e:
-            raise ApiError(503, f"API unreachable: {type(e).__name__}") from e
+        except httpx.TimeoutException:
+            raise ApiError(504, 'timeout', error_type='transport_timeout') from None
+        except httpx.HTTPError:
+            raise ApiError(503, 'unreachable', error_type='transport_error') from None
 
     @staticmethod
     def _unwrap(r: httpx.Response) -> Any:
         if r.status_code >= 400:
+            error_type = None
             try:
-                detail = r.json().get("detail", r.text)
+                body = r.json()
+                detail = body.get('detail', r.text)
+                error_type = body.get('error_type')
             except Exception:
                 detail = r.text
-            raise ApiError(r.status_code, str(detail))
+            raise ApiError(r.status_code, str(detail), error_type=error_type,
+                           retry_after_seconds=_retry_seconds(r.headers.get('retry-after')))
         if r.status_code == 204:
             return None
         return r.json()
