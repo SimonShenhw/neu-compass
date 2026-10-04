@@ -76,7 +76,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 # 注意: 'eval/' 不进 wheel,避免 shadow Python 内建 eval()。
 # 该目录里的脚本走 `python eval/run_eval.py` 直接执行,不做 module import。
-packages = ["config", "schemas", "scrapers", "llm", "rag", "api", "app"]
+packages = ["config", "db", "schemas", "scrapers", "llm", "rag", "api", "app"]
 
 # === Ruff ===
 [tool.ruff]

@@ -19,21 +19,11 @@ Tier model (PLAN §6.4 give-to-get gate, ADR §3.4):
   level 2：+ 薪资区间
            （需要 user.contribution_count >= 2）
 
-The API does the actual filtering — it returns only rows whose
-visibility_level is ≤ user.contribution_count. We render whatever it gives
-us. For locked tiers, we show a placeholder "🔒 Contribute to unlock".
-
-真正的过滤在 API 那一层完成 —— 它只返回 visibility_level ≤
-user.contribution_count 的行，我们拿到什么就渲染什么。对于被锁住的
-分级，我们展示占位提示 "🔒 Contribute to unlock"。
-
-Upload form is inline at the bottom; on submit it POSTs to /coop, which
-applies k-anonymity (k=2) before persisting. UI surfaces the 422 detail
-verbatim if the row would be uniquely identifying.
-
-上传表单内嵌在页面底部；提交时会 POST 到 /coop，该接口在持久化之前
-会应用 k-匿名（k=2）。如果这条记录会造成唯一可识别，UI 会原样展示
-422 的错误详情。
+The API lists curated seeds and reviewed UGC with a current two-contributor
+cohort, then redacts fields according to the caller's tier. Uploads are private
+and pending; submitting is not publishing and does not immediately earn credit.
+中文：API 只列策展种子和满足不同贡献者门槛的已审核经历，再做字段分层；
+上传先私有待审，不等于公开或立即获得贡献奖励。
 """
 
 from __future__ import annotations
@@ -46,6 +36,22 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
+def apply_upload_result(state, response: dict) -> None:
+    """Use the server's count/state; never infer credit from HTTP 201.
+
+    中文：贡献数与审核状态以服务端为准，不从提交成功自行推断加一。
+    """
+    state["user_contribution_count"] = response["contribution_count"]
+    messages = {
+        "pending": "已私有收集，等待人工脱敏审核；尚未公开，也未新增贡献奖励。",
+        "approved": "已审核，等待至少两个不同贡献者的同组经历齐备后公开。",
+        "published": "已审核并公开；贡献奖励以服务端计数为准。",
+        "rejected": "此提交已被审核拒绝；未公开，请联系审核员处理。",
+    }
+    prefix = "重复提交，保留原记录（内容未替换）。" if response["duplicate"] else ""
+    state["_coop_upload_success"] = f"{prefix} `{response['coop_id']}`：{messages[response['status']]}"
 
 
 def render() -> None:
@@ -91,12 +97,10 @@ def render_coop_panel(st) -> None:
     from app.state_manager import is_logged_in  # noqa: PLC0415
 
     st.subheader("💼 NEU Co-op Experiences")
-    st.caption("PII k=2 anonymity enforced server-side · give-to-get 解锁 · F1 合规")
+    st.caption("人工脱敏审核后按不同贡献者门控公开 · private pending collection · give-to-get 解锁")
 
-    # Success from the PREVIOUS render's upload (we st.rerun() after a 2xx
-    # so the listing above reflects the newly unlocked tier immediately).
-    # 中文:上一次渲染里上传成功的提示（2xx 后我们会 st.rerun()，
-    # 这样上方的列表能立刻反映新解锁的分级）。
+    # The previous upload's actual server state survives the rerun.
+    # 中文：重跑后显示上一次提交的真实服务端状态，不暗示立即解锁。
     success_msg = st.session_state.pop("_coop_upload_success", None)
     if success_msg:
         st.success(success_msg)
@@ -104,7 +108,7 @@ def render_coop_panel(st) -> None:
     session_token = st.session_state.get("session_token")
     if not is_logged_in(st.session_state):
         st.info(
-            "Browsing as guest — only preview-tier rows visible. "
+            "Browsing as guest — public records with preview fields visible. "
             "Log in to see interview details + salary buckets after contributing."
         )
 
@@ -231,21 +235,7 @@ def render_coop_panel(st) -> None:
             with ApiClient(session_token=session_token) as api:
                 try:
                     resp = api.upload_coop(payload)
-                    # Contribution unlocked a tier server-side; rerun so the
-                    # listing above refetches with the new tier and the
-                    # sidebar count stops lying. Message survives the rerun
-                    # via session_state (rendered at the top of the panel).
-                    # 中文:这次贡献在服务端解锁了一个分级；重新运行以便
-                    # 上方列表用新分级重新抓取，侧边栏的计数也不再是
-                    # 旧值。提示信息通过 session_state 挺过这次 rerun
-                    # （在面板顶部渲染）。
-                    st.session_state["user_contribution_count"] = (
-                        st.session_state.get("user_contribution_count", 0) + 1
-                    )
-                    st.session_state["_coop_upload_success"] = (
-                        f"Submitted as `{resp['coop_id']}` "
-                        f"(level {resp['visibility_level']})."
-                    )
+                    apply_upload_result(st.session_state, resp)
                     st.rerun()
                 except ApiError as e:
                     # The generalization hint only applies to the

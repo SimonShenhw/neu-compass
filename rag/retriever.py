@@ -29,15 +29,10 @@ from typing import Any
 
 from db.repository import CourseRepository
 from rag.embedder import EmbedderProtocol
+from rag.filters import ELIGIBLE_STATUS, filter_course_ids
 from rag.index import FaissIndex
+from rag.profiling import profiled, stage
 from schemas.course import Course
-
-# Status of courses eligible for retrieval. ADR-0013: pending = not yet
-# embedded; failed = gave up; only indexed has a valid FAISS row.
-# 中文:可被检索的课程状态。ADR-0013:pending = 尚未完成 embedding;
-# failed = 已放弃处理;只有 indexed 才在 FAISS 里有对应行。
-ELIGIBLE_STATUS = "indexed"
-
 
 @dataclass
 class SearchHit:
@@ -89,13 +84,15 @@ class Retriever:
         # 中文:批量回填 —— 每条命中只需一次 SELECT + 一次 Pydantic 解析,
         # 取代旧版逐行 get() 的 N+1 查询(经 HybridRetriever 候选池,相当于
         # 每次 /search 发出 k*3=60 条 SELECT)。
-        courses = self._course_repo.get_batch([cid for cid, _ in top])
+        with stage('vector_hydrate'):
+            courses = self._course_repo.get_batch([cid for cid, _ in top])
         return [
             SearchHit(course=courses[cid], score=score)
             for cid, score in top
             if cid in courses
         ]
 
+    @profiled('vector_retrieval')
     def search_ids(
         self,
         query: str,
@@ -129,12 +126,15 @@ class Retriever:
             candidates = None  # "search the whole index" — the cheap path
             # 中文:即"搜索整个索引"—— 最便宜的路径。
 
-        query_vec = self._embedder.encode([query])[0]
-        return self._index.search(query_vec, k=k, candidate_course_ids=candidates)
+        with stage('embedding'):
+            query_vec = self._embedder.encode([query])[0]
+        with stage('vector_search'):
+            return self._index.search(query_vec, k=k, candidate_course_ids=candidates)
 
     # === Hard filter ===
     # 中文:=== 硬过滤 ===
 
+    @profiled('sqlite_filter')
     def filter_ids(self, filters: dict[str, Any]) -> list[str]:
         """Public access to the SQLite hard-filter step. HybridRetriever uses
         this to scope its BM25 leg to the same allowed set as the vector leg
@@ -152,53 +152,7 @@ class Retriever:
 
         中文:对 courses 表施加 WHERE 条件;只返回 status='indexed' 的行。
         """
-        clauses = ["status = ?"]
-        params: list[Any] = [ELIGIBLE_STATUS]
-
-        if "term" in filters:
-            clauses.append("json_extract(metadata, '$.term') = ?")
-            params.append(filters["term"])
-
-        if "credits" in filters:
-            clauses.append("json_extract(metadata, '$.credits') = ?")
-            params.append(filters["credits"])
-
-        if "delivery_mode" in filters:
-            clauses.append("json_extract(metadata, '$.delivery_mode') = ?")
-            params.append(filters["delivery_mode"])
-
-        if "professor" in filters:
-            # Substring match against the professor JSON array's text dump.
-            # Acceptable for MVP; precise array-element match would need
-            # json_each in a subquery.
-            # 中文:对 professor JSON 数组的文本转储做子串匹配。对 MVP 来说
-            # 可以接受;要精确匹配数组元素,则需要在子查询里用 json_each。
-            clauses.append("json_extract(metadata, '$.professor') LIKE ?")
-            params.append(f"%{filters['professor']}%")
-
-        if "primary_code_prefix" in filters:
-            # Layer 2 (PLAN v3.0+): when the query mentions a program / major
-            # prefix (AAI, CS, DS, EECE, INFO, ...), narrow the candidate pool
-            # at the SQLite layer BEFORE BM25/vector retrieval. Bilingual NEU
-            # students often phrase questions like "我是 AAI 专业 ..." — without
-            # this filter the hybrid leg pulls in cross-discipline noise (ALY /
-            # ARTG / BINF) that has lexical/semantic similarity but is wrong.
-            # Format: "AAI" matches "AAI 5015", "AAI 6640", etc. We append a
-            # space so 'CS' doesn't accidentally match 'CSYE'.
-            # 中文:Layer 2(PLAN v3.0+):当查询提到某个专业 / 项目前缀
-            # (AAI、CS、DS、EECE、INFO 等)时,在 BM25/向量检索之前先在
-            # SQLite 层缩小候选池。双语 NEU 学生常这样提问:"我是 AAI 专业
-            # ..." —— 没有这层过滤,混合检索会带入跨学科噪声(ALY / ARTG /
-            # BINF),这些课程词面/语义上相似,但其实是错的。格式:"AAI"
-            # 匹配 "AAI 5015"、"AAI 6640" 等。末尾补一个空格,避免 'CS'
-            # 意外匹配到 'CSYE'。
-            prefix = str(filters["primary_code_prefix"]).upper()
-            clauses.append("primary_code LIKE ?")
-            params.append(f"{prefix} %")
-
-        sql = f"SELECT course_id FROM courses WHERE {' AND '.join(clauses)}"
-        rows = self._conn.execute(sql, params).fetchall()
-        return [r["course_id"] for r in rows]
+        return filter_course_ids(self._conn, filters)
 
 
 __all__ = ["ELIGIBLE_STATUS", "Retriever", "SearchHit"]

@@ -49,8 +49,8 @@ class QueryLogRepository:
         result_course_ids: list[str] | None = None,
         rejection_reason: str | None = None,
         user_id: str | None = None,
-    ) -> None:
-        self._conn.execute(
+    ) -> int:
+        cursor = self._conn.execute(
             """
             INSERT INTO query_log (
                 route, query, matched_via, k, latency_ms,
@@ -63,6 +63,7 @@ class QueryLogRepository:
                 rejection_reason, user_id,
             ),
         )
+        return int(cursor.lastrowid)
 
     def list_recent(self, limit: int = 100) -> list[sqlite3.Row]:
         return self._conn.execute(

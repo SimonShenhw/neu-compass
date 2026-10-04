@@ -36,12 +36,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.dependencies import get_course_repo, get_program_repo
+from api.dependencies import DbConn, get_course_repo, get_program_repo
 from api.models import CourseDetailOut, CoursePrereqOut, CourseProgramEdgeOut
 from db.program_repository import ProgramRepository
 from db.repository import CourseNotFound, CourseRepository
+from db.course_requisite_repository import CourseRequisiteRepository
+from schemas.course_requisite_document import CourseRequisiteListing
+from schemas.course_requisite_source import CourseRequisiteSource
+from rag.answer_evidence import build_answer_evidence
 
 router = APIRouter(prefix="/course", tags=["course"])
 
@@ -62,14 +66,25 @@ router = APIRouter(prefix="/course", tags=["course"])
         "`[]` for courses outside any seeded program.\n\n"
         "Co-op data is **not** mixed in; call `GET /coop?course_id=...` "
         "separately so visibility-tier authorization stays in one place."
+        " `answer_evidence` adds recorded catalog provenance, extracted field "
+        "quotes, missing fields and source/seed warnings; no raw_text is "
+        "automatically labeled official."
+        " `course_requisites` lists year-scoped clause documents separately; "
+        "literal credit_hours preserve fixed/fractional/range title evidence "
+        "without choosing section credits or changing the Course integer field. "
+        "description keyword evidence is not an interpreted enrollment rule. "
+        "Read-time program_contexts include only same-edition source-checked "
+        "plans explicitly naming the course, not personal applicability or merged grades. "
+        "No edition/path is auto-selected and legacy edges remain unverified."
     ),
     responses={
         200: {"description": "Course found and returned."},
         404: {"description": "course_id not in `courses` table."},
     },
 )
-async def get_course(
+def get_course(
     course_id: str,
+    conn: DbConn,
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
 ) -> CourseDetailOut:
@@ -111,4 +126,25 @@ async def get_course(
         **course.model_dump(),
         program_context=program_context,
         prerequisites=prerequisites,
+        answer_evidence=build_answer_evidence(conn, [course], program_seed=bool(program_context))[course.course_id],
+        course_requisites=CourseRequisiteRepository(conn).list_for_course(course_id),
     )
+
+
+@router.get("/{course_id}/requisites", response_model=CourseRequisiteListing,
+            summary="Read year-scoped prerequisite/corequisite clauses (not eligibility)")
+def get_course_requisites(
+    course_id: str, conn: DbConn,
+    course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
+    catalog_year: Annotated[str | None, Query(pattern=r"^\d{4}-\d{4}$")] = None,
+) -> CourseRequisiteListing:
+    try:
+        course_repo.get(course_id)
+    except CourseNotFound as exc:
+        raise HTTPException(status_code=404, detail="Course not found") from exc
+    if catalog_year is not None:
+        try:
+            CourseRequisiteSource.edition(catalog_year)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Consecutive catalog edition required") from exc
+    return CourseRequisiteRepository(conn).list_for_course(course_id, catalog_year=catalog_year)

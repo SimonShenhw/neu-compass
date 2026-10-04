@@ -1,0 +1,29 @@
+[
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T22:05:34.400595Z",
+    "sha256": "452d61ad1569d87c06d7fe42ed7d1a7eafc7d463a50366fe4fdf9d9bdcc07b63",
+    "byte_count": 202210,
+    "page_title": "Computer Science (CS)"
+  },
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T22:05:34.629315Z",
+    "sha256": "aeda639a4775a860defb71fa8a8af09475f3d499fdcc2cd25e794301712be55b",
+    "byte_count": 62583,
+    "page_title": "Data Science (DS)"
+  },
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/course-descriptions/info/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T22:05:34.881352Z",
+    "sha256": "a08123c2aacbb635ff5d9ef786b32657f392a547174a55b62edcad6bb905402c",
+    "byte_count": 87360,
+    "page_title": "Information Systems Program (INFO)"
+  }
+]

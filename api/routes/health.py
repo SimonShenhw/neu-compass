@@ -16,7 +16,7 @@ Cloudflare Tunnel + 负载均衡的模式：/health 回答"进程本身是否还
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response, status
 
 from api.models import HealthResponse, ReadyResponse
 
@@ -44,13 +44,16 @@ async def health() -> HealthResponse:
     description=(
         "Returns `status='ready'` once the lifespan startup hook completed: "
         "FAISS index loaded, BM25 corpus built, bge-m3 embedder warmed, "
-        "bge-reranker-v2-m3 warmed. Returns `status='warming'` for ~70-100 "
-        "seconds after process start (cold model load — see "
+        "optional reranker warmed when enabled. Returns HTTP 503 with "
+        "`status='warming'` while the retrieval stack is unavailable (~70-100 "
+        "seconds of cold model load — see "
         "[PLAN_v2.0 §2.5](docs/PLAN_v2.0.md)).\n\n"
-        "Orchestrators should wait for `ready` before routing user traffic."
+        "HTTP 200 means ready. Orchestrators must not route user traffic "
+        "on HTTP 503; `/health` remains the process-liveness endpoint."
     ),
+    responses={503: {"model": ReadyResponse, "description": "Retrieval stack not ready."}},
 )
-async def ready(request: Request) -> ReadyResponse:
+async def ready(request: Request, response: Response) -> ReadyResponse:
     state = request.app.state
     is_ready_flag = bool(getattr(state, "ready", False))
     faiss_index = getattr(state, "faiss_index", None)
@@ -77,6 +80,11 @@ async def ready(request: Request) -> ReadyResponse:
         and bm25_corpus.count > 0
         and embedder is not None
     )
+
+    # A 200/warming body fools curl -f and status-only deployment probes.
+    # 中文：warming 必须返回 503，避免 curl -f 把未就绪误判成成功。
+    if not is_actually_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
     return ReadyResponse(
         status="ready" if is_actually_ready else "warming",

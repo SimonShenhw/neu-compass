@@ -94,6 +94,7 @@ _STATUS_TO_TYPE: dict[int, str] = {
     404: "not_found",
     409: "conflict",
     422: "invalid_input",
+    429: "rate_limited",
     502: "upstream_error",
     503: "service_unavailable",
 }
@@ -114,26 +115,28 @@ def _error_response(
     status_code: int,
     error_type: str,
     detail: str,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = ErrorResponse(
         detail=detail,
         error_type=error_type,
         status_code=status_code,
     ).model_dump()
-    return JSONResponse(status_code=status_code, content=body)
+    return JSONResponse(status_code=status_code, content=body, headers=headers)
 
 
 async def http_exception_handler(
     request: Request, exc: HTTPException,
 ) -> JSONResponse:
     """Replace FastAPI's default `{"detail": ...}` with structured shape.
-    Preserves the original status_code + detail; just adds error_type.
+    Preserves the original status_code + detail + headers; adds error_type.
     把 FastAPI 默认的 `{"detail": ...}` 替换成结构化形状。保留原始的
     status_code + detail，只是新增 error_type。"""
     return _error_response(
         status_code=exc.status_code,
         error_type=_http_status_to_type(exc.status_code),
         detail=str(exc.detail),
+        headers=exc.headers,
     )
 
 

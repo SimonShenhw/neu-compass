@@ -83,14 +83,15 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 
 def _format_evidence(results: list[dict]) -> list[dict]:
-    """Pull out the (course_id, code, name) tuple per result for the bubble UI.
-    为证据气泡 UI 从每条结果中抽取 (course_id, code, name) 元组。"""
+    """Keep identifiers, retrieval score, and source/gap metadata for history.
+    中文：保留来源与缺失信息，不能在写入聊天历史时丢掉证据语义。"""
     return [
         {
             "course_id": r["course_id"],
             "primary_code": r["primary_code"],
             "primary_name": r["primary_name"],
             "score": r["score"],
+            **({"answer_evidence": r["answer_evidence"]} if "answer_evidence" in r else {}),
         }
         for r in results
     ]
@@ -137,6 +138,9 @@ def stream_assistant(
     """
     state["last_chat_meta"] = None
     state["last_chat_error"] = None
+    state['last_chat_feedback'] = None
+    import hashlib
+    answer_hash = hashlib.sha256()
     for event in api.chat_stream(body):
         etype = event.get("type")
         if etype == "meta":
@@ -144,6 +148,7 @@ def stream_assistant(
         elif etype == "token":
             text = event.get("text", "")
             if text:
+                answer_hash.update(text.encode('utf-8'))
                 yield text
         elif etype == "error":
             detail = event.get("detail", "unknown error")
@@ -151,6 +156,18 @@ def stream_assistant(
             yield f"\n\n⚠️ {detail}"
             return
         elif etype == "done":
+            if body.get('allow_feedback_capture') is not True:
+                return
+            from config import settings  # noqa: PLC0415
+            if settings.answer_feedback_enabled is not True:
+                return
+            from schemas.answer_feedback import AnswerFeedbackReceipt
+            try:
+                target = AnswerFeedbackReceipt.model_validate(event.get('feedback'))
+                if state['last_chat_meta'] is not None and target.answer_sha256 == answer_hash.hexdigest():
+                    state['last_chat_feedback'] = target.model_dump(mode='json')
+            except ValueError:
+                pass
             return
 
 
@@ -220,16 +237,17 @@ Hero 区示例查询 chips，仅在首次访问（尚无聊天历史）时展示
 def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> None:
     """Result cards for one evidence list: rank + code + name + relative
     score bar, with a 查看 button per row. Bar widths normalize against
-    the top score WITHIN this list (relative confidence, not absolute).
+    the top score WITHIN this list (relative retrieval score, NOT factual confidence).
     Shared by chat history and the live response path so the two can't
     drift apart visually.
 
     渲染一组证据的结果卡片：名次 + 课程代码 + 名称 + 相对分数条，每行带
-    一个查看按钮。分数条宽度按本列表内的最高分归一化（表达的是相对置信
-    度，不是绝对值）。聊天历史与实时响应两条路径共用此函数，两处的视觉
+    一个查看按钮。分数条宽度按本列表内的最高分归一化（相对检索分数，
+    不是事实可信度）。聊天历史与实时响应两条路径共用此函数，两处的视觉
     呈现才不会各自漂移。"""
     from app.state_manager import select_course  # noqa: PLC0415
     from app.ui_theme import result_card_html  # noqa: PLC0415
+    from app.answer_evidence_view import render_answer_evidence  # noqa: PLC0415
 
     top = max((float(r.get("score", 0.0)) for r in results), default=0.0)
     for i, ev in enumerate(results):
@@ -246,6 +264,7 @@ def _render_evidence_block(st: object, results: list[dict], key_prefix: str) -> 
             ),
             unsafe_allow_html=True,
         )
+        render_answer_evidence(cols[0], ev.get("answer_evidence"))
         if cols[1].button(
             "查看", key=f"{key_prefix}-{ev['course_id']}",
             use_container_width=True,
@@ -351,7 +370,6 @@ def render() -> None:
         init_state,
         is_logged_in,
         record_search,
-        select_course,
     )
     from app.streamlit_auth_ui import (  # noqa: PLC0415
         handle_oauth_callback,
@@ -365,7 +383,6 @@ def render() -> None:
         hero_html,
         inject_theme,
         matched_via_badge,
-        prereq_label_md,
         program_context_html,
         sidebar_brand_html,
         topic_pills_html,
@@ -449,9 +466,9 @@ def render() -> None:
 
     # Deep links (?course= / ?program=) route the same way, and must land in
     # this same window: after handle_oauth_callback (which clears
-    # query_params on every exit path) and before the radio instantiates.
+    # query_params when processing an OAuth return) and before the radio instantiates.
     # 深链（?course= / ?program=）走同一套路由，且必须落在同一个窗口里：
-    # 在 handle_oauth_callback 之后（它每条退出路径都会清空 query_params），
+    # 在 handle_oauth_callback 之后（它处理 OAuth 回调时会清空 query_params），
     # 在 radio 实例化之前。
     from app.deep_links import apply_deep_link  # noqa: PLC0415
 
@@ -479,6 +496,13 @@ def render() -> None:
 
     with chat_col:
         st.subheader("💬 Chat")
+        from app.program_plan_view import render_chat_program_selector  # noqa: PLC0415
+        from app.program_view import get_programs_cached  # noqa: PLC0415
+        try:
+            chat_program_id = render_chat_program_selector(st, get_programs_cached(st))
+        except ApiError:
+            chat_program_id = None
+            st.caption("暂时无法加载项目选择；课程检索仍可使用。")
 
         # Discovery + sample chips — only on first visit (no chat history
         # yet). Round-3 fix for the cold-start blank screen: the landing
@@ -525,6 +549,9 @@ def render() -> None:
                 avatar="🎓" if msg["role"] == "user" else "🧭",
             ):
                 st.markdown(msg["content"])
+                from app.answer_evidence_view import render_retrieval_notices  # noqa: PLC0415
+
+                render_retrieval_notices(st, msg.get("notices"))
                 if msg.get("evidence"):
                     n_ev = len(msg["evidence"])
                     with st.expander(
@@ -540,6 +567,9 @@ def render() -> None:
                             st, msg["evidence"],
                             key_prefix=f"open-{msg_idx}-{msg['role']}",
                         )
+            if msg['role'] == 'assistant':
+                from app.answer_feedback_view import render_answer_feedback
+                render_answer_feedback(st, msg, key_prefix=f'answer-feedback-{msg_idx}')
             # Follow-up suggestion chips under the LATEST answer only —
             # they ride the conversation-continuity path (context tier),
             # so a click answers about the course(s) just discussed.
@@ -568,6 +598,8 @@ def render() -> None:
 
         # New input → stream assistant response. Two paths: chat_input box
         # OR a pending_query injected by a hero-block sample chip (above).
+        from app.answer_feedback_view import render_feedback_capture_control
+        capture_allowed = render_feedback_capture_control(st)
         chat_input_value = st.chat_input(
             "问我任何课程问题：CS 5800 / 易学的 ML 课 / algo …"
         )
@@ -590,7 +622,10 @@ def render() -> None:
             chat_body: dict[str, object] = {
                 "query": prompt,
                 "k": min(st.session_state.get("search_k", 5), 10),
+                "allow_feedback_capture": capture_allowed,
             }
+            if chat_program_id is not None:
+                chat_body["program_id"] = chat_program_id
             if chat_history:
                 chat_body["history"] = chat_history
             if context_ids:
@@ -612,7 +647,13 @@ def render() -> None:
                         stream = stream_assistant(api, chat_body, st.session_state)
                         final_text = st.write_stream(stream) or ""
                 except ApiError as e:
-                    final_text = f"⚠️ Chat failed: {e.detail}"
+                    # 409 = the API needs the student to clarify the program
+                    # (ambiguous prefix / selection conflict), not a failure.
+                    # 中文：409 表示需要学生明确项目（前缀歧义或选择冲突），不是故障。
+                    final_text = (
+                        f"🧭 {e.detail}" if e.status_code == 409
+                        else f"⚠️ Chat failed: {e.detail}"
+                    )
                     st.markdown(final_text)
 
                 meta = st.session_state.get("last_chat_meta") or {}
@@ -643,6 +684,8 @@ def render() -> None:
                 content=final_text,
                 evidence=_format_evidence(results),
                 matched_via=matched_via,
+                feedback=st.session_state.get('last_chat_feedback'),
+                notices=meta.get("notices"),
             )
             # Rerun immediately so the message renders via the HISTORY path.
             # The live evidence block above only exists inside `if prompt:`;
@@ -681,6 +724,9 @@ def render() -> None:
 
             if course.get("professor"):
                 st.markdown("**Professor:** " + ", ".join(course["professor"]))
+
+            from app.answer_evidence_view import render_answer_evidence, render_field_evidence  # noqa: PLC0415
+            render_answer_evidence(st, course.get("answer_evidence"), detailed=True)
 
             # Soft fields (workload / difficulty / grading / skills) — the
             # product's own sample chips advertise "课业最轻", so when the
@@ -729,35 +775,11 @@ def render() -> None:
                     program_context_html(course["program_context"]),
                     unsafe_allow_html=True,
                 )
-            if course.get("prerequisites"):
-                st.markdown("**🧱 先修关系 · Prerequisites**")
-                # Mini prereq graph (round-3 review's "killer feature" ask):
-                # st.graphviz_chart renders the DOT source client-side —
-                # no graphviz runtime in the image.
-                from rag.prereq_graph import build_prereq_dot  # noqa: PLC0415
-
-                dot = build_prereq_dot(
-                    course["primary_code"], course["prerequisites"],
-                )
-                if dot:
-                    st.graphviz_chart(dot)
-                for p in course["prerequisites"]:
-                    cols = st.columns([4, 1])
-                    cols[0].markdown(
-                        prereq_label_md(
-                            code=p.get("primary_code"),
-                            name=p.get("primary_name"),
-                            course_id=p["course_id"],
-                            requirement=p["requirement"],
-                        )
-                    )
-                    # Only navigable when the prereq exists in the catalog.
-                    if p.get("primary_code") and cols[1].button(
-                        "查看", key=f"prereq-{p['course_id']}",
-                        use_container_width=True,
-                    ):
-                        select_course(st.session_state, p["course_id"])
-                        st.rerun()
+            from app.course_requisite_view import render_course_requisites, render_prerequisite_links  # noqa: PLC0415
+            requisite_bundle = course.get("course_requisites")
+            render_course_requisites(st, requisite_bundle, course_id=course["course_id"],
+                course_code=course["primary_code"], course_name=course["primary_name"], key=f"course-requisites-{cid}")
+            render_prerequisite_links(st, course, requisite_bundle)
 
             if course.get("ai_policy"):
                 # Friendly rendering — the raw st.json dump was the last
@@ -780,11 +802,7 @@ def render() -> None:
                 with st.expander(
                     f"Evidence ({len(course['evidence_snippets'])})"
                 ):
-                    for ev in course["evidence_snippets"]:
-                        st.markdown(
-                            f"> *{ev['quote']}* — `{ev['source_id']}` "
-                            f"(confidence {ev['confidence']:.2f})"
-                        )
+                    render_field_evidence(st, course["evidence_snippets"])
 
             # Share link — the produce half of deep links. st.code gets a
             # hover copy button for free, which is the entire interaction.

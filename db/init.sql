@@ -357,3 +357,110 @@ CREATE TABLE IF NOT EXISTS query_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_query_log_created ON query_log(created_at);
+
+-- BEGIN COOP_MODERATION_V1_3
+-- Private submissions are NOT public experiences. Only reviewed groups with
+-- >=2 distinct authenticated contributors may be published and credited.
+-- 中文：待审内容私有存储；不同贡献者的已审核同组记录齐备后才公开、记功。
+CREATE TABLE IF NOT EXISTS coop_submissions (
+    coop_id              TEXT PRIMARY KEY,
+    contributor_user_id  TEXT NOT NULL,
+    submission_key       TEXT NOT NULL,
+    group_key            TEXT NOT NULL,
+    payload              JSON NOT NULL CHECK (json_valid(payload)),
+    review_status        TEXT NOT NULL DEFAULT 'pending'
+                           CHECK (review_status IN ('pending', 'approved', 'rejected', 'published')),
+    reviewer             TEXT,
+    redaction_audit      TEXT,
+    created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at          TIMESTAMP,
+    FOREIGN KEY (contributor_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE (contributor_user_id, submission_key)
+);
+CREATE INDEX IF NOT EXISTS idx_coop_submissions_group
+    ON coop_submissions(group_key, review_status);
+
+-- A logical experience earns credit once even if multiple originals are
+-- generalized into the same reviewed group. Caller owns the whole transaction.
+CREATE TABLE IF NOT EXISTS coop_contribution_credits (
+    user_id      TEXT NOT NULL,
+    group_key    TEXT NOT NULL,
+    coop_id      TEXT NOT NULL,
+    credited_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, group_key),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (coop_id) REFERENCES coop_submissions(coop_id) ON DELETE CASCADE
+);
+INSERT OR IGNORE INTO schema_versions (version, notes)
+VALUES ('1.3', 'Private Co-op moderation queue + distinct-contributor publication + credit ledger');
+-- END COOP_MODERATION_V1_3
+
+-- BEGIN CATALOG_SOURCES_V1_4
+-- Provenance is separate from mutable Course JSON and mixed retrieval raw_text.
+CREATE TABLE IF NOT EXISTS course_catalog_sources (
+    course_id TEXT PRIMARY KEY,
+    snapshot JSON NOT NULL CHECK (json_valid(snapshot)),
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+);
+INSERT OR IGNORE INTO schema_versions(version, notes)
+VALUES ('1.4', 'Source-aware catalog snapshots for answer grounding; Course JSON schema unchanged');
+-- END CATALOG_SOURCES_V1_4
+
+-- BEGIN PROGRAM_PLANS_V1_5
+-- Independent version/path scopes; legacy guessed edges are never migrated as verified.
+CREATE TABLE IF NOT EXISTS program_plans (
+    plan_id TEXT PRIMARY KEY,
+    program_id TEXT NOT NULL,
+    campus TEXT NOT NULL,
+    catalog_year TEXT NOT NULL,
+    pathway TEXT NOT NULL CHECK (pathway IN ('standard', 'align', 'bridge')),
+    concentration TEXT NOT NULL DEFAULT '',
+    document JSON NOT NULL CHECK (json_valid(document)),
+    content_hash TEXT NOT NULL,
+    FOREIGN KEY (program_id) REFERENCES programs(program_id) ON DELETE CASCADE,
+    UNIQUE (program_id, campus, catalog_year, pathway, concentration)
+);
+INSERT OR IGNORE INTO schema_versions(version, notes)
+VALUES ('1.5', 'Version-scoped program rule documents; legacy seed edges unchanged');
+-- END PROGRAM_PLANS_V1_5
+
+-- BEGIN COURSE_REQUISITES_V1_6
+-- Explicit course/year clause documents; legacy Course JSON/edges unchanged.
+CREATE TABLE IF NOT EXISTS course_requisite_documents (
+    course_id TEXT NOT NULL,
+    catalog_year TEXT NOT NULL,
+    document JSON NOT NULL CHECK (json_valid(document)),
+    content_hash TEXT NOT NULL,
+    PRIMARY KEY (course_id, catalog_year),
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+);
+INSERT OR IGNORE INTO schema_versions(version, notes)
+VALUES ('1.6', 'Year-scoped course prerequisite/corequisite clause documents; not eligibility evaluation');
+-- END COURSE_REQUISITES_V1_6
+
+-- BEGIN ANSWER_FEEDBACK_V1_7
+-- Only completed answers are votable; capability tokens are stored as hashes.
+-- Original query_log.user_id retains the eval marker. Feedback never logs queries.
+CREATE TABLE IF NOT EXISTS chat_answers (
+    answer_id TEXT NOT NULL PRIMARY KEY CHECK (length(answer_id)=32),
+    query_log_id INTEGER NOT NULL UNIQUE,
+    answer_text TEXT NOT NULL CHECK (length(answer_text) BETWEEN 1 AND 64000),
+    answer_sha256 TEXT NOT NULL CHECK (length(answer_sha256)=64),
+    feedback_token_hash TEXT NOT NULL CHECK (length(feedback_token_hash)=64),
+    prompt_version TEXT NOT NULL CHECK (length(prompt_version) BETWEEN 1 AND 64),
+    request_context JSON NOT NULL CHECK (json_valid(request_context)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY (query_log_id) REFERENCES query_log(log_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS answer_feedback (
+    answer_id TEXT NOT NULL PRIMARY KEY,
+    rating TEXT NOT NULL CHECK (rating IN ('up','down')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (answer_id) REFERENCES chat_answers(answer_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_chat_answers_expires ON chat_answers(expires_at);
+INSERT OR IGNORE INTO schema_versions(version, notes)
+VALUES ('1.7', 'Private completed chat answers and receipt-bound latest feedback; original telemetry unchanged');
+-- END ANSWER_FEEDBACK_V1_7

@@ -1,9 +1,7 @@
 ﻿"""Tests for api.routes.coop — POST upload (k-anonymity gated) + GET list (tiered).
 
-The k-anonymity gate is the security boundary that PLAN §3.4 marks as a red
-line. These tests pin down both the rejection path (would-be uniquely
-identifying) and the acceptance path (combined-corpus ≥ k=2) — so a future
-refactor can't silently drop the gate.
+Uploads now collect privately. Reviewed publication is tested separately;
+these tests preserve authentication, content-derived tiers and field redaction.
 """
 
 from __future__ import annotations
@@ -65,10 +63,10 @@ def test_post_coop_without_user_id_returns_401(api_client: TestClient) -> None:
 # === POST /coop — k-anonymity ===
 
 
-def test_post_coop_first_unique_triple_rejected(
+def test_post_coop_first_unique_triple_pending(
     api_client: TestClient, empty_db: sqlite3.Connection
 ) -> None:
-    """No prior matching row → combined corpus has 1 → uniquely identifying → 422."""
+    """First unique experience is collected privately, not rejected or published."""
     _seed_user(empty_db, "u-test", contribution_count=0)
     r = api_client.post(
         "/coop",
@@ -79,15 +77,16 @@ def test_post_coop_first_unique_triple_rejected(
         },
         headers=_auth("u-test"),
     )
-    assert r.status_code == 422
-    detail = r.json()["detail"].lower()
-    assert "uniquely identifying" in detail
+    assert r.status_code == 201
+    assert r.json()["status"] == "pending"
+    assert r.json()["contribution_count"] == 0
+    assert api_client.get("/coop").json() == []
 
 
 def test_post_coop_second_match_accepted(
     api_client: TestClient, empty_db: sqlite3.Connection
 ) -> None:
-    """One prior matching row exists → new submission makes combined=2 ≥ k=2 → 201."""
+    """A matching seed cannot replace review or distinct-contributor evidence."""
     _seed_user(empty_db, "u-test", contribution_count=0)
     repo = CoopRepository(empty_db)
     repo.add(
@@ -113,6 +112,7 @@ def test_post_coop_second_match_accepted(
     assert r.status_code == 201
     body = r.json()
     assert body["accepted"] is True
+    assert body["status"] == "pending"
     assert body["coop_id"].startswith("coop-")
     # No interview / salary content → preview tier
     assert body["visibility_level"] == 0
@@ -121,11 +121,10 @@ def test_post_coop_second_match_accepted(
 # === POST /coop — give-to-get contribution credit (PLAN §6.4) ===
 
 
-def test_post_coop_accepted_increments_contribution_count(
+def test_post_coop_pending_does_not_increment_contribution_count(
     api_client: TestClient, empty_db: sqlite3.Connection
 ) -> None:
-    """Accepted upload must credit the contributor — without this the
-    give-to-get gate can never unlock higher visibility tiers."""
+    """Storage alone earns no credit; reviewed publication is the reward boundary."""
     _seed_user(empty_db, "u-test", contribution_count=0)
     repo = CoopRepository(empty_db)
     repo.add(
@@ -148,7 +147,7 @@ def test_post_coop_accepted_increments_contribution_count(
     row = empty_db.execute(
         "SELECT contribution_count FROM users WHERE user_id = ?", ("u-test",)
     ).fetchone()
-    assert row["contribution_count"] == 1
+    assert row["contribution_count"] == 0
 
 
 # === POST /coop — visibility tier derivation ===

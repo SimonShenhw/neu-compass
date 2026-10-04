@@ -15,10 +15,10 @@ Layer 3 本体（培养方案 / 必修课程边）此前只能侧面触及：要
 页面 —— 列表接口驱动培养方案卡片网格，课程表接口驱动按学期分组的课程
 表格。
 
-No auth: program curricula are public catalog facts (same tier as
+No auth: these records are public, but legacy seeds are NOT verified catalog facts (same tier as
 /course/{id}). The give-to-get gate only guards Co-op contributions.
 
-无需鉴权：培养方案课程表是公开目录事实（与 /course/{id} 同一层级）。
+无需鉴权：这些记录公开，但旧 seed 不是已核验目录事实（与 /course/{id} 同一层级）。
 贡献换权限门只守护 Co-op 贡献内容。
 
 Response models live HERE rather than api/models.py — they are private to
@@ -33,12 +33,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import get_course_repo, get_program_repo
+from api.dependencies import DbConn, get_course_repo, get_program_policy_reader, get_program_repo
+from db.program_plan_repository import ProgramPlanRepository
 from db.program_repository import ProgramNotFound, ProgramRepository
 from db.repository import CourseRepository
+from schemas.program_plan import ProgramPlan
+from schemas.program_policy_view import ProgramPolicyView
+from rag.program_policy_evidence import ProgramPolicyReader
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
@@ -58,6 +62,8 @@ class ProgramSummaryOut(BaseModel):
     department: str | None = None
     college: str | None = None
     course_count: int
+    plan_count: int = 0
+    warnings: list[str] = Field(default_factory=lambda: ["legacy_seed_unverified", "legacy_scope_unknown"])
 
 
 class CurriculumCourseOut(BaseModel):
@@ -77,9 +83,9 @@ class CurriculumCourseOut(BaseModel):
 
 
 class CurriculumSemesterOut(BaseModel):
-    """Semester group. semester=None means 'no recommended slot' — the UI
-    labels that group "anytime" (任意学期) and it always sorts last.
-    学期分组。semester=None 表示"没有推荐学期"—— UI 把这组标为"任意学期"，
+    """Semester group. semester=None means 'no recorded recommendation', NOT
+    permission to enroll in any term, and it always sorts last.
+    学期分组。semester=None 表示"没有记录推荐学期"，不是任意学期可修，
     并且始终排在最后。"""
 
     model_config = ConfigDict(extra="forbid")
@@ -96,6 +102,16 @@ class ProgramCurriculumOut(BaseModel):
     prefix: str
     notes: str | None = None
     semesters: list[CurriculumSemesterOut]
+    plans: list[ProgramPlan] = Field(default_factory=list)
+    plan_schema_available: bool = False
+    warnings: list[str] = Field(default_factory=lambda: ["legacy_seed_unverified", "legacy_scope_unknown"])
+
+
+class ProgramPlansOut(BaseModel):
+    program_id: str
+    schema_available: bool
+    plans: list[ProgramPlan]
+    warnings: list[str] = Field(default_factory=lambda: ["personal_catalog_applicability_unconfirmed", "not_an_eligibility_evaluator"])
 
 
 # === Routes ===
@@ -107,8 +123,8 @@ class ProgramCurriculumOut(BaseModel):
     summary="List seeded programs (with curriculum size)",
     description=(
         "Returns every seeded program with its required-course edge count. "
-        "Public read — program curricula are catalog facts, not gated "
-        "content.\n\n"
+        "Public read, not gated content. Legacy seeds have unverified scope; "
+        "plan_count counts usable version-scoped documents, not verified full degrees.\n\n"
         "`course_count` counts curriculum EDGES (including edges whose "
         "course hasn't been scraped yet), so it can exceed the number of "
         "rows the curriculum view renders."
@@ -117,7 +133,8 @@ class ProgramCurriculumOut(BaseModel):
         200: {"description": "Program list (possibly empty before seeding)."},
     },
 )
-async def list_programs(
+def list_programs(
+    conn: DbConn,
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
 ) -> list[ProgramSummaryOut]:
     out: list[ProgramSummaryOut] = []
@@ -135,6 +152,7 @@ async def list_programs(
                 department=program.department,
                 college=program.college,
                 course_count=len(edges),
+                plan_count=len(ProgramPlanRepository(conn).list_for_program(program.program_id)),
             )
         )
     return out
@@ -149,7 +167,7 @@ async def list_programs(
         "`semester_recommended`, display names resolved from the catalog "
         "in a single batched SELECT.\n\n"
         "Groups are ordered semester 1, 2, ... with the no-recommendation "
-        "group (`semester: null` — render as \"anytime\") last. Edges "
+        "group (`semester: null` — no semester information, NOT anytime eligibility) last. Edges "
         "whose course_id is missing from the `courses` table (dangling "
         "seed edge, course not yet scraped) are silently dropped rather "
         "than failing the whole curriculum view."
@@ -159,8 +177,9 @@ async def list_programs(
         404: {"description": "program_id not in `programs` table."},
     },
 )
-async def get_program_curriculum(
+def get_program_curriculum(
     program_id: str,
+    conn: DbConn,
     program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
     course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
 ) -> ProgramCurriculumOut:
@@ -209,4 +228,49 @@ async def get_program_curriculum(
             CurriculumSemesterOut(semester=sem, courses=cs)
             for sem, cs in groups.items()
         ],
+        plans=ProgramPlanRepository(conn).list_for_program(program_id),
+        plan_schema_available=ProgramPlanRepository(conn).available(),
     )
+
+
+@router.get("/{program_id}/plans", response_model=ProgramPlansOut,
+            summary="Version-scoped requirement documents (not eligibility decisions)")
+def get_program_plans(
+    program_id: str, conn: DbConn,
+    program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
+    campus: Annotated[str | None, Query(pattern=r"^[a-z][a-z0-9-]{0,39}$")] = None,
+    catalog_year: Annotated[str | None, Query(pattern=r"^\d{4}-\d{4}$")] = None,
+    pathway: Annotated[str | None, Query(pattern=r"^(standard|align|bridge)$")] = None,
+) -> ProgramPlansOut:
+    try:
+        program_repo.get_program(program_id)
+    except ProgramNotFound as exc:
+        raise HTTPException(status_code=404, detail="program_id not found") from exc
+    if catalog_year:
+        start, end = map(int, catalog_year.split("-"))
+        if end != start + 1:
+            raise HTTPException(status_code=422, detail="Catalog year must be consecutive")
+    repo = ProgramPlanRepository(conn)
+    return ProgramPlansOut(program_id=program_id, schema_available=repo.available(),
+                           plans=repo.list_for_program(program_id, campus=campus, catalog_year=catalog_year, pathway=pathway))
+
+
+@router.get("/{program_id}/plans/{plan_id}/policies", response_model=ProgramPolicyView,
+    summary="Read-only evidence for one exact current plan, not eligibility",
+    description="Missing, stale or unusable policy sources return explicit states with no usable fragments. "
+                "No latest-edition fallback, auto-fetch, DB writes or merged policy decisions.")
+def get_selected_program_policies(
+    program_id: str, plan_id: str, conn: DbConn, response: Response,
+    program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
+    policy_reader: Annotated[ProgramPolicyReader, Depends(get_program_policy_reader)],
+) -> ProgramPolicyView:
+    try:
+        program_repo.get_program(program_id)
+    except ProgramNotFound as exc:
+        raise HTTPException(status_code=404, detail="program_id not found") from exc
+    plans = ProgramPlanRepository(conn).list_for_program(program_id)
+    plan = next((item for item in plans if item.plan_id == plan_id), None)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="No usable current plan with this ID in the selected program")
+    response.headers["Cache-Control"] = "no-store"
+    return policy_reader.read(plan)

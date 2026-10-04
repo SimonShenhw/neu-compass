@@ -36,16 +36,20 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from schemas.course_requisites import CatalogRequisites
+from schemas.catalog_credit_hours import CatalogCreditHours
+from scrapers.course_requisites import parse_course_requisites
 
 from scrapers._base import create_client, fetch_with_retry, logger
 
 CATALOG_BASE_URL = "https://catalog.northeastern.edu"
 
 # Title format: "AAI 5015.  Mathematical Concepts.  (3 Hours)"
-# Lenient on whitespace + accept fractional credits + plural Hour/Hours.
+# The hours model checks literal numbers/ranges; no numeric fallback on bad text.
 _TITLE_RE = re.compile(
-    r"^([A-Z]{2,4})\s?(\d{4}[A-Z]?)\.\s+(.+?)\.\s+\(([\d.]+)\s*Hours?\)\s*$"
+    r"^([A-Z]{2,4})\s?(\d{4}[A-Z]?)\.\s+(.+?)\.\s+\(([^()]{1,100})\)\s*$"
 )
 
 # "X and Y are cross-listed" prose pattern (case-insensitive, optional hyphen).
@@ -76,6 +80,16 @@ class CatalogEntry(BaseModel):
     prereqs: list[str] = Field(default_factory=list)
     cross_listed_codes: list[str] = Field(default_factory=list)
     catalog_url: str | None = None
+    # None on legacy JSONL is unknown, not an assertion of no requirements.
+    # 中文：新爬取保留逻辑，旧平铺字段/持久化 Course 不自动升级。
+    requisites: CatalogRequisites | None = None
+    credit_hours: CatalogCreditHours | None = None  # Legacy JSONL has no literal-hours evidence.
+
+    @model_validator(mode="after")
+    def fixed_credits_match_literal(self):
+        if self.credit_hours is not None and self.credits != self.credit_hours.fixed_integer():
+            raise ValueError("Fixed integer credits must not contradict literal catalog hours")
+        return self
 
 
 class CatalogEntryNotFound(LookupError):
@@ -217,12 +231,11 @@ def _parse_courseblock(block: Tag, *, source_url: str) -> CatalogEntry | None:
     course_code = f"{m.group(1).upper()} {m.group(2).upper()}"
     course_name = m.group(3).strip()
 
-    credit_str = m.group(4)
     try:
-        credit_val = float(credit_str)
-        credits = int(credit_val) if credit_val == int(credit_val) else None
+        hours = CatalogCreditHours.from_text(" ".join(m.group(4).split()))
     except ValueError:
-        credits = None
+        return None  # Bad hours mean uncertain title identity, not credits=None success.
+    credits = hours.fixed_integer()
 
     desc_p = block.find("p", class_="cb_desc")
     description = desc_p.get_text(" ", strip=True) if desc_p else None
@@ -263,6 +276,8 @@ def _parse_courseblock(block: Tag, *, source_url: str) -> CatalogEntry | None:
         prereqs=prereqs,
         cross_listed_codes=cross_listed,
         catalog_url=source_url,
+        requisites=parse_course_requisites(block),
+        credit_hours=hours,
     )
 
 

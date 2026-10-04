@@ -28,7 +28,7 @@ spread:
 
 Ordering constraints inside render() — both are load-bearing:
   1. AFTER `handle_oauth_callback()`. That function calls
-     `st.query_params.clear()` on every one of its exit paths, so a
+     `st.query_params.clear()` when it handles an OAuth return, so a
      deep-link read placed before it would see params on a normal visit
      and an empty dict on an OAuth return.
   2. BEFORE `st.sidebar.radio(..., key="nav_page")`. We route by writing
@@ -37,7 +37,7 @@ Ordering constraints inside render() — both are load-bearing:
      the filter-clear callback).
 
 render() 内部的两条顺序约束，都不是可有可无的：
-  1. 必须在 `handle_oauth_callback()` 之后。该函数在它每一条退出路径上都会
+  1. 必须在 `handle_oauth_callback()` 之后。该函数处理 OAuth 回调时会
      调用 `st.query_params.clear()`，所以放在它前面读深链，正常访问时能读到
      参数、而 OAuth 返回时会读到空字典。
   2. 必须在 `st.sidebar.radio(..., key="nav_page")` 之前。我们靠写
@@ -94,6 +94,7 @@ def share_url(
     *,
     course: str | None = None,
     program: str | None = None,
+    plan=None,
 ) -> str:
     """Build a copyable deep link onto the public UI origin.
 
@@ -106,7 +107,14 @@ def share_url(
     百分号编码交给 urlencode 处理；能原样通过的 ref（常见的 'CS-5800'）保持
     人类可读，通不过的（含中日韩字符的俗称别名）也依然能正确往返。
     """
-    params = [(k, v) for k, v in ((COURSE_PARAM, course), (PROGRAM_PARAM, program)) if v]
+    if plan is not None:
+        from app.program_plan_links import PlanLink
+        target = PlanLink.from_plan(plan)
+        if course is not None or (program is not None and program != target.program_id):
+            raise ValueError('Plan link cannot share a conflicting destination')
+        params = target.query_pairs()
+    else:
+        params = [(k, v) for k, v in ((COURSE_PARAM, course), (PROGRAM_PARAM, program)) if v]
     # rstrip, not "strip one slash": PUBLIC_BASE_URL is hand-edited, and a
     # stray 'https://x.dev//' must not become a protocol-relative '//?...'.
     # 中文：用 rstrip 而不是「去掉一个斜杠」：PUBLIC_BASE_URL 是手工填的，
@@ -162,7 +170,7 @@ def match_program_ref(ref: str, programs: list[dict]) -> str | None:
 
 
 def apply_deep_link(st, *, pages: list[str]) -> None:
-    """Consume `?course=` / `?program=` once per session, then route.
+    """Legacy refs once per session; exact plan links once per query token.
 
     No-op when neither param is present, or when this session already
     applied one. Both params together are legal: the program is teed up in
@@ -181,6 +189,10 @@ def apply_deep_link(st, *, pages: list[str]) -> None:
     与 program_view 抓取辅助函数里「失败不缓存，好让预热中的 API 能恢复」
     这条规则保持一致。
     """
+    from app.program_plan_links import has_plan_link
+    if has_plan_link(st.query_params):
+        _apply_plan_ref(st, pages=pages)
+        return
     if st.session_state.get(APPLIED_FLAG):
         return
 
@@ -196,6 +208,79 @@ def apply_deep_link(st, *, pages: list[str]) -> None:
         settled &= _apply_course_ref(st, course_ref, pages=pages)
     if settled:
         st.session_state[APPLIED_FLAG] = True
+
+
+def _apply_plan_ref(st, *, pages: list[str]) -> None:
+    from app.api_client import ApiClient, ApiError
+    from app.program_plan_links import (APPLIED_KEY, PENDING_KEY, MESSAGES, RETRY_KEY,
+        clear_plan_link_selection, plan_query_token, read_plan_link, resolve_plan_link)
+
+    token = plan_query_token(st.query_params)
+    if st.session_state.get(APPLIED_KEY) == token:
+        return
+
+    def settle(message: str | None) -> None:
+        # Terminal outcome for this link (applied or definitively unusable):
+        # route to Programs ONCE, never retain another link's selection, and
+        # never re-fetch this token. Runs before the nav/plan widgets exist.
+        # 中文：这条链接的终态（已应用或确定不可用）：只路由到培养方案页一次，
+        # 不保留其他链接的选择，此 token 不再重复请求。运行在导航/方案组件之前。
+        clear_plan_link_selection(st.session_state)
+        st.session_state['nav_page'] = pages[1]
+        st.session_state[APPLIED_KEY] = token
+        st.session_state[APPLIED_FLAG] = True
+        if message is not None:
+            st.warning(message)
+
+    try:
+        target = read_plan_link(st.query_params)
+    except ValueError:
+        settle(MESSAGES['invalid'])
+        return
+    try:
+        # Fresh GET, not the session curriculum cache: pin current revision.
+        with ApiClient(session_token=st.session_state.get('session_token'), timeout=8.0) as api:
+            body = api.get_program_curriculum(target.program_id)
+    except ApiError as exc:
+        if exc.status_code in {408, 429} or exc.status_code >= 500:
+            # Transient: retried on a later rerun WITHOUT touching navigation
+            # or the current program selection — doing that on every rerun of
+            # an outage pinned the student to the Programs page. Only the
+            # linked family's stale plan choice is dropped, once per link.
+            # 中文：暂时性失败：之后的 rerun 再重试，但不动导航和当前项目选择
+            # —— 以前每次 rerun 都这么做，故障期间学生会被钉在培养方案页。
+            # 只在每条链接第一次时清掉该项目旧的方案选择。
+            if st.session_state.get(RETRY_KEY) != token:
+                st.session_state.pop(f'program-plan-{target.program_id}', None)
+                st.session_state[RETRY_KEY] = token
+                st.warning('🔗 方案链接暂时无法核对，稍后会自动重试；在此之前不会改动你当前的页面。')
+            return
+        settle(MESSAGES['unavailable'])
+        _evict_family(st, target.program_id)
+        return
+    except ValueError:
+        settle(MESSAGES['unusable'])
+        _evict_family(st, target.program_id)
+        return
+    status, plan = resolve_plan_link(target, body)
+    settle(None if plan is not None else MESSAGES[status])
+    cache = _evict_family(st, target.program_id)
+    if plan is not None:
+        cache[target.program_id] = body
+        st.session_state['selected_program_id'] = target.program_id
+        st.session_state[PENDING_KEY] = target.model_dump(mode='json')
+
+
+def _evict_family(st, program_id: str) -> dict:
+    """Drop the family's plan widget choice and cached curriculum; return the cache.
+    中文：丢弃该项目的方案组件选择和缓存的课程表；返回缓存字典。"""
+    st.session_state.pop(f'program-plan-{program_id}', None)
+    cache = st.session_state.get('_curriculum_cache')
+    if not isinstance(cache, dict):
+        cache = {}
+        st.session_state['_curriculum_cache'] = cache
+    cache.pop(program_id, None)
+    return cache
 
 
 def _ref_label(ref: str) -> str:

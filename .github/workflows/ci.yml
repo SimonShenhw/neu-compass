@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test & Integrity Checks
+    runs-on: ubuntu-latest
+    env:
+      # config.settings requires GEMINI_API_KEY at import time and CI has no
+      # .env (gitignored). A non-secret placeholder lets Settings() construct;
+      # offline tests stub every model/LLM call and `-m "not live"` skips the
+      # network suite, so this value is never sent anywhere.
+      # 中文：config.settings 导入时要求 GEMINI_API_KEY，而 CI 没有 .env（已
+      # gitignore）。占位值只为让 Settings() 能构造；离线测试替身了所有模型/LLM
+      # 调用，live 用例被 -m "not live" 排除，这个值不会被发往任何地方。
+      GEMINI_API_KEY: ci-placeholder-not-a-secret
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify uv.lock consistency
+        run: uv lock --check
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Verify production dependencies & wheel integrity
+        run: uv run pytest tests/test_production_dependencies.py -v
+
+      - name: Execute disaster recovery rehearsal
+        run: uv run python scripts/rehearse_recovery.py --json
+
+      - name: Run offline test suite
+        run: uv run pytest -m "not live" --tb=short

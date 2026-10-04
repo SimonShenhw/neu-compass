@@ -35,6 +35,12 @@ class ProgramNotFound(LookupError):
     """
 
 
+class ProgramAmbiguous(LookupError):
+    def __init__(self, prefix: str, programs: list[Program]):
+        self.programs = programs
+        super().__init__(f"Multiple programs match {prefix}; choose program_id: " + ", ".join(p.program_id for p in programs))
+
+
 class ProgramRepository:
     """Caller owns the connection lifecycle; route layer commits.
 
@@ -104,12 +110,14 @@ class ProgramRepository:
         任何 program 被 seed 过,返回 None —— 此时调用方应退回到纯前缀
         过滤的检索方式(Layer 2 路径)。
         """
-        row = self._conn.execute(
+        rows = self._conn.execute(
             "SELECT program_id, full_name, prefix, department, college, notes "
-            "FROM programs WHERE prefix = ? COLLATE NOCASE LIMIT 1",
+            "FROM programs WHERE prefix = ? COLLATE NOCASE ORDER BY program_id",
             (prefix,),
-        ).fetchone()
-        return Program(**dict(row)) if row else None
+        ).fetchall()
+        if len(rows) > 1:
+            raise ProgramAmbiguous(prefix, [Program(**dict(row)) for row in rows])
+        return Program(**dict(rows[0])) if rows else None
 
     def list_programs(self) -> list[Program]:
         rows = self._conn.execute(
@@ -277,4 +285,4 @@ class ProgramRepository:
         return [CoursePrerequisite(**dict(r)) for r in rows]
 
 
-__all__ = ["ProgramNotFound", "ProgramRepository"]
+__all__ = ["ProgramAmbiguous", "ProgramNotFound", "ProgramRepository"]

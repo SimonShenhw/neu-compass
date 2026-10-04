@@ -27,7 +27,9 @@ from typing import Any, Callable, Protocol
 
 import structlog
 
+from rag.filters import filter_course_ids
 from rag.retriever import SearchHit
+from schemas.course import Course
 
 log = structlog.get_logger("neu_compass.routes.common")
 
@@ -61,6 +63,23 @@ def build_hard_filters(req: _FilterableRequest) -> dict[str, object]:
     if req.professor is not None:
         filters["professor"] = req.professor
     return filters
+
+
+def filter_courses(
+    conn: sqlite3.Connection, courses: list[Course], filters: dict[str, object],
+) -> list[Course]:
+    """Apply the retrieval SQL contract to a shortcut, preserving its input order.
+
+    No explicit filters preserves existing direct-lookup behavior. With filters,
+    only indexed courses qualify, just as on the hybrid path. Truncate afterwards.
+    中文：无显式筛选时保留直接查找语义；有筛选时与混合路径共用 SQL，之后再截断。
+    """
+    if not filters or not courses:
+        return courses
+    allowed = set(filter_course_ids(
+        conn, filters, candidate_course_ids=[course.course_id for course in courses],
+    ))
+    return [course for course in courses if course.course_id in allowed]
 
 
 def fetch_texts(
@@ -192,9 +211,10 @@ def log_query(
     result_course_ids: list[str] | None = None,
     rejection_reason: str | None = None,
     user_id: str | None = None,
-) -> None:
-    """Telemetry write that must NEVER break a request — swallows every
-    failure (including 'no such table: query_log' on a not-yet-migrated
+) -> int | None:
+    """Return the committed log ID or None; telemetry must NEVER break a request.
+
+    Swallows every failure (including 'no such table: query_log' on a not-yet-migrated
     DB) with a structlog warning. One INSERT + commit on the request's
     own connection; negligible next to retrieval cost.
     遥测写入，绝不能打断请求 —— 任何失败（包括未迁移数据库上的
@@ -203,14 +223,16 @@ def log_query(
     try:
         from db.query_log_repository import QueryLogRepository  # noqa: PLC0415
 
-        QueryLogRepository(conn).add(
+        log_id = QueryLogRepository(conn).add(
             route=route, query=query, matched_via=matched_via, k=k,
             latency_ms=latency_ms, result_course_ids=result_course_ids,
             rejection_reason=rejection_reason, user_id=user_id,
         )
         conn.commit()
+        return log_id
     except Exception as e:  # noqa: BLE001 — telemetry is best-effort / 遥测是尽力而为
         log.warning("query_log.write_failed", error=str(e)[:120])
+        return None
 
 
-__all__ = ["attempt_hyde_rescue", "build_hard_filters", "fetch_texts", "log_query"]
+__all__ = ["attempt_hyde_rescue", "build_hard_filters", "fetch_texts", "filter_courses", "log_query"]

@@ -1,0 +1,29 @@
+[
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science/computer-science-mscs/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T13:05:55.072354Z",
+    "sha256": "9209d0dc6e988d49830af136defb933c32f5d507ed843dff99a4ba97cc5f76b3",
+    "byte_count": 46741,
+    "page_title": "Computer Science, MSCS (Boston)"
+  },
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/graduate/university-interdisciplinary-programs/science-data-ms-bos/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T13:05:55.311489Z",
+    "sha256": "0b03d0f4eebb05e16a97d6d5efda520e363314b86e6657c44121184545c080dc",
+    "byte_count": 67213,
+    "page_title": "Data Science, MS (Boston)"
+  },
+  {
+    "format_version": 1,
+    "url": "https://catalog.northeastern.edu/graduate/engineering/multidisciplinary/information-systems-msis/",
+    "catalog_year": "2026-2027",
+    "captured_at": "2026-10-01T13:05:55.377855Z",
+    "sha256": "3e57ff50dcb8bdd5674f1df509aa5bb0cf964ef1fb953723799b862930c01f01",
+    "byte_count": 45991,
+    "page_title": "Information Systems, MSIS (Boston)"
+  }
+]

@@ -1,0 +1,96 @@
+[
+  {
+    "plan_id": "cs-ms-boston-2026-2027-standard",
+    "program_id": "cs-ms",
+    "campus": "boston",
+    "catalog_year": "2026-2027",
+    "pathway": "standard",
+    "coverage": "partial",
+    "review_status": "source_checked",
+    "checked_by": "codex-source-crosscheck",
+    "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science/computer-science-mscs/",
+    "source_title": "Computer Science, MSCS (Boston), 2026-2027 Edition",
+    "source_catalog_year": "2026-2027",
+    "source_excerpt": "CS 5010\nand CS 5011\n…\nCS 5800",
+    "captured_on": "2026-10-01",
+    "notes": "仅普通 MSCS 的 core 课程关系片段。不是 Align，也不包含首学期排课建议；配套关系不是课程先修顺序。来源代码为短摘录，非完整页面存档。",
+    "requirements": {
+      "kind": "all_of", "label": "普通 MSCS 局部规则（非完整培养方案）",
+      "children": [
+        {
+          "kind": "all_of", "label": "Core 课程组合",
+          "children": [
+            {"kind": "course", "label": "Programming 主课", "course_code": "CS 5010"},
+            {"kind": "course", "label": "Programming recitation 配套", "course_code": "CS 5011"},
+            {"kind": "course", "label": "Algorithms", "course_code": "CS 5800"}
+          ]
+        },
+        {"kind": "unmodeled", "label": "广度领域选择、选修学分、毕业出口、总学分与 GPA 等尚未完整建模；不能据此判毕业。"}
+      ]
+    }
+  },
+  {
+    "plan_id": "ds-ms-boston-2026-2027-standard",
+    "program_id": "ds-ms",
+    "campus": "boston",
+    "catalog_year": "2026-2027",
+    "pathway": "standard",
+    "coverage": "partial",
+    "review_status": "source_checked",
+    "checked_by": "codex-source-crosscheck",
+    "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/university-interdisciplinary-programs/science-data-ms-bos/",
+    "source_title": "Data Science, MS (Boston), 2026-2027 Edition",
+    "source_catalog_year": "2026-2027",
+    "source_excerpt": "DS 5110\n…\nCS 5800\n…\nor EECE 7205\n…\nCS 6140\n…\nor EECE 5644\n…\nDS 5500",
+    "captured_on": "2026-10-01",
+    "notes": "仅普通 MSDS 共享 core 片段，不是 Align；concentration 与跨院系政策未完整覆盖，不提供个人资格或选课顺序判断。",
+    "requirements": {
+      "kind": "all_of", "label": "MSDS 共享核心片段",
+      "children": [
+        {"kind": "course", "label": "Programming with Data", "course_code": "DS 5110"},
+        {"kind": "any_of", "label": "Algorithms 二选一", "children": [
+          {"kind": "course", "label": "Algorithms", "course_code": "CS 5800"},
+          {"kind": "course", "label": "Computer Engineering", "course_code": "EECE 7205"}
+        ]},
+        {"kind": "any_of", "label": "Machine Learning 二选一", "children": [
+          {"kind": "course", "label": "Machine Learning", "course_code": "CS 6140"},
+          {"kind": "course", "label": "Machine Learning and Pattern Recognition", "course_code": "EECE 5644"}
+        ]},
+        {"kind": "course", "label": "Interdisciplinary Capstone", "course_code": "DS 5500"},
+        {"kind": "condition", "label": "核心课程累计 GPA 至少 3.000；此处不计算个人成绩。"},
+        {"kind": "unmodeled", "label": "Concentration 选修组、Co-op 条件、总学分与个体学院政策未完整建模。"}
+      ]
+    }
+  },
+  {
+    "plan_id": "info-ms-boston-2026-2027-standard-general",
+    "program_id": "info-ms",
+    "campus": "boston",
+    "catalog_year": "2026-2027",
+    "pathway": "standard",
+    "concentration": "general",
+    "coverage": "partial",
+    "review_status": "source_checked",
+    "checked_by": "codex-source-crosscheck",
+    "checked_on": "2026-10-01",
+    "source_url": "https://catalog.northeastern.edu/graduate/engineering/multidisciplinary/information-systems-msis/",
+    "source_title": "Information Systems, MSIS (Boston), 2026-2027 Edition",
+    "source_catalog_year": "2026-2027",
+    "source_excerpt": "INFO 5100\n…\nINFO 5101",
+    "captured_on": "2026-10-01",
+    "notes": "仅通用 MSIS core 片段，不是 Bridge；不覆盖 Medical Software Engineering concentration 的 INFO 5200 替代，不能用于该路径的资格判断。",
+    "requirements": {
+      "kind": "all_of", "label": "通用 MSIS 核心片段",
+      "children": [
+        {"kind": "all_of", "label": "Core 主课与配套 lab", "children": [
+          {"kind": "course", "label": "Application Engineering", "course_code": "INFO 5100"},
+          {"kind": "course", "label": "配套 lab（0 学分不等于可省略）", "course_code": "INFO 5101"}
+        ]},
+        {"kind": "condition", "label": "工程学院 required core 课程须 C 或以上；此处不评价成绩或逐课程先修门槛。"},
+        {"kind": "unmodeled", "label": "选修组、coursework/project/thesis 出口、可选 concentration、Co-op 及总学分规则未完整建模。"}
+      ]
+    }
+  }
+]

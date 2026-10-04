@@ -58,6 +58,7 @@ import threading
 from typing import Callable, TypeVar
 
 from rag.retriever import SearchHit
+from rag.profiling import stage
 
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 
@@ -206,7 +207,8 @@ def rerank_pairs(
     if not pairs:
         return []
     payloads, texts = zip(*pairs)
-    scores = reranker.score(query, list(texts))
+    with stage('rerank_score'):
+        scores = reranker.score(query, list(texts))
     scored = list(zip(payloads, scores))
     scored.sort(key=lambda t: -t[1])
     if top_k is not None:
@@ -363,7 +365,8 @@ def rerank_blend_hits(
 
     rrf_scores = [hit.score for hit, _ in pairs]
     texts = [text for _, text in pairs]
-    rerank_scores = reranker.score(query, texts)
+    with stage('rerank_score'):
+        rerank_scores = reranker.score(query, texts)
 
     blended = zscore_blend(rrf_scores, rerank_scores, alpha=blend_alpha)
 
@@ -438,7 +441,8 @@ def rerank_blend_with_rejection(
 
     rrf_scores = [hit.score for hit, _ in pairs]
     texts = [text for _, text in pairs]
-    rerank_scores = reranker.score(query, texts)
+    with stage('rerank_score'):
+        rerank_scores = reranker.score(query, texts)
 
     max_sig = max(rerank_scores) if rerank_scores else 0.0
     n_above = sum(1 for s in rerank_scores if s >= reject_threshold)

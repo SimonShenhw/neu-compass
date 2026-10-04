@@ -1,4 +1,4 @@
-# scripts/deploy.ps1 - Push NEU-Compass from PC dev box to the NAS.
+﻿# scripts/deploy.ps1 - Push NEU-Compass from PC dev box to the NAS.
 #
 # What this does (in order):
 #   1. Pre-flight: verify Tailscale, WSL, NAS SSH reachable, NAS dirs exist
@@ -6,7 +6,7 @@
 #   3. scp .env             → ${NasUser}@${NasHost}:${NasPath}/.env
 #   4. (opt-in) tar-pipe runtime data via WSL → ${NasPath}/runtime-data/
 #   5. ssh nas "docker compose up -d [--build]"
-#   6. Probe http://${NasHost}:8000/ready via Tailscale
+#   6. Verify API readiness, UI health, and read-only deep-link resolution
 #
 # Why tar-pipe instead of rsync?
 #   The UGREEN DXP NAS wraps /usr/bin/rsync with an ACL that only allows
@@ -42,6 +42,8 @@ param(
     [string]$NasPath     = $(if ($env:NEU_NAS_PATH) { $env:NEU_NAS_PATH } else { '/volume1/docker/neu-compass' }),
     [string]$WslDistro   = 'Ubuntu-24.04',
     [string]$WslDataDir  = '~/neu-compass-data',
+    [ValidateRange(1, 3600)]
+    [int]$ReadyTimeoutSeconds = 180,
     [switch]$SyncData,                     # opt-in: also push runtime-data (~2.3GB)
     [switch]$SkipCode,
     [switch]$NoBuild,
@@ -234,28 +236,76 @@ if ($DryRun) {
     Write-Host '  (dry-run skipped)'
 } else {
     $composeCmd = if ($NoBuild) { 'docker compose up -d' } else { 'docker compose up -d --build' }
-    & ssh "$NasTarget" "cd '$NasPath' && $composeCmd 2>&1 | tail -15"
+    # Keep compose in the foreground and preserve its actual exit status.
+    # 中文：不接远端 tail 管道，否则 tail 成功会掩盖 compose 失败。
+    & ssh "$NasTarget" "cd '$NasPath' && $composeCmd"
     if ($LASTEXITCODE -ne 0) { Write-Host '  X docker compose failed' -ForegroundColor Red; exit 1 }
 
-    # Health probe via Tailscale (faster feedback than waiting on public CF)
+    # Read-only probes: do not call /search or /chat (query_log / Gemini).
+    # 中文：只读验收，不污染真实查询日志，也不消耗 Gemini 配额。
     Write-Host ''
-    Write-Host "  Probing http://${NasHost}:8000/ready (180s timeout) " -NoNewline
-    $deadline = (Get-Date).AddSeconds(180)
+    Write-Host "  Probing API + UI + deep links + Co-op (${ReadyTimeoutSeconds}s timeout) " -NoNewline
+    $deadline = (Get-Date).AddSeconds($ReadyTimeoutSeconds)
     $ok = $false
+    $pendingCheck = 'API readiness'
+    $lastProbeError = ''
     while ((Get-Date) -lt $deadline) {
         try {
+            $pendingCheck = 'API readiness'
             $r = Invoke-WebRequest "http://${NasHost}:8000/ready" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-            if ($r.StatusCode -eq 200) { $ok = $true; break }
-        } catch { }
+            $readyBody = $r.Content | ConvertFrom-Json -ErrorAction Stop
+            if ($r.StatusCode -ne 200 -or $readyBody.status -ne 'ready' -or
+                [int]$readyBody.courses_indexed -le 0 -or [int]$readyBody.bm25_corpus -le 0) {
+                throw 'API is not ready or its retrieval indexes are empty'
+            }
+
+            $pendingCheck = 'UI health'
+            $ui = Invoke-WebRequest "http://${NasHost}:8501/_stcore/health" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            if ($ui.StatusCode -ne 200 -or $ui.Content.Trim() -ne 'ok') {
+                throw 'Streamlit health endpoint did not return 200/ok'
+            }
+
+            $pendingCheck = 'deep-link resolution'
+            $resolved = Invoke-WebRequest "http://${NasHost}:8000/resolve/course?ref=CS-5800" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            $resolveBody = $resolved.Content | ConvertFrom-Json -ErrorAction Stop
+            $matches = @($resolveBody.matches | Where-Object {
+                $_.primary_code -eq 'CS 5800' -and $_.course_id
+            })
+            if ($resolved.StatusCode -ne 200 -or $matches.Count -eq 0) {
+                throw 'CS-5800 deep link did not resolve to the catalog course'
+            }
+
+            $pendingCheck = 'Co-op moderation schema'
+            $coop = Invoke-WebRequest "http://${NasHost}:8000/coop" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            if ($coop.StatusCode -ne 200 -or -not $coop.Content.Trim().StartsWith('[')) {
+                throw 'Co-op listing unavailable; confirm the v1.3 moderation migration'
+            }
+            $null = $coop.Content | ConvertFrom-Json -ErrorAction Stop
+            # The public list now degrades to seeds instead of 503 before the
+            # v1.3 migration, so read the schema state from the header.
+            # PS5 headers map to strings, PS7 to string arrays: compare all.
+            # 中文：迁移前公开列表会降级为只有种子而不是 503，所以改读响应头。
+            $moderation = @($coop.Headers.Keys | Where-Object { $_ -ieq 'X-Coop-Moderation' } |
+                ForEach-Object { $coop.Headers[$_] })
+            if ($moderation -notcontains 'available') {
+                throw 'Co-op moderation schema missing on the server; apply the v1.3 migration (public list is seeds-only until then)'
+            }
+
+            $ok = $true
+            break
+        } catch {
+            $lastProbeError = $_.Exception.Message
+        }
         Write-Host -NoNewline '.'
         Start-Sleep -Seconds 3
     }
     Write-Host ''
     if ($ok) {
-        Write-Host '  OK NAS api /ready 200' -ForegroundColor Green
+        Write-Host '  OK API ready + UI healthy + deep-link resolution + Co-op available' -ForegroundColor Green
     } else {
-        Write-Host '  ! NAS api did not reach /ready in 180s — check logs:' -ForegroundColor Yellow
-        Write-Host "    ssh $NasTarget 'cd $NasPath && docker compose logs --tail=100 api'" -ForegroundColor DarkGray
+        Write-Host "  X deploy checks failed: $pendingCheck ($lastProbeError)" -ForegroundColor Red
+        Write-Host "    ssh $NasTarget 'cd $NasPath && docker compose logs --tail=100 api ui'" -ForegroundColor DarkGray
+        exit 1
     }
 }
 

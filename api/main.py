@@ -38,9 +38,10 @@ from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 
+from api.admission import AdmissionGuard, AdmissionMiddleware, AdmissionPolicy
 from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
-from api.routes import auth, chat, coop, course, health, program, resolve, search
+from api.routes import auth, chat, coop, course, feedback, health, program, resolve, search
 from config import settings
 from db.connection import connect
 from rag.embedder import BGEM3Embedder
@@ -92,8 +93,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # 1) FAISS — cheap (read from disk).
     # 中文：1）FAISS —— 代价很低（从磁盘读取）。
-    faiss_index = FaissIndex.load(settings.faiss_index_path)
-    log.info("api.startup.faiss_loaded", count=faiss_index.count)
+    # Enforce the manifest (08A): a vector set built with another embedding
+    # model, or a torn publish (new index + old id_map), must refuse to serve
+    # instead of returning silently wrong neighbours. Legacy manifest-less
+    # indexes still load, with a warning.
+    # 中文：强制校验清单（08A）：用别的嵌入模型建的向量集、或一次撕裂的发布
+    # （新索引 + 旧 id_map），必须拒绝服务，而不是静默返回错误的近邻。
+    # 没有清单的旧索引照常加载，但记一条警告。
+    faiss_index = FaissIndex.load(
+        settings.faiss_index_path,
+        expected_model=settings.embedding_model,
+        verify_checksums=True,
+    )
+    log.info(
+        "api.startup.faiss_loaded",
+        count=faiss_index.count,
+        manifest_verified=faiss_index.manifest is not None,
+    )
+    if faiss_index.manifest is None:
+        log.warning("api.startup.faiss_manifest_missing", detail="legacy index; model and integrity unverified")
 
     # 2) BM25 corpus from SQLite snapshot — cheap (≤1k docs in ~10ms).
     # 中文：2）从 SQLite 快照构建 BM25 语料 —— 代价很低（≤1000 篇文档约 10ms）。
@@ -346,7 +364,7 @@ def _build_openvino_stack(log: Any) -> tuple[Any, Any]:
     return embedder, reranker
 
 
-def create_app(*, run_startup: bool = True) -> FastAPI:
+def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | None = None) -> FastAPI:
     """Build the FastAPI app. `run_startup=False` skips lifespan for tests
     that populate app.state with fakes.
     构建 FastAPI 应用。`run_startup=False` 会跳过 lifespan，供那些手动往
@@ -358,6 +376,17 @@ def create_app(*, run_startup: bool = True) -> FastAPI:
         lifespan=lifespan if run_startup else None,
     )
 
+    if admission_guard is None and settings.request_guard_enabled:
+        admission_guard = AdmissionGuard(AdmissionPolicy(
+            capacity=settings.request_guard_capacity,
+            refill_per_second=settings.request_guard_refill_per_second,
+            max_inflight=settings.request_guard_max_inflight,
+        ))
+    app.state.admission_guard = admission_guard
+    if admission_guard is not None:
+        app.add_middleware(AdmissionMiddleware, guard=admission_guard)
+    # Access logging is outermost so denied requests also get x-request-id.
+    # 中文：日志包住门禁，拒绝响应也有既有 request-id；不新增 query_log。
     app.add_middleware(RequestLogMiddleware)
     register_exception_handlers(app)
 
@@ -366,6 +395,7 @@ def create_app(*, run_startup: bool = True) -> FastAPI:
     app.include_router(course.router)
     app.include_router(coop.router)
     app.include_router(chat.router)
+    app.include_router(feedback.router)
     app.include_router(auth.router)
     app.include_router(program.router)
     app.include_router(resolve.router)

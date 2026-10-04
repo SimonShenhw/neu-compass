@@ -1,8 +1,10 @@
 # PII 脱敏指南 (NEU-Compass)
 
 > **适用范围**: 任何即将进 `coop_experiences` 表 / Co-op 上传 / 未来扩展到学生 review 的数据
-> **强制阶段**: 写库前。一旦数据进了 SQLite 即视为已发布,事后撤是补救不是预防
+> **强制阶段**: 贡献者提交前自行去除直接 PII；写入公开 `coop_experiences` 前人工复审。2026-09-30 开发版本新增私有 `coop_submissions`，私有收集不等于公开，也不代表允许上传直接 PII。
 > **关联**: PLAN §6.3 PII 脱敏标准 / §9 法律合规 / ADR(待补)
+
+> **当前实现与运维入口**：[Co-op 私有收集与审核](coop-moderation.md)。该版本尚未部署；待审存储不提供额外静态加密。两账号门槛不能替代文本脱敏、存储访问控制或保留期限管理。
 
 ## 0. 为什么 NEU 这件事尤其敏感
 
@@ -13,7 +15,7 @@ Northeastern AAI/DS/CS graduate cohort **极小**。每年 AAI fall 入学约 10
 你写 "我在 Boston 某 Quant 机构 2025 Summer 做 Quant Dev,面了 LSTM 时序模型",
 **就这一句话**,只要你那届有一个人在 Quant 公司做了带时序模型的 Co-op,你就被定位了。
 
-这是为什么 PLAN §6.3 / v1.3 加了 **k-anonymity** 强制规则:不允许唯一三元组进库。
+这是为什么需要公开前的群组门控：独有经历可以私有待审，但不能据此直接公开。
 
 ## 1. 什么算 PII
 
@@ -65,45 +67,42 @@ Northeastern AAI/DS/CS graduate cohort **极小**。每年 AAI fall 入学约 10
 
 ### 2.2 k=2 规则
 
-**已发布的所有 Co-op 数据中,任意三元组必须出现 ≥ 2 次。**
+**公开 UGC 的同一三元组须有至少两个不同登录用户的已审核经历。** 同一用户重复行、身份为空的行和策展种子不计数。种子走独立人工策展，不声称其满足此 UGC 门槛。
 
 实操:用 `schemas.coop.is_uniquely_identifying`:
 
 ```python
 from schemas.coop import is_uniquely_identifying
-from db.coop_repository import CoopRepository
+from db.coop_submission_repository import CoopSubmissionRepository
 
-repo = CoopRepository(conn)
-existing = repo.list_all()
+# Only approved/published records belong in this final reviewed corpus.
+# Production review/publish/credit uses the atomic repository workflow.
+reviewed_corpus = [...]  # reviewed CoopExperience objects, including the target
 new_record = CoopExperience(...)
 
-if is_uniquely_identifying(new_record, existing + [new_record], k=2):
-    # 三元组目前在库内只出现 1 次 (即将插入的这条)
-    raise ValueError(
-        f"k-anonymity violation: ({new_record.company}, "
-        f"{new_record.role}, {new_record.coop_term}) appears only once. "
-        "Generalize company to industry bucket or wait for a 2nd contribution."
-    )
+if is_uniquely_identifying(new_record, reviewed_corpus, k=2):
+    # Keep approved-but-not-public; never echo private triples into routine logs.
+    raise ValueError("Publication requires a second distinct reviewed contributor")
 ```
 
 ### 2.3 处理唯一三元组的两种路径
 
 **路径 A — 等待 (推荐)**:
 - 把记录加进 review queue, 状态待发布
-- 每收一条新 Co-op,重新跑 k-anonymity 检查
-- 直到出现第二条同三元组,两条一起发布
+- 每审核通过一条新 Co-op,重新检查不同贡献者门槛
+- 直到第二个不同用户的同组记录也已审核,同组一起发布
 
 **路径 B — 桶化 (打折)**:
 - 把 company 改成 industry 桶: "State Street" -> "Boston 大型资管 (Quant)"
 - 重新检查 k-anonymity (现在的三元组是 ("Boston 大型资管 (Quant)", "Quant Dev", "Summer 2025"))
-- 桶化后通常通过
+- 桶化后仍必须满足两个不同用户的已审核同组记录；泛化本身不是通过条件
 
 ### 2.4 反例: 桶化也救不回的场景
 
 如果 NEU 那届只有 1 人在 Quant 行业做 Co-op,**任何**桶化都还是定位到他。
 此时:
 - **不发布**, 永久存在 review queue
-- 或得到该同学的明确知情同意 + 书面授权 (ADR-0007 待写)
+- 当前实现没有「凭同意绕过群组门槛」的分支；授权记录机制仍待单独设计
 
 ## 3. 字段级脱敏 patterns
 
@@ -160,12 +159,12 @@ def auto_redact_pre(text: str) -> str:
 ☐ 3. 同事 / 上司 / 面试官名替换为通用称呼
 ☐ 4. 精确薪资 -> 桶值 (e.g. "$30-35/hr")
 ☐ 5. 时间窗仅保留学期粒度 (e.g. "Summer 2025", 不写 "Jun 1 - Aug 15")
-☐ 6. is_uniquely_identifying() 跑过, 返回 False
+☐ 6. UGC：已审核同组集合按不同贡献者检查通过；种子：独立策展确认残余识别风险
 ☐ 7. 在 redaction_audit 字段记录: 谁审 / 删了什么 / 桶化了什么
 ☐ 8. (UGC 路径) 上传者明确同意 PLAN §6.3 redaction policy
 ```
 
-任何一个未打勾, 不入库。
+任何一个适用项未打勾，不写入公开经历表；私有收集也必须遵守直接 PII 去除要求。
 
 ### 4.1 redaction_audit 字段格式
 
@@ -221,18 +220,9 @@ def auto_redact_pre(text: str) -> str:
 
 ### 6.1 立即 (5 分钟内)
 
-```bash
-# 把那条 Co-op 隐藏掉, 不让任何用户能看到
-sqlite3 ~/neu-compass-data/courses.db <<EOF
-UPDATE coop_experiences
-SET visibility_level = 99,  -- 大于任何用户的 contribution_count
-    redaction_audit = 'EMERGENCY HIDE: PII LEAK ' || datetime('now')
-WHERE coop_id = '<the_problem_coop_id>';
-EOF
-```
+先通过受控的维护/访问策略暂停 Co-op 公开读取，保留私有证据并交由可信运维处理。本批尚无单条已公开经历撤回接口；不得把重复审核命令当成撤回操作。
 
-(visibility_level=99 利用 `users.contribution_count <= visibility_level` 这条比较,
-没人贡献 99 条所以谁都看不见。比 DELETE 好,保留审计trail。)
+**不要设置 `visibility_level=99` 或把它设成 2 来隐藏问题行**：DDL 只允许 0/1/2，而且公开 API 的字段分层不是审核/撤回状态；提高分层不能保证隐藏已泄漏内容。原文的 level=99 紧急 SQL 已移除，不能作为运行指令。
 
 ### 6.2 当天 (24 小时内)
 
@@ -252,7 +242,22 @@ EOF
 当前是手工审核。规模上来后:
 
 - 自动 PII 检测器集成 ([Microsoft Presidio](https://github.com/microsoft/presidio) / 自训 NER)
-- 自动 k-anonymity 检查在 API 层 reject 上传
-- 区分 公开级别 0/1/2 之外的 "撤回区" (level=99)
+- 继续完善私有收集、人工审核与不同贡献者门控（不是拒绝首条合法提交）
+- 用独立审核/撤回状态实现单条下架，不复用内容分层或 level=99
 - 法律 / 合规审计 log
 - 上传者授权状态记录 (ADR-0007 待写)
+
+## 8. 06B 私有回答反馈的留存边界（2026-10-02）
+
+本地新增 `chat_answers`／`answer_feedback`，与 Co-op 公开审核分开。完整回答与请求筛选值可能复述用户个人信息；原查询继续保存在 query_log。06C-1 起必须运营开关启用、当前请求明确允许且捕获成功；此时即使用户不投票也会保存完成回答。默认关闭，UI 有默认未勾选的保存告知；关闭、取消或清对话不删除原查询／已保存数据。新表没有自动脱敏或清理机制，不能因反馈只收 👍／👎 就称数据没有 PII。
+
+- 原 token 只在 no-store 完成响应和当前 UI 私有状态，DB 存随机凭证 hash；不放 URL、公开访问日志、Git 或导出。清对话／登出清掉 UI 凭证，但不删除 DB／备份记录。
+- 七天是**反馈凭证有效期**，不是查询／回答留存期。生产启用前须确认访问控制、前端告知、最小留存／清理及备份／导出脱敏；本批未实施 purge 或个人删除接口，不宣称法规／学校合规已验收。
+- 保留评测来源标记，原 NULL 仅表示没有 X-Eval-Run。反馈不是正确性标签，样本导出仍需受控且人工审查，不直接发布用户原文或把下票当 ground truth。
+- 外键定义从 query_log → 回答 → 评价的级联关系，删除／备份清理必须由可信运维在明确授权、备份和目标确认后处理；本批只在临时库测试关系，没有对真实数据执行删除。
+
+06B-2 新增 [离线候选导出／审查入口](feedback-review-export.md)：默认只输出统计，显式 JSONL 仍默认元数据，原文需要成对隐私开关和私有新文件。投票凭证及其 hash、OAuth、session 与 raw user_id 不导出；元数据里的 ID／内容 hash／时间／课程线索仍是私有可关联数据，不能直接公开或称匿名化。仓库内限定已忽略的 data/raw/feedback_review，外部目录、Windows ACL、备份与临时文件仍须治理；七天不会清除导出文件。本批只验证合成临时库，没有实际 PII 审查／导出或清理真实数据。
+
+本批测试的缺字段错误栈曾含 Settings 配置值；本地已隐藏敏感字段 repr 和校验字符串输入，并清理本次 RED 报告的错误细节。不能撤回工具输出历史，相关凭证处置／轮换仍须由持有人确认；显式 model_dump／errors() 不自动脱敏，不记录新值。
+
+功能、迁移与测试边界见 [回答反馈说明](answer-feedback.md) 与 [联合发布验收准备](joint-release-acceptance.md)；生产数据库／留存策略修改、密钥操作仍需单独确认。

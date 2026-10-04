@@ -7,13 +7,13 @@ Mirrors CourseRepository pattern. Caller owns connection.
 
 Visibility-aware reads: list_visible_to(user_id) joins users.contribution_count
 and returns only rows whose visibility_level <= the user's count. Use this
-in the API layer; raw list_all() bypasses the tier system and is for admin
-/ analytics only.
+only for trusted internal reads. The public API uses list_public() plus
+field-level tier redaction; raw list_all() is for operators/analytics only.
 
 感知可见性(visibility)的读取:list_visible_to(user_id) 会关联
 users.contribution_count,只返回 visibility_level <= 该用户贡献数的行。
-API 层应该用这个方法;裸的 list_all() 绕过分级(tier)系统,只给管理员
-/ 数据分析用。
+此方法仅用于可信内部读取；公开 API 使用 list_public() 后再做字段分层。
+裸的 list_all() 只给运维/数据分析用。
 """
 
 from __future__ import annotations
@@ -107,11 +107,10 @@ class CoopRepository:
         )
 
     def delete(self, coop_id: str) -> None:
-        """Hard delete. Use sparingly; prefer setting visibility_level=2 to
-        hide bad data while preserving audit trail.
+        """Hard delete. Use sparingly; visibility_level=2 is NOT moderation
+        withdrawal and does not hide a row from high-tier readers.
 
-        中文:硬删除。请谨慎使用;更推荐把 visibility_level 设为 2 来隐藏
-        问题数据,同时保留审计记录(audit trail)。
+        中文：谨慎硬删除；visibility_level=2 不是撤回审核，不能隐藏问题记录。
         """
         cursor = self._conn.execute(
             "DELETE FROM coop_experiences WHERE coop_id = ?", (coop_id,),
@@ -151,6 +150,36 @@ class CoopRepository:
             "ORDER BY created_at DESC"
         ).fetchall()
         return [self._row_to_coop(r) for r in rows]
+
+    def moderation_schema_available(self) -> bool:
+        """Whether the v1.3 private review queue exists in this database.
+        中文：本数据库是否已有 v1.3 私有审核队列表。"""
+        return self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coop_submissions'",
+        ).fetchone() is not None
+
+    def list_public(self) -> list[CoopExperience]:
+        """Curator seeds OR reviewed UGC with a CURRENT distinct-contributor cohort.
+
+        Pending/rejected/legacy unreviewed UGC is never returned. Rechecking the
+        cohort prevents account deletion from leaving a singleton publicly visible.
+        Before the v1.3 migration no reviewed UGC can exist, so the public list
+        is the curated seeds — browsing degrades instead of failing outright.
+        中文：策展种子或当前仍满足不同贡献者门槛的已审核 UGC；删除账号后重新检查。
+        v1.3 迁移之前不可能存在已审核 UGC，因此公开列表只有策展种子 —— 浏览功能
+        降级而不是直接失败。
+        """
+        if not self.moderation_schema_available():
+            return self.list_seed()
+        rows = self._conn.execute(
+            "SELECT c.* FROM coop_experiences c WHERE c.is_seed_data=1 OR EXISTS ("
+            "SELECT 1 FROM coop_submissions s WHERE s.coop_id=c.coop_id "
+            "AND s.contributor_user_id=c.contributor_user_id AND s.review_status='published' "
+            "AND (SELECT COUNT(DISTINCT p.contributor_user_id) FROM coop_submissions p "
+            "WHERE p.group_key=s.group_key AND p.review_status='published') >= 2) "
+            "ORDER BY c.created_at DESC",
+        ).fetchall()
+        return [self._row_to_coop(row) for row in rows]
 
     def list_visible_to_user(self, user_id: str) -> list[CoopExperience]:
         """Visibility-aware list: returns only rows whose visibility_level

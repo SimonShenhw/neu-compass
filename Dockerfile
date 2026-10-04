@@ -70,10 +70,25 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev $SLIM_EXCLUDES
 
+# Exact pins for everything installed OUTSIDE uv.lock (the lock cannot carry
+# these platform-specific wheels). Every `--build` deploy re-runs these layers
+# (`COPY . .` above invalidates the cache), so a floating spec re-resolves on
+# EVERY deploy — the 2026-06-12 crash-loop came from exactly that. Values are
+# the known-good production set recorded below; change them deliberately, in
+# one commit, after a build + eval on the NAS. tests/test_production_dependencies.py
+# asserts these stay exact.
+# 中文：uv.lock 之外安装的包全部钉死版本（lock 装不了这些平台相关的 wheel）。
+# 每次 `--build` 部署都会重跑这几层（上面的 `COPY . .` 让缓存失效），浮动版本
+# 就会在每次部署时重新解析 —— 2026-06-12 的反复重启崩溃就是这么来的。取值是下方
+# 记录的已知可用生产组合；要改就单独一个 commit 改，并在 NAS 上构建 + 跑评测。
+ARG TORCH_CPU_VERSION=2.12.0
+ARG OPTIMUM_VERSION=2.2.0
+ARG OPTIMUM_INTEL_VERSION=2.0.0
+
 # CPU torch BEFORE optimum-intel: optimum's torch dependency is then already
 # satisfied, so the CUDA wheel never enters the image. ~200MB vs ~6GB.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache torch --index-url https://download.pytorch.org/whl/cpu
+    uv pip install --no-cache "torch==${TORCH_CPU_VERSION}" --index-url https://download.pytorch.org/whl/cpu
 
 # Layer in OpenVINO-native inference deps LAST. These are added via
 # `uv pip install` (not the lock) because they're platform-specific —
@@ -89,14 +104,24 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # torch — and the api crash-looped at boot. The working production stack is
 # optimum 2.x INFERENCE path (the PC-side 2.x incompatibility was the
 # optimum-onnx EXPORT path with transformers 4.57, a different code path).
-# These install outside uv.lock, so drift risk exists either way; if a
-# future rebuild breaks here, pin to the exact versions of the last good
-# image rather than guessing a range. Known-good as of 2026-06-12:
+# These install outside uv.lock, so they are pinned EXACTLY (ARGs above) to
+# the last known-good image. Known-good as of 2026-06-12:
 #   optimum 2.2.0 / optimum-intel 2.0.0 / torch 2.12.0+cpu / transformers 4.57.6
+# Residual drift: the `openvino` extra's own packages (openvino,
+# openvino-tokenizers, nncf) are still resolved at build time. The freeze file
+# written below records the exact set each build actually got, so the next
+# pin can copy it instead of guessing.
+# 中文：openvino 这个 extra 自己拉进来的包（openvino、openvino-tokenizers、
+# nncf）仍在构建时解析；下面写出的 freeze 文件会记录每次构建实际装到的完整
+# 版本，下一次钉版本时直接照抄，不用猜。
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --no-cache \
-        "optimum-intel[openvino]>=1.21" \
-        "optimum>=1.20"
+        "optimum-intel[openvino]==${OPTIMUM_INTEL_VERSION}" \
+        "optimum==${OPTIMUM_VERSION}"
+
+# Exact record of what this build resolved (lock + out-of-lock layers).
+# 中文：记录本次构建实际解析出的完整版本（lock 内 + lock 外各层）。
+RUN uv pip freeze > /app/runtime-freeze.txt
 
 # --- Runtime ---
 FROM python:3.12-slim-bookworm

@@ -30,10 +30,11 @@ produces but mis-consumes is worse than none. Both landed together.
 Called from the pre-radio block of `streamlit_app.render()`, wedged into
 a window bounded on both sides:
 
-- **After `handle_oauth_callback()`** — that function calls
-  `st.query_params.clear()` on *every* exit path, so a read placed
-  before it sees params on a normal visit and an empty dict on an OAuth
-  return. (ADR-0028 flagged this trap; it is real.)
+- **After `handle_oauth_callback()`** — that function clears query
+  params when processing an OAuth return, not on an ordinary visit
+  without a callback code. Keep callback handling before link consumption;
+  this ordering alone does not preserve a destination across OAuth.
+  (Description corrected in the 2026-10-02 extension; auth logic unchanged.)
 - **Before `st.sidebar.radio(..., key="nav_page")`** — routing means
   writing `nav_page`, and writing a widget-bound key after its widget
   rendered raises `StreamlitAPIException`. Same rule that governs the
@@ -167,3 +168,35 @@ Two smaller ones this round surfaced:
 - Bare-number aliases already work for the courses that have them seeded
   (`?course=5800` resolves), but only those — the ADR-0028
   "bare-number aliases" item is still open for the rest of the catalog.
+
+## 2026-10-02 extension — 06A exact program-plan links
+
+The original 923 → 991 result above is the historical legacy-link
+snapshot, not verification of this extension or a current deployment.
+Legacy course/family links remain supported. A source-checked plan
+selected in the Programs view now produces a v1 exact link with eight
+required, single-occurrence fields: `plan_v`, `program`, `plan`, `campus`,
+`catalog_year`, `pathway`, `concentration`, and `plan_revision`.
+Concentration uses a non-empty nullable JSON scalar (`null` or an encoded
+JSON string); a concentration literally named `null` stays distinct.
+
+Full links use the existing public `GET /programs/{program_id}`, bypass
+and evict only the target family's session curriculum cache, then verify
+the exact ID, scope, content revision and review status. Duplicate or
+invalid records, stale/missing targets and conflicting course parameters
+fail closed, without substituting another plan, prefix match, latest
+year or legacy seed. Pending selection is revalidated against the actual
+documents before the selectbox exists. Terminal outcomes are guarded by
+the current public-query token, so clearing/refreshing does not snap back
+but a different full link in the same session can be consumed. Transient
+408/429/5xx failures remain retryable. No URL rewriting, query-log/model
+traffic, API route/schema migration, or OAuth behavior change was added.
+
+An unselected or draft plan produces an explicitly labelled family link.
+Selecting public content is not evidence of personal catalog applicability
+or qualification. Production deployment and real Google-account flows
+remain separate; preserving a destination through an OAuth return was
+not implemented here. [Exact contract and failure behavior](../program-plan-sharing.md)
+and the [single development log](../development-change-log.md) document
+this local extension. Its tests use isolated API fixtures and six
+Streamlit AppTest flows, not a live browser or NAS acceptance run.
