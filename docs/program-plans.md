@@ -147,9 +147,9 @@ v1.5 独立 `program_plans` 表，以 `plan_id` 为主键、完整 scope 为唯�
 .venv/bin/python scripts/sync_program_plans.py --db-path /tmp/neu-compass-plan-rehearsal.sqlite3 --plan-file data/program_plan_seed/boston_2026_2027_pathway_rules.json --source-dir data/raw/program_catalog --commit
 ```
 
-整批先解析/验证文档；重复 ID/scope、未存在的项目家族或占位冲突失败。提交时 v1.5 加表与所有文档写入处于同一事务，后续失败连前面插入及本次建表一并回滚；重复导入幂等。空 JSON 数组可用于显式的仅 v1.5 加表演练。
+整批先解析/验证文档；重复 ID/scope、未存在的项目家族或占位冲突失败。提交时 v1.5 加表与所有文档写入处于同一事务，后续失败连前面插入及本次建表一并回滚；重复导入同一文件幂等。若会用较弱版本覆盖已带来源指纹（`source_html_sha256`）或已 `source_checked` 的方案（例如导入 extended 后单独重跑 core），或用更早的抓取覆盖带指纹的较新抓取，整批拒绝（只读运行同样拒绝，一行都不写）并列出方案与原因。只想更新文件里的其他方案时，同步一份去掉这些方案的文件；确需替换它们时显式加 `--allow-downgrade`。完整性校验不通过、甚至新旧版本已校验不过（例如多了新字段）的旧行不对外展示，但仍按它 JSON 里记录的指纹、审核状态和抓取日期判断（读不出抓取日期时只按前两项）：同等或更强的版本可以覆盖修复，较弱的照样拒绝；连这三项都没有的旧行（例如 `{}`）不记录任何来源，可直接覆盖。抓取工具对以前存档过的同一份网页沿用最初的抓取日期，所以网页真的退回旧版本时，同步会以 `drops_newer_capture` 被拒；确认属实后加 `--allow-downgrade`。空 JSON 数组可用于显式的仅 v1.5 加表演练。
 
-报告中的 `records` 是输入数，`schema_missing` 是执行前状态，`would_store` 是预计变更数，`stored` 是提交时实际变化数。脚本不创建项目家族，不改旧培养方案、课程列、先修边或 FAISS/BM25，不执行网络请求，也不代替独立的 v1.3 Co-op / v1.4 课程来源迁移。
+报告中的 `records` 是输入数，`schema_missing` 是执行前状态，`would_store` 是预计变更数，`stored` 是提交时实际变化数，`downgraded`（只在加 `--allow-downgrade` 时出现）列出被有意降级的方案。成功时 stdout 只有这份 JSON 报告，库里的告警（例如无法使用的旧行）写到 stderr；被拒或失败时 stdout 是一行说明。脚本不创建项目家族，不改旧培养方案、课程列、先修边或 FAISS/BM25，不执行网络请求，也不代替独立的 v1.3 Co-op / v1.4 课程来源迁移。
 
 提交到副本后应检查 API 的精确范围、缺失警告、界面选择与 409 边界，再安排真实模型/浏览器验收。生产备份、迁移、同步 API/UI 发布和回滚需要另行确认，不能把测试临时库通过当成上线验收。
 

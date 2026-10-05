@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -81,13 +83,44 @@ def test_rehearse_recovery_corrupted_sqlite_fails(tmp_path: Path) -> None:
     assert any("integrity check failed" in err or "Unexpected exception" in err for err in report["errors"])
 
 
+def test_deterministic_embedder_is_stable_across_processes() -> None:
+    """str hashing is salted per process (PYTHONHASHSEED), so a hash()-seeded fake
+    embedder produced different vectors, and a different top hit, on every run."""
+    # Each text's vector must depend on the text alone: the same alone, in a batch, or reordered.
+    probe = (
+        "import hashlib\n"
+        "from scripts.rehearse_recovery import _DeterministicEmbedder\n"
+        "texts = ['Algorithms and data structures', 'CS 5800', 'CS 5004']\n"
+        "embedder = _DeterministicEmbedder()\n"
+        "def digests(rows):\n"
+        "    return [hashlib.sha256(row.tobytes()).hexdigest() for row in rows]\n"
+        "batch = digests(embedder.encode(texts))\n"
+        "alone = [digests(embedder.encode([text]))[0] for text in texts]\n"
+        "reordered = digests(embedder.encode(texts[::-1]))[::-1]\n"
+        "assert batch == alone == reordered, (batch, alone, reordered)\n"
+        "print(*batch)\n"
+    )
+    runs = []
+    for hash_seed in ["1", "2"]:
+        proc = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=False,
+                              cwd=Path(__file__).resolve().parent.parent, timeout=120,
+                              env={**os.environ, "PYTHONHASHSEED": hash_seed})
+        assert proc.returncode == 0, proc.stderr
+        digests = proc.stdout.split()
+        assert len(digests) == 3 and all(re.fullmatch(r"[0-9a-f]{64}", item) for item in digests), proc.stdout
+        assert len(set(digests)) == 3, "different texts (two of equal length) must not share a vector"
+        runs.append(digests)
+    assert runs[0] == runs[1]
+
+
 def test_rehearse_recovery_cli_subprocess() -> None:
     cmd = [
         sys.executable,
         "scripts/rehearse_recovery.py",
         "--json",
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=300,
+                          cwd=Path(__file__).resolve().parent.parent)
     assert proc.returncode == 0, f"CLI rehearsal failed with stderr: {proc.stderr}"
     data = json.loads(proc.stdout)
     assert data["success"] is True

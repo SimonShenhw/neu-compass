@@ -13,6 +13,7 @@ import httpx
 import pytest
 
 from db.connection import connect
+from db.program_plan_repository import PlanDowngradeError
 from db.program_repository import ProgramRepository
 from schemas.program import Program
 from schemas.program_plan import ProgramPlan
@@ -195,6 +196,45 @@ def test_extended_bundle_real_cli_import_on_temp_db_is_readonly_then_idempotent(
     assert conn.execute("SELECT COUNT(*) FROM program_plans").fetchone()[0] == 5
     assert [tuple(row) for row in conn.execute("SELECT * FROM programs ORDER BY program_id")] == old_rows
     conn.close()
+
+
+def test_rerunning_the_core_layer_after_extended_is_refused(tmp_path):
+    """The release imports core, then extended (re-using two core plan IDs, now
+    fingerprinted). Re-running core alone used to downgrade those two silently."""
+    path = tmp_path / "runtime.db"
+    init_database(path)
+    conn = connect(path)
+    for family in ["cs-ms", "ds-ms", "info-ms"]:
+        ProgramRepository(conn).add_program(Program(program_id=family, full_name="Legacy", prefix=family.split("-")[0].upper()))
+    conn.commit()
+    conn.close()
+    core_file, extended_file = tmp_path / "core.json", tmp_path / "extended.json"
+    core_file.write_text(CORE.read_text(encoding="utf-8"), encoding="utf-8")
+    plans, archive = [], None
+    for item in json.loads(EXTENDED.read_text(encoding="utf-8")):
+        plan, archive = archived_plan(tmp_path, item)
+        plans.append(plan.model_dump(mode="json"))
+    extended_file.write_text(json.dumps(plans), encoding="utf-8")
+
+    def documents():
+        conn = connect(path)
+        try:
+            return [tuple(row) for row in conn.execute(
+                "SELECT plan_id, document, content_hash FROM program_plans ORDER BY plan_id")]
+        finally:
+            conn.close()
+
+    assert sync_plans(path, core_file, commit=True)["stored"] == 3
+    assert sync_plans(path, extended_file, commit=True, source_dir=archive)["stored"] == 5
+    imported = documents()
+    shared = ["cs-ms-boston-2026-2027-standard", "info-ms-boston-2026-2027-standard-general"]
+    for commit in [False, True]:
+        with pytest.raises(PlanDowngradeError) as refused:
+            sync_plans(path, core_file, commit=commit)
+        assert sorted(item["plan_id"] for item in refused.value.downgrades) == shared
+        assert {item["reason"] for item in refused.value.downgrades} == {"drops_source_fingerprint"}
+        assert documents() == imported
+    assert sync_plans(path, extended_file, commit=True, source_dir=archive)["stored"] == 0
 
 
 def test_table_parser_preserves_group_boundaries_and_stops_before_optional_coop():
