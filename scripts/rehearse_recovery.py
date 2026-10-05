@@ -25,6 +25,7 @@ import argparse
 import contextlib
 import io
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -57,7 +58,10 @@ class _DeterministicEmbedder:
     def encode(self, texts: list[str], *, normalize: bool = True) -> np.ndarray:
         vecs = []
         for t in texts:
-            seed = abs(hash(t)) % (2**32)
+            # Not hash(t): str hashing is salted per process, so the vectors (and the
+            # reported top hit) changed from run to run.
+            # 中文：不用 hash(t)：字符串哈希每个进程加盐不同，向量和报告里的 top hit 每次都会变。
+            seed = int.from_bytes(hashlib.sha256(t.encode("utf-8")).digest()[:8], "big")
             rng = np.random.default_rng(seed)
             vecs.append(rng.standard_normal(EMBEDDING_DIM, dtype=np.float32))
         out = np.vstack(vecs).astype(np.float32)

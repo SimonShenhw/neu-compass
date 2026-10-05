@@ -1367,3 +1367,61 @@
 - 2026-10-04 约 21:55 UTC，NAS 非正常停机（没有关机记录，原因不明），22:14 UTC 自动重启，服务随之恢复、没有报错。UGOS 重启后把项目目录改回 root:root，下次部署前要先 `sudo chown -R shenhaowei:docker /volume1/docker/neu-compass`。
 - 仍遗留（与 09 相同，本批未处理）：单独重跑 v1.5 的 core 会把 2 份方案降级；v1.6 验收清单里有 35 门占位课；验证器对旧库的 ALTER 漂移和 0 字节输入过严；`rehearse_recovery.py` 用 `hash()` 做种子；回答引用 64 位 snapshot_id 显得冗长；/chat 还没有回答质量评测集。
 
+## 11 — v1.5 防降级与恢复演练确定性（2026-10-05）
+
+### 范围与原因
+
+- 处理 09/10 遗留里两条确定性的小问题：
+  1. v1.5 的 core 与 extended 两层共用 2 个 plan_id（`cs-ms-boston-2026-2027-standard`、`info-ms-boston-2026-2027-standard-general`）。extended 版本带来源指纹，规则也更全（CS 13 个节点对 6 个，INFO 28 对 6）。按 core → extended → pathway 跑一次没有问题；但之后单独重跑 core，会用无指纹的旧版本悄悄覆盖这 2 份（dry-run 只显示 would_store=2，不报错）。10-04 上线时是靠人记住「不要重放 core」避开的。
+  2. `scripts/rehearse_recovery.py` 的假嵌入器用内置 `hash()` 做随机种子。Python 对字符串哈希按进程加盐，所以每次运行的向量都不同，报告里的 top_search_hit 也跟着变（不影响通过与否）。
+
+### 已实现（三轮审查后的最终行为）
+
+1. `db/program_plan_repository.py`：
+   - `provenance_downgrade(prior, incoming)` 有三条规则，按顺序取第一条作为原因：
+     1. 旧的有来源指纹（`source_html_sha256`）、新的没有 → `drops_source_fingerprint`；
+     2. 旧的是 `source_checked`、新的不是 → `drops_source_review`（只保护 `source_checked`；draft 换 draft、draft 升级都放行）；
+     3. 两边都有指纹、指纹不同、新的抓取日期更早 → `drops_newer_capture`（同一指纹不算；旧行读不出抓取日期时这条不适用）。指纹不同、日期相同或更晚属于重新抓取，放行。
+   - 旧行一侧只用 `_recorded()` 从原始 JSON 读这三项（`RecordedProvenance`），不做整份方案校验：内容哈希对不上、或新旧版本校验不过（`extra="forbid"`、校验收紧）的行，照样按它记录的来源判断，较弱的版本不能悄悄覆盖，同等或更强的可以修复。不是 JSON 对象的文档（`[]`、`null`、数字、双重编码）和 `{}` 不记录来源，可以直接覆盖。指纹字段只要非空就算有指纹（形状意外时宁可拒绝）；日期也接受 `2026-10-01T00:00:00` 这种写法。
+   - `store(plan, *, allow_downgrade=False)` 默认拒绝降级，抛 `PlanDowngradeError(ValueError)`（带 `.downgrades`，可 pickle/copy，保留 `__notes__`）。`list_for_program()` 的完整性校验抽成 `_verified()`，行为不变。
+2. `scripts/sync_program_plans.py`：
+   - 第一次写入前，在同一事务里预检查整份文件：先按行的列值做 `validate_slot()`（与 `store()` 一致，换绑错误不被掩盖，dry-run 与 commit 判断相同），再判断降级；有降级就整份拒绝、一行都不写，并列出全部方案与原因。dry-run 同样拒绝。
+   - CLI：`--allow-downgrade` 有意放行（报告里带 `downgraded`）；拒绝时打印一行说明、退出码 1，提示「同步一份去掉这些方案的文件，或确认后加 `--allow-downgrade`（例如网页确实退回了旧版本）」；structlog 改写到 stderr，成功时 stdout 只有 JSON 报告。
+3. `scripts/rehearse_recovery.py` 和 `tests/test_rebuild_faiss.py` 的假嵌入器改用 SHA-256 派生种子，跨进程稳定。
+4. `docs/program-plans.md`：导入说明写明以上规则、只更新部分方案的做法、网页回退时的处理和输出约定。
+
+### 修改文件
+
+| 文件 | 修改 |
+|---|---|
+| `db/program_plan_repository.py` | 三条规则、`RecordedProvenance` / `_recorded()` / `recorded()`、`store(allow_downgrade=)`、`_verified()`、可 pickle 的 `PlanDowngradeError` |
+| `scripts/sync_program_plans.py` | 整份文件预检查（先 `validate_slot`）、`--allow-downgrade`、拒绝提示、日志写 stderr |
+| `scripts/rehearse_recovery.py` | 种子改用 SHA-256 |
+| `tests/test_program_plan_storage.py` | 22 个新测试：整份拒绝（连非降级方案也不写）、`--allow-downgrade`、规则与优先级（含 `RecordedProvenance`）、抓取日期比较、损坏 / 校验不过 / 篡改 / 任意形状的旧行、draft 重放与编辑、范围错误优先、pickle/copy、CLI 拒绝与 stdout |
+| `tests/test_program_sources.py` | 按真实层顺序：core → extended（合成存档）→ 再跑 core 被拒、库内容不变，extended 重放仍为 0 |
+| `tests/test_recovery_rehearsal.py` | 跨进程（`PYTHONHASHSEED` 分别为 1、2），单独、批量、换序编码的向量都一致，3 段文本互不相同；CLI 演练测试补上 `timeout` 和 `cwd` |
+| `tests/test_rebuild_faiss.py` | 测试内的假嵌入器同样改种子 |
+| `docs/program-plans.md` | 导入说明 |
+| 本文件 | 记录 11 |
+
+### 验证记录
+
+- 全量回归：`2697 passed, 5 warnings`，0 失败（10 之后为 2673，本批新增 24 项；5 个警告与之前相同）。
+- 变异检查 40/40 被测试拦下。每个变异体在 /tmp 下各自独立的仓库副本里并行跑，真实工作区从未改动。覆盖：三条规则的删除、反向、改比较符、改顺序、去掉条件；旧行读取的各种退化（整份校验、遇到异常形状崩溃、读错日期字段、缺审核状态当成 source_checked、去掉保护分支）；`store()` 与预检查的各种退化（不拦、只在 dry-run 拦、只记第一条、先写其余再报错、跳过 `validate_slot`）；CLI（忽略参数、日志回到 stdout）；`__reduce__`；种子的 4 种退化（`hash()`、常数、批内位置、文本长度）。
+- ruff 0.5.0（F/E9/B）：7 个改动的代码和测试文件没有新增告警（两个测试文件各 1 条，改动前就有）。
+- 三轮只读审查，每轮 2 路（语义 / 测试质量），都没有 CRITICAL/HIGH：
+  - 第 1 轮 8 条（中 1、中低 1、低 4、小 2）：整份拒绝没有测试钉住、损坏的带指纹行被悄悄覆盖、拒绝提示照着做不了、异常不能 pickle、不比较抓取新旧、种子测试太弱、CLI 警告混进 stdout、原因优先级没钉住。第 2 轮全部处理（用户 10-05 同意按推荐做：损坏行按记录的来源判断；不加跳过参数，只把提示改准确）。
+  - 第 2 轮：校验不过的行会让防线失效、预检查与 `store()` 判断范围的依据不同、日期规则在网页回退时会误拦（保留规则，写清处理办法）、`__reduce__` 丢 `__notes__`，以及若干测试缺口。第 3 轮全部处理。
+  - 第 3 轮：draft 一侧没有测试、旧行日期字段没钉住、`_recorded()` 的保护分支没有测试、`{}` 用例分辨力不够、日期写法和非字符串指纹两处读取缺口、测试日期依赖种子等。本轮全部处理，第 3 轮审查者构造的 10 个存活变异也都纳入上面的 40 个，全部被拦下。没有再开第 4 轮。
+
+### 已知、未处理（均为低）
+
+- structlog 默认渲染器按 stdout 是否终端决定颜色：stdout 是终端、stderr 重定向到文件时，文件里会带颜色码。
+- 被拒或失败时的一行说明仍写 stdout（文档写明的是「成功时」stdout 只有 JSON）。
+- 双重编码或包在数组里的文档按「不记录来源」处理，可以被直接覆盖（`model_dump_json` 不会写出这种文档）。
+- 预检查提前做 `validate_slot()` 后，同一文件里同时有「换绑范围」和「项目未导入」两种错误时，先报的错误可能与以前不同（都是整份失败；CLI 只打印异常类型）。
+
+### 发布状态
+
+- 改的是导入工具与演练脚本，不在线上请求路径上；合并后不需要单独部署，下次部署时随镜像生效，生产库也不用重跑任何迁移。在那之前，NAS 镜像里仍是旧脚本（没有防降级），所以新镜像部署前仍不要单独重跑 v1.5 的 core。
+

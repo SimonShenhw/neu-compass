@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from pathlib import Path
 
@@ -22,7 +23,8 @@ class _DeterministicEmbedder:
     def encode(self, texts: list[str], *, normalize: bool = True) -> np.ndarray:
         vecs = []
         for t in texts:
-            seed = abs(hash(t)) % (2**32)
+            # hash(t) is salted per process; sha256 keeps the vectors stable across runs.
+            seed = int.from_bytes(hashlib.sha256(t.encode("utf-8")).digest()[:8], "big")
             rng = np.random.default_rng(seed)
             vecs.append(rng.standard_normal(EMBEDDING_DIM, dtype=np.float32))
         out = np.vstack(vecs).astype(np.float32)
