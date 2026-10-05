@@ -1333,3 +1333,37 @@
   - 索引发布在崩溃后仍可能留下撕裂状态（会被拒绝加载，需要重建），没有做整组原子切换。
 - 上线前：在生产库的备份副本上按 v1.3 → v1.7 的顺序演练迁移。
 
+## 10 — 上线记录；钉住 lock 之外的传递依赖（2026-10-05）
+
+### 范围与原因
+
+- 01–09 已于 2026-10-04 合并进 main（merge commit `1c1b601`），19:13 UTC 起在 NAS 上线。线上库按 v1.3 → v1.7 迁移完成，结果与生产快照演练逐项一致，原有数据未变。上线后评测（v0.4，116/116 成功）：R@5 0.8609 / MRR 0.9362（09-14 基线 0.8628 / 0.9293），alias/hybrid/rejected 仍是 31/75/10，server p50/p95 871.7/1251.2 ms。
+- 09 遗留的「openvino 等传递依赖未锁」在这次上线中真的发生了。对比 7 月镜像（`ed8e7971fcc0`）和新镜像（`57464a30d708`）的完整包清单，只有 8 个包版本不同，全部来自 lock 之外的两层 `uv pip install`：openvino 2026.2.1 → 2026.4.1（openvino-tokenizers 同步升级）、nncf 3.2.0 → 3.4.0、ninja、pydot、pyparsing、setuptools 70.2.0 → 78.1.0，以及 torch 2.12.1+cpu → 2.12.0+cpu（08 钉的 2.12.0 抄自 6 月的记录，7 月镜像实际是 2.12.1）。用夹具模型时代码输出 116/116 不变，所以 R@5 的微降（全部来自 q083 的第 5 名）是真实模型分数的漂移，最可能来自 openvino 升级。本批把这些包钉住，以后用同一份代码重建镜像，得到的是同一套依赖。
+
+### 已实现
+
+1. 新增 `runtime-constraints.txt`：9 个包的精确版本（setuptools、openvino、openvino-tokenizers、openvino-telemetry、nncf、ninja、pydot、pyparsing、tabulate），逐字抄自线上镜像的 `/app/runtime-freeze.txt`。setuptools 是因为 torch 2.12.0+cpu 要求 `<82`，torch 那层会从 PyTorch CPU 源另取一个版本；其余是 optimum-intel 2.0.0 不设上限的依赖。
+2. Dockerfile 的两层 `uv pip install` 都加上 `--constraint runtime-constraints.txt`，注释更新为 2026-10-04 的已知可用组合。torch、optimum、optimum-intel 仍由 ARG 精确钉住，取值不变（与线上一致）。
+3. 测试：新增 `test_out_of_lock_transitive_packages_are_constrained_exactly`，要求每条 lock 之外的安装都读约束文件、文件里每行都是 `name==version`、已知会浮动的 9 个包都在且不重复。顺带修正提取安装命令的辅助函数：先去掉注释行再匹配（之前会把注释里出现的 `uv pip install` 字样也当成命令）。
+
+### 修改文件
+
+| 文件 | 修改 |
+|---|---|
+| `runtime-constraints.txt`（新增） | lock 之外传递依赖的精确版本 |
+| `Dockerfile` | 两层 `uv pip install` 读约束文件；注释更新 |
+| `tests/test_production_dependencies.py` | 新增约束文件测试；提取命令时跳过注释行 |
+| 本文件 | 记录 10 |
+
+### 验证记录
+
+- `tests/test_production_dependencies.py`：14 passed。变异检查：6 种改坏方式（任一层去掉 `--constraint`、约束写成范围、漏掉一个包、重复一行、torch 顶层改成 `>=`）都被测试拦下，原文件通过。
+- 解析演练（`uv pip compile`，只解析不安装，Python 3.12 / manylinux x86_64）：torch 层只用 PyTorch CPU 源，解析出 torch 2.12.0+cpu 与 setuptools 78.1.0；optimum-intel 层走 PyPI、其余包固定为线上版本，解析出的 9 个包与线上镜像完全一致。对照组：不带约束时，今天解析出的结果也相同。所以本批不改变下次构建的结果，只防止以后漂移。
+- 镜像未重建、未重新部署：线上镜像本来就是这套版本，下次部署时自动生效。
+
+### 发布状态与下一段
+
+- 线上运行的仍是 `1c1b601` 构建的镜像；本批只改构建约束，合并后不需要单独部署。
+- 2026-10-04 约 21:55 UTC，NAS 非正常停机（没有关机记录，原因不明），22:14 UTC 自动重启，服务随之恢复、没有报错。UGOS 重启后把项目目录改回 root:root，下次部署前要先 `sudo chown -R shenhaowei:docker /volume1/docker/neu-compass`。
+- 仍遗留（与 09 相同，本批未处理）：单独重跑 v1.5 的 core 会把 2 份方案降级；v1.6 验收清单里有 35 门占位课；验证器对旧库的 ALTER 漂移和 0 字节输入过严；`rehearse_recovery.py` 用 `hash()` 做种子；回答引用 64 位 snapshot_id 显得冗长；/chat 还没有回答质量评测集。
+
