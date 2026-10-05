@@ -1,0 +1,35 @@
+# Exact versions for the packages the Dockerfile's out-of-lock `uv pip install`
+# layers would otherwise re-resolve on every `--build` deploy. uv.lock cannot
+# carry them: the image installs CPU torch + optimum-intel outside the lock, and
+# their own dependencies float with them. Both of those layers read this file.
+# Copied verbatim from /app/runtime-freeze.txt of the production image built
+# 2026-10-04 (sha256:57464a30d708; live-API eval v0.4: R@5 0.8609 / MRR 0.9362).
+# To change: build on the NAS, run the eval, then copy the new freeze lines here
+# in ONE commit. tests/test_production_dependencies.py keeps every line exact.
+# 中文：Dockerfile 里 lock 之外的两层 `uv pip install` 原本每次 `--build` 部署都会
+# 重新解析这些包（uv.lock 管不到：镜像在 lock 之外装 CPU torch + optimum-intel，
+# 它们自己的依赖跟着浮动）。这两层都读本文件。版本逐字抄自 2026-10-04 线上镜像的
+# /app/runtime-freeze.txt（线上评测 R@5 0.8609 / MRR 0.9362）。要改：先在 NAS 上
+# 构建 + 跑评测，再把新的 freeze 行一次性抄进来，单独一个 commit。
+
+# torch 2.12.0+cpu requires setuptools<82, so the torch layer replaces the
+# locked 82.0.1 with whatever the PyTorch CPU index serves (70.2.0 in the July
+# image, 78.1.0 in the 2026-10-04 one).
+# 中文：torch 2.12.0+cpu 要求 setuptools<82，torch 那层会把 lock 里的 82.0.1 换成
+# PyTorch CPU 源当时提供的版本（7 月镜像是 70.2.0，2026-10-04 镜像是 78.1.0）。
+setuptools==78.1.0
+
+# optimum-intel 2.0.0 leaves these unbounded (openvino>=2026.0, nncf>=2.19.0, ...).
+# Between the July and 2026-10-04 images this moved openvino 2026.2.1 -> 2026.4.1
+# with no code change, and live ranking shifted slightly.
+# 中文：optimum-intel 2.0.0 对这些不设上限（openvino>=2026.0、nncf>=2.19.0 等）；
+# 7 月与 2026-10-04 两个镜像之间，openvino 就这样在没改代码的情况下从 2026.2.1 变成
+# 2026.4.1，线上排序随之轻微漂移。
+openvino==2026.4.1
+openvino-tokenizers==2026.4.1.0
+openvino-telemetry==2025.2.0
+nncf==3.4.0
+ninja==1.13.2
+pydot==4.0.1
+pyparsing==3.3.3
+tabulate==0.10.0

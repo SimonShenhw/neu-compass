@@ -73,14 +73,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Exact pins for everything installed OUTSIDE uv.lock (the lock cannot carry
 # these platform-specific wheels). Every `--build` deploy re-runs these layers
 # (`COPY . .` above invalidates the cache), so a floating spec re-resolves on
-# EVERY deploy — the 2026-06-12 crash-loop came from exactly that. Values are
-# the known-good production set recorded below; change them deliberately, in
-# one commit, after a build + eval on the NAS. tests/test_production_dependencies.py
-# asserts these stay exact.
+# EVERY deploy — the 2026-06-12 crash-loop came from exactly that. The three
+# top-level packages are the ARGs below; the packages THEY pull in (openvino,
+# nncf, the setuptools torch needs, ...) are pinned in runtime-constraints.txt,
+# which every `uv pip install` here reads. Values are the known-good production
+# set recorded below; change them deliberately, in one commit, after a build +
+# eval on the NAS. tests/test_production_dependencies.py asserts both stay exact.
 # 中文：uv.lock 之外安装的包全部钉死版本（lock 装不了这些平台相关的 wheel）。
 # 每次 `--build` 部署都会重跑这几层（上面的 `COPY . .` 让缓存失效），浮动版本
-# 就会在每次部署时重新解析 —— 2026-06-12 的反复重启崩溃就是这么来的。取值是下方
-# 记录的已知可用生产组合；要改就单独一个 commit 改，并在 NAS 上构建 + 跑评测。
+# 就会在每次部署时重新解析 —— 2026-06-12 的反复重启崩溃就是这么来的。三个顶层包
+# 用下面的 ARG 钉；它们带进来的包（openvino、nncf、torch 需要的 setuptools 等）钉在
+# runtime-constraints.txt 里，这里每条 `uv pip install` 都读它。取值是下方记录的已知
+# 可用生产组合；要改就单独一个 commit 改，并在 NAS 上构建 + 跑评测。两处都由
+# tests/test_production_dependencies.py 断言保持精确版本。
 ARG TORCH_CPU_VERSION=2.12.0
 ARG OPTIMUM_VERSION=2.2.0
 ARG OPTIMUM_INTEL_VERSION=2.0.0
@@ -88,7 +93,8 @@ ARG OPTIMUM_INTEL_VERSION=2.0.0
 # CPU torch BEFORE optimum-intel: optimum's torch dependency is then already
 # satisfied, so the CUDA wheel never enters the image. ~200MB vs ~6GB.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache "torch==${TORCH_CPU_VERSION}" --index-url https://download.pytorch.org/whl/cpu
+    uv pip install --no-cache --constraint runtime-constraints.txt \
+        "torch==${TORCH_CPU_VERSION}" --index-url https://download.pytorch.org/whl/cpu
 
 # Layer in OpenVINO-native inference deps LAST. These are added via
 # `uv pip install` (not the lock) because they're platform-specific —
@@ -105,17 +111,21 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # optimum 2.x INFERENCE path (the PC-side 2.x incompatibility was the
 # optimum-onnx EXPORT path with transformers 4.57, a different code path).
 # These install outside uv.lock, so they are pinned EXACTLY (ARGs above) to
-# the last known-good image. Known-good as of 2026-06-12:
+# the last known-good image. Known-good as of 2026-10-04 (image 57464a30d708,
+# live eval R@5 0.8609 / MRR 0.9362):
 #   optimum 2.2.0 / optimum-intel 2.0.0 / torch 2.12.0+cpu / transformers 4.57.6
-# Residual drift: the `openvino` extra's own packages (openvino,
-# openvino-tokenizers, nncf) are still resolved at build time. The freeze file
-# written below records the exact set each build actually got, so the next
-# pin can copy it instead of guessing.
-# 中文：openvino 这个 extra 自己拉进来的包（openvino、openvino-tokenizers、
-# nncf）仍在构建时解析；下面写出的 freeze 文件会记录每次构建实际装到的完整
-# 版本，下一次钉版本时直接照抄，不用猜。
+#   / openvino 2026.4.1 (full transitive set: runtime-constraints.txt)
+# Before 2026-10-05 the extra's own packages (openvino, openvino-tokenizers,
+# nncf, ...) still resolved at build time: the July and 2026-10-04 images got
+# openvino 2026.2.1 and 2026.4.1 from the same spec, and live ranking shifted
+# slightly. runtime-constraints.txt now pins them, copied from the freeze file
+# written below; the next re-pin copies that file again instead of guessing.
+# 中文：2026-10-05 之前，这个 extra 自己拉进来的包（openvino、openvino-tokenizers、
+# nncf 等）仍在构建时解析：同样的写法，7 月镜像装到 openvino 2026.2.1、2026-10-04
+# 镜像装到 2026.4.1，线上排序随之轻微漂移。现在由 runtime-constraints.txt 钉住（抄自
+# 下面写出的 freeze 文件）；下次重新钉版本也照抄 freeze 文件，不要猜。
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache \
+    uv pip install --no-cache --constraint runtime-constraints.txt \
         "optimum-intel[openvino]==${OPTIMUM_INTEL_VERSION}" \
         "optimum==${OPTIMUM_VERSION}"
 
