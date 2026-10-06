@@ -88,7 +88,15 @@ PROGRAM_CAVEAT = re.compile(
 PROGRAMS_PAGE = re.compile(r"培养方案|Programs page|\bPrograms\b", re.I)
 SAVED_COPY = re.compile(r"副本|saved copy|stored copy|copy of the catalog|不是实时|非实时|not a live", re.I)
 
-SENTENCE = re.compile(r"[^。！？!?\n]+[。！？!?]?")
+# A sentence ends at 。！？!?, at a line break, or at a period followed by a space or the end; not at
+# the period in 4.0, U.S. or an abbreviation such as e.g. or approx. 中文：句子在 。！？!?、换行、
+# 或后面跟空白/结尾的英文句号处结束；4.0、U.S. 里的点和 e.g.、approx. 这类缩写不算。
+SENTENCE_END = re.compile(r"[。！？!?]+|\.(?=\s|$)|\n")
+ABBREVIATION = re.compile(r"\b(?:(?i:e\.g|i\.e|approx|vs|cf|prof|dr|mrs?|ms|fig)|[A-Z])$")
+# A pronoun in a review sentence refers the review to a person, i.e. the instructor ("RMP 上的评价说他
+# 讲得清楚"); 其他/他们/他人 are not pronouns for one person. 中文：评价句里的人称代词指的是某个人，也就是
+# 老师；其他、他们、他人不算。
+PERSON = re.compile(r"(?<!其)他(?![们人])|她(?![们人])|\b(?:he|she|his|her|him)\b", re.I)
 REPORT_CUE = re.compile(r"报告|称|表示|提到|指出|反映|认为|评价(显示|说)|评论(显示|说)|据[^。\n]{0,20}(评价|评论)|"
                         r"根据[^。\n]{0,40}(评价|评论)|\breport|\bsay|\bsaid\b|\baccording to\b|\bmention|"
                         r"\bnote[sd]?\b|\bdescribe|\breviews?\b|\breviewers?\b", re.I)
@@ -119,6 +127,45 @@ def number_pattern(value: float) -> re.Pattern:
     """A number as an answer may write it (12 / 12.0), not part of a larger number or a credit count."""
     core = rf"{int(value)}(?:\.0+)?" if float(value).is_integer() else re.escape(str(value))
     return re.compile(rf"(?<![\d.]){core}(?![\d]|\.\d|\s*(?:学分|credits?|credit-hours?))", re.I)
+
+
+def sentences(text: str) -> list[str]:
+    """The answer's sentences (see SENTENCE_END), blank ones dropped. 中文：回答里的句子，空句去掉。"""
+    parts, start = [], 0
+    for end in SENTENCE_END.finditer(text):
+        if end.group(0) == "." and ABBREVIATION.search(text, start, end.start()):
+            continue
+        parts.append(text[start:end.end()])
+        start = end.end()
+    parts.append(text[start:])
+    return [part for part in parts if part.strip()]
+
+
+def review_attribution(parts: list[str], has_rmp_data: bool) -> str:
+    """How the sentences that cite reviews attribute them. Consecutive review sentences form one
+    passage; each passage must name the instructor (or refer to them as he/she) itself, so an
+    unrelated "professor" elsewhere does not count. The other-course caveat may also sit in the
+    sentence right after a passage. 中文：引用评价的句子怎样归属。连续的评价句算一段；每段自己要
+    提到老师（或用他/她指代），别处无关的 "professor" 不算。"可能是别的课"的提示也可以在紧接着的下一句。"""
+    reviewing = [bool(RMP_NAME.search(part)) or (has_rmp_data and bool(REVIEW_WORD.search(part))) for part in parts]
+    passages, index = [], 0
+    while index < len(parts):
+        if not reviewing[index]:
+            index += 1
+            continue
+        end = index
+        while end + 1 < len(parts) and reviewing[end + 1]:
+            end += 1
+        passages.append((index, end))
+        index = end + 1
+    if not passages:
+        return "not used"
+    if not all(any(INSTRUCTOR.search(part) or PERSON.search(part) for part in parts[start:end + 1])
+               for start, end in passages):
+        return "UNQUALIFIED"
+    if any(OTHER_COURSE.search(part) for start, end in passages for part in parts[start:end + 2]):
+        return "instructor + may be another course"
+    return "instructor, no other-course caveat"
 
 
 def find_links(text: str) -> list[dict]:
@@ -161,16 +208,8 @@ def check_answer(text: str, context: AnswerContext) -> dict:
     counts = [_context(text, m) for pattern in (COUNT_ZH, COUNT_EN) for m in pattern.finditer(text)
               if m.group(1).lower() not in SINGULAR]
 
-    uses_reviews = bool(RMP_NAME.search(text)) or (context.has_rmp_data and bool(REVIEW_WORD.search(text)))
-    instructor = bool(INSTRUCTOR.search(text))
-    if not uses_reviews:
-        rmp = "not used"
-    elif instructor and OTHER_COURSE.search(text):
-        rmp = "instructor + may be another course"
-    elif instructor:
-        rmp = "instructor, no other-course caveat"
-    else:
-        rmp = "UNQUALIFIED"
+    parts = sentences(text)
+    rmp = review_attribution(parts, context.has_rmp_data)
 
     caveats = {"fetch_date": (context.fetch_date_relevant, FETCH_DATE), "no_catalog": (context.no_catalog_relevant, NO_CATALOG),
                "prereq_logic": (context.prereq_relevant, PREREQ_LOGIC), "program_caveat": (context.program_notice, PROGRAM_CAVEAT)}
@@ -179,7 +218,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         missing.append("programs_page_pointer")
 
     estimates = []
-    for sentence in (m.group(0) for m in SENTENCE.finditer(text)):
+    for sentence in parts:
         for value in sorted(set(context.unstated_values)):
             for number in number_pattern(value).finditer(sentence):
                 before = sentence[max(0, number.start() - 20):number.start()]
@@ -204,7 +243,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "estimates": estimates,
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
-        "saved_copy_mentions": sum(1 for m in SENTENCE.finditer(text) if SAVED_COPY.search(m.group(0))),
+        "saved_copy_mentions": sum(1 for part in parts if SAVED_COPY.search(part)),
         "chars": len(text),
     }
 
@@ -226,4 +265,5 @@ def summarize(checks: list[dict]) -> dict:
     }
 
 
-__all__ = ["AnswerContext", "HARD_FAILURES", "check_answer", "find_links", "number_pattern", "summarize"]
+__all__ = ["AnswerContext", "HARD_FAILURES", "check_answer", "find_links", "number_pattern", "review_attribution",
+           "sentences", "summarize"]

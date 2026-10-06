@@ -74,6 +74,7 @@ def test_case_is_built_like_chat_and_the_context_reflects_the_evidence():
 def test_dry_run_writes_prompts_and_makes_no_model_calls(tmp_path):
     report = run([QUESTION], PAYLOADS, out=tmp_path, runs=2, max_calls=5, stream_fn=None)
     assert report["model_calls"] == 0 and report["records"] == []
+    assert report["status"] == "dry run" and report["planned_calls"] == 0
     assert (tmp_path / "prompts" / "Q1.txt").read_text(encoding="utf-8").startswith("You are a concise")
     assert json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))["summary"]["answers"] == 0
 
@@ -89,6 +90,7 @@ def test_runs_check_every_answer_and_stop_at_the_call_cap(tmp_path):
 
     report = run([QUESTION], PAYLOADS, out=tmp_path, runs=3, max_calls=2, stream_fn=fake)
     assert len(calls) == 2 and report["model_calls"] == 2 and len(report["records"]) == 2
+    assert report["planned_calls"] == 3 and report["status"] == "incomplete"  # The cap stopped it early.
     assert report["summary"]["ids_fail"] == 1 and report["summary"]["links_fail"] == 0
     assert (tmp_path / "answers" / "Q1_run1.md").exists() and (tmp_path / "answers" / "Q1_run2.md").exists()
     assert "| Q1 run 2 | ids_fail |" in (tmp_path / "summary.md").read_text(encoding="utf-8")
@@ -100,9 +102,94 @@ def test_model_errors_are_recorded_with_the_key_redacted(tmp_path):
         yield  # pragma: no cover - makes this a generator, like the real stream
 
     report = run([QUESTION], PAYLOADS, out=tmp_path, runs=1, max_calls=1, stream_fn=broken, secret="SECRET-KEY-VALUE")
-    assert report["errors"] == 1 and "checks" not in report["records"][0]
+    assert report["errors"] == 1 and "checks" not in report["records"][0] and report["status"] == "incomplete"
     saved = (tmp_path / "results.json").read_text(encoding="utf-8")
     assert "SECRET-KEY-VALUE" not in saved and "[REDACTED]" in saved
+
+
+def fake_api(monkeypatch):
+    real_client = httpx.Client
+
+    def handler(request):
+        course_id = request.url.path.rsplit("/", 1)[-1]
+        return httpx.Response(200, json=payload(course_id, "CS " + course_id[-4:], "Course " + course_id[-4:]))
+
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs))
+
+
+def fake_model(monkeypatch, answers):
+    """generate_text_stream yields the next answer in turn; an exception in the list is raised."""
+    import llm.gemini_client as gemini  # noqa: PLC0415
+    from config import settings  # noqa: PLC0415
+
+    script = iter(answers)
+
+    def stream(prompt):
+        answer = next(script)
+        if isinstance(answer, Exception):
+            raise answer
+        yield answer
+
+    monkeypatch.setattr(gemini, "generate_text_stream", stream)
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key-not-real")
+
+
+PLAIN = "这门课讲图算法。"
+
+
+@pytest.mark.parametrize("answers, code, status", [
+    ([PLAIN] * 5, 0, "complete"),
+    ([RuntimeError("upstream unavailable")] * 5, 3, "incomplete"),  # Nothing was checked.
+    ([PLAIN] * 4 + [RuntimeError("timeout")], 3, "incomplete"),
+    ([PLAIN] * 4 + ["Leaked neu-cs-5800."], 1, "complete"),
+    (["Leaked neu-cs-5800."] + [RuntimeError("timeout")] * 4, 1, "incomplete"),  # A hard failure comes first.
+])
+def test_exit_code_tells_complete_incomplete_and_failed_runs_apart(answers, code, status, tmp_path, monkeypatch):
+    fake_api(monkeypatch)
+    fake_model(monkeypatch, answers)
+    assert main(["--api-base", "http://api.test", "--out", str(tmp_path), "--runs", "1"]) == code
+    report = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    assert report["status"] == status and report["planned_calls"] == report["model_calls"] == 5
+    assert f"**{status}**" in (tmp_path / "summary.md").read_text(encoding="utf-8")
+
+
+def test_a_run_stopped_by_the_call_cap_is_incomplete(tmp_path, monkeypatch):
+    fake_api(monkeypatch)
+    fake_model(monkeypatch, [PLAIN] * 3)
+    assert main(["--api-base", "http://api.test", "--out", str(tmp_path), "--runs", "2", "--max-calls", "3"]) == 3
+    report = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    assert (report["planned_calls"], report["model_calls"], report["status"]) == (10, 3, "incomplete")
+
+
+@pytest.mark.parametrize("flag", ["--runs", "--max-calls"])
+def test_runs_and_the_call_cap_must_be_positive(flag, tmp_path):
+    with pytest.raises(SystemExit) as raised:
+        main(["--api-base", "http://api.test", "--out", str(tmp_path), flag, "0"])
+    assert raised.value.code == 2
+
+
+def test_rescore_keeps_the_original_runs_errors(tmp_path):
+    answers = iter([PLAIN, RuntimeError("timeout")])
+
+    def stream(prompt):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        yield answer
+
+    run([QUESTION], PAYLOADS, out=tmp_path, runs=2, max_calls=5, stream_fn=stream)
+    assert main(["--rescore", str(tmp_path / "results.json")]) == 3
+    rescored = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    assert rescored["errors"] == 1 and rescored["status"] == "incomplete"
+
+
+def test_status_of_reports_written_before_the_plan_was_recorded():
+    from scripts.eval_answers_live import run_status  # noqa: PLC0415
+
+    checked = {"checks": {}}
+    assert run_status({"model_calls": 0, "records": [], "errors": 0}) == "dry run"
+    assert run_status({"model_calls": 2, "records": [checked, checked], "errors": 0}) == "complete"
+    assert run_status({"model_calls": 2, "records": [checked, {"error": "x"}], "errors": 1}) == "incomplete"
 
 
 def test_main_dry_run_uses_only_tagged_get_requests(tmp_path, monkeypatch):

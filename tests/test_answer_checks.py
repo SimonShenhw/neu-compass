@@ -6,7 +6,7 @@ quiet on a good answer.
 
 from __future__ import annotations
 
-from eval.answer_checks import AnswerContext, check_answer, number_pattern, summarize
+from eval.answer_checks import AnswerContext, check_answer, number_pattern, sentences, summarize
 
 CATALOG = "https://catalog.northeastern.edu/course-descriptions/cs/"
 ZH = AnswerContext(lang="zh", allowed_urls=frozenset({CATALOG}), has_rmp_data=True, fetch_date_relevant=True,
@@ -96,6 +96,44 @@ def test_saved_copy_sentences_are_counted_per_sentence():
     once = "这些内容来自目录的存档副本，并非实时查询。"
     assert check_answer(once, AnswerContext(lang="zh"))["saved_copy_mentions"] == 1
     assert check_answer(once * 3, AnswerContext(lang="zh"))["saved_copy_mentions"] == 3
+
+
+def test_sentences_end_at_english_periods_but_not_in_numbers_or_abbreviations():
+    assert sentences("It is 4.0/5. See e.g. the notes. U.S. law applies. Dr. Li agrees. Done") == [
+        "It is 4.0/5.", " See e.g. the notes.", " U.S. law applies.", " Dr. Li agrees.", " Done"]
+    assert sentences("第一句。第二句！\n\n第三句") == ["第一句。", "第二句！", "第三句"]
+
+
+def test_an_estimate_in_one_sentence_does_not_cover_a_number_in_the_next():
+    context = AnswerContext(lang="en", unstated_values=(4.0, 12.0))
+    checks = check_answer("The workload is estimated at 12 hours a week. Reviews report a difficulty of 4.0/5.", context)
+    assert {item["value"]: item["kind"] for item in checks["estimates"]} == {
+        12.0: "qualified as estimate", 4.0: "AS REVIEWER-REPORTED"}
+    twice = "It comes from a saved copy of the catalog. That saved copy is not a live check."
+    assert check_answer(twice, context)["saved_copy_mentions"] == 2
+
+
+def test_review_attribution_comes_from_the_sentences_that_cite_reviews():
+    en, zh = AnswerContext(lang="en", has_rmp_data=True), AnswerContext(lang="zh", has_rmp_data=True)
+
+    def rmp(text, context):
+        return check_answer(text, context)["rmp"]
+
+    # An unrelated "professor" elsewhere does not attribute the reviews.
+    assert rmp("Ask your professor about prerequisites. RateMyProfessors reviews say this course is easy.", en) == (
+        "UNQUALIFIED")
+    # Consecutive review sentences share one attribution; a pronoun refers to the instructor.
+    assert rmp("On RateMyProfessors, reviews are positive. These reviews are of the instructor and may be about "
+               "other courses.", en) == "instructor + may be another course"
+    assert rmp("CS 5800 由王老师授课。RateMyProfessors 上的评价说他讲得清楚。", zh) == "instructor, no other-course caveat"
+    assert rmp("RateMyProfessors 上的评价说这门课很难，其他课也一样。", zh) == "UNQUALIFIED"  # 其他 is not 他.
+    # Every passage that cites reviews needs its own attribution.
+    assert rmp("RateMyProfessors 上对任课老师的评价说很难。\n\n这门课讲图算法。\n\nRateMyProfessors 的评价说作业多。", zh) == (
+        "UNQUALIFIED")
+    # The other-course caveat counts in the sentence right after a passage, not further away.
+    assert rmp("RateMyProfessors 上对任课老师的评价说很难。不过不一定是这门课。", zh) == "instructor + may be another course"
+    assert rmp("RateMyProfessors 上对任课老师的评价说很难。这门课讲图算法。也可能是别的课。", zh) == (
+        "instructor, no other-course caveat")
 
 
 def test_summary_counts():

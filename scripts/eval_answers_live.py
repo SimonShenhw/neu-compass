@@ -10,14 +10,17 @@ Run from the repo root in the project venv (config.settings reads GEMINI_API_KEY
     python scripts/eval_answers_live.py --api-base http://<api-host>:8000 --out /tmp/answer-eval
     python scripts/eval_answers_live.py --api-base http://<api-host>:8000 --out /tmp/x --dry-run
     python scripts/eval_answers_live.py --rescore /tmp/answer-eval/results.json   # after tuning checks
-Exit code: 0 no hard failure, 1 some answer failed a hard check, 2 setup error.
+Exit code: 0 every planned answer was checked and none failed a hard check (or a dry run), 1 some
+answer failed a hard check, 2 setup or argument error, 3 incomplete (a model call failed, the call
+cap stopped the run early, or no answer was checked). --rescore keeps the original run's errors.
 
 中文：按 /chat 的方式问真实模型，并检查回答（eval/answer_checks.py）。证据只来自线上 API 的
 GET /course/{id}（只读，并带 X-Eval-Run 标记，不会被当成学生查询）；提示词用本地的
 llm/prompts/chat_v4.py，构造方式与 api/routes/chat.py 相同；回答来自
 llm.gemini_client.generate_text_stream，参数与 /chat 一样。结果写到 --out：results.json、每个
-回答一个 Markdown 文件、summary.md。不会打印 API key。退出码：0 没有硬失败，1 有回答没过硬检查，
-2 准备阶段出错。
+回答一个 Markdown 文件、summary.md。不会打印 API key。退出码：0 计划的每个回答都检查过且没有硬失败
+（或空跑），1 有回答没过硬检查，2 准备阶段或参数出错，3 不完整（有模型调用失败、调用上限提前停止，
+或没有任何回答可检查）。--rescore 保留原来那次运行的错误。
 """
 
 from __future__ import annotations
@@ -153,15 +156,41 @@ def context_from_json(data: dict):
                             "unstated_values": tuple(data["unstated_values"])})
 
 
+def run_status(report: dict) -> str:
+    """'dry run', 'complete' (every planned call returned an answer that was checked) or
+    'incomplete' (a call failed, the call cap stopped the run early, or nothing was checked).
+    A report written before planned_calls existed counts its model calls as the plan.
+    中文：'dry run'、'complete'（计划的每次调用都有回答且检查过）或 'incomplete'（有调用失败、
+    调用上限提前停止，或没有回答可检查）。没有 planned_calls 的旧报告把实际调用次数当作计划。"""
+    if report.get("dry_run", report["model_calls"] == 0 and not report["records"]):
+        return "dry run"
+    answered = sum(1 for record in report["records"] if "checks" in record)
+    return "complete" if 0 < answered == report.get("planned_calls", report["model_calls"]) else "incomplete"
+
+
+def exit_code(report: dict) -> int:
+    """0 complete (or a dry run) with no hard failure, 1 some answer failed a hard check,
+    3 incomplete. 中文：0 完整（或空跑）且没有硬失败，1 有回答没过硬检查，3 不完整。"""
+    from eval.answer_checks import HARD_FAILURES  # noqa: PLC0415
+
+    if any(report["summary"][name] for name in HARD_FAILURES):
+        return 1
+    return 3 if report["status"] == "incomplete" else 0
+
+
 def write_report(out: Path, report: dict) -> None:
     """results.json and summary.md from a report dict (shared by run and rescore)."""
     from eval.answer_checks import HARD_FAILURES, summarize  # noqa: PLC0415
 
     report["summary"] = summarize([record["checks"] for record in report["records"] if "checks" in record])
+    report["status"] = run_status(report)
     (out / "results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    lines = [f"# Answer check · prompt {report['prompt_version']}", "", f"chat_v4.py {report['chat_v4_sha256'][:12]} · "
-             f"{report['model_calls']} model calls · {report['errors']} errors", "", "| answer | hard failures | "
-             "caveats missing | as reviewer-reported | saved-copy sentences |", "|---|---|---|---|---|"]
+    planned = report.get("planned_calls", report["model_calls"])
+    lines = [f"# Answer check · prompt {report['prompt_version']}", "", f"**{report['status']}** · "
+             f"chat_v4.py {report['chat_v4_sha256'][:12]} · {planned} planned · {report['model_calls']} model calls · "
+             f"{report['errors']} errors · {report['summary']['answers']} answers checked", "",
+             "| answer | hard failures | caveats missing | as reviewer-reported | saved-copy sentences |",
+             "|---|---|---|---|---|"]
     for record in report["records"]:
         if "checks" not in record:
             lines.append(f"| {record['qid']} run {record['run']} | error | | | |")
@@ -229,6 +258,8 @@ def run(questions: list[dict], payloads: dict[str, dict], *, out: Path, runs: in
         "prompt_version": PROMPT_VERSION,
         "chat_v4_sha256": hashlib.sha256(chat_v4.read_bytes()).hexdigest(),
         "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "dry_run": stream_fn is None,
+        "planned_calls": len(questions) * runs if stream_fn else 0,
         "model_calls": calls if stream_fn else 0,
         "errors": sum(1 for record in records if "error" in record),
         "records": records,
@@ -250,11 +281,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-calls", type=int, default=25)
     parser.add_argument("--dry-run", action="store_true", help="build prompts and contexts, no model calls")
     args = parser.parse_args(argv)
-    hard = ("ids_fail", "links_fail", "counts_fail", "rmp_fail")
+    if args.runs < 1 or args.max_calls < 1:
+        parser.error("--runs and --max-calls must be at least 1")
     if args.rescore:
         report = rescore(args.rescore)
-        print(json.dumps({"rescored": str(args.rescore), "summary": report["summary"]}, ensure_ascii=False))
-        return 1 if any(report["summary"][name] for name in hard) else 0
+        print(json.dumps({"rescored": str(args.rescore), "status": report["status"], "summary": report["summary"]},
+                         ensure_ascii=False))
+        return exit_code(report)
     if not args.api_base or not args.out:
         parser.error("--api-base and --out are required unless --rescore is given")
 
@@ -276,10 +309,11 @@ def main(argv: list[str] | None = None) -> int:
         stream_fn, secret = generate_text_stream, settings.gemini_api_key
     report = run(questions, payloads, out=args.out, runs=args.runs, max_calls=args.max_calls,
                  stream_fn=stream_fn, secret=secret)
-    print(json.dumps({"prompt_version": report["prompt_version"], "model_calls": report["model_calls"],
+    print(json.dumps({"prompt_version": report["prompt_version"], "status": report["status"],
+                      "planned_calls": report["planned_calls"], "model_calls": report["model_calls"],
                       "errors": report["errors"], "summary": report["summary"]}, ensure_ascii=False))
     print(f"report: {args.out / 'summary.md'}")
-    return 1 if any(report["summary"][name] for name in hard) else 0
+    return exit_code(report)
 
 
 if __name__ == "__main__":
