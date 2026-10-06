@@ -124,7 +124,7 @@ HTTP API (FastAPI)  · Public:  https://api.neu-compass.me
   ↓                                    ↑
   ↓  (Streamlit consumer)              ↑
   ↓  app/streamlit_app.py              ↑
-  ↓  st.write_stream(stream_assistant) ↑
+  ↓  render_streamed_answer(st, ...)   ↑
   ↓  + render_auth_sidebar             ↑
 
 查询路径 (alias-first → program ontology → hybrid + Layer 2 prefix filter → reranker reject)

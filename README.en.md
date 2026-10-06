@@ -45,7 +45,7 @@ HTTP API (FastAPI)
          ↓                                ↑
   (Streamlit consumes)         (browser hits via Cloudflare)
   app/streamlit_app.py
-  st.write_stream(stream_assistant)
+  render_streamed_answer(st, stream_assistant(...))  (link-filtered)
   + render_auth_sidebar
 
 Query path (alias-first → hybrid → optional rerank)

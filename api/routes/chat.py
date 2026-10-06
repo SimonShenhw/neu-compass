@@ -27,9 +27,11 @@ results，供前端先渲染证据）、零到多个 token（逐字输出的文�
 done.feedback 仅在服务端启用、本请求明确允许保存、完整非空回答及关联存储
 都成功时出现；凭证不放入 meta。默认不新增完整回答保存，原查询日志仍记录。
 
-Streamlit consumes via httpx.stream + iter_lines + st.write_stream.
+Streamlit consumes via httpx.stream + iter_lines + render_streamed_answer
+(app/answer_evidence_view.py; link-filters every partial render).
 
-Streamlit 端通过 httpx.stream + iter_lines + st.write_stream 消费这个流。
+Streamlit 端通过 httpx.stream + iter_lines + render_streamed_answer 消费这个流
+（app/answer_evidence_view.py，每次部分渲染都经过链接过滤）。
 """
 
 from __future__ import annotations

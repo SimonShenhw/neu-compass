@@ -201,9 +201,9 @@ originRequest:
   disableChunkedEncoding: false
 ```
 
-### 3.3 Streamlit `st.write_stream` 消费
+### 3.3 Streamlit 流式消费（`render_streamed_answer`；2026-10-05 之前是 `st.write_stream`）
 
-`app/streamlit_app.py` 里 `st.write_stream(stream_assistant(...))` 要求 generator 直接 yield string。
+`app/streamlit_app.py` 里 `render_streamed_answer(st, stream_assistant(...))` 要求 generator 直接 yield string。
 如果 generator 内部 catch 了 exception 后 `return` 而不是 raise:
 
 ```python
@@ -241,7 +241,7 @@ def stream_assistant(prompt):
 - [ ] §2.1 F12 Network 看到 `_stcore/stream` Status 101 Switching Protocols
 - [ ] chat_input 接受输入(光标 + 文字进入)
 - [ ] 提交后 uvicorn log 见 `chat.completed` 事件
-- [ ] Streamlit `st.write_stream` 渲染 token 流(不是一次性 dump)
+- [ ] 回答按 token 流式渲染(`render_streamed_answer`,不是一次性 dump)
 - [ ] 如果以上都过但视觉仍灰 → 写进 README known-limitations,不阻塞 ship
 
 ---

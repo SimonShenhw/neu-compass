@@ -67,18 +67,20 @@ def test_prompt_and_metadata_use_the_recorded_catalog_not_mixed_text(api_client)
     conn.execute("UPDATE courses SET raw_text=? WHERE course_id=?", ("MIXED REVIEW TEXT: definitely easy", "c-cs-5800"))
     meta, prompt = capture_chat(api_client)
     evidence = meta["results"][0]["answer_evidence"]
-    assert meta["prompt_version"] == "4.1"
+    assert meta["prompt_version"] == "4.2"
     assert evidence["catalog"]["description"] == snapshot.description
     assert evidence["catalog"]["retrieved_at"] is None
     assert "catalog_retrieval_date_unknown" in evidence["warnings"]
-    assert snapshot.snapshot_id in prompt
+    # 4.2: the audit ID travels in the meta for the UI, never into the answer prompt.
+    assert evidence["catalog"]["snapshot_id"] == snapshot.snapshot_id
+    assert snapshot.snapshot_id not in prompt
     assert snapshot.catalog_url in prompt
     assert snapshot.description in prompt
     assert "MIXED REVIEW TEXT" not in prompt
     assert evidence == api_client.get("/course/c-cs-5800").json()["answer_evidence"]
 
 
-def test_soft_estimates_keep_quotes_and_source_ids(api_client):
+def test_soft_estimates_keep_quotes_and_name_their_source_kind(api_client):
     conn = api_client.app.dependency_overrides[get_db_conn]()
     repo = CourseRepository(conn)
     record = repo.get("c-cs-5800").model_dump()
@@ -95,7 +97,11 @@ def test_soft_estimates_keep_quotes_and_source_ids(api_client):
     assert "extracted_evidence_not_official_facts" in evidence["warnings"]
     assert "workload_hours_per_week" not in evidence["missing_fields"]
     assert "difficulty_score" not in evidence["missing_fields"]
-    assert "rmp_review_test" in prompt
+    # The UI still gets the ID; the model gets what kind of source it is.
+    assert evidence["field_evidence"][0]["source_id"] == "rmp_review_test"
+    assert "rmp_review_test" not in prompt
+    from llm.prompts.chat_v4 import SOURCE_KIND_LABELS  # noqa: PLC0415
+    assert f'"source_kind": {json.dumps(SOURCE_KIND_LABELS["rmp_review"], ensure_ascii=False)}' in prompt
     assert "Reported 10 h/week" in prompt
     assert '"workload_hours_per_week": 10.0' in prompt
     assert '"extraction_confidence": 0.8' in prompt

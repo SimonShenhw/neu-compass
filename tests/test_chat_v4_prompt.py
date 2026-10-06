@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import re
+
+import pytest
 
 from llm.prompts.chat_v4 import (
-    DESCRIPTION_LIMIT, QUOTE_LIMIT, QUOTES_PER_COURSE, PROMPT_TEMPLATE, PROMPT_VERSION,
+    DESCRIPTION_LIMIT, QUOTE_LIMIT, QUOTES_PER_COURSE, PROMPT_TEMPLATE, PROMPT_VERSION, SOURCE_KIND_LABELS,
     build_prompt, format_courses_block,
 )
-from rag.answer_evidence import course_answer_evidence
+from rag.answer_evidence import SOURCE_KIND_PREFIXES, course_answer_evidence
 from rag.retriever import SearchHit
 from schemas.course import Course
 from db.catalog_source_repository import CatalogSourceRepository
@@ -20,8 +23,95 @@ def course(**updates):
 
 
 def test_version_and_empty_candidates():
-    assert PROMPT_VERSION == "4.1"
+    assert PROMPT_VERSION == "4.2"
     assert "no matches found in catalog" in build_prompt("unknown", [])
+
+
+@pytest.mark.parametrize("description", ["Graph algorithms.", None])
+def test_internal_ids_never_reach_the_prompt_but_their_meaning_does(description):
+    """4.2: answers printed the 64-hex snapshot digest and base64 review IDs verbatim. The model
+    now sees source kinds only; the IDs stay in the API evidence the UI shows. Snapshots without
+    a description are stored too (as None) and must lose their ID as well."""
+    ids = ["rmp_review_UmF0aW5nLTQyNzM5Njgw", "reddit_t1_abc", "mystery_source_1", "rmp_review_UmF0aW5nLTM4",
+           "rmp_review_UmF0aW5nLTU1", "rmp_review_UmF0aW5nLTY2", "rmp_review_UmF0aW5nLTc3", "rmp_review_UmF0aW5nLTM4"]
+    record = course(workload_hours_per_week=10, source_review_ids=ids, evidence_snippets=[
+        {"field": "workload_hours_per_week", "value": 10, "source_id": ids[0], "quote": "About 10 hours", "confidence": 0.9},
+        {"field": "difficulty_score", "value": 3, "source_id": "catalog_neu-cs-5800", "quote": "Moderate", "confidence": 0.5},
+    ])
+    snapshot = CatalogSourceRepository.snapshot(CatalogEntry(
+        course_code=record.primary_code, course_name=record.primary_name, description=description,
+        catalog_url="https://catalog.northeastern.edu/course-descriptions/cs/",
+    ))
+    assert snapshot.description == description
+    evidence = course_answer_evidence(record, snapshot)
+    prompt = build_prompt("x", [SearchHit(course=record, score=1)], evidence={record.course_id: evidence})
+    # Whole IDs, and their distinctive parts without the prefix (a stripped or truncated copy).
+    id_parts = [i.removeprefix("rmp_review_").removeprefix("reddit_") for i in ids if i.startswith(("rmp_review_", "reddit_"))]
+    for identifier in (snapshot.snapshot_id, snapshot.snapshot_id.removeprefix("catalog:"), *ids, *id_parts,
+                       "catalog_neu-cs-5800"):
+        assert identifier not in prompt
+    projected = json.loads(format_courses_block([SearchHit(course=record, score=1)], {record.course_id: evidence}))[0]
+    # Exact keys at every level, so no new ID-like field can slip into the projection unnoticed.
+    assert set(projected) == {"course_id", "primary_code", "primary_name", "recorded_metadata", "answer_evidence"}
+    used = projected["answer_evidence"]
+    assert set(used) == {"catalog", "field_evidence", "field_evidence_omitted_count", "recorded_sources",
+                         "missing_fields", "warnings"}
+    assert set(used["catalog"]) == {"course_code", "course_name", "description", "credits", "prereq_codes",
+                                    "catalog_url", "imported_at", "retrieved_at",
+                                    *(["description_truncated"] if description else [])}
+    assert used["catalog"]["catalog_url"] == snapshot.catalog_url
+    assert used["catalog"]["description"] == description
+    assert [item["source_kind"] for item in used["field_evidence"]] == [
+        SOURCE_KIND_LABELS["rmp_review"], SOURCE_KIND_LABELS["catalog_derived"]]
+    assert all(set(item) == {"field", "source_kind", "supported_value", "quote", "quote_truncated",
+                             "extraction_confidence"} for item in used["field_evidence"])
+    assert "source_review_ids" not in used
+    # Kinds only, sorted, no total: 8 IDs (one repeated) must not become "8 reviews of this course".
+    assert used["recorded_sources"] == [SOURCE_KIND_LABELS["rmp_review"], "Reddit discussion", "other recorded source"]
+    # The projection never mutates the evidence the API returns to the UI.
+    assert evidence.catalog.snapshot_id == snapshot.snapshot_id
+    assert evidence.source_review_ids == ids
+    assert evidence.field_evidence[0].source_id == ids[0]
+
+
+def test_citation_rules_ask_for_plain_words_and_catalog_links_only():
+    rules = " ".join(PROMPT_TEMPLATE.split())  # Re-wrapping the template must not break these checks.
+    for sentinel in ("cite it as a Markdown link to its supplied catalog_url",
+                     "labelled in the student's language: [NEU 官方课程目录](catalog_url) in a Chinese answer",
+                     "Never use that link for any other page",
+                     # A post-review live run: no answer said the catalog text is a stored copy.
+                     "these details come from a saved copy of the catalog, not a live check",
+                     "source_kind in plain words", "which may be about other courses they teach",
+                     # The same run had extracted estimates presented as what reviewers reported.
+                     "is an estimate made during extraction: say so, never \"reviewers report\" that number",
+                     "The only URLs you may write are supplied catalog_url values",
+                     "never print internal identifiers, hashes, JSON field names, or warning/notice codes",
+                     "recorded_sources only lists the kinds of sources the extraction step reported using",
+                     "does not back catalog facts such as credits, term or prerequisites",
+                     "Students can see the recorded sources in the course detail panel",
+                     # A first 4.2 draft got the Programs page linked to the catalog URL.
+                     "it has no URL, so do not link it"):
+        assert sentinel in rules
+    # Nothing still asks for an ID the projection no longer supplies, or says the sources are
+    # shown under the answer (the cards there never list them).
+    for stale in ("snapshot_id", "source_id", "source_review_ids"):
+        assert stale not in rules
+    assert not re.search(r"\b(?:under|below|beneath|after) (?:your|the) answers?\b", rules, re.IGNORECASE)
+
+
+def test_every_source_kind_has_a_label_that_says_what_the_source_is():
+    """A kind without a label would raise KeyError in build_prompt (a 500 before streaming)."""
+    assert set(SOURCE_KIND_LABELS) == {kind for _, kind in SOURCE_KIND_PREFIXES} | {"other"}
+    assert SOURCE_KIND_LABELS == {
+        # Found by a name search and fetched per instructor: maybe a namesake, maybe another course.
+        "rmp_review": "RateMyProfessors review of a professor matched to this course's instructor by name"
+                      " (may be about another course)",
+        "reddit": "Reddit discussion", "syllabus": "course syllabus", "synthetic": "synthetic test data",
+        # raw_text at extraction time; not necessarily older than the snapshot, and possibly mixed.
+        "catalog_derived": "course text used during extraction (may mix catalog and other text;"
+                           " not the recorded catalog snapshot)",
+        "other": "other recorded source",
+    }
 
 
 def test_retrieval_notices_are_quoted_data_with_an_explicit_rule():

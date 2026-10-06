@@ -214,8 +214,9 @@ class ApiClient:
 
         Each yield is a parsed dict with shape
         {"type": "meta"|"token"|"error"|"done", ...}. Caller renders
-        accordingly (Streamlit st.write_stream consumes the `text` from
-        token events; meta is stashed for evidence bubbles).
+        accordingly (app.answer_evidence_view.render_streamed_answer
+        renders the `text` from token events through the link filter;
+        meta is stashed for evidence bubbles).
 
         Raises ApiError if the server returns non-200 BEFORE streaming
         starts. Errors mid-stream surface as in-stream `error` events,
@@ -225,7 +226,8 @@ class ApiClient:
 
         每次产出都是一个解析好的字典，形状为
         {"type": "meta"|"token"|"error"|"done", ...}。调用方据此渲染
-        （Streamlit 的 st.write_stream 消费 token 事件里的 `text`；
+        （app.answer_evidence_view.render_streamed_answer 把 token 事件里的
+        `text` 经链接过滤后渲染；
         meta 被暂存起来用于证据气泡）。
 
         若服务端在开始流式输出之前就返回了非 200，抛出 ApiError。

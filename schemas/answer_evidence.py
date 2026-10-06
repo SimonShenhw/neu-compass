@@ -12,6 +12,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from schemas.course import COURSE_CODE_PATTERN, EvidenceSnippet
 
+# Exact HTTPS origin/path of an official NEU catalog department page; also the only link
+# target the UI lets a model answer keep.
+# 中文：NEU 官方目录院系页的精确 HTTPS 地址形式；也是界面允许模型回答保留的唯一链接目标。
+OFFICIAL_CATALOG_URL = re.compile(r"https://catalog\.northeastern\.edu/course-descriptions/[a-z]{2,8}/")
+
 
 class CatalogSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -38,7 +43,7 @@ class CatalogSnapshot(BaseModel):
     @classmethod
     def official_catalog_url(cls, value: str) -> str:
         # Exact HTTPS origin/path; never turn arbitrary source IDs into links.
-        if not re.fullmatch(r"https://catalog\.northeastern\.edu/course-descriptions/[a-z]{2,8}/", value):
+        if not OFFICIAL_CATALOG_URL.fullmatch(value):
             raise ValueError("An explicit official NEU catalog department URL is required")
         return value
 

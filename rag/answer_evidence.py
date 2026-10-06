@@ -12,6 +12,18 @@ AVAILABILITY_FIELDS = (
     "credits", "term", "delivery_mode", "professor", "prereqs", "topics_covered",
     "skill_tags", "workload_hours_per_week", "difficulty_score", "grading_components", "career_relevance",
 )
+# Source-ID prefix -> stable kind code, so the prompt and the UI can say where a field came
+# from without showing students raw review IDs. Unknown prefixes are "other", never guessed.
+# 中文：来源 ID 前缀 → 稳定的来源类型码；提示词与界面据此说明来源，不必把原始评价 ID
+# 给学生看。未知前缀一律归为 other，不猜。
+SOURCE_KIND_PREFIXES = (
+    ("rmp_review_", "rmp_review"), ("reddit_", "reddit"), ("syllabus_", "syllabus"),
+    ("synthetic_seed_", "synthetic"), ("catalog_", "catalog_derived"),
+)
+
+
+def source_kind(source_id: str) -> str:
+    return next((kind for prefix, kind in SOURCE_KIND_PREFIXES if source_id.startswith(prefix)), "other")
 
 
 def course_answer_evidence(course: Course, catalog: CatalogSnapshot | None = None,
