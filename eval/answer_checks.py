@@ -1,0 +1,229 @@
+"""Checks for real /chat answers: internal IDs, links, review counts, RMP attribution, caveats,
+estimate wording, link-label language, repeated disclaimers.
+
+Pure functions over the answer text and what the prompt supplied (AnswerContext);
+scripts/eval_answers_live.py runs them against the real model. The patterns were tuned on real
+gemini-2.5-flash answers to prompts 4.1/4.2 (2026-10-05); they flag likely problems for a person
+to read, they do not prove an answer correct.
+
+中文：真实 /chat 回答的检查：内部 ID、链接、评价条数、RMP 归属、各项说明、估计值措辞、链接
+标签语言、重复的免责句。只看回答文本和提示词提供的内容（AnswerContext），是纯函数；
+scripts/eval_answers_live.py 用它们检查真实模型的回答。这些模式是用 2026-10-05 gemini-2.5-flash
+对 4.1/4.2 提示词的真实回答调出来的，作用是标出可能的问题给人看，不能证明回答正确。
+"""
+
+from __future__ import annotations
+
+import re
+from collections import Counter
+from dataclasses import dataclass, field
+
+# JSON field names and warning/notice codes the prompt contains; an answer must not print them.
+FIELD_NAMES = ("snapshot_id", "source_kind", "recorded_sources", "field_evidence", "catalog_url",
+               "source_review_ids", "missing_fields", "supported_value", "recorded_metadata")
+CODES = ("catalog_source_unavailable", "catalog_retrieval_date_unknown", "catalog_metadata_conflict",
+         "extracted_evidence_not_official_facts", "field_evidence_value_conflict", "topics_source_unavailable",
+         "prerequisite_logic_unavailable", "program_seed_unverified", "synthetic_record_not_real_course",
+         "program_schedule_unverified")
+
+CATALOG_HEX = re.compile(r"catalog:[0-9a-fA-F]+")
+HEX_RUN = re.compile(r"[0-9a-fA-F]{12,}")
+ID_PREFIX = re.compile(r"(?<![A-Za-z0-9])(?:rmp_review_|reddit_|syllabus_|synthetic_seed_|catalog_)[A-Za-z0-9_\-=]*")
+BASE64_CANDIDATE = re.compile(r"[A-Za-z0-9+/=_\-]{16,}")
+COURSE_ID = re.compile(r"\bneu-[a-z]{2,6}-\d{4}[a-z]?\b")
+
+MD_LINK = re.compile(r"!?\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+[\"'][^\"']*[\"'])?\s*\)")
+AUTOLINK = re.compile(r"<((?:https?|ftp)://[^>\s]+)>")
+REF_DEF = re.compile(r"^\s*\[([^\]]+)\]:\s*(\S+)", re.M)
+BARE_URL = re.compile(r"(?:https?://|www\.)[^\s<>()\[\]\"'，。、；）（]+")
+PROGRAM_LABEL = re.compile(r"培养方案|program", re.I)
+CJK = re.compile(r"[一-鿿]")
+
+COUNT_ZH = re.compile(
+    r"(\d+|[一二两三四五六七八九十百]+)\s*(?:\+|多)?\s*(?:条|位|个|份|名|篇|则)\s*"
+    r"(?:来自\s*)?(?:RateMyProfessors\s*|RMP\s*)?(?:上的?\s*)?(?:学生的?)?"
+    r"(?:评价|评论|点评|评分|打分|学生|同学|反馈|用户)")
+COUNT_EN = re.compile(
+    r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|fifty|dozens?)"
+    r"\s+(?:[A-Za-z\-]+\s+){0,2}(?:reviews?|reviewers?|students?|ratings?|comments?)\b", re.I)
+
+SINGULAR = {"1", "一", "one"}
+
+RMP_NAME = re.compile(r"RateMyProfessors|Rate ?My ?Professors?|\bRMP\b", re.I)
+REVIEW_WORD = re.compile(r"评价|评论|点评|口碑|学生反馈|reviews?|reviewers?|ratings?", re.I)
+# Word boundaries: without them "professor" also matched inside "RateMyProfessors", so every RMP
+# mention looked instructor-attributed. 中文：要有词边界，否则 "professor" 会在 "RateMyProfessors"
+# 里面也匹配，任何提到 RMP 的回答都会被当成「归给了老师」。
+INSTRUCTOR = re.compile(r"(任课|授课)?(老师|教师|教授|讲师)|\b(?:instructor|professor|teacher)s?\b", re.I)
+OTHER_COURSE = re.compile(
+    r"(其他|别的|另外的|其它|其他的)(课|课程)|不一定(是|针对|关于|只)?(这门|本|该)课|未必(是|针对|关于)?(这门|本|该)课|"
+    r"不(只|仅)(是|针对|限于)?(这门|本|该)课|可能(是|针对|关于|涉及|来自|包括|包含)[^。\n]{0,12}(其他|别的|其它|另一门)|"
+    r"other (?:courses?|classes)|another (?:course|class)|not necessarily (?:about |for )?(?:this|the|CS)|"
+    r"not (?:specific|limited) to (?:this|the|CS)", re.I)
+
+FETCH_DATE = re.compile(
+    r"(抓取|获取|采集|检索|收录|爬取|更新)(的)?(日期|时间)[^。\n]{0,12}(未知|不明|不详|不清楚|没有记录|未记录)|"
+    r"(日期|时间)(未知|不明|不详)|不是实时|非实时|并非实时|而非实时|不是[^。\n]{0,8}实时|实时核[对查实验]|"
+    r"存档|快照|保存的?副本|副本|"
+    r"fetch(?:ed)? date|retriev\w* date|when it was (?:fetched|retrieved|captured)|saved copy|stored copy|"
+    r"copy of the catalog|not a live|not live|archived|snapshot|recorded (?:copy|version)|"
+    r"may (?:have changed|be out ?of ?date|be outdated|not reflect)|not (?:necessarily )?(?:the )?current", re.I)
+NO_CATALOG = re.compile(
+    r"(没有|缺少|无|缺乏|未找到|找不到)[^。\n]{0,10}(目录|catalog)|(目录|catalog)[^。\n]{0,10}(缺失|不可用|没有|未找到)|"
+    r"no (?:official |recorded )?catalog|catalog (?:record|entry|snapshot|description|data)s? (?:is |are )?"
+    r"(?:not available|unavailable|missing)|lacks? (?:a |an )?(?:official )?catalog|without (?:a |an )?(?:official )?catalog", re.I)
+PREREQ_LOGIC = re.compile(
+    r"(并且|且|或者|或|和/或|全部|都需要|都要|任一|任意一门|其中一门|组合|是否需要全部)[^。\n]{0,40}"
+    r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|未知|没有标明|需要[^。\n]{0,6}(核实|确认))|"
+    r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|没有标明)[^。\n]{0,40}(并且|且|或|全部|都|任一|其中一门)|"
+    r"(且|或)的?关系|AND/OR|and/or|logical relationship|"
+    r"\b(?:all|both|either|any one|any)\b[^.\n]{0,80}\b(?:unclear|not (?:specified|indicated|stated|clear)|"
+    r"doesn't (?:say|specify|indicate)|does not (?:say|specify|indicate)|cannot (?:tell|determine|confirm)|unknown)\b|"
+    r"\b(?:unclear|not (?:specified|indicated|stated|clear)|doesn't (?:say|specify|indicate)|does not (?:say|specify|indicate)|"
+    r"cannot (?:tell|determine|confirm)|unknown)\b[^.\n]{0,80}\b(?:all|both|either|any one|whether)\b", re.I)
+PROGRAM_CAVEAT = re.compile(
+    r"(没有|无|尚无|并无|暂无|缺少)[^。\n]{0,15}(核实|核验|验证|确认|官方)[^。\n]{0,15}(学期|课表|安排|计划|顺序)|"
+    r"并非官方|不是官方|非官方|不代表官方|不是[^。\n]{0,8}官方|未经(核实|核验|验证)|"
+    r"no verified|not (?:an |the )?official|unverified|isn't (?:an |the )?official", re.I)
+PROGRAMS_PAGE = re.compile(r"培养方案|Programs page|\bPrograms\b", re.I)
+SAVED_COPY = re.compile(r"副本|saved copy|stored copy|copy of the catalog|不是实时|非实时|not a live", re.I)
+
+SENTENCE = re.compile(r"[^。！？!?\n]+[。！？!?]?")
+REPORT_CUE = re.compile(r"报告|称|表示|提到|指出|反映|认为|评价(显示|说)|评论(显示|说)|据[^。\n]{0,20}(评价|评论)|"
+                        r"根据[^。\n]{0,40}(评价|评论)|\breport|\bsay|\bsaid\b|\baccording to\b|\bmention|"
+                        r"\bnote[sd]?\b|\bdescribe|\breviews?\b|\breviewers?\b", re.I)
+ESTIMATE_CUE = re.compile(r"估计|估算|推断|推测|抽取|提取|整理|得出|预估|estimat|inferr|\binfer\b|extract|derived", re.I)
+RECORD_CUE = re.compile(r"记录|存储|recorded|stored|the record|record shows|record lists", re.I)
+
+
+@dataclass(frozen=True)
+class AnswerContext:
+    """What the prompt supplied for one question. 中文：一个问题的提示词里提供了什么。"""
+
+    lang: str  # "zh" or "en": the language the question was asked in
+    allowed_urls: frozenset[str] = frozenset()  # catalog_url of each supplied course with a valid snapshot
+    has_rmp_data: bool = False
+    fetch_date_relevant: bool = False  # a supplied snapshot has no retrieved_at
+    no_catalog_relevant: bool = False  # a supplied course has no snapshot
+    prereq_relevant: bool = False
+    program_notice: bool = False  # program_schedule_unverified was passed
+    unstated_values: tuple[float, ...] = ()  # numeric estimates that no supplied quote states
+    prompt_keys: frozenset[str] = field(default_factory=frozenset)  # JSON keys in the prompt's course block
+
+
+def _context(text: str, match: re.Match, width: int = 40) -> str:
+    return text[max(0, match.start() - width):min(len(text), match.end() + width)].replace("\n", " ")
+
+
+def number_pattern(value: float) -> re.Pattern:
+    """A number as an answer may write it (12 / 12.0), not part of a larger number or a credit count."""
+    core = rf"{int(value)}(?:\.0+)?" if float(value).is_integer() else re.escape(str(value))
+    return re.compile(rf"(?<![\d.]){core}(?![\d]|\.\d|\s*(?:学分|credits?|credit-hours?))", re.I)
+
+
+def find_links(text: str) -> list[dict]:
+    """Markdown links, autolinks, reference definitions and bare URLs, with their labels."""
+    links, rest = [], text
+    for pattern, kind in ((MD_LINK, "markdown"), (AUTOLINK, "autolink"), (REF_DEF, "refdef")):
+        for match in pattern.finditer(rest):
+            label, target = (match.group(1), match.group(2)) if kind != "autolink" else ("", match.group(1))
+            links.append({"kind": kind, "label": label, "target": target})
+        rest = pattern.sub(" ", rest)
+    links.extend({"kind": "bare", "label": "", "target": match.group(0).rstrip(".,;:!?)")}
+                 for match in BARE_URL.finditer(rest))
+    return links
+
+
+def check_answer(text: str, context: AnswerContext) -> dict:
+    """Every check for one answer. Hard failures: ids_fail, links_fail, counts_fail, rmp_fail.
+    The rest are signals for a person to read. 中文：一个回答的全部检查。硬失败：ids_fail、links_fail、
+    counts_fail、rmp_fail；其余是给人看的信号。"""
+    ids = {
+        "catalog_hex": CATALOG_HEX.findall(text),
+        "hex_runs": HEX_RUN.findall(text),
+        "id_prefixes": ID_PREFIX.findall(text),
+        "base64_like": [token for token in BASE64_CANDIDATE.findall(text)
+                        if re.search(r"[A-Z]", token) and re.search(r"[a-z]", token) and re.search(r"\d", token)],
+        "course_ids": COURSE_ID.findall(text),
+        "field_names": [name for name in FIELD_NAMES if re.search(rf"\b{re.escape(name)}\b", text)],
+        "codes": [code for code in CODES if code in text],
+        "prompt_keys": sorted(key for key in context.prompt_keys if "_" in key and re.search(rf"\b{re.escape(key)}\b", text)),
+    }
+    links = find_links(text)
+    for link in links:
+        link["allowed_target"] = link["target"] in context.allowed_urls
+        link["literal_catalog_url"] = link["target"].strip() == "catalog_url"
+        link["programs_label"] = bool(PROGRAM_LABEL.search(link["label"]))
+    labels = [link["label"] for link in links if link["kind"] == "markdown"]
+    # "一条评论提到…" / "one review reported…" names the single quoted review, which is accurate;
+    # only counts above one can overstate. 中文：「一条评论提到……」指的是被引用的那一条，属实；
+    # 只有大于一的条数才可能夸大。
+    counts = [_context(text, m) for pattern in (COUNT_ZH, COUNT_EN) for m in pattern.finditer(text)
+              if m.group(1).lower() not in SINGULAR]
+
+    uses_reviews = bool(RMP_NAME.search(text)) or (context.has_rmp_data and bool(REVIEW_WORD.search(text)))
+    instructor = bool(INSTRUCTOR.search(text))
+    if not uses_reviews:
+        rmp = "not used"
+    elif instructor and OTHER_COURSE.search(text):
+        rmp = "instructor + may be another course"
+    elif instructor:
+        rmp = "instructor, no other-course caveat"
+    else:
+        rmp = "UNQUALIFIED"
+
+    caveats = {"fetch_date": (context.fetch_date_relevant, FETCH_DATE), "no_catalog": (context.no_catalog_relevant, NO_CATALOG),
+               "prereq_logic": (context.prereq_relevant, PREREQ_LOGIC), "program_caveat": (context.program_notice, PROGRAM_CAVEAT)}
+    missing = [name for name, (relevant, pattern) in caveats.items() if relevant and not pattern.search(text)]
+    if context.program_notice and not PROGRAMS_PAGE.search(text):
+        missing.append("programs_page_pointer")
+
+    estimates = []
+    for sentence in (m.group(0) for m in SENTENCE.finditer(text)):
+        for value in sorted(set(context.unstated_values)):
+            for number in number_pattern(value).finditer(sentence):
+                before = sentence[max(0, number.start() - 20):number.start()]
+                if RECORD_CUE.search(before):
+                    kind = "attributed to the record"
+                elif ESTIMATE_CUE.search(sentence):
+                    kind = "qualified as estimate"
+                elif REPORT_CUE.search(sentence):
+                    kind = "AS REVIEWER-REPORTED"
+                else:
+                    kind = "unattributed"
+                estimates.append({"value": value, "kind": kind, "sentence": sentence.strip()[:220]})
+
+    return {
+        "ids": ids, "ids_fail": any(ids.values()),
+        "links": links, "links_fail": any(not l["allowed_target"] or l["programs_label"] or l["literal_catalog_url"] for l in links),
+        "label_language_ok": (all(CJK.search(label) for label in labels) if context.lang == "zh"
+                              else not any(CJK.search(label) for label in labels)) if labels else None,
+        "counts": counts, "counts_fail": bool(counts),
+        "rmp": rmp, "rmp_fail": rmp == "UNQUALIFIED",
+        "caveats_missing": missing,
+        "estimates": estimates,
+        "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
+        # Sentences, not matches: one sentence often says both 副本 and 非实时.
+        "saved_copy_mentions": sum(1 for m in SENTENCE.finditer(text) if SAVED_COPY.search(m.group(0))),
+        "chars": len(text),
+    }
+
+
+HARD_FAILURES = ("ids_fail", "links_fail", "counts_fail", "rmp_fail")
+
+
+def summarize(checks: list[dict]) -> dict:
+    """Counts across answers, for the report table. 中文：跨回答的计数，用于报告表格。"""
+    rmp = Counter(item["rmp"] for item in checks)
+    return {
+        "answers": len(checks),
+        **{name: sum(1 for item in checks if item[name]) for name in HARD_FAILURES},
+        "label_language_bad": sum(1 for item in checks if item["label_language_ok"] is False),
+        "caveats_missing": dict(Counter(name for item in checks for name in item["caveats_missing"])),
+        "estimates_as_reported": sum(len(item["estimates_as_reported"]) for item in checks),
+        "repeated_saved_copy": sum(1 for item in checks if item["saved_copy_mentions"] > 1),
+        "rmp": dict(rmp),
+    }
+
+
+__all__ = ["AnswerContext", "HARD_FAILURES", "check_answer", "find_links", "number_pattern", "summarize"]

@@ -23,7 +23,7 @@ def course(**updates):
 
 
 def test_version_and_empty_candidates():
-    assert PROMPT_VERSION == "4.2"
+    assert PROMPT_VERSION == "4.3"
     assert "no matches found in catalog" in build_prompt("unknown", [])
 
 
@@ -79,11 +79,19 @@ def test_citation_rules_ask_for_plain_words_and_catalog_links_only():
     for sentinel in ("cite it as a Markdown link to its supplied catalog_url",
                      "labelled in the student's language: [NEU 官方课程目录](catalog_url) in a Chinese answer",
                      "Never use that link for any other page",
-                     # A post-review live run: no answer said the catalog text is a stored copy.
-                     "these details come from a saved copy of the catalog, not a live check",
+                     # Live runs: first no answer said the catalog text is a stored copy, then
+                     # multi-course answers said it once per course, then "once per answer" made
+                     # answers about a course with no catalog say it too.
+                     "If you used any catalog description, say once per answer (not once per course), in one "
+                     "short plain sentence, that it comes from a saved copy of the catalog, not a live check",
+                     "For a course whose catalog is null, say the available record has no official catalog "
+                     "description for it",
+                     # Two answers gave only the estimate when it disagreed with its quote.
+                     "give both numbers (what the quote says and the estimate) and say it needs verification",
                      "source_kind in plain words", "which may be about other courses they teach",
                      # The same run had extracted estimates presented as what reviewers reported.
-                     "is an estimate made during extraction: say so, never \"reviewers report\" that number",
+                     "is an estimate made during extraction: put \"estimated\" right next to that number, "
+                     "and never write that reviews or reviewers report or give that number",
                      "The only URLs you may write are supplied catalog_url values",
                      "never print internal identifiers, hashes, JSON field names, or warning/notice codes",
                      "recorded_sources only lists the kinds of sources the extraction step reported using",

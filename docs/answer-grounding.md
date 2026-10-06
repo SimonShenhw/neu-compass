@@ -12,7 +12,7 @@
 
 ## API、提示词和界面共用的契约
 
-- `/chat` 首个 NDJSON meta 带 `prompt_version`（当前 `"4.2"`），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
+- `/chat` 首个 NDJSON meta 带 `prompt_version`（当前 `"4.3"`：在 4.2 的基础上，存档副本那句每个回答只说一次，数值冲突时两个数都要写出来；4.2 从未部署），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
 - `answer_evidence` 包含 `catalog`、`field_evidence`、`source_review_ids`、`missing_fields`、`warnings`。缺失包括官方描述及常用选课字段；`None`/空列表表示记录未提供，数值 0 不当成缺失。这不是完整 syllabus 字段的覆盖率报告。
 - v4 提示词与 SSE meta 使用同一份读取结果，避免模型拿到一套依据、界面显示另一套。课程详情涉及培养方案时另外标记未核验 seed；chat 的培养方案捷径也标记该限制。不同查询语境的警告不必逐字相同。
 - 目录与课程学分冲突、数值估计与支持值冲突时保留两边并警告，不静默改写课程或选择一个值。先修代码列表不保留 AND/OR；培养方案 seed 不等于正式 Plan of Study 或选课资格保证。
@@ -37,6 +37,14 @@
 - 检索分数条只是候选内部的相对排序分数，不表示事实可信度。
 
 `llm/prompts/chat_v3.py` 保留不变，新增 v4 而不覆盖旧版本。提示词约束及离线测试不保证真实模型始终遵守，也不构成 prompt injection 防护证明；真实回答的来源归因、截断影响与中英表现仍需独立评测。
+
+改了提示词之后，用 `scripts/eval_answers_live.py` 复核真实回答：
+- 证据只从线上 `GET /course/{id}` 取，请求带 `X-Eval-Run` 标记，不会被当成学生查询；
+- 提示词用本地的 `chat_v4.py`，按 `/chat` 的方式构造；模型调用走 `/chat` 同一个函数和参数，调用次数有上限；
+- `eval/answer_checks.py` 检查内部 ID、链接、评价条数、RMP 归属（硬检查），以及各项说明、估计值措辞、链接标签语言、重复的存档副本句（给人看的信号）；
+- `--dry-run` 只生成提示词；`--rescore` 用调整后的检查重评已保存的回答，不再调 API 和模型。
+
+这些检查只标出可能的问题，不能证明回答正确，结果仍要有人读。
 
 ## 既有数据库的来源回填
 

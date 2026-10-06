@@ -17,10 +17,17 @@ from schemas.answer_evidence import CourseAnswerEvidence
 # 4.2: sources are cited in plain words; snapshot/source IDs no longer reach the model
 #      (answers printed 64-hex digests and base64 review IDs). They stay in the chat meta
 #      and the course detail panel.
+# 4.3: the saved-copy sentence once per answer and only when a catalog description was used
+#      (4.2 repeated it for every course); a course without a catalog says so; "estimated" next
+#      to extracted numbers; a value conflict names both numbers. From the 2026-10-05/06 live
+#      checks (scripts/eval_answers_live.py); 4.2 was never deployed.
 # 中文：4.1 新增检索提示码区块（program_schedule_unverified）。
 # 4.2 用普通说法引用来源；快照 ID、来源 ID 不再传给模型（回答里曾直接印出 64 位摘要和
 # base64 评价 ID）。它们仍在 chat meta 和课程详情面板里。
-PROMPT_VERSION = "4.2"
+# 4.3 存档副本那句每个回答只说一次、且只在用到目录描述时说（4.2 会对每门课各说一次）；没有
+# 目录的课要说明没有；抽取的数字旁边写「估计」；数值冲突时两个数都要写出来。来自 2026-10-05/06
+# 的真实模型复核（scripts/eval_answers_live.py）；4.2 从未部署。
+PROMPT_VERSION = "4.3"
 DESCRIPTION_LIMIT = 1200
 QUOTE_LIMIT = 300
 QUOTES_PER_COURSE = 3
@@ -48,8 +55,10 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   For claims derived from its description, cite it as a Markdown link to its supplied
   catalog_url, labelled in the student's language: [NEU 官方课程目录](catalog_url) in a
   Chinese answer, [NEU course catalog](catalog_url) in an English one. Never use that
-  link for any other page. Say in one short plain sentence that these details come from
-  a saved copy of the catalog, not a live check.
+  link for any other page. If you used any catalog description, say once per answer (not
+  once per course), in one short plain sentence, that it comes from a saved copy of the
+  catalog, not a live check. For a course whose catalog is null, say the available record
+  has no official catalog description for it.
   imported_at is an IMPORT time, NOT a retrieval date. Unknown retrieved_at means
   the catalog fetch date is unknown; do not call this a current semester offering.
 - field_evidence quotes support extracted estimates/opinions, NOT official catalog facts.
@@ -57,7 +66,8 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   RateMyProfessors reviews of the instructor, which may be about other courses they teach)
   and qualify them as reported or inferred. A supported_value that its quote does not
   state itself (e.g. hours per week, a difficulty score) is an estimate made during
-  extraction: say so, never "reviewers report" that number.
+  extraction: put "estimated" right next to that number, and never write that reviews or
+  reviewers report or give that number.
   Extraction confidence is not a fact probability.
 - Structured fields without a linked quote/document have unverified provenance.
   recorded_sources only lists the kinds of sources the extraction step reported using;
@@ -79,8 +89,8 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   is not proved or disproved by the course-code prefix.
 - On catalog_metadata_conflict, explicitly state the discrepancy and request official
   confirmation; do not silently prefer one value or combine incompatible records.
-- On field_evidence_value_conflict, do not state the numeric estimate as established;
-  its stored value disagrees with its supporting snippet. Say it needs verification.
+- On field_evidence_value_conflict, the stored estimate disagrees with its own quote: give
+  both numbers (what the quote says and the estimate) and say it needs verification.
 - synthetic_record_not_real_course means test data, not a real course recommendation.
 - Retrieval scores are not confidence in source truth. Cite only supplied sources.
 - If no matches found in catalog, state the absence and ask one clarifying question.
