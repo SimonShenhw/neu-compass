@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import re
+import time
 
 from pydantic import ValidationError
 
@@ -103,31 +104,67 @@ def _when(value: datetime) -> str:
     return value.strftime("%Y-%m-%d %H:%M")
 
 
-# Model answers are untrusted Markdown (catalog descriptions and review quotes reach the
-# prompt). answer_markdown() keeps only links whose target is an official catalog department
-# page. Any other inline-link destination is dropped (the label stays), images become links,
-# reference definitions are disabled, and other autolinks / bare URLs lose their scheme so no
-# Markdown rule can make them clickable. Code spans get the same treatment on purpose: guessing
-# where CommonMark puts code boundaries is how filters get bypassed, and a scheme-less URL in
-# code is merely less exact. An email address may still render as a mail link (it opens a
-# mail client, not a web page).
-# 中文：模型回答是不可信的 Markdown（目录描述与评价引文都会进提示词）。只保留指向官方目录
-# 院系页的链接；其余行内链接去掉目标（保留文字），图片改为链接，引用式定义失效，其余自动
-# 链接和裸 URL 去掉协议头，任何 Markdown 规则都无法再让它们可点。代码片段同样处理，这是
-# 有意的：去猜 CommonMark 的代码边界正是过滤被绕过的常见原因，代码里的 URL 少了协议头只是
-# 不够精确。邮箱地址仍可能显示成邮件链接（只会打开邮件客户端，不会打开网页）。
-# \x00 marks placeholders, so no pattern below may match across one.
-_DESTINATION = re.compile(
-    r"\]\(\s*(<[^>\n\x00]*>|[^)\s\x00]*)(?:\s+(?:\"[^\"\n\x00]*\"|'[^'\n\x00]*'|\([^)\n\x00]*\)))?\s*\)")
-_AUTOLINK = re.compile(r"<([A-Za-z][A-Za-z0-9+.\-]{1,31}:[^<>\s\x00]*)>")
-_BARE_URL = re.compile(r"(?i:https?://|www\.)[^\s<>()\[\]`\"'\x00]+")
-_SCHEME_OR_WWW = re.compile(r"^(?:[A-Za-z][A-Za-z0-9+.\-]*:/*|www\.)", re.IGNORECASE)
-_TRAILING_PUNCTUATION = ".,;:!?。，；：！？、）」』》】”’"
+# Model answers are untrusted Markdown (catalog descriptions and review quotes reach the prompt).
+# answer_markdown() makes the renderer show the model's text as written: emphasis, lists,
+# headings, tables and code still work, official catalog department links stay clickable, and
+# nothing else can become a link, image, HTML, math or directive. One linear pass that only
+# inserts characters:
+#   1. official catalog links ([label](URL), <URL>, a bare URL) are set aside under placeholders;
+#   2. every backslash is doubled, so the model's own escapes stay visible and cannot hide part
+#      of a URL from the steps below or from the renderer's decoding;
+#   3. a word joiner (U+2060: invisible, not a line-break opportunity) goes after the first
+#      letter of every http(s):// and www., so the renderer's bare-URL linking never finds one;
+#   4. a backslash goes before each character that opens something else: an entity ("&#", "&a"),
+#      HTML or an autolink ("<a", "</", "<!", "<?"), a link destination or a reference definition
+#      / footnote ("](", "]:"), an image ("![", or "!" before a kept catalog link), math ("$")
+#      and a directive or shortcode (":" before a name; a word joiner goes after that ":" too,
+#      because Streamlit swaps :name: shortcodes for emoji, icons or its logo image in the
+#      decoded text, where the backslash is already gone);
+#   5. the placeholders come back as [label](URL) / <URL>, labels escaped like everything else.
+# Every opener is escaped, so the text the renderer shows is the text checked here: decoding an
+# escape or entity, or re-rendering a directive label, cannot produce a link. Only the two
+# placeholder marks (private-use U+E000 / U+E001) are replaced, with U+FFFD. Costs: the model's
+# backslashes, entities, math and Streamlit directives / shortcodes (":red[...]", ":smile:")
+# show literally; other links show as their Markdown source, and a copied non-catalog URL or
+# ":name" carries the invisible word joiner; inside code, inserted escapes are visible and a catalog URL
+# shows in angle brackets; a table's "\|" becomes a column break. Streamlit still draws "->" and
+# "<-" as arrows and the few emoji shortcodes that start with punctuation (":+1:"). An email
+# address may still become a mail link.
+# 中文：模型回答是不可信的 Markdown（目录描述与评价引文都会进提示词）。answer_markdown() 让渲染器
+# 按原样显示模型的文字：强调、列表、标题、表格、代码照常；官方目录院系页链接保持可点；其他东西都不能
+# 变成链接、图片、HTML、公式或指令。只插入字符的一遍线性处理：1 先把官方目录链接换成占位符；
+# 2 所有反斜杠翻倍，模型自己写的转义原样显示，不能把网址的一部分藏起来躲过后面的步骤或渲染器的解码；
+# 3 每个 http(s):// 和 www. 的首字母后插一个 word joiner（U+2060，不可见、不产生换行点），渲染器的
+# 裸网址识别就找不到它们；4 在会开启其他结构的字符前加反斜杠：实体、HTML/自动链接、链接目标、
+# 引用式定义/脚注、图片（含目录链接前的 "!"）、公式、指令和短代码（名字前的 ":" 后面再插一个 word
+# joiner：Streamlit 在解码后的文字里把 :名字: 短代码换成 emoji、图标或它的 logo 图片，那时反斜杠已经
+# 没了）；5 把占位符还原成 [标签](URL) /
+# <URL>，标签同样经过转义。每个开启符都被转义，渲染器显示的就是这里检查过的文字：解码转义或实体、
+# 把指令标签再渲染一次，都不可能产生链接。只替换占位符用的两个私用区字符（换成 U+FFFD）。代价：模型
+# 写的反斜杠、实体、公式和 Streamlit 指令/短代码原样显示；其他链接显示成 Markdown 原文，复制出的
+# 非目录网址和 ":名字" 带着不可见的 word joiner；代码里能看到插入的转义，目录网址会带尖括号显示；表格的 "\|"
+# 会变成分列。Streamlit 仍会把 "->"、"<-" 画成箭头，以标点开头的少数 emoji 短代码（":+1:"）仍会变成
+# emoji。邮箱地址仍可能变成邮件链接。
+WORD_JOINER = "\u2060"
+_CATALOG_URL = OFFICIAL_CATALOG_URL.pattern + r"(?:#[A-Za-z0-9_-]{1,64})?"  # An in-page anchor is harmless.
+_CATALOG_LINK = re.compile(
+    r"\[([^\[\]\n]{1,200})\]\(\s{0,20}<?(" + _CATALOG_URL + r")>?(?:\s{1,20}\"[^\"\n]{0,200}\")?\s{0,20}\)")
+_CATALOG_AUTOLINK = re.compile(r"<(" + _CATALOG_URL + r")>")
+_CATALOG_BARE = re.compile(_CATALOG_URL)
+_URL_START = re.compile(r"(?i)(?:h(?=ttps?://)|w(?=ww\.))")
+# ":" before a directive or shortcode name (any character that is not whitespace or ASCII
+# punctuation) comes first, so "]:name" also gets its word joiner.
+_OPENER = re.compile(
+    r"(?P<name>:(?=[^\s!-/:-@\[-`{-~]))|&(?=[#A-Za-z])|<(?=[A-Za-z/!?])|(?<=\])[(:]|!(?=[\[\ue000])|\$")
+_MARKS = re.compile("[\ue000\ue001]")
+_PLACEHOLDER = re.compile("\ue000(\\d+)\ue001")
 
 
-def _inert(url: str) -> str:
-    # One prefix per call; the fixed-point loop below handles "https://https://x" and "www.https://x".
-    return _SCHEME_OR_WWW.sub("", url, count=1)
+def _literal(text: str) -> str:
+    """Steps 2-4 for text that must render as written."""
+    text = text.replace("\\", "\\\\")
+    text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, text)
+    return _OPENER.sub(lambda match: "\\" + match.group(0) + (WORD_JOINER if match.lastgroup else ""), text)
 
 
 def answer_markdown(text: str) -> str:
@@ -135,44 +172,35 @@ def answer_markdown(text: str) -> str:
 
     def keep(fragment: str) -> str:
         kept.append(fragment)
-        return f"\x00{len(kept) - 1}\x00"
+        return f"\ue000{len(kept) - 1}\ue001"
 
-    def autolink(match: re.Match[str]) -> str:
-        url = match.group(1)
-        return keep(f"<{url}>") if OFFICIAL_CATALOG_URL.fullmatch(url) else _inert(url)
-
-    def bare(match: re.Match[str]) -> str:
-        url = match.group(0)
-        core = url.rstrip(_TRAILING_PUNCTUATION)
-        return (keep(f"<{core}>") if OFFICIAL_CATALOG_URL.fullmatch(core) else _inert(core)) + url[len(core):]
-
-    text = text.replace("\x00", "")
-    # Repeat to a fixed point: removing one construct can splice its neighbours into a new one
-    # ("[a](x)(//evil)" -> "[a](//evil)"). Each pass only shortens text or swaps a URL for a
-    # placeholder, so this terminates. An allowed URL is a placeholder by the time
-    # _DESTINATION runs, which leaves "[label](<allowed>)" intact and drops every other target.
-    while True:
-        before = text
-        text = text.replace("![", "[")  # An image would fetch its URL on render.
-        text = _AUTOLINK.sub(autolink, text)
-        text = _BARE_URL.sub(bare, text)
-        text = _DESTINATION.sub("]", text)
-        if text == before:
-            break
-    text = text.replace("]:", "]\\:")  # "\:" renders as ":" but can never start a definition.
-    # No kept fragment contains a placeholder, so a single restore pass suffices.
-    return re.sub("\x00(\\d+)\x00", lambda match: kept[int(match.group(1))], text)
+    text = _MARKS.sub("\ufffd", text)  # The model cannot forge a placeholder.
+    text = _CATALOG_LINK.sub(lambda match: keep(f"[{_literal(match.group(1))}]({match.group(2)})"), text)
+    text = _CATALOG_AUTOLINK.sub(lambda match: keep(f"<{match.group(1)}>"), text)
+    text = _CATALOG_BARE.sub(lambda match: keep(f"<{match.group(0)}>"), text)
+    return _PLACEHOLDER.sub(lambda match: kept[int(match.group(1))], _literal(text))
 
 
-def render_streamed_answer(st, chunks) -> str:
-    """Live counterpart of answer_markdown(): each partial render is filtered as a whole, so a
-    link split across tokens is never shown raw. Returns the raw text for chat history.
-    中文：流式输出时每次都对已到达的全文过滤，跨 token 的链接也不会以原样出现；返回原文存历史。"""
+def render_streamed_answer(st, chunks, *, min_interval: float = 0.1, clock=time.monotonic) -> str:
+    """Live counterpart of answer_markdown(): every render shows the filtered text so far, so a
+    link split across tokens is never shown raw. Renders at most once per `min_interval` seconds
+    and once more at the end, also when the stream fails midway (filtering the whole text again
+    for every token was quadratic). Returns the raw text for chat history.
+    中文：流式输出时每次渲染都显示已到达全文的过滤结果，跨 token 的链接也不会以原样出现。最多每
+    `min_interval` 秒渲染一次，结尾再渲染一次，流中途出错时也一样（每个 token 都重新过滤全文是
+    平方级的）。返回原文存历史。"""
     placeholder = st.empty()
-    text = ""
-    for chunk in chunks:
-        text += chunk
-        placeholder.markdown(answer_markdown(text))
+    text, shown, last = "", "", None
+    try:
+        for chunk in chunks:
+            text += chunk
+            now = clock()
+            if last is None or now - last >= min_interval:
+                placeholder.markdown(answer_markdown(text))
+                shown, last = text, now
+    finally:
+        if text != shown:
+            placeholder.markdown(answer_markdown(text))
     return text
 
 
