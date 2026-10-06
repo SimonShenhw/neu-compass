@@ -159,7 +159,7 @@ def test_real_widget_single_edition_is_shown_by_default_and_still_clearable():
     assert not app.exception and app.selectbox[0].value == "2026-2027"
     text = "\n".join(item.value for item in app.text)
     assert "全部分支（AND）" in text and "最低成绩：B-" in text
-    assert any("只记录了这一个 Catalog 年度" in item.value for item in app.caption)
+    assert any("只记录了这一个 Catalog 年份" in item.value for item in app.caption)
     app.selectbox[0].set_value(None).run(timeout=45)
     assert not app.exception and len(app.text) == 0
 
@@ -188,7 +188,8 @@ def test_structured_records_keep_navigation_but_not_the_flat_graph():
     assert [b.label for b in app.button] == ["查看"]  # catalog course only, ghost not navigable
     assert any(item.value == "CS 5001 · Foundations" for item in app.text)
     assert not any("required" in item.value or "必修" in item.value for item in app.text)
-    assert any("仅导航" in item.value for item in app.markdown)
+    assert any("去看看这些先修课" in item.value for item in app.markdown)
+    assert any("只用来跳转" in item.value for item in app.caption)
 
 
 def test_without_structured_records_the_legacy_graph_and_rows_remain():
@@ -208,3 +209,22 @@ def test_real_widget_unparsed_clause_is_visible_without_partial_rule_or_markup()
     assert not any(raw in item.value for item in app.markdown)
     assert any("未解析" in item.value for item in app.text)
     assert len(app.get("graphviz_chart")) == 0
+
+
+def test_the_rule_stays_up_front_and_the_caveats_fold_into_expanders():
+    """Students see the parsed rule first; the long caveats, credit evidence, description keywords
+    and source details sit in 先修的来源与说明, the program context in its own expander."""
+    from tests.ui_recorder import Recorder
+
+    st = Recorder(choice="2026-2027")
+    render(st, bundle(document()))
+    top = st.at(())
+    assert any(kind == "text" and "全部分支（AND）" in value for kind, value, _ in top)
+    assert ("markdown", "**先修课**", ()) in top and ("markdown", "**共修课（与先修分开）**", ()) in top
+    folded = st.under("📎 先修的来源与说明")
+    assert any("不判断个人注册" in value for _, value, _ in folded)
+    assert any(value.startswith("[官方院系来源](") for _, value, _ in folded)
+    assert any("来源 HTML 字节摘要" in value for _, value, _ in folded)
+    assert not any("来源 HTML 字节摘要" in value or "不判断个人注册" in value for _, value, _ in top)
+    assert ("expander", "🎓 同一年份培养方案里的相关要求", ()) in top
+    assert st.under("🎓 同一年份培养方案里的相关要求")

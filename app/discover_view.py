@@ -107,7 +107,7 @@ def _render_program_row(st) -> None:
     if not programs:
         return
 
-    st.markdown("**🎓 按培养方案浏览 / Browse by program:**")
+    st.markdown("**🎓 按培养方案浏览**")
     cols = st.columns(min(len(programs), 4))
     for i, p in enumerate(programs):
         label = f"{p.get('prefix', '?')} · {int(p.get('course_count', 0))} 门课"
@@ -153,7 +153,7 @@ def _render_starter_row(st) -> None:
     if not picks:
         return
 
-    st.markdown("**🔥 入门推荐 / Starter picks:**")
+    st.markdown("**🔥 入门推荐**")
     cols = st.columns(len(picks))
     for col, (prefix, course) in zip(cols, picks):
         col.markdown(
@@ -198,15 +198,21 @@ def _render_coop_teaser(st) -> None:
     if not coops:
         return
 
-    st.markdown("**💼 Co-op 风向 / Recent co-ops:**")
+    from app.ui_theme import plain_text_html  # noqa: PLC0415
+
+    st.markdown("**💼 最近的 Co-op 经验**")
     for c in coops[:2]:
-        # Markdown, not raw HTML — Streamlit sanitizes markdown itself
-        # (same precedent as coop_view's listing rows).
-        # 中文:用 markdown 而非原生 HTML —— Streamlit 会自行清理
-        # markdown（与 coop_view 列表行的先例一致）。
-        st.markdown(f"- **{c.get('company', '')}** · {c.get('role', '')}")
+        # Company/role include reviewed student submissions. Escaped HTML, not Markdown:
+        # Streamlit's Markdown keeps links of any scheme and other syntax.
+        # 中文：公司和职位包含审核过的学生投稿。用转义后的 HTML 而不是 Markdown：
+        # Streamlit 的 Markdown 会保留任意协议的链接和其他语法。
+        st.markdown(
+            f'<div class="nc-line">• <b>{plain_text_html(c.get("company", ""))}</b> · '
+            f'{plain_text_html(c.get("role", ""))}</div>',
+            unsafe_allow_html=True,
+        )
         if int(c.get("visibility_level", 0)) >= 1:
-            st.caption("🔒 面试细节/薪资 · 贡献解锁")
+            st.caption("🔒 面试细节和薪资：登录并分享自己的经验后解锁")
     if st.button("去看看 →", key="disc-coop"):
         st.session_state["pending_nav_to_coop"] = True
         st.rerun()

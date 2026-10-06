@@ -9,8 +9,9 @@ import re
 import pytest
 
 from app.answer_evidence_view import (
-    FIELD_LABELS, SOURCE_KIND_LABELS, WARNING_LABELS, _when, answer_markdown, evidence_summary,
-    render_answer_evidence, render_field_evidence, render_streamed_answer, snapshot_digest, source_summary,
+    FIELD_LABELS, SHORT_WARNING_LABELS, SOURCE_KIND_LABELS, WARNING_LABELS, _when, answer_markdown,
+    evidence_summary, notice_line, render_answer_evidence, render_course_overview, render_field_evidence,
+    render_streamed_answer, snapshot_digest, source_summary,
 )
 from app.streamlit_app import _format_evidence, _render_evidence_block
 from db.catalog_source_repository import CatalogSourceRepository
@@ -111,12 +112,52 @@ def test_compact_cards_bound_the_gap_list_but_details_keep_every_field():
 
 
 def test_compact_cards_do_not_hide_seed_conflict_or_synthetic_warnings():
+    """Cards under an answer keep every important caveat, merged into ONE line (they used to add a
+    caption per warning, several per course)."""
     data = evidence()
     data["warnings"] = ["program_seed_unverified", "catalog_metadata_conflict", "field_evidence_value_conflict",
-                        "synthetic_record_not_real_course", "extracted_evidence_not_official_facts"]
+                        "synthetic_record_not_real_course", "extracted_evidence_not_official_facts",
+                        "catalog_retrieval_date_unknown"]
     st = FakeSurface()
     render_answer_evidence(st, data)
-    assert all(WARNING_LABELS[warning] in st.captions for warning in data["warnings"])
+    notices = [line for line in st.captions if line.startswith("⚠️")]
+    assert notices == ["⚠️ " + "；".join(SHORT_WARNING_LABELS[warning] for warning in data["warnings"][:5]) + "。"]
+    assert SHORT_WARNING_LABELS["catalog_retrieval_date_unknown"] not in notices[0]  # Detail panel only.
+    assert len(st.captions) == 3  # Source line, missing fields, one caveat line.
+
+
+def test_notice_line_keeps_api_order_drops_repeats_and_unknown_codes():
+    assert notice_line([]) is None and notice_line(["not_a_known_code"]) is None
+    assert notice_line(["synthetic_record_not_real_course", "program_seed_unverified", "synthetic_record_not_real_course",
+                        "not_a_known_code"]) == (
+        "⚠️ " + SHORT_WARNING_LABELS["synthetic_record_not_real_course"] + "；"
+        + SHORT_WARNING_LABELS["program_seed_unverified"] + "。")
+    assert notice_line(["program_seed_unverified", "topics_source_unavailable"], only={"topics_source_unavailable"}) == (
+        "⚠️ " + SHORT_WARNING_LABELS["topics_source_unavailable"] + "。")
+    assert set(SHORT_WARNING_LABELS) == set(WARNING_LABELS)  # Every warning has both forms.
+
+
+def test_course_overview_shows_the_description_its_source_and_one_caveat_line():
+    data = evidence(catalog=True)
+    data["warnings"].append("program_seed_unverified")
+    st = FakeSurface()
+    render_course_overview(st, data)
+    assert st.texts == [data["catalog"]["description"]]
+    assert st.captions[0] == f"课程描述来自 [NEU 官方课程目录]({data['catalog']['catalog_url']}) 的存档副本，不是实时核对。"
+    assert st.captions[1] == notice_line(data["warnings"]) and len(st.captions) == 2
+    missing = FakeSurface()
+    render_course_overview(missing, evidence())  # No snapshot: say so once, not again in the caveat line.
+    assert missing.texts == [] and missing.captions[0] == "没有官方目录描述的存档。"
+    assert not any(SHORT_WARNING_LABELS["catalog_source_unavailable"] in line for line in missing.captions)
+    corrupt = evidence(catalog=True)
+    corrupt["catalog"]["catalog_url"] = "https://elsewhere.example/page"
+    broken = FakeSurface()
+    render_course_overview(broken, corrupt)
+    assert broken.texts == [] and broken.captions[0].startswith("目录存档没有通过格式或来源校验")
+    assert not any("elsewhere.example" in line for line in broken.captions + broken.markdowns)
+    nothing = FakeSurface()
+    render_course_overview(nothing, None)
+    assert nothing.captions == nothing.texts == []
 
 
 def test_snapshot_link_description_and_dates_have_separate_meaning():
@@ -396,4 +437,4 @@ def test_live_and_history_result_cards_use_shared_provenance_renderer():
         st = FakeSurface()
         _render_evidence_block(st, [result], key_prefix=prefix)
         assert "未附可追溯" in st.children[0].captions[0]
-        assert WARNING_LABELS["program_seed_unverified"] in st.children[0].captions
+        assert notice_line(["program_seed_unverified"]) in st.children[0].captions

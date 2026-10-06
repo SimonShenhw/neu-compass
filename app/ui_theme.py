@@ -45,12 +45,12 @@ ALIPAY_BLUE = "#1677FF"
 # 取值集合保持一致（api/routes/search.py）：alias / hybrid / program /
 # rejected / empty。
 _BADGE_STYLES: dict[str, tuple[str, str, str]] = {
-    "alias": ("直达 · alias", "#E6F7EE", "#18A058"),
-    "hybrid": ("检索 · hybrid", "#E8F1FF", ALIPAY_BLUE),
-    "program": ("培养方案 · program", "#F0EBFF", "#7B61FF"),
-    "context": ("续聊 · context", "#E6FFFB", "#0E9A8F"),
-    "rejected": ("无匹配 · rejected", "#FFF1E6", "#E8731A"),
-    "empty": ("空结果 · empty", "#F2F3F5", "#646A73"),
+    "alias": ("按课程代码找到", "#E6F7EE", "#18A058"),
+    "hybrid": ("按内容检索", "#E8F1FF", ALIPAY_BLUE),
+    "program": ("按培养方案", "#F0EBFF", "#7B61FF"),
+    "context": ("接着上一个问题", "#E6FFFB", "#0E9A8F"),
+    "rejected": ("没找到匹配的课", "#FFF1E6", "#E8731A"),
+    "empty": ("没有结果", "#F2F3F5", "#646A73"),
 }
 
 GLOBAL_CSS = """
@@ -167,6 +167,13 @@ h3 { font-weight: 600; color: #26303E; letter-spacing: 0.2px; }
   margin-left: 6px;
 }
 
+.nc-line {
+  color: #3D4757;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0.15rem 0 0.45rem 0;
+}
+.nc-line-label { font-weight: 600; color: #1F2A3D; }
 .nc-banner {
   background: #FFFFFF;
   border: 1px solid #EBEEF5;
@@ -377,9 +384,13 @@ def hero_html(
 def guest_banner_html() -> str:
     """Soft card replacing the default st.info guest notice.
     替代默认 st.info 访客提示的柔和卡片。"""
+    # Tiers per coop_view: level 0 for everyone, 1 reviewed contribution → interview
+    # details, 2 → salary range. 中文：分级同 coop_view：0 级所有人可见，1 条已审核贡献
+    # 解锁面试细节，2 条解锁薪资区间。
     return (
-        '<div class="nc-banner">🔒 当前为游客浏览 — 仅可见 level-0 (preview) '
-        "Co-op 数据。用 NEU 邮箱登录（左侧栏）解锁贡献分级内容。</div>"
+        '<div class="nc-banner">🔒 你现在是游客：课程搜索和培养方案都能用；Co-op 经验只显示'
+        "公司、职位、学期和时长。用 NEU 邮箱登录（左侧栏）后分享自己的 Co-op 经验，审核通过"
+        "后解锁更多：1 条看面试细节，2 条看薪资区间。</div>"
     )
 
 
@@ -558,8 +569,32 @@ def empty_detail_html() -> str:
     return (
         '<div class="nc-empty">'
         '<div class="nc-empty-icon">📘</div>'
-        "点击左侧搜索结果中的课程<br>查看课程详情、培养方案定位与先修关系"
+        "点回答下方课程旁的「查看」<br>这里会显示课程详情、先修要求和培养方案定位"
         "</div>"
+    )
+
+
+def plain_text_html(text: object) -> str:
+    """Escaped text for a block-level HTML tag that STARTS the st.markdown string (see
+    labelled_line_html). Newlines become <br>, so the value stays inside one HTML block,
+    which the Markdown parser never reads as Markdown (no links, emphasis, math or
+    directives from the data). Next to Markdown text, inside a paragraph, it would still be
+    parsed, so never use it there.
+
+    中文：用于放在 st.markdown 字符串开头的块级 HTML 标签里（见 labelled_line_html）。
+    换行改成 <br>，值留在同一个 HTML 块里，Markdown 解析器不会把它当 Markdown 解析
+    （数据里的链接、强调、公式、指令都不会生效）。如果和 Markdown 文字放在同一段落里，
+    仍会被解析，所以不要那样用。"""
+    return html.escape(str(text)).replace("\r", "").replace("\n", "<br>")
+
+
+def labelled_line_html(label: str, value: object) -> str:
+    """'<label>：value' as a single escaped HTML line (the value is data, e.g. extracted
+    fields; the label is ours). 中文：「标签：值」的单行转义 HTML；值是数据（例如抽取字段），
+    标签是我们自己的文字。"""
+    return (
+        f'<div class="nc-line"><span class="nc-line-label">{html.escape(label)}：</span>'
+        f"{plain_text_html(value)}</div>"
     )
 
 
@@ -595,7 +630,9 @@ __all__ = [
     "guest_banner_html",
     "hero_html",
     "inject_theme",
+    "labelled_line_html",
     "matched_via_badge",
+    "plain_text_html",
     "prereq_label_md",
     "program_context_html",
     "requirement_badge",

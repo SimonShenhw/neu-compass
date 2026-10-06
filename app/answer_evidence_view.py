@@ -35,6 +35,21 @@ WARNING_LABELS = {
     "field_evidence_value_conflict": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
     "synthetic_record_not_real_course": "此记录为合成测试数据，不是实际课程推荐。",
 }
+# One-line forms of the same warnings (notice_line): cards and the top of the detail panel show
+# every applicable one in a single caption; the full sentences stay in the detailed view.
+# 中文：同一批提示的一行短句（notice_line）：卡片和详情面板顶部把适用的提示合成一行；
+# 完整句子留在详细视图里。
+SHORT_WARNING_LABELS = {
+    "catalog_source_unavailable": "没有官方目录的存档",
+    "catalog_retrieval_date_unknown": "目录的抓取日期没有记录",
+    "extracted_evidence_not_official_facts": "工作量、难度等是根据评价的估计，不是官方信息",
+    "topics_source_unavailable": "主题列表没有来源",
+    "prerequisite_logic_unavailable": "先修课之间是「都要」还是「任选」不清楚",
+    "program_seed_unverified": "培养方案关系没有核实，不是正式的 Plan of Study",
+    "catalog_metadata_conflict": "目录学分和课程记录不一致，请向学校核实",
+    "field_evidence_value_conflict": "有估计值和评价原文对不上，需要核实",
+    "synthetic_record_not_real_course": "这是测试数据，不是真实课程",
+}
 # Per-answer retrieval notices from /chat meta. Only KNOWN codes render;
 # anything else is dropped (never echoed as markdown).
 # 中文：/chat meta 里的回答级检索提示码。只渲染已知代码；其余一律丢弃
@@ -177,20 +192,62 @@ def evidence_summary(evidence: dict, *, missing_limit: int | None = None) -> lis
     return lines
 
 
-def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False) -> None:
+def notice_line(warnings: list, *, only: set[str] | None = None) -> str | None:
+    """Every known caveat that applies, as one short line ('⚠️ a；b。'), in the API's order.
+    Unknown codes are skipped here; the full list (unknown codes included) stays in the
+    detailed view. 中文：把适用的已知提示合成一行短句，按 API 给出的顺序；未知代码不进这一行，
+    完整列表（含未知代码）仍在详细视图里。"""
+    shown = [SHORT_WARNING_LABELS[code] for code in dict.fromkeys(warnings)
+             if code in SHORT_WARNING_LABELS and (only is None or code in only)]
+    return "⚠️ " + "；".join(shown) + "。" if shown else None
+
+
+def render_course_overview(st, evidence: dict | None) -> None:
+    """Top of the course detail panel: the recorded official description, where it comes from,
+    and one line with every caveat. The full provenance goes in render_answer_evidence(detailed).
+    中文：课程详情面板最上面：记录的官方描述、它从哪里来，以及一行汇总的提示。完整的来源信息
+    放在 render_answer_evidence(detailed) 里。"""
+    if evidence is None:
+        return  # Backward-compatible history entries may predate this contract.
+    snapshot = _catalog_snapshot(evidence)
+    if snapshot:
+        if snapshot.description:
+            st.text(snapshot.description)
+        # catalog_url passed CatalogSnapshot's official-URL and department checks.
+        st.caption(f"课程描述来自 [NEU 官方课程目录]({snapshot.catalog_url}) 的存档副本，不是实时核对。")
+    elif evidence.get("catalog"):
+        st.caption("目录存档没有通过格式或来源校验，所以不显示描述和链接。")
+    else:
+        st.caption("没有官方目录描述的存档。")
+    # The caption above already says when there is no catalog record.
+    line = notice_line([code for code in evidence.get("warnings", []) if code != "catalog_source_unavailable"])
+    if line:
+        st.caption(line)
+
+
+def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False,
+                           show_description: bool = True) -> None:
+    """Compact (cards under an answer): source line, missing fields, one caveat line.
+    Detailed (course detail, inside 来源与说明): every field, every warning in full, snapshot and
+    recorded sources. show_description=False when render_course_overview already showed it.
+    中文：紧凑模式（回答下方的卡片）：来源、缺失字段、一行提示。详细模式（课程详情的「来源与说明」
+    里）：全部字段、每条提示的完整说明、快照和记录来源。若 render_course_overview 已显示描述，
+    传 show_description=False。"""
     if evidence is None:
         return  # Backward-compatible history entries may predate this contract.
     for line in evidence_summary(evidence, missing_limit=None if detailed else 5):
         st.caption(line)
-    for warning in evidence.get("warnings", []):
-        if detailed or warning in COMPACT_WARNINGS:
-            st.caption(WARNING_LABELS.get(warning, warning))
     if not detailed:
+        line = notice_line(evidence.get("warnings", []), only=COMPACT_WARNINGS)
+        if line:
+            st.caption(line)
         return
+    for warning in evidence.get("warnings", []):
+        st.caption(WARNING_LABELS.get(warning, warning))
     snapshot = _catalog_snapshot(evidence)
     if snapshot:
         st.markdown(f"[官方目录来源]({snapshot.catalog_url}) · 非实时核验")
-        if snapshot.description:
+        if snapshot.description and show_description:
             st.text(snapshot.description)
         # A 64-hex digest is unreadable: show its head, keep the whole ID one hover away.
         # Captions and tooltips render Markdown, so a malformed ID is never echoed.

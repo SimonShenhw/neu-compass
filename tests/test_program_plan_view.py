@@ -19,7 +19,7 @@ def document():
 class FakeSurface:
     def __init__(self, choice=None):
         self.choice = choice
-        self.captions, self.texts, self.markdowns, self.selectors = [], [], [], []
+        self.captions, self.texts, self.markdowns, self.selectors, self.helps = [], [], [], [], []
         self.session_state = {}
 
     def caption(self, text):
@@ -31,8 +31,9 @@ class FakeSurface:
     def markdown(self, text):
         self.markdowns.append(text)
 
-    def selectbox(self, label, values, *, format_func, key):
+    def selectbox(self, label, values, *, format_func, key, help=None):
         self.selectors.append((label, values, [format_func(value) for value in values], key))
+        self.helps.append(help)
         return self.choice
 
     def expander(self, label):
@@ -108,10 +109,12 @@ def test_chat_program_choice_is_optional_and_does_not_imply_year_or_campus():
     programs = [{"program_id": "cs-ms", "full_name": "CS MS"}, {"program_id": "cs-align", "full_name": "CS Align"}]
     st = FakeSurface()
     assert render_chat_program_selector(st, programs) is None
-    assert st.selectors[0][1][0] is None
+    assert st.selectors[0][1][0] is None and st.selectors[0][2][0] == "不指定"
+    assert st.selectors[0][0] == "你的项目（可选）"
+    assert "不替你选校区或 Catalog 年份" in st.helps[0]
     selected = FakeSurface(choice="cs-align")
     assert render_chat_program_selector(selected, programs) == "cs-align"
-    assert any("个人适用性尚未" in line for line in selected.captions)
+    assert any("校区、Catalog 年份和你个人的要求仍需要自己核实" in line for line in selected.captions)
 
 
 def test_stale_chat_selection_is_cleared_before_rendering_widget():

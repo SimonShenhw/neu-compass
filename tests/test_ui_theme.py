@@ -51,13 +51,34 @@ def test_hero_logged_in_shows_display_name_escaped() -> None:
     assert "<b>&" not in out
 
 
+# === plain_text_html / labelled_line_html ===
+
+
+def test_plain_text_lines_escape_html_and_stay_one_html_block() -> None:
+    """Extracted fields go through these. A CommonMark parser must read the result as ONE HTML
+    block (no Markdown inside), and newlines must not end it early."""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import labelled_line_html, plain_text_html  # noqa: PLC0415
+
+    assert plain_text_html("a <b>&\"x\"</b>\r\nb\n\nc") == "a &lt;b&gt;&amp;&quot;x&quot;&lt;/b&gt;<br>b<br><br>c"
+    line = labelled_line_html("任课老师 <i>", "[x](https://elsewhere.example) **y**\n\n$z$ :help[w]")
+    assert line.startswith('<div class="nc-line"><span class="nc-line-label">任课老师 &lt;i&gt;：</span>')
+    assert "\n" not in line
+    assert [token.type for token in MarkdownIt("commonmark").parse(line)] == ["html_block"]
+
+
 # === guest_banner_html ===
 
 
 def test_guest_banner_mentions_login_path() -> None:
+    """Student wording for the give-to-get tiers in coop_view: level 0 for everyone, 1 reviewed
+    contribution for interview details, 2 for salary ranges."""
     out = guest_banner_html()
     assert "nc-banner" in out
-    assert "level-0" in out
+    assert "游客" in out and "NEU 邮箱登录" in out and "审核通过" in out
+    assert "1 条看面试细节" in out and "2 条看薪资区间" in out
+    assert "level-0" not in out and "preview" not in out
 
 
 # === matched_via_badge ===
@@ -73,6 +94,14 @@ def test_badge_known_tiers_have_distinct_styles() -> None:
 
 def test_badge_unknown_tier_falls_back_to_neutral() -> None:
     assert matched_via_badge("some_future_tier") == matched_via_badge("empty")
+
+
+def test_badge_labels_describe_the_match_for_students() -> None:
+    """The labels used to be retrieval jargon ('直达 · alias', '检索 · hybrid')."""
+    labels = {tier: matched_via_badge(tier).split(">")[1].split("<")[0] for tier in
+              ("alias", "hybrid", "program", "context", "rejected", "empty")}
+    assert labels == {"alias": "按课程代码找到", "hybrid": "按内容检索", "program": "按培养方案",
+                      "context": "接着上一个问题", "rejected": "没找到匹配的课", "empty": "没有结果"}
 
 
 # === course_header_html ===

@@ -20,11 +20,13 @@ def render_chat_program_selector(st, programs: list[dict]) -> str | None:
     if st.session_state.get(key) not in {None, *by_id}:
         st.session_state.pop(key, None)
     selected = st.selectbox(
-        "对话项目（可选；不是方案年度选择）", [None, *by_id], key=key,
-        format_func=lambda value: "不指定；有歧义时请明确选择" if value is None else f"{by_id[value]['full_name']} · {value}",
+        "你的项目（可选）", [None, *by_id], key=key,
+        format_func=lambda value: "不指定" if value is None else f"{by_id[value]['full_name']} · {value}",
+        help="选了以后，回答会按这个项目理解你的问题，比如「第一学期上什么」。问题对应好几个项目时，"
+             "系统会请你在这里选一个。它不替你选校区或 Catalog 年份。",
     )
     if selected is not None:
-        st.caption("仅区分项目；校区、Catalog 年度与个人适用性尚未由此确认。")
+        st.caption("只用来区分项目；校区、Catalog 年份和你个人的要求仍需要自己核实。")
     return selected
 
 
