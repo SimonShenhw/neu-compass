@@ -11,16 +11,19 @@ Run from the repo root in the project venv (config.settings reads GEMINI_API_KEY
     python scripts/eval_answers_live.py --api-base http://<api-host>:8000 --out /tmp/x --dry-run
     python scripts/eval_answers_live.py --rescore /tmp/answer-eval/results.json   # after tuning checks
 Exit code: 0 every planned answer was checked and none failed a hard check (or a dry run), 1 some
-answer failed a hard check, 2 setup or argument error, 3 incomplete (a model call failed, the call
-cap stopped the run early, or no answer was checked). --rescore keeps the original run's errors.
+answer failed a hard check, 2 setup, argument or input error (an unreachable API or a non-200 GET,
+a missing or malformed --questions or --rescore file, a payload that does not fit), 3 incomplete
+(a model call failed, the call cap stopped the run early, or no answer was checked). Every prompt
+is built before the first model call. --rescore keeps the original run's errors.
 
 中文：按 /chat 的方式问真实模型，并检查回答（eval/answer_checks.py）。证据只来自线上 API 的
 GET /course/{id}（只读，并带 X-Eval-Run 标记，不会被当成学生查询）；提示词用本地的
 llm/prompts/chat_v4.py，构造方式与 api/routes/chat.py 相同；回答来自
 llm.gemini_client.generate_text_stream，参数与 /chat 一样。结果写到 --out：results.json、每个
 回答一个 Markdown 文件、summary.md。不会打印 API key。退出码：0 计划的每个回答都检查过且没有硬失败
-（或空跑），1 有回答没过硬检查，2 准备阶段或参数出错，3 不完整（有模型调用失败、调用上限提前停止，
-或没有任何回答可检查）。--rescore 保留原来那次运行的错误。
+（或空跑），1 有回答没过硬检查，2 准备阶段、参数或输入出错（API 连不上或 GET 不是 200、--questions
+或 --rescore 文件缺失或格式不对、数据对不上），3 不完整（有模型调用失败、调用上限提前停止，或没有任何
+回答可检查）。第一次调用模型之前会先构造好全部提示词。--rescore 保留原来那次运行的错误。
 """
 
 from __future__ import annotations
@@ -186,7 +189,7 @@ def write_report(out: Path, report: dict) -> None:
     report["status"] = run_status(report)
     (out / "results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     planned = report.get("planned_calls", report["model_calls"])
-    lines = [f"# Answer check · prompt {report['prompt_version']}", "", f"**{report['status']}** · "
+    lines = [f"# Answer check · prompt {report['prompt_version']} · {report['status']}", "",
              f"chat_v4.py {report['chat_v4_sha256'][:12]} · {planned} planned · {report['model_calls']} model calls · "
              f"{report['errors']} errors · {report['summary']['answers']} answers checked", "",
              "| answer | hard failures | caveats missing | as reviewer-reported | saved-copy sentences |",
@@ -217,6 +220,35 @@ def rescore(results: Path) -> dict:
     return report
 
 
+QUESTION_KEYS = ("qid", "lang", "query", "course_ids", "route", "notices")
+
+
+def validate_questions(questions: object) -> list[dict]:
+    """A --questions file must be a non-empty list of questions shaped like DEFAULT_QUESTIONS; a bad
+    one is a setup error, found before any request. 中文：--questions 文件必须是非空列表，每个问题
+    的形状和 DEFAULT_QUESTIONS 一样；不合格是准备阶段的错误，在发任何请求之前就发现。"""
+    if not isinstance(questions, list) or not questions:
+        raise ValueError("the questions file must hold a non-empty JSON list")
+    for index, question in enumerate(questions):
+        if not isinstance(question, dict) or any(key not in question for key in QUESTION_KEYS):
+            raise ValueError(f"question {index} needs the keys {', '.join(QUESTION_KEYS)}")
+        if question["lang"] not in ("zh", "en") or question["route"] not in ("alias", "hybrid", "program"):
+            raise ValueError(f"question {index}: lang must be zh or en, route alias, hybrid or program")
+        ids = question["course_ids"]
+        if not isinstance(ids, list) or not ids or not all(isinstance(cid, str) and cid for cid in ids):
+            raise ValueError(f"question {index}: course_ids must be a non-empty list of course IDs")
+        if not isinstance(question["notices"], list):
+            raise ValueError(f"question {index}: notices must be a list")
+    return questions
+
+
+def prepare(questions: list[dict], payloads: dict[str, dict]) -> list[tuple[dict, str, object]]:
+    """(question, prompt, context) for every question, built before the first model call, so a bad
+    question or payload stops the run before it costs anything. 中文：在第一次调用模型之前先为每个
+    问题构造（问题，提示词，上下文），坏的问题或数据在花钱之前就让运行停下。"""
+    return [(question, *build_case(question, payloads)) for question in questions]
+
+
 def redact(message: str, secret: str | None) -> str:
     if secret:
         message = message.replace(secret, "[REDACTED]")
@@ -229,12 +261,14 @@ def run(questions: list[dict], payloads: dict[str, dict], *, out: Path, runs: in
     from eval.answer_checks import check_answer  # noqa: PLC0415
     from llm.prompts.chat_v4 import PROMPT_VERSION  # noqa: PLC0415
 
+    cases = prepare(questions, payloads)
     (out / "answers").mkdir(parents=True, exist_ok=True)
     (out / "prompts").mkdir(parents=True, exist_ok=True)
     records, calls = [], 0
-    for question in questions:
-        prompt, context = build_case(question, payloads)
+    for question, prompt, context in cases:
         (out / "prompts" / f"{question['qid']}.txt").write_text(prompt, encoding="utf-8")
+        (out / "prompts" / f"{question['qid']}.context.json").write_text(
+            json.dumps(context_to_json(context), ensure_ascii=False, indent=2), encoding="utf-8")
         for attempt in range(1, runs + 1 if stream_fn else 1):
             if calls >= max_calls:
                 break
@@ -279,12 +313,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--questions", type=Path, help="JSON list of questions (default: the built-in five)")
     parser.add_argument("--runs", type=int, default=2)
     parser.add_argument("--max-calls", type=int, default=25)
-    parser.add_argument("--dry-run", action="store_true", help="build prompts and contexts, no model calls")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="build and save the prompts and contexts, no model calls")
     args = parser.parse_args(argv)
     if args.runs < 1 or args.max_calls < 1:
         parser.error("--runs and --max-calls must be at least 1")
+    # A missing or malformed input file, or a payload that does not fit, is a setup error (2), not
+    # a hard failure (1). 中文：输入文件缺失或格式不对、数据对不上，都是准备阶段的错误（2），不是硬失败（1）。
+    setup_errors = (OSError, ValueError, KeyError, TypeError)
     if args.rescore:
-        report = rescore(args.rescore)
+        try:
+            report = rescore(args.rescore)
+        except setup_errors as exc:
+            print(f"setup error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
         print(json.dumps({"rescored": str(args.rescore), "status": report["status"], "summary": report["summary"]},
                          ensure_ascii=False))
         return exit_code(report)
@@ -293,12 +335,14 @@ def main(argv: list[str] | None = None) -> int:
 
     import httpx  # noqa: PLC0415
 
-    questions = json.loads(args.questions.read_text(encoding="utf-8")) if args.questions else DEFAULT_QUESTIONS
     headers = {"X-Eval-Run": args.eval_run, "User-Agent": "neu-compass-answer-eval/1"}
     try:
+        questions = (validate_questions(json.loads(args.questions.read_text(encoding="utf-8"))) if args.questions
+                     else DEFAULT_QUESTIONS)
         with httpx.Client(base_url=args.api_base.rstrip("/"), headers=headers, timeout=30.0) as client:
             payloads = fetch_courses(client, (cid for question in questions for cid in question["course_ids"]))
-    except (httpx.HTTPError, RuntimeError) as exc:
+        prepare(questions, payloads)  # Every prompt and context, before the first model call.
+    except (*setup_errors, RuntimeError, httpx.HTTPError) as exc:
         print(f"setup error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     stream_fn, secret = None, None

@@ -71,10 +71,12 @@ def test_reviews_need_instructor_attribution_and_the_site_name_is_not_one():
 
 
 def test_missing_caveats_are_listed():
-    context = AnswerContext(lang="zh", fetch_date_relevant=True, no_catalog_relevant=True, prereq_relevant=True,
-                            program_notice=True)
-    assert check_answer("这门课讲图算法。", context)["caveats_missing"] == [
+    context = AnswerContext(lang="zh", allowed_urls=frozenset({CATALOG}), fetch_date_relevant=True,
+                            no_catalog_relevant=True, prereq_relevant=True, program_notice=True)
+    assert check_answer(f"这门课讲图算法，见 [NEU 官方课程目录]({CATALOG})。", context)["caveats_missing"] == [
         "fetch_date", "no_catalog", "prereq_logic", "program_caveat", "programs_page_pointer"]
+    # 4.3 asks for the saved-copy note only when the catalog description was used (and linked).
+    assert "fetch_date" not in check_answer("这门课讲图算法。", context)["caveats_missing"]
 
 
 def test_an_unstated_estimate_called_reviewer_reported_is_flagged():
@@ -134,6 +136,55 @@ def test_review_attribution_comes_from_the_sentences_that_cite_reviews():
     assert rmp("RateMyProfessors 上对任课老师的评价说很难。不过不一定是这门课。", zh) == "instructor + may be another course"
     assert rmp("RateMyProfessors 上对任课老师的评价说很难。这门课讲图算法。也可能是别的课。", zh) == (
         "instructor, no other-course caveat")
+
+
+def test_ordinary_english_with_numbers_is_not_a_review_count():
+    en = AnswerContext(lang="en")
+    for text in ("Many CS 5800 students find it hard.", "Here are 3 options for students.",
+                 "CS 5200 reviews on the record are mixed."):
+        assert not check_answer(text, en)["counts_fail"], text
+    assert check_answer("50 of the reviews say it is hard.", en)["counts_fail"]
+    assert check_answer("Twelve positive reviews say it is easy.", en)["counts_fail"]
+
+
+def test_review_attribution_edge_cases():
+    en, zh = AnswerContext(lang="en", has_rmp_data=True), AnswerContext(lang="zh", has_rmp_data=True)
+
+    def rmp(text, context):
+        return check_answer(text, context)["rmp"]
+
+    # 评价 as assessment is not a review.
+    assert rmp("这门课的评价方式包括作业和考试。成绩评价以作业为主。", zh) == "not used"
+    # The site's spaced name is not an instructor.
+    assert rmp("Rate My Professors 上的评价说作业很多。", zh) == "UNQUALIFIED"
+    # 他们 / 他人 / 她们 are not one person; he / she are.
+    assert rmp("RateMyProfessors 上的评价说他们觉得作业多。", zh) == "UNQUALIFIED"
+    assert rmp("RateMyProfessors 上的评价说她讲得清楚。", zh) == "instructor, no other-course caveat"
+    assert rmp("RateMyProfessors reviews say she explains proofs well.", en) == "instructor, no other-course caveat"
+    # Every passage needs its own other-course caveat.
+    two = ("RateMyProfessors 上对任课老师的评价说很难，可能是关于别的课。\n\n这门课讲图算法。\n\n"
+           "RateMyProfessors 上对任课老师的评价还说作业多。")
+    assert rmp(two, zh) == "instructor, no other-course caveat"
+
+
+def test_link_checks_ignore_course_names_but_catch_uppercase_and_other_schemes():
+    context = AnswerContext(lang="en", allowed_urls=frozenset({CATALOG}))
+    assert not check_answer(f"See [CS 5010 Programming Design Paradigm]({CATALOG}).", context)["links_fail"]
+    assert check_answer(f"See the [Programs page]({CATALOG}).", context)["links_fail"]
+    assert check_answer("Visit HTTPS://ELSEWHERE.EXAMPLE or WWW.ELSEWHERE.EXAMPLE.", context)["links_fail"]
+    assert check_answer("Write to <mailto:office@elsewhere.example>.", context)["links_fail"]
+
+
+def test_the_no_catalog_note_is_not_a_repeated_saved_copy_sentence():
+    text = "这些内容来自目录的存档副本，不是实时核对。CS 5200 没有官方目录描述的存档副本。"
+    assert check_answer(text, AnswerContext(lang="zh"))["saved_copy_mentions"] == 1
+
+
+def test_a_single_capital_letter_ends_a_sentence_but_dotted_initials_and_approx_do_not():
+    assert sentences("Most of it is Part A. RMP reviews say it is easy.") == [
+        "Most of it is Part A.", " RMP reviews say it is easy."]
+    assert sentences("It is a U.S. course. It takes approx. 12 hours.") == [
+        "It is a U.S. course.", " It takes approx. 12 hours."]
 
 
 def test_summary_counts():

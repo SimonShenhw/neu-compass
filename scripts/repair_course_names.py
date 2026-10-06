@@ -8,9 +8,10 @@ title, so that course also never got its catalog snapshot.
 
 Default: read-only report of every course whose stored name differs from its archived catalog
 title. --commit repairs only the unambiguous kind: the stored name ends like a sentence and appears
-verbatim in the course's own description (archived description or stored raw_text), and the archive
-has exactly one title for that code. Other mismatches (renamed courses, edition differences) are
-listed, never changed. A repair goes through CourseRepository.rename: name column and Course JSON
+verbatim in the course's own description (archived description or stored raw_text). The archive
+entry is matched by course code; an archive that gives any code two different titles aborts the
+whole run before the database is opened. Other mismatches (renamed courses, edition differences)
+are listed, never changed. A repair goes through CourseRepository.rename: name column and Course JSON
 change together, and status stays as it was, because neither index reads the name (FAISS embeds
 raw_text, BM25 indexes raw_text + search_expansion), so nothing needs re-indexing and the course
 never drops out of search. One transaction; explicit existing DB and archive directory; no network.
@@ -20,8 +21,9 @@ Afterwards run sync_catalog_sources.py to attach the snapshots that now match.
 自己描述的第一句，多半是 2026-06 之前把整个 LLM 输出写回的富化留下的（现在 review_enrichment
 只合并软字段）。sync_catalog_sources.py 只在存的名称和目录标题完全一致时才挂快照，所以这门课一直
 没有目录快照。默认只读，列出所有与存档目录标题不一致的课程；--commit 只修明确的那一类：存的名称
-以句号等结尾、并且原样出现在这门课自己的描述里（存档描述或存的 raw_text），且存档里这个代码只有
-一个标题。其他不一致（改名、版本差异）只列出、不改。修复走 CourseRepository.rename：名称列和
+以句号等结尾、并且原样出现在这门课自己的描述里（存档描述或存的 raw_text）。存档按课程代码对应；
+存档里只要有一个代码对应两个不同标题，整个运行就在打开数据库之前中止。其他不一致（改名、版本差异）
+只列出、不改。修复走 CourseRepository.rename：名称列和
 Course JSON 一起改，status 保持不变，因为两个索引都不读名称（FAISS 嵌入 raw_text，BM25 索引
 raw_text + search_expansion），所以不用重建索引，这门课也不会从搜索里消失。一个事务；必须显式给出
 已存在的数据库和存档目录；不联网。之后再跑 sync_catalog_sources.py，把现在能对上的快照挂上。
@@ -123,7 +125,7 @@ def cli(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         report = repair_names(args.db_path, args.catalog_dir, commit=args.commit)
-    except (OSError, sqlite3.Error, ValueError) as exc:
+    except (OSError, sqlite3.Error, ValueError, LookupError) as exc:  # LookupError: CourseNotFound.
         print(f"Course name repair failed ({type(exc).__name__}); no transaction committed.")
         return 1
     print(json.dumps(report, ensure_ascii=False))

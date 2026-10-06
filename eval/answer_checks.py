@@ -33,24 +33,33 @@ BASE64_CANDIDATE = re.compile(r"[A-Za-z0-9+/=_\-]{16,}")
 COURSE_ID = re.compile(r"\bneu-[a-z]{2,6}-\d{4}[a-z]?\b")
 
 MD_LINK = re.compile(r"!?\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+[\"'][^\"']*[\"'])?\s*\)")
-AUTOLINK = re.compile(r"<((?:https?|ftp)://[^>\s]+)>")
+# Any scheme, and case-insensitive: the renderer links HTTPS:// and WWW. too.
+AUTOLINK = re.compile(r"<([A-Za-z][A-Za-z0-9+.\-]{1,31}:[^<>\s]*)>")
 REF_DEF = re.compile(r"^\s*\[([^\]]+)\]:\s*(\S+)", re.M)
-BARE_URL = re.compile(r"(?:https?://|www\.)[^\s<>()\[\]\"'，。、；）（]+")
-PROGRAM_LABEL = re.compile(r"培养方案|program", re.I)
+BARE_URL = re.compile(r"(?:https?://|www\.)[^\s<>()\[\]\"'，。、；）（]+", re.I)
+PROGRAM_LABEL = re.compile(r"培养方案|\bprograms?\b", re.I)  # Not "Programming" in a course name.
 CJK = re.compile(r"[一-鿿]")
 
 COUNT_ZH = re.compile(
     r"(\d+|[一二两三四五六七八九十百]+)\s*(?:\+|多)?\s*(?:条|位|个|份|名|篇|则)\s*"
     r"(?:来自\s*)?(?:RateMyProfessors\s*|RMP\s*)?(?:上的?\s*)?(?:学生的?)?"
     r"(?:评价|评论|点评|评分|打分|学生|同学|反馈|用户)")
+# Up to two words between the number and the noun, but never a preposition ("3 options for
+# students" is not a count of reviews). 中文：数字和名词之间最多两个词，但不能是介词。
 COUNT_EN = re.compile(
     r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|fifty|dozens?)"
-    r"\s+(?:[A-Za-z\-]+\s+){0,2}(?:reviews?|reviewers?|students?|ratings?|comments?)\b", re.I)
+    r"\s+(?:(?!(?:for|to|in|on|at|with|about|per|from|by|into|than)\b)[A-Za-z\-]+\s+){0,2}"
+    r"(?:reviews?|reviewers?|students?|ratings?|comments?)\b", re.I)
+# The 4-digit number of a course code ("CS 5800 students") is not a count.
+COURSE_CODE_BEFORE = re.compile(r"\b[A-Z]{2,5}\s?$")
 
 SINGULAR = {"1", "一", "one"}
 
 RMP_NAME = re.compile(r"RateMyProfessors|Rate ?My ?Professors?|\bRMP\b", re.I)
-REVIEW_WORD = re.compile(r"评价|评论|点评|口碑|学生反馈|reviews?|reviewers?|ratings?", re.I)
+# 评价 also means assessment: 评价方式 / 评价标准 / 成绩评价 / 考核评价 are about grading, not reviews.
+# 中文：评价也指考核：评价方式、评价标准、成绩评价、考核评价说的是打分方式，不是评价网站的评论。
+REVIEW_WORD = re.compile(r"(?<!成绩)(?<!考核)评价(?!方式|标准|体系|方法)|评论|点评|口碑|学生反馈|"
+                         r"reviews?|reviewers?|ratings?", re.I)
 # Word boundaries: without them "professor" also matched inside "RateMyProfessors", so every RMP
 # mention looked instructor-attributed. 中文：要有词边界，否则 "professor" 会在 "RateMyProfessors"
 # 里面也匹配，任何提到 RMP 的回答都会被当成「归给了老师」。
@@ -89,10 +98,13 @@ PROGRAMS_PAGE = re.compile(r"培养方案|Programs page|\bPrograms\b", re.I)
 SAVED_COPY = re.compile(r"副本|saved copy|stored copy|copy of the catalog|不是实时|非实时|not a live", re.I)
 
 # A sentence ends at 。！？!?, at a line break, or at a period followed by a space or the end; not at
-# the period in 4.0, U.S. or an abbreviation such as e.g. or approx. 中文：句子在 。！？!?、换行、
-# 或后面跟空白/结尾的英文句号处结束；4.0、U.S. 里的点和 e.g.、approx. 这类缩写不算。
+# the period in 4.0, in dotted initials (U.S.) or after an abbreviation such as e.g. or approx. A
+# single capital letter does end one ("... Part A. Reviews say ..."), so a lone initial in a name
+# splits it. 中文：句子在 。！？!?、换行、或后面跟空白/结尾的英文句号处结束；4.0、U.S. 这种连续缩写
+# 和 e.g.、approx. 这类缩写不算。单个大写字母后的句号算结束（"... Part A. Reviews say ..."），所以
+# 人名里单独的首字母会把句子分开。
 SENTENCE_END = re.compile(r"[。！？!?]+|\.(?=\s|$)|\n")
-ABBREVIATION = re.compile(r"\b(?:(?i:e\.g|i\.e|approx|vs|cf|prof|dr|mrs?|ms|fig)|[A-Z])$")
+ABBREVIATION = re.compile(r"\b(?:(?i:e\.g|i\.e|approx|vs|cf|prof|dr|mrs?|ms|fig)|(?:[A-Z]\.)+[A-Z])$")
 # A pronoun in a review sentence refers the review to a person, i.e. the instructor ("RMP 上的评价说他
 # 讲得清楚"); 其他/他们/他人 are not pronouns for one person. 中文：评价句里的人称代词指的是某个人，也就是
 # 老师；其他、他们、他人不算。
@@ -144,9 +156,11 @@ def sentences(text: str) -> list[str]:
 def review_attribution(parts: list[str], has_rmp_data: bool) -> str:
     """How the sentences that cite reviews attribute them. Consecutive review sentences form one
     passage; each passage must name the instructor (or refer to them as he/she) itself, so an
-    unrelated "professor" elsewhere does not count. The other-course caveat may also sit in the
-    sentence right after a passage. 中文：引用评价的句子怎样归属。连续的评价句算一段；每段自己要
-    提到老师（或用他/她指代），别处无关的 "professor" 不算。"可能是别的课"的提示也可以在紧接着的下一句。"""
+    unrelated "professor" elsewhere does not count, and neither does the site's own name ("Rate
+    My Professors"). Every passage needs the other-course caveat, inside it or in the sentence
+    right after it. 中文：引用评价的句子怎样归属。连续的评价句算一段；每段自己要提到老师（或用
+    他/她指代），别处无关的 "professor" 不算，网站名本身（"Rate My Professors"）也不算。每段都要有
+    "可能是别的课"的提示，在段内或紧接着的下一句。"""
     reviewing = [bool(RMP_NAME.search(part)) or (has_rmp_data and bool(REVIEW_WORD.search(part))) for part in parts]
     passages, index = [], 0
     while index < len(parts):
@@ -160,10 +174,10 @@ def review_attribution(parts: list[str], has_rmp_data: bool) -> str:
         index = end + 1
     if not passages:
         return "not used"
-    if not all(any(INSTRUCTOR.search(part) or PERSON.search(part) for part in parts[start:end + 1])
+    if not all(any(INSTRUCTOR.search(RMP_NAME.sub(" ", part)) or PERSON.search(part) for part in parts[start:end + 1])
                for start, end in passages):
         return "UNQUALIFIED"
-    if any(OTHER_COURSE.search(part) for start, end in passages for part in parts[start:end + 2]):
+    if all(any(OTHER_COURSE.search(part) for part in parts[start:end + 2]) for start, end in passages):
         return "instructor + may be another course"
     return "instructor, no other-course caveat"
 
@@ -206,12 +220,18 @@ def check_answer(text: str, context: AnswerContext) -> dict:
     # only counts above one can overstate. 中文：「一条评论提到……」指的是被引用的那一条，属实；
     # 只有大于一的条数才可能夸大。
     counts = [_context(text, m) for pattern in (COUNT_ZH, COUNT_EN) for m in pattern.finditer(text)
-              if m.group(1).lower() not in SINGULAR]
+              if m.group(1).lower() not in SINGULAR
+              and not (len(m.group(1)) == 4 and m.group(1).isdigit()
+                       and COURSE_CODE_BEFORE.search(text, max(0, m.start() - 8), m.start()))]
 
     parts = sentences(text)
     rmp = review_attribution(parts, context.has_rmp_data)
 
-    caveats = {"fetch_date": (context.fetch_date_relevant, FETCH_DATE), "no_catalog": (context.no_catalog_relevant, NO_CATALOG),
+    # 4.3 asks for the saved-copy note only when a catalog description was used, which the answer
+    # shows by linking the catalog. 中文：4.3 只在用到目录描述时要求说明存档副本，回答用了就会链接目录。
+    used_catalog = any(link["allowed_target"] for link in links)
+    caveats = {"fetch_date": (context.fetch_date_relevant and used_catalog, FETCH_DATE),
+               "no_catalog": (context.no_catalog_relevant, NO_CATALOG),
                "prereq_logic": (context.prereq_relevant, PREREQ_LOGIC), "program_caveat": (context.program_notice, PROGRAM_CAVEAT)}
     missing = [name for name, (relevant, pattern) in caveats.items() if relevant and not pattern.search(text)]
     if context.program_notice and not PROGRAMS_PAGE.search(text):
@@ -243,7 +263,8 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "estimates": estimates,
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
-        "saved_copy_mentions": sum(1 for part in parts if SAVED_COPY.search(part)),
+        # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.
+        "saved_copy_mentions": sum(1 for part in parts if SAVED_COPY.search(part) and not NO_CATALOG.search(part)),
         "chars": len(text),
     }
 

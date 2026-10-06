@@ -75,6 +75,8 @@ def test_dry_run_writes_prompts_and_makes_no_model_calls(tmp_path):
     report = run([QUESTION], PAYLOADS, out=tmp_path, runs=2, max_calls=5, stream_fn=None)
     assert report["model_calls"] == 0 and report["records"] == []
     assert report["status"] == "dry run" and report["planned_calls"] == 0
+    saved = json.loads((tmp_path / "prompts" / "Q1.context.json").read_text(encoding="utf-8"))
+    assert saved["lang"] == "zh" and saved["allowed_urls"] == [CATALOG]  # The context is kept as well.
     assert (tmp_path / "prompts" / "Q1.txt").read_text(encoding="utf-8").startswith("You are a concise")
     assert json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))["summary"]["answers"] == 0
 
@@ -150,7 +152,7 @@ def test_exit_code_tells_complete_incomplete_and_failed_runs_apart(answers, code
     assert main(["--api-base", "http://api.test", "--out", str(tmp_path), "--runs", "1"]) == code
     report = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
     assert report["status"] == status and report["planned_calls"] == report["model_calls"] == 5
-    assert f"**{status}**" in (tmp_path / "summary.md").read_text(encoding="utf-8")
+    assert (tmp_path / "summary.md").read_text(encoding="utf-8").splitlines()[0].endswith(f"· {status}")
 
 
 def test_a_run_stopped_by_the_call_cap_is_incomplete(tmp_path, monkeypatch):
@@ -190,6 +192,70 @@ def test_status_of_reports_written_before_the_plan_was_recorded():
     assert run_status({"model_calls": 0, "records": [], "errors": 0}) == "dry run"
     assert run_status({"model_calls": 2, "records": [checked, checked], "errors": 0}) == "complete"
     assert run_status({"model_calls": 2, "records": [checked, {"error": "x"}], "errors": 1}) == "incomplete"
+    # A real run that planned nothing checked nothing: never "complete".
+    assert run_status({"dry_run": False, "planned_calls": 0, "model_calls": 0, "records": [], "errors": 0}) == (
+        "incomplete")
+
+
+@pytest.mark.parametrize("questions_text", [
+    "not json", "[]", '[{"qid": "Q1"}]', json.dumps([{**QUESTION, "course_ids": []}]),
+    json.dumps([{**QUESTION, "route": "guess"}]),
+])
+def test_a_bad_questions_file_is_a_setup_error_before_any_request(questions_text, tmp_path, monkeypatch):
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: pytest.fail("no request for a bad questions file"))
+    questions = tmp_path / "questions.json"
+    questions.write_text(questions_text, encoding="utf-8")
+    assert main(["--api-base", "http://api.test", "--out", str(tmp_path / "out"), "--questions", str(questions)]) == 2
+    assert main(["--api-base", "http://api.test", "--out", str(tmp_path / "out"),
+                 "--questions", str(tmp_path / "missing.json")]) == 2
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("response", [
+    httpx.Response(503, text="busy"), httpx.Response(200, text="<html>not json</html>"),
+    httpx.Response(200, json={"unexpected": True}),
+])
+def test_api_problems_are_setup_errors_before_any_model_call(response, tmp_path, monkeypatch):
+    real_client = httpx.Client
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(lambda request: response), **kwargs))
+    fake_model(monkeypatch, [])  # Any model call would raise StopIteration inside the run.
+    assert main(["--api-base", "http://api.test", "--out", str(tmp_path / "out"), "--runs", "1"]) == 2
+    assert not (tmp_path / "out").exists()
+
+
+def test_a_bad_rescore_file_is_a_setup_error(tmp_path):
+    assert main(["--rescore", str(tmp_path / "missing.json")]) == 2
+    broken = tmp_path / "broken.json"
+    broken.write_text("{not json", encoding="utf-8")
+    assert main(["--rescore", str(broken)]) == 2
+    odd = tmp_path / "odd.json"
+    odd.write_text(json.dumps({"records": [{"qid": "Q1", "run": 1, "answer": "x", "context": {"lang": "zh"}}]}),
+                   encoding="utf-8")
+    assert main(["--rescore", str(odd)]) == 2  # A saved context missing its fields.
+
+
+def test_main_redacts_the_configured_key_from_recorded_errors(tmp_path, monkeypatch):
+    fake_api(monkeypatch)
+    fake_model(monkeypatch, [RuntimeError("upstream rejected test-key-not-real")] * 5)
+    assert main(["--api-base", "http://api.test", "--out", str(tmp_path), "--runs", "1"]) == 3
+    saved = (tmp_path / "results.json").read_text(encoding="utf-8")
+    assert "test-key-not-real" not in saved and "[REDACTED]" in saved
+
+
+def test_context_flags_follow_the_evidence_both_ways():
+    plain = {**payload(snapshot=False), "source_review_ids": ["syllabus_a"], "evidence_snippets": [],
+             "workload_hours_per_week": None, "difficulty_score": None, "prereqs": []}
+    _, context = build_case({**QUESTION, "course_ids": ["neu-cs-5800"]}, {"neu-cs-5800": plain})
+    assert not context.has_rmp_data and not context.prereq_relevant and not context.fetch_date_relevant
+    dated = payload()
+    dated["answer_evidence"]["catalog"]["retrieved_at"] = "2026-10-01T00:00:00Z"
+    _, context = build_case({**QUESTION, "course_ids": ["neu-cs-5800"]}, {"neu-cs-5800": dated})
+    assert not context.fetch_date_relevant and not context.no_catalog_relevant
+    program_prompt, _ = build_case({**QUESTION, "route": "program"}, PAYLOADS)
+    alias_prompt, _ = build_case(QUESTION, PAYLOADS)
+    # The rules name the code in both prompts; only the program route adds it to the course evidence.
+    assert program_prompt.count("program_seed_unverified") > alias_prompt.count("program_seed_unverified")
 
 
 def test_main_dry_run_uses_only_tagged_get_requests(tmp_path, monkeypatch):

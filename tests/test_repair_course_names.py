@@ -1,8 +1,9 @@
 """scripts/repair_course_names.py: read-only report by default; --commit repairs only names that are a
-sentence of the course's own description, keeps raw_text, and leaves the course pending for re-index.
+sentence of the course's own description, keeps raw_text, and keeps the status (no index reads the
+name, and a 'pending' course would drop out of search).
 
 中文：scripts/repair_course_names.py：默认只读；--commit 只修「名称是这门课自己描述里的一句话」的记录，
-保留 raw_text，并把课程留成 pending 等重新索引。
+保留 raw_text，status 保持不变（两个索引都不读名称；设成 pending 反而会让课程从搜索里消失）。
 """
 
 from __future__ import annotations
@@ -106,6 +107,11 @@ def test_after_the_repair_the_catalog_snapshot_can_attach(runtime):
     ("Database Management Systems", [DESCRIPTION], False),  # No sentence ending.
     ("Introduces relational database management systems", [DESCRIPTION], False),  # In it, but not a sentence.
     ("  Introduces   relational database management systems as a class of software systems. ", [DESCRIPTION], True),
+    # Other sentence endings count too.
+    ("这门课介绍关系型数据库管理系统，以及它们作为一类软件系统的设计和使用方法。",
+     ["这门课介绍关系型数据库管理系统，以及它们作为一类软件系统的设计和使用方法。之后讲查询优化。"], True),
+    ("Why do relational database systems matter for software design?",
+     ["Why do relational database systems matter for software design? This course answers it."], True),
 ])
 def test_only_a_sentence_from_the_course_own_description_counts(name, texts, expected):
     assert is_description_sentence(name, texts) is expected
@@ -127,6 +133,20 @@ def test_cli_defaults_to_read_only_and_fails_closed(runtime, tmp_path, capsys):
     assert rows(path)["neu-cs-5200"]["primary_name"] == SENTENCE
     assert cli(["--db-path", str(tmp_path / "missing.db"), "--catalog-dir", str(archive)]) == 1
     assert not (tmp_path / "missing.db").exists()  # A typo never creates an empty database.
+
+
+def test_cli_reports_a_vanished_course_as_a_failure_without_committing(runtime, monkeypatch, capsys):
+    from db.repository import CourseNotFound  # noqa: PLC0415
+
+    path, archive = runtime
+    before = rows(path)
+
+    def vanished(self, course_id, name):
+        raise CourseNotFound(course_id)
+
+    monkeypatch.setattr(CourseRepository, "rename", vanished)
+    assert cli(["--db-path", str(path), "--catalog-dir", str(archive), "--commit"]) == 1
+    assert "no transaction committed" in capsys.readouterr().out and rows(path) == before
 
 
 def test_a_sentence_found_only_in_the_stored_raw_text_also_counts(runtime):
