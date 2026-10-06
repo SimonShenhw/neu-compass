@@ -68,6 +68,9 @@ def test_listing_shows_reviewed_submissions_as_plain_text(monkeypatch) -> None:
     assert len(with_data) == 2  # Company line and salary line.
     for value in with_data:
         assert value.startswith("<div") and [t.type for t in MarkdownIt("commonmark").parse(value)] == ["html_block"]
+    # Without unsafe_allow_html the escaped lines would show as literal markup.
+    html_lines = [item for item in app.markdown if item.value.startswith("<div")]
+    assert len(html_lines) >= 4 and all(item.allow_html for item in html_lines)
     assert any("Acme &lt;i&gt;Co&lt;/i&gt;" in value for value in with_data)  # Escaped, not raw HTML.
     assert "Two rounds " + linked in [item.value for item in app.text]
     assert any(item.value == "含面试细节和薪资" for item in app.caption)

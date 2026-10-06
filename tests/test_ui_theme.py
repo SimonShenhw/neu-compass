@@ -223,6 +223,37 @@ def test_prereq_label_resolved_and_dangling() -> None:
     assert "`c-ghost`" in dangling and "建议先修" in dangling
 
 
+def test_html_helpers_keep_data_inside_one_html_block() -> None:
+    """A blank line inside a value would end the HTML block, and the rest would be parsed as
+    Markdown, links included. 中文：值里的空行会结束 HTML 块，后面的内容会按 Markdown 解析（包括链接）。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import program_context_html, result_card_html  # noqa: PLC0415
+
+    linked = "x\r\n\r\n[note](https://elsewhere.example/page)"
+    outputs = [course_header_html(code=linked, name=linked, term=linked), topic_pills_html([linked]),
+               result_card_html(rank=1, code=linked, name=linked, score=0.5, pct=50),
+               program_context_html([{"program_name": linked, "requirement_type": "core"}])]
+    for out in outputs:
+        assert "\n" not in out and "\r" not in out
+        assert [token.type for token in MarkdownIt("commonmark").parse(out)] == ["html_block"]
+
+
+def test_prereq_label_shows_database_text_literally() -> None:
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import prereq_label_md  # noqa: PLC0415
+
+    label = prereq_label_md(code="CS 5800", name="Algo [note](https://elsewhere.example/page) *x*\n\n# y",
+                            course_id="neu-cs-5800", requirement="required")
+    tokens = MarkdownIt("commonmark").parse(label)
+    types = [token.type for token in tokens] + [child.type for token in tokens for child in token.children or []]
+    assert "link_open" not in types and "heading_open" not in types and "em_open" in types  # *必须先修* only.
+    assert types.count("strong_open") == 1 and types.count("em_open") == 1 and types.count("paragraph_open") == 1
+    text = "".join(child.content for token in tokens for child in token.children or [] if child.type == "text")
+    assert "Algo [note](h\u2060ttps:\u2060//elsewhere.example/page) *x* # y" in text
+
+
 def test_empty_footer_brand_render() -> None:
     from app.ui_theme import (  # noqa: PLC0415
         empty_detail_html,

@@ -300,20 +300,32 @@ URL_START = re.compile(r"(?i)https?://|www\.")
 
 
 CODE_TOKENS = {"code_inline", "code_block", "fence"}
+# Streamlit-only syntax markdown-it does not model, judged on the text or the source instead:
+# shortcodes (emoji, its logo image, material icons) are swapped in the decoded text; a directive
+# can start at a ":" before anything but ASCII whitespace or punctuation; remark-math reads "$".
+# 中文：markdown-it 不认识的 Streamlit 语法，改为检查解码后的文字或源文本：短代码（emoji、logo 图片、
+# material 图标）在解码后的文字里替换；":" 后面只要不是 ASCII 空白或标点就可能开始一个指令；remark-math 读 "$"。
+SHORTCODE = re.compile(r":(?:streamlit|material/[\w-]+|[A-Za-z0-9_][\w-]*):")
+NAMED_COLON = re.compile(r"(\\*):(?=[^ \t\r\n!-/:-@\[-`{-~])")
+DOLLAR = re.compile(r"(\\*)\$")
 
 
 def rendered(markdown: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """CommonMark plus GFM tables and strikethrough as an independent judge: the (target, text) of
     every link, and the decoded visible text outside links as (token type, text), one piece per
-    text node (a URL can only be recognised inside one). Raises on any image or raw HTML.
-    markdown-it accepts every link target here, so it never hides one the filter let through.
+    text node (a URL can only be recognised inside one). Raises on any image, raw HTML, reference
+    definition (markdown-it keeps those out of the token stream, so they are read from env) or
+    fenced block whose info string is math (Streamlit renders that as KaTeX). markdown-it accepts
+    every link target here, so it never hides one the filter let through.
     中文：用 CommonMark（加 GFM 表格和删除线）独立判定：每个链接的（目标，文字），以及链接以外解码后的
-    可见文字（token 类型，文字），每个文本节点一段（网址只能在单个节点里被识别）；出现图片或原始 HTML
-    就报错。这里让 markdown-it 接受任何链接目标，免得它替过滤器挡掉。"""
+    可见文字（token 类型，文字），每个文本节点一段（网址只能在单个节点里被识别）。出现图片、原始 HTML、
+    引用式定义（markdown-it 不把它放进 token，从 env 里读）或信息串为 math 的代码块（Streamlit 会渲染成
+    KaTeX）就报错。这里让 markdown-it 接受任何链接目标，免得它替过滤器挡掉。"""
     from markdown_it import MarkdownIt  # noqa: PLC0415  (locked, via rich)
 
     md = MarkdownIt("commonmark").enable(["table", "strikethrough"])
     md.validateLink = lambda url: True
+    env: dict = {}
     links: list[tuple[str, str]] = []
     outside: list[tuple[str, str]] = []
     inside: list[str] | None = None
@@ -323,6 +335,8 @@ def rendered(markdown: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]
         nonlocal inside, href
         for token in tokens:
             assert token.type not in {"image", "html_inline", "html_block"}, token.type
+            if token.type == "fence":
+                assert (token.info.split() or [""])[0].lower() != "math", token.info
             if token.type == "link_open":
                 href, inside = str(token.attrGet("href")), []
             elif token.type == "link_close":
@@ -337,16 +351,19 @@ def rendered(markdown: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]
                 else:
                     inside.append(piece)
 
-    walk(md.parse(markdown))
+    walk(md.parse(markdown, env))
+    assert not env.get("references"), env.get("references")  # A definition turns "[x]" into a link.
     return links, outside
 
 
 def assert_inert(markdown: str) -> str:
     """Only catalog links (or a mail link, the accepted cost). Visible text has no URL start,
     except a catalog autolink's own text and a kept catalog URL inside code (code is never
-    linked; it shows there in angle brackets). Returns the visible text outside links.
-    中文：只有目录链接（或邮件链接，已接受的代价）。可见文字里没有网址开头；例外只有目录自动链接
-    自己的文字，以及代码里保留的目录网址（代码不会变成链接，那里会带尖括号显示）。返回链接以外的可见文字。"""
+    linked; it shows there in angle brackets), and no Streamlit shortcode; in the source, every
+    "$" and every ":" a directive name could follow is escaped. Returns the visible text outside
+    links. 中文：只有目录链接（或邮件链接，已接受的代价）。可见文字里没有网址开头（例外只有目录自动
+    链接自己的文字，以及代码里保留的目录网址：代码不会变成链接，那里会带尖括号显示），也没有 Streamlit
+    短代码；源文本里每个 "$"、每个后面可能跟指令名的 ":" 都已转义。返回链接以外的可见文字。"""
     links, outside = rendered(markdown)
     for href, text in links:
         assert CATALOG_HREF.fullmatch(href) or href.startswith("mailto:"), href
@@ -354,6 +371,9 @@ def assert_inert(markdown: str) -> str:
     for kind, piece in outside:
         for match in URL_START.finditer(piece):
             assert kind in CODE_TOKENS and CATALOG_HREF.match(piece, match.start()), (kind, piece)
+        assert not SHORTCODE.search(piece), piece
+    for pattern in (NAMED_COLON, DOLLAR):  # An odd run of backslashes escapes the character.
+        assert all(len(match.group(1)) % 2 for match in pattern.finditer(markdown)), markdown
     return "".join(piece for _, piece in outside)
 
 
@@ -391,6 +411,13 @@ EXPECTED = [
     ("a\\b \\*x\\* \\<b>", "a\\\\b \\\\*x\\\\* \\\\\\<b>"),
     ("`a<b`", "`a\\<b`"),  # Inserted escapes are visible inside code (a cost),
     (f"`{CATALOG}`", f"`<{CATALOG}>`"),  # and so are a kept catalog URL's angle brackets.
+    # Streamlit renders a ```math block as KaTeX when the answer has a "$...$" pair anywhere.
+    ("$x$\n\n```math\ny\n```", f"\\$x\\$\n\n```m{WJ}ath\ny\n```"),
+    ("> ~~~ Math\n> y\n> ~~~", f"> ~~~ M{WJ}ath\n> y\n> ~~~"),
+    # A directive name may be any non-ASCII character, and the renderer's whitespace is narrower
+    # than Python's \s (which includes U+001C).
+    ("a :中文[x] a", f"a \\:{WJ}中文[x] a"),
+    (":" + chr(0x1C) + "x[y]", f"\\:{WJ}" + chr(0x1C) + "x[y]"),
     ("\ue0000\ue001", "\ufffd0\ufffd"),  # The model cannot forge a placeholder.
 ]
 
@@ -417,6 +444,7 @@ def test_catalog_links_survive_and_point_where_they_said():
 FRAGMENTS = [
     "[", "]", "(", ")", "<", ">", "!", "&", "#", ";", "\\", ":", "$", "`", "*", "_", "~", "|", "^", '"',
     "'", "=", "-", " ", "  ", "\n", "\n\n", "a", "x", "1", "104", "x68", "amp", "h", "ttp", "s", "://",
+    "```", "~~~", "math", "streamlit", "smile", "material/home", "help", "中文",
     "w", "ww", ".", "/", "@", "elsewhere.example", CATALOG, CATALOG[:-1], "#cs5800", "red", "\ue000",
     "\ue001", "0",
 ]
@@ -424,6 +452,7 @@ FRAGMENTS = [
 PLAIN_FRAGMENTS = [
     "[", "]", "(", ")", "<", ">", "!", "&", "#", ";", "\\", ":", "$", '"', "'", "=", " ", "a", "x", "1",
     "104", "x68", "amp", "h", "ttp", "s", "://", "w", "ww", ".", "/", "elsewhere.example", "red",
+    "streamlit", "smile", "material/home", "help", "中文",
 ]
 
 
@@ -447,7 +476,7 @@ def test_plain_text_renders_exactly_as_written(seed):
 
 @pytest.mark.parametrize("unit", [
     "[a](b", "](", "]:", "![", "<a", "&#", "&a", "\\", "$", ":a", "h", "https://", "www.", "[",
-    "[" + "a" * 199, f"[a]({CATALOG}", f"<{CATALOG}", CATALOG, "\ue000",
+    "[" + "a" * 199, f"[a]({CATALOG}", f"<{CATALOG}", CATALOG, "```" + " " * 97, "``` m", "\ue000",
 ])
 def test_filtering_takes_linear_time(unit):
     text = (unit * (200_000 // len(unit) + 1))[:200_000]  # About three times the longest answer.
@@ -490,6 +519,14 @@ def test_a_link_split_across_tokens_is_never_rendered_raw():
     for n, shown in enumerate(placeholder.markdowns, start=1):
         assert shown == answer_markdown("".join(chunks[:n]))
         assert_inert(shown)
+
+
+def test_the_default_interval_is_a_tenth_of_a_second():
+    st = FakeSurface()
+    times = iter([0.0, 0.05, 0.1, 0.15])
+    render_streamed_answer(st, iter(["a", "b", "c", "d"]), clock=lambda: next(times))
+    placeholder, = st.children
+    assert placeholder.markdowns == ["a", "abc", "abcd"]
 
 
 def test_a_fast_stream_renders_twice_and_an_empty_one_not_at_all():

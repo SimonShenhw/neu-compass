@@ -107,43 +107,48 @@ def _when(value: datetime) -> str:
 # Model answers are untrusted Markdown (catalog descriptions and review quotes reach the prompt).
 # answer_markdown() makes the renderer show the model's text as written: emphasis, lists,
 # headings, tables and code still work, official catalog department links stay clickable, and
-# nothing else can become a link, image, HTML, math or directive. One linear pass that only
-# inserts characters:
+# nothing else can become a link, image, HTML, math, directive or shortcode. One linear pass:
 #   1. official catalog links ([label](URL), <URL>, a bare URL) are set aside under placeholders;
 #   2. every backslash is doubled, so the model's own escapes stay visible and cannot hide part
 #      of a URL from the steps below or from the renderer's decoding;
 #   3. a word joiner (U+2060: invisible, not a line-break opportunity) goes after the first
-#      letter of every http(s):// and www., so the renderer's bare-URL linking never finds one;
+#      letter of every http(s):// and www., so the renderer's bare-URL linking never finds one,
+#      and after the "m" of a "math" info string right after a code fence, because Streamlit
+#      renders a ```math block as KaTeX whenever the answer also has a "$...$" pair;
 #   4. a backslash goes before each character that opens something else: an entity ("&#", "&a"),
 #      HTML or an autolink ("<a", "</", "<!", "<?"), a link destination or a reference definition
 #      / footnote ("](", "]:"), an image ("![", or "!" before a kept catalog link), math ("$")
 #      and a directive or shortcode (":" before a name; a word joiner goes after that ":" too,
 #      because Streamlit swaps :name: shortcodes for emoji, icons or its logo image in the
 #      decoded text, where the backslash is already gone);
-#   5. the placeholders come back as [label](URL) / <URL>, labels escaped like everything else.
-# Every opener is escaped, so the text the renderer shows is the text checked here: decoding an
-# escape or entity, or re-rendering a directive label, cannot produce a link. Only the two
-# placeholder marks (private-use U+E000 / U+E001) are replaced, with U+FFFD. Costs: the model's
-# backslashes, entities, math and Streamlit directives / shortcodes (":red[...]", ":smile:")
-# show literally; other links show as their Markdown source, and a copied non-catalog URL or
-# ":name" carries the invisible word joiner; inside code, inserted escapes are visible and a catalog URL
-# shows in angle brackets; a table's "\|" becomes a column break. Streamlit still draws "->" and
-# "<-" as arrows and the few emoji shortcodes that start with punctuation (":+1:"). An email
-# address may still become a mail link.
+#   5. the placeholders come back as [label](URL) / <URL> (a title or angle brackets around the
+#      URL are dropped), labels escaped like everything else.
+# Outside the kept catalog links the pass only inserts characters, and every opener is escaped,
+# so the text the renderer shows is the text checked here: decoding an escape or entity, or
+# re-rendering a directive label, cannot produce a link. The two placeholder marks (private-use
+# U+E000 / U+E001) are replaced with U+FFFD. Costs: the model's backslashes, entities, math and
+# Streamlit directives / shortcodes (":red[...]", ":smile:") show literally; other links show as
+# their Markdown source, and a copied non-catalog URL or ":name" carries the invisible word
+# joiner; inside code, inserted escapes are visible and a catalog URL shows in angle brackets; a
+# table's "\|" becomes a column break. Streamlit still applies its typographic replacements
+# ("->", "<-", "<->", "--", ">=", "<=", "~=") and the few emoji shortcodes that start with
+# punctuation (":+1:"). An email address may still become a mail link.
 # 中文：模型回答是不可信的 Markdown（目录描述与评价引文都会进提示词）。answer_markdown() 让渲染器
 # 按原样显示模型的文字：强调、列表、标题、表格、代码照常；官方目录院系页链接保持可点；其他东西都不能
-# 变成链接、图片、HTML、公式或指令。只插入字符的一遍线性处理：1 先把官方目录链接换成占位符；
-# 2 所有反斜杠翻倍，模型自己写的转义原样显示，不能把网址的一部分藏起来躲过后面的步骤或渲染器的解码；
-# 3 每个 http(s):// 和 www. 的首字母后插一个 word joiner（U+2060，不可见、不产生换行点），渲染器的
-# 裸网址识别就找不到它们；4 在会开启其他结构的字符前加反斜杠：实体、HTML/自动链接、链接目标、
-# 引用式定义/脚注、图片（含目录链接前的 "!"）、公式、指令和短代码（名字前的 ":" 后面再插一个 word
-# joiner：Streamlit 在解码后的文字里把 :名字: 短代码换成 emoji、图标或它的 logo 图片，那时反斜杠已经
-# 没了）；5 把占位符还原成 [标签](URL) /
-# <URL>，标签同样经过转义。每个开启符都被转义，渲染器显示的就是这里检查过的文字：解码转义或实体、
-# 把指令标签再渲染一次，都不可能产生链接。只替换占位符用的两个私用区字符（换成 U+FFFD）。代价：模型
-# 写的反斜杠、实体、公式和 Streamlit 指令/短代码原样显示；其他链接显示成 Markdown 原文，复制出的
-# 非目录网址和 ":名字" 带着不可见的 word joiner；代码里能看到插入的转义，目录网址会带尖括号显示；表格的 "\|"
-# 会变成分列。Streamlit 仍会把 "->"、"<-" 画成箭头，以标点开头的少数 emoji 短代码（":+1:"）仍会变成
+# 变成链接、图片、HTML、公式、指令或短代码。一遍线性处理：1 先把官方目录链接换成占位符；2 所有反斜杠
+# 翻倍，模型自己写的转义原样显示，不能把网址的一部分藏起来躲过后面的步骤或渲染器的解码；3 每个
+# http(s):// 和 www. 的首字母后插一个 word joiner（U+2060，不可见、不产生换行点），渲染器的裸网址识别
+# 就找不到它们；代码围栏后面紧跟的 "math" 信息串也在 "m" 后插一个（回答里只要还有一对 "$...$"，
+# Streamlit 就会把 ```math 代码块渲染成 KaTeX 公式）；4 在会开启其他结构的字符前加反斜杠：实体、
+# HTML/自动链接、链接目标、引用式定义/脚注、图片（含目录链接前的 "!"）、公式、指令和短代码（名字前的
+# ":" 后面再插一个 word joiner：Streamlit 在解码后的文字里把 :名字: 短代码换成 emoji、图标或它的 logo
+# 图片，那时反斜杠已经没了）；5 把占位符还原成 [标签](URL) / <URL>（URL 两边的尖括号和标题会去掉），
+# 标签同样经过转义。除了保留的目录链接，这一遍只插入字符，而且每个开启符都被转义，所以渲染器显示的
+# 就是这里检查过的文字：解码转义或实体、把指令标签再渲染一次，都不可能产生链接。占位符用的两个私用区
+# 字符（U+E000 / U+E001）换成 U+FFFD。代价：模型写的反斜杠、实体、公式和 Streamlit 指令/短代码原样
+# 显示；其他链接显示成 Markdown 原文，复制出的非目录网址和 ":名字" 带着不可见的 word joiner；代码里
+# 能看到插入的转义，目录网址会带尖括号显示；表格的 "\|" 会变成分列。Streamlit 的排版替换仍然生效
+# （"->"、"<-"、"<->"、"--"、">="、"<="、"~="），以标点开头的少数 emoji 短代码（":+1:"）仍会变成
 # emoji。邮箱地址仍可能变成邮件链接。
 WORD_JOINER = "\u2060"
 _CATALOG_URL = OFFICIAL_CATALOG_URL.pattern + r"(?:#[A-Za-z0-9_-]{1,64})?"  # An in-page anchor is harmless.
@@ -152,19 +157,35 @@ _CATALOG_LINK = re.compile(
 _CATALOG_AUTOLINK = re.compile(r"<(" + _CATALOG_URL + r")>")
 _CATALOG_BARE = re.compile(_CATALOG_URL)
 _URL_START = re.compile(r"(?i)(?:h(?=ttps?://)|w(?=ww\.))")
-# ":" before a directive or shortcode name (any character that is not whitespace or ASCII
-# punctuation) comes first, so "]:name" also gets its word joiner.
+_MATH_FENCE = re.compile(r"(?i)(?<=```|~~~)([ \t]*m)(?=ath)")
+# ":" before a directive or shortcode name comes first, so "]:name" also gets its word joiner.
+# A name may start with anything but ASCII whitespace or punctuation: the renderer's notion of
+# whitespace is narrower than Python's \s (which also takes U+001C-U+001F and U+0085), so the
+# class is spelled out. Escaping a ":" that needed none is harmless.
 _OPENER = re.compile(
-    r"(?P<name>:(?=[^\s!-/:-@\[-`{-~]))|&(?=[#A-Za-z])|<(?=[A-Za-z/!?])|(?<=\])[(:]|!(?=[\[\ue000])|\$")
+    r"(?P<name>:(?=[^ \t\r\n!-/:-@\[-`{-~]))|&(?=[#A-Za-z])|<(?=[A-Za-z/!?])|(?<=\])[(:]|!(?=[\[\ue000])|\$")
 _MARKS = re.compile("[\ue000\ue001]")
 _PLACEHOLDER = re.compile("\ue000(\\d+)\ue001")
+_ASCII_PUNCTUATION = re.compile(r"[!-/:-@\[-`{-~]")
 
 
 def _literal(text: str) -> str:
     """Steps 2-4 for text that must render as written."""
     text = text.replace("\\", "\\\\")
     text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, text)
+    text = _MATH_FENCE.sub(lambda match: match.group(1) + WORD_JOINER, text)
     return _OPENER.sub(lambda match: "\\" + match.group(0) + (WORD_JOINER if match.lastgroup else ""), text)
+
+
+def literal_markdown(value: object) -> str:
+    """One line of plain text for a Markdown context, e.g. a course name from the database in a
+    label: whitespace runs (line breaks included) become one space, every ASCII punctuation
+    character is escaped, and URL starts and ":" get the same word joiner as answer_markdown().
+    中文：放进 Markdown 的一行纯文字，例如标签里来自数据库的课程名：连续空白（含换行）变成一个
+    空格，每个 ASCII 标点都转义，网址开头和 ":" 后面插入和 answer_markdown() 一样的 word joiner。"""
+    text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, " ".join(str(value).split()))
+    return _ASCII_PUNCTUATION.sub(
+        lambda match: "\\" + match.group(0) + (WORD_JOINER if match.group(0) == ":" else ""), text)
 
 
 def answer_markdown(text: str) -> str:

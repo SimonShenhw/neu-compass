@@ -13,7 +13,7 @@ from __future__ import annotations
 
 class Recorder:
     def __init__(self, shared=None, path=None, *, choice=None):
-        self.shared = shared or {"log": [], "stack": [()], "state": {}, "choice": choice}
+        self.shared = shared or {"log": [], "stack": [()], "state": {}, "choice": choice, "html": []}
         self.path = path
         self.session_state = self.shared["state"]
 
@@ -25,6 +25,13 @@ class Recorder:
 
     def markdown(self, value, **kwargs):
         self._add("markdown", value)
+        if kwargs.get("unsafe_allow_html"):
+            self.shared["html"].append(value)
+
+    @property
+    def html(self):
+        """Markdown values passed with unsafe_allow_html=True."""
+        return self.shared["html"]
 
     def caption(self, value, **kwargs):
         self._add("caption", value)

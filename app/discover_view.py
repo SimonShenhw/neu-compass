@@ -50,8 +50,6 @@ hero's _ready_info — a 30s timeout per rerun would freeze the landing).
 
 from __future__ import annotations
 
-import html
-
 # Featured programs for the 入门推荐 row, in display order. Ids missing
 # from the seeded set silently drop out (checked against the /programs
 # listing first, so unseeded ids never trigger per-rerun 404 fetches).
@@ -80,13 +78,17 @@ def _semester1_pick(curriculum: dict) -> dict | None:
 
 
 def _starter_card_html(*, code: str, name: str, prefix: str) -> str:
-    """Compact 入门推荐 card: blue code + program pill + course name.
-    紧凑的入门推荐卡片：蓝色代码 + 培养方案 pill + 课程名称。"""
+    """Compact 入门推荐 card: blue code + program pill + course name. The values come from the
+    database, so they are escaped with line breaks turned into <br> (a blank line would end the
+    HTML block). 中文：紧凑的入门推荐卡片：蓝色代码 + 培养方案 pill + 课程名称。值来自数据库，
+    所以转义并把换行变成 <br>（空行会结束 HTML 块）。"""
+    from app.ui_theme import plain_text_html  # noqa: PLC0415
+
     return (
         '<div class="nc-result-card">'
-        f'<span class="nc-result-code">{html.escape(code)}</span> '
-        f'<span class="nc-pill">{html.escape(prefix)}</span><br>'
-        f'<span class="nc-result-name">{html.escape(name)}</span>'
+        f'<span class="nc-result-code">{plain_text_html(code)}</span> '
+        f'<span class="nc-pill">{plain_text_html(prefix)}</span><br>'
+        f'<span class="nc-result-name">{plain_text_html(name)}</span>'
         "</div>"
     )
 
@@ -211,8 +213,16 @@ def _render_coop_teaser(st) -> None:
             f'{plain_text_html(c.get("role", ""))}</div>',
             unsafe_allow_html=True,
         )
-        if int(c.get("visibility_level", 0)) >= 1:
-            st.caption("🔒 面试细节和薪资：登录并分享自己的经验后解锁")
+        # visibility_level is what the row contains; the API leaves out what this viewer's tier
+        # has not unlocked. 中文：visibility_level 是这一行有什么；这位访客的等级还没解锁的
+        # 字段，API 不会返回。
+        level = int(c.get("visibility_level", 0))
+        locked = [label for label, needs, present in (
+            ("面试细节", 1, c.get("interview_summary") or c.get("technical_questions")),
+            ("薪资区间", 2, c.get("salary_range_usd")),
+        ) if level >= needs and not present]
+        if locked:
+            st.caption(f"🔒 这条有{'和'.join(locked)}：分享自己的经验并通过审核后解锁")
     if st.button("去看看 →", key="disc-coop"):
         st.session_state["pending_nav_to_coop"] = True
         st.rerun()

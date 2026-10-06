@@ -228,3 +228,18 @@ def test_the_rule_stays_up_front_and_the_caveats_fold_into_expanders():
     assert not any("来源 HTML 字节摘要" in value or "不判断个人注册" in value for _, value, _ in top)
     assert ("expander", "🎓 同一年份培养方案里的相关要求", ()) in top
     assert st.under("🎓 同一年份培养方案里的相关要求")
+
+
+def test_folding_keeps_every_caveat_of_the_sources():
+    """The 2026-10-06 reorder moved the caveats into 先修的来源与说明; none may be lost on the way."""
+    from schemas.catalog_credit_hours import CatalogCreditHours
+    from tests.ui_recorder import Recorder
+
+    ranged = CourseRequisiteDocument.model_validate(
+        {**document().model_dump(mode="json"), "credit_hours": CatalogCreditHours.from_text("1-4 Hours").model_dump(mode="json")})
+    st = Recorder(choice="2026-2027")
+    render(st, bundle(ranged))
+    folded = [value for kind, value, _ in st.under("📎 先修的来源与说明") if kind == "caption"]
+    for needle in ("不判断个人注册、减免、成绩、开课或完整政策", "院系页面未声明校区或个人路径", "旧详情若有整数",
+                   "此证据不重写 Course 的整数 credits", "来源捕获 UTC", "批准/资格证据和项目片段不是完整学校政策"):
+        assert any(needle in value for value in folded), needle

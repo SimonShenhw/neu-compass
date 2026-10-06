@@ -111,8 +111,8 @@ def render_coop_panel(st) -> None:
     from app.state_manager import is_logged_in  # noqa: PLC0415
 
     st.subheader("💼 NEU Co-op 经验")
-    st.caption("学生分享的 Co-op 经验：先人工去掉个人信息并审核，同一类经验至少有 2 位不同的同学分享后才公开。"
-               "分享自己的经验可以解锁更多细节。")
+    st.caption("这里有整理好的示例记录，也有同学分享的 Co-op 经验。同学的分享先人工去掉个人信息并审核，"
+               "同一类经验至少有 2 位不同的同学分享后才公开。分享自己的经验可以解锁更多细节。")
 
     # The previous upload's actual server state survives the rerun.
     # 中文：重跑后显示上一次提交的真实服务端状态，不暗示立即解锁。
@@ -123,7 +123,7 @@ def render_coop_panel(st) -> None:
     session_token = st.session_state.get("session_token")
     if not is_logged_in(st.session_state):
         st.info(
-            "你现在是游客：只能看到公开记录的公司、职位、学期和时长。用 NEU 邮箱登录并分享自己的经验，"
+            "你现在是游客：只能看到公开记录的公司、职位、行业、学期和时长。用 NEU 邮箱登录并分享自己的经验，"
             "审核通过后能看到更多：1 条看面试细节，2 条看薪资区间。"
         )
 

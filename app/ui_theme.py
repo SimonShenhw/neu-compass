@@ -389,7 +389,7 @@ def guest_banner_html() -> str:
     # 解锁面试细节，2 条解锁薪资区间。
     return (
         '<div class="nc-banner">🔒 你现在是游客：课程搜索和培养方案都能用；Co-op 经验只显示'
-        "公司、职位、学期和时长。用 NEU 邮箱登录（左侧栏）后分享自己的 Co-op 经验，审核通过"
+        "公司、职位、行业、学期和时长。用 NEU 邮箱登录（左侧栏）后分享自己的 Co-op 经验，审核通过"
         "后解锁更多：1 条看面试细节，2 条看薪资区间。</div>"
     )
 
@@ -406,6 +406,14 @@ def matched_via_badge(matched_via: str) -> str:
         f'<span class="nc-badge" style="background:{bg};color:{fg};">'
         f"{html.escape(label)}</span>"
     )
+
+
+def _one_line(value: object) -> str:
+    """Escaped data for the one-block HTML these helpers build: line breaks become spaces, because
+    a blank line would end the HTML block and the rest would be read as Markdown (links included).
+    中文：这些函数拼出的单块 HTML 里的数据：转义，换行变成空格；空行会结束 HTML 块，后面的内容
+    就会被当成 Markdown（包括链接）。"""
+    return html.escape(" ".join(str(value).splitlines()))
 
 
 def course_header_html(
@@ -438,14 +446,14 @@ def course_header_html(
         chips += (
             '<div class="nc-meta-chip">'
             f'<span class="nc-meta-label">{label}</span>'
-            f'<span class="nc-meta-value">{html.escape(str(value))}</span>'
+            f'<span class="nc-meta-value">{_one_line(value)}</span>'
             "</div>"
         )
     chips_row = f'<div class="nc-meta-row">{chips}</div>' if chips else ""
     return (
         '<div class="nc-card">'
-        f'<span class="nc-card-code">{html.escape(code)}</span>'
-        f'<p class="nc-card-name">{html.escape(name)}</p>'
+        f'<span class="nc-card-code">{_one_line(code)}</span>'
+        f'<p class="nc-card-name">{_one_line(name)}</p>'
         f"{chips_row}"
         "</div>"
     )
@@ -457,7 +465,7 @@ def topic_pills_html(topics: list[str]) -> str:
     if not topics:
         return ""
     pills = "".join(
-        f'<span class="nc-pill">{html.escape(t)}</span>' for t in topics
+        f'<span class="nc-pill">{_one_line(t)}</span>' for t in topics
     )
     return f"<div>{pills}</div>"
 
@@ -480,8 +488,8 @@ def result_card_html(
     return (
         '<div class="nc-result-card">'
         f'<span class="nc-result-rank">{int(rank)}</span>'
-        f'<span class="nc-result-code">{html.escape(code)}</span> '
-        f'<span class="nc-result-name">{html.escape(name)}</span>'
+        f'<span class="nc-result-code">{_one_line(code)}</span> '
+        f'<span class="nc-result-name">{_one_line(name)}</span>'
         f'<span class="nc-score-num">{score:.3f}</span>'
         '<div class="nc-score-track">'
         f'<div class="nc-score-fill" style="width:{pct}%;"></div>'
@@ -542,7 +550,7 @@ def program_context_html(edges: list[dict]) -> str:
         )
         rows += (
             '<div class="nc-prog-row">'
-            f'<div class="nc-prog-name">🎓 {html.escape(str(e.get("program_name", "")))}</div>'
+            f'<div class="nc-prog-name">🎓 {_one_line(e.get("program_name", ""))}</div>'
             f'<div class="nc-prog-meta">{requirement_badge(str(e.get("requirement_type", "")))} '
             f"{sem_chip}</div>"
             "</div>"
@@ -554,11 +562,18 @@ def prereq_label_md(
     *, code: str | None, name: str | None, course_id: str, requirement: str,
 ) -> str:
     """Markdown line for one prerequisite row (the Open button next to it
-    is a Streamlit widget, so this stays markdown rather than HTML).
+    is a Streamlit widget, so this stays markdown rather than HTML). Code
+    and name come from the database (names have been LLM-written), so they go
+    in as literal text; the bare ID goes in a code span without backticks or
+    line breaks.
 
     一行先修课程的 markdown 文本（它旁边的 Open 按钮是 Streamlit 组件，
-    所以这里保持 markdown 形式而不是 HTML）。"""
-    shown = f"**{code}** — {name}" if code and name else f"`{course_id}`"
+    所以这里保持 markdown 形式而不是 HTML）。代码和名称来自数据库（名称曾由
+    模型写入），所以按纯文字放进去；只有 ID 时放进代码片段，去掉反引号和换行。"""
+    from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+
+    shown = (f"**{literal_markdown(code)}** — {literal_markdown(name)}" if code and name
+             else f"`{' '.join(str(course_id).replace('`', '').split())}`")
     req = _PREREQ_LABELS.get(requirement, requirement)
     return f"{shown}  \n*{req}*"
 

@@ -30,12 +30,14 @@ def test_chat_input_is_called_in_the_main_body_so_streamlit_pins_it():
              and isinstance(node.func, ast.Attribute) and node.func.attr == "chat_input"]
     assert len(calls) == 1
     node = calls[0]
+    # On the module itself: a container's method (chat_col.chat_input) also renders inline.
+    assert isinstance(node.func.value, ast.Name) and node.func.value.id == "st"
     while node is not render:
         node = parents[node]
         assert not isinstance(node, (ast.With, ast.AsyncWith)), "chat_input must not be inside a `with` block"
 
 
-def harness(monkeypatch, *, answer: str):
+def harness(monkeypatch, *, answer: str, refusal: str | None = None):
     import app.api_client as api_module
     import app.cookie_session as cookies
     import app.discover_view as discover
@@ -52,6 +54,8 @@ def harness(monkeypatch, *, answer: str):
             return httpx.Response(200, json=[])
         if request.method == "GET":
             return httpx.Response(200, json={"status": "ready", "courses_indexed": 3, "bm25_corpus": 3})
+        if refusal is not None:
+            return httpx.Response(409, json={"detail": refusal})
         return httpx.Response(200, content=body)
 
     landing_calls = []
@@ -77,6 +81,8 @@ def test_landing_is_skipped_while_the_first_question_is_answered(monkeypatch):
     landing_calls = harness(monkeypatch, answer="Plain answer.")
     app = AppTest.from_string("from app.streamlit_app import render\nrender()").run(timeout=45)
     assert not app.exception and len(landing_calls) == 1
+    # Pinned: AppTest files a main-body chat_input under the bottom block, not under main.
+    assert len(app.chat_input) == 1 and len(app.main.chat_input) == 0
     assert any(item.value == QUERY_LOG_NOTICE for item in app.caption)
     app.chat_input[0].set_value("first question").run(timeout=45)
     assert not app.exception and len(landing_calls) == 1  # No landing in either run.
@@ -85,12 +91,30 @@ def test_landing_is_skipped_while_the_first_question_is_answered(monkeypatch):
     assert not app.exception and len(landing_calls) == 1
 
 
+def test_a_clarification_request_is_filtered_live_as_it_is_from_history(monkeypatch):
+    """A 409 detail is stored as the assistant's message; history re-renders it through
+    answer_markdown, so the live render must too (AppTest keeps both passes in one tree)."""
+    from app.answer_evidence_view import answer_markdown
+
+    detail = "请先选项目，见 [说明](https://elsewhere.example/notes)"
+    harness(monkeypatch, answer="unused", refusal=detail)
+    app = AppTest.from_string("from app.streamlit_app import render\nrender()").run(timeout=45)
+    app.chat_input[0].set_value("CS first semester").run(timeout=45)
+    assert not app.exception
+    assert app.session_state["messages"][-1]["content"] == f"🧭 {detail}"
+    shown = [item.value for item in app.markdown]
+    assert answer_markdown(f"🧭 {detail}") in shown and f"🧭 {detail}" not in shown
+
+
 def test_guest_banner_is_skipped_on_the_coop_page_whose_own_notice_says_the_same(monkeypatch):
     harness(monkeypatch, answer="unused")
     app = AppTest.from_string("from app.streamlit_app import render\nrender()").run(timeout=45)
     assert not app.exception
-    assert any("你现在是游客：课程搜索" in item.value for item in app.markdown)
+    # Both notices list what level 0 shows (the API's tier 0 includes the industry).
+    assert any("你现在是游客：课程搜索" in item.value and "行业" in item.value for item in app.markdown)
     app.radio[0].set_value("💼 Co-op 经验").run(timeout=45)
     assert not app.exception
     assert not any("你现在是游客：课程搜索" in item.value for item in app.markdown)
-    assert any("你现在是游客：只能看到公开记录" in item.value for item in app.info)
+    assert any("你现在是游客：只能看到公开记录" in item.value and "行业" in item.value for item in app.info)
+    # Curator seed rows are public as well, not only reviewed student shares.
+    assert any("示例记录" in item.value and "同学分享" in item.value for item in app.caption)

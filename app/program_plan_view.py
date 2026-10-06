@@ -9,6 +9,9 @@ from pydantic import ValidationError
 from schemas.program_plan import ProgramPlan, RequirementNode
 
 PATH_LABELS = {"standard": "普通 MS", "align": "Align", "bridge": "Bridge"}
+# The /chat 409 messages name this selector; tests keep the two in step.
+# 中文：/chat 的 409 提示里写了这个选择框的名字；测试保证两边一致。
+SELECTOR_LABEL = "你的项目（可选）"
 
 
 def render_chat_program_selector(st, programs: list[dict]) -> str | None:
@@ -20,7 +23,7 @@ def render_chat_program_selector(st, programs: list[dict]) -> str | None:
     if st.session_state.get(key) not in {None, *by_id}:
         st.session_state.pop(key, None)
     selected = st.selectbox(
-        "你的项目（可选）", [None, *by_id], key=key,
+        SELECTOR_LABEL, [None, *by_id], key=key,
         format_func=lambda value: "不指定" if value is None else f"{by_id[value]['full_name']} · {value}",
         help="选了以后，回答会按这个项目理解你的问题，比如「第一学期上什么」。问题对应好几个项目时，"
              "系统会请你在这里选一个。它不替你选校区或 Catalog 年份。",

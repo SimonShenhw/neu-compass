@@ -677,7 +677,11 @@ def render() -> None:
                         f"🧭 {e.detail}" if e.status_code == 409
                         else f"⚠️ Chat failed: {e.detail}"
                     )
-                    st.markdown(final_text)
+                    # Same filter as when history re-renders this assistant message.
+                    # 中文：和历史里重新渲染这条助手消息时用同一个过滤。
+                    from app.answer_evidence_view import answer_markdown  # noqa: PLC0415
+
+                    st.markdown(answer_markdown(final_text))
 
                 meta = st.session_state.get("last_chat_meta") or {}
                 results = meta.get("results", [])

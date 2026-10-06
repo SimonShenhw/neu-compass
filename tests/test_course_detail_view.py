@@ -73,15 +73,18 @@ def test_description_estimates_and_prerequisites_come_before_the_folded_sources(
 
 
 def test_extracted_fields_render_as_one_escaped_html_block_never_markdown():
-    """Instructors, grading names, careers and AI-policy text come from an LLM reading reviews and
-    syllabi. A CommonMark parser must see each line as a single HTML block: no link, no emphasis."""
+    """Name, topics, skills, instructors, grading names, careers and AI-policy text can come from
+    an LLM reading reviews and syllabi. A CommonMark parser must see each line as a single HTML
+    block (a blank line inside a value would end it): no link, no emphasis."""
     st = Recorder()
-    render_course_detail(st, payload(), cid="neu-cs-5800")
+    render_course_detail(st, payload(primary_name="Algorithms\n\n" + LINKED, topics_covered=["graphs\n\n" + LINKED],
+                                     skill_tags=["proofs\r\n\r\n" + LINKED]), cid="neu-cs-5800")
     lines = [e[1] for e in st.log if e[0] == "markdown" and "elsewhere.example" in e[1]]
-    assert len(lines) == 5  # Grading, careers, instructors, permitted tools, notes.
+    assert len(lines) == 8  # Header, grading, topics, skills, careers, instructors, permitted tools, notes.
     for line in lines:
-        assert line.startswith("<div") and "\n" not in line
+        assert line.startswith("<div") and "\n" not in line and "\r" not in line
         assert [token.type for token in COMMONMARK.parse(line)] == ["html_block"]
+        assert line in st.html  # Without unsafe_allow_html the escaped markup would show literally.
     notes = next(line for line in lines if "first line" in line)
     assert "first line<br><br>second line" in notes  # A blank line would have ended the HTML block.
     assert not any(e[0] in {"caption", "markdown"} and "elsewhere.example" in e[1] and not e[1].startswith("<div")

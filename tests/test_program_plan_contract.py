@@ -60,6 +60,9 @@ def test_prefix_ambiguity_requests_selection_instead_of_picking_first(api_client
     response = api_client.post("/chat", json={"query": "CS first semester"})
     assert response.status_code == 409
     assert "cs-ms" in response.text and "cs-align" in response.text
+    from app.program_plan_view import SELECTOR_LABEL  # noqa: PLC0415
+
+    assert f"「{SELECTOR_LABEL}」" in response.json()["detail"]  # Names the selector the student sees.
 
 
 def test_explicit_program_selection_is_accepted(api_client, empty_db):
@@ -177,6 +180,9 @@ def test_explicit_family_and_query_prefix_conflict_requires_clarification(api_cl
     ProgramRepository(empty_db).add_program(Program(program_id="cs-ms", full_name="CS", prefix="CS"))
     response = api_client.post("/chat", json={"query": "AAI first semester", "program_id": "cs-ms"})
     assert response.status_code == 409
+    from app.program_plan_view import SELECTOR_LABEL  # noqa: PLC0415
+
+    assert f"「{SELECTOR_LABEL}」" in response.json()["detail"] and "不指定" in response.json()["detail"]
 
 
 def test_ambiguous_program_does_not_call_model_or_hybrid(api_client, empty_db):
