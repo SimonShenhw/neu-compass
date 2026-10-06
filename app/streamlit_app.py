@@ -36,15 +36,15 @@ Pipeline per user message:
   1. add_message(role='user', content=prompt)
   2. ApiClient.chat_stream({"query": prompt, ...filters}) → NDJSON events
   3. meta event captured to state (drives evidence bubble)
-  4. token events stream into st.write_stream — assistant message renders
-     incrementally
+  4. token events stream into render_streamed_answer — assistant message
+     renders incrementally, link-filtered by answer_markdown
   5. Final assistant text + evidence persisted to state.messages
 
 每条用户消息的处理流水线：
   1. add_message(role='user', content=prompt)
   2. ApiClient.chat_stream({"query": prompt, ...filters}) → NDJSON 事件流
   3. meta 事件写入 state（驱动证据气泡）
-  4. token 事件流入 st.write_stream —— 助手消息增量渲染
+  4. token 事件流入 render_streamed_answer —— 助手消息增量渲染，链接经 answer_markdown 过滤
   5. 最终助手文本 + 证据持久化到 state.messages
 
 Auth: login link / logout button live in the sidebar (render_auth_sidebar).
@@ -122,11 +122,11 @@ def stream_assistant(
     body: dict[str, Any],
     state: Any,
 ) -> Iterator[str]:
-    """Generator for `st.write_stream`. Consumes /chat NDJSON events,
+    """Generator for `render_streamed_answer`. Consumes /chat NDJSON events,
     yields assistant tokens, and side-effect captures the meta event in
     `state['last_chat_meta']` for the post-stream evidence rendering.
 
-    供 `st.write_stream` 使用的生成器：消费 /chat 的 NDJSON 事件流，逐个
+    供 `render_streamed_answer` 使用的生成器：消费 /chat 的 NDJSON 事件流，逐个
     产出助手 token，并把 meta 事件旁路存入 `state['last_chat_meta']`，
     供流结束后渲染证据区使用。
 
@@ -169,6 +169,17 @@ def stream_assistant(
             except ValueError:
                 pass
             return
+
+
+def _render_message_text(st: Any, msg: dict) -> None:
+    """Assistant text is model output, so only official catalog links stay
+    clickable; the student's own text renders as typed.
+
+    助手文本是模型输出，只有官方目录链接保持可点击；学生自己输入的文本原样渲染。"""
+    from app.answer_evidence_view import answer_markdown  # noqa: PLC0415
+
+    content = str(msg["content"])
+    st.markdown(answer_markdown(content) if msg["role"] == "assistant" else content)
 
 
 def _recent_history(messages: list[dict], limit: int = 6) -> list[dict]:
@@ -548,9 +559,9 @@ def render() -> None:
                 msg["role"],
                 avatar="🎓" if msg["role"] == "user" else "🧭",
             ):
-                st.markdown(msg["content"])
                 from app.answer_evidence_view import render_retrieval_notices  # noqa: PLC0415
 
+                _render_message_text(st, msg)
                 render_retrieval_notices(st, msg.get("notices"))
                 if msg.get("evidence"):
                     n_ev = len(msg["evidence"])
@@ -644,8 +655,10 @@ def render() -> None:
                     with ApiClient(
                         session_token=st.session_state.get("session_token")
                     ) as api:
+                        from app.answer_evidence_view import render_streamed_answer  # noqa: PLC0415
+
                         stream = stream_assistant(api, chat_body, st.session_state)
-                        final_text = st.write_stream(stream) or ""
+                        final_text = render_streamed_answer(st, stream)
                 except ApiError as e:
                     # 409 = the API needs the student to clarify the program
                     # (ambiguous prefix / selection conflict), not a failure.

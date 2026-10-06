@@ -466,7 +466,8 @@ def generate_text_stream(
 ) -> Iterator[str]:
     """Yield text chunks as Gemini produces them.
 
-    Used by /chat for token-by-token UI streaming (Streamlit st.write_stream).
+    Used by /chat for token-by-token UI streaming (rendered by
+    app.answer_evidence_view.render_streamed_answer).
     Caller must consume the iterator promptly — Gemini disconnects idle
     streams after a few seconds.
 
@@ -476,7 +477,7 @@ def generate_text_stream(
     to that point is what the caller already received.
 
     中文:随 Gemini 产出逐块 yield 文本。
-    供 /chat 用于逐 token 的 UI 流式展示(Streamlit st.write_stream)。
+    供 /chat 用于逐 token 的 UI 流式展示(由 app.answer_evidence_view.render_streamed_answer 渲染)。
     调用方必须及时消费这个迭代器 —— Gemini 会在闲置几秒后断开流。
     如果 SDK 在流初始化时抛错,或响应从未产出任何文本(安全拦截、空
     completion),都会抛出 GeminiError。流中途逐块出现的错误也会作为
