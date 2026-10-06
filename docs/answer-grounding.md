@@ -71,6 +71,20 @@ python scripts/sync_catalog_sources.py --db-path "H:/neu-compass-backup/rehearsa
 - 来源表目前每门课只保存一个快照，更新会替换上一份；不是多版本历史仓库。内容摘要不含导入/抓取时间，原始 JSONL 与旧版本需要另外保存。
 - 若没有可校验存档，不执行来源回填；读取端继续提示缺失。v1.4 不替代第三批独立的 v1.3 Co-op 迁移，也不自动部署 API/UI。
 
+**课程名修复（2026-10-06）**：线上库里 CS 5200 存的 `primary_name` 是它描述的第一句话（"Introduces relational database management systems…"），多半是 2026-06 之前「把整个 LLM 输出写回」的富化留下的（现在 `llm/review_enrichment.py` 只合并软字段，有测试钉住名称不被改）。因为回填要求名称和目录标题完全一致，这门课一直被计入 `skipped_title_mismatch`，没有目录快照。`scripts/repair_course_names.py` 修这一类：
+
+- 默认只读，列出所有与存档目录标题不一致的课程；
+- `--commit` 只修「存的名称以句号等结尾、原样出现在这门课自己的描述或 `raw_text` 里」的记录，其他不一致（改名、版本差异）只列出、不改；
+- 修复走 `CourseRepository.rename()`：名称列和 Course JSON 一起改，status 不变。两个索引都不读名称（FAISS 嵌入 `raw_text`，BM25 索引 `raw_text` + `search_expansion`），所以不用重建索引，课程也不会从搜索里消失。
+
+本地开发库（7 月的副本）只报出 CS 5200 一门；另有 AAI 6600 被列为其他不一致（存的是 syllabus seed 的 "Introduction to Artificial Intelligence"，目录标题是 "Applied Artificial Intelligence"），需要人来定，不自动改。
+
+下次部署时在生产库上照这个顺序做（先 `chown` NAS 项目目录、做好部署前备份）：
+1. `python scripts/repair_course_names.py --db-path <生产库> --catalog-dir <v1.4 回填用的同一份存档>`，看报告；
+2. 确认后加 `--commit`；
+3. `python scripts/sync_catalog_sources.py --db-path <生产库> --catalog-dir <同一份存档>`，确认 CS 5200 变成 matched、`would_store` 符合预期，再加 `--commit`；
+4. 不需要重建索引，也不需要重启 API：`/course` 和回答每次请求都从库里读名称和快照。
+
 普通 `ingest_neu_catalog.py` 现在同时存来源快照，并在缺表或来源不合格时失败。**不要用它给既有富化课程补来源**：原摄取会重写 Course、把状态置为 pending 并要求重建索引。回填工具就是为避开这些副作用而单独提供的。
 
 ## 上线前仍需完成

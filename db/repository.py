@@ -109,6 +109,27 @@ class CourseRepository:
              metadata, raw_text, generated, course.schema_version),
         )
 
+    def rename(self, course_id: str, primary_name: str) -> None:
+        """Change only the display name, in the name column and the Course JSON.
+
+        The one deliberate exception to "content changed -> pending": neither index reads the
+        name (FAISS embeds raw_text; BM25 indexes raw_text + search_expansion), so the stored
+        vectors stay valid and status / indexed_at are left as they are. Resetting to 'pending'
+        would hide the course from search (ADR-0013) until a re-embed it does not need.
+
+        中文：只改显示名称（名称列和 Course JSON）。这是「内容变了就改回 pending」的唯一刻意例外：
+        两个索引都不读名称（FAISS 嵌入 raw_text；BM25 索引 raw_text + search_expansion），已存的
+        向量仍然有效，所以 status / indexed_at 保持不变。改成 'pending' 会让这门课在搜索里消失
+        （ADR-0013），直到一次它并不需要的重新嵌入。
+        """
+        renamed = Course.model_validate({**self.get(course_id).model_dump(), "primary_name": primary_name})
+        metadata, generated = self._serialize(renamed)
+        self._conn.execute(
+            "UPDATE courses SET primary_name = ?, metadata = ?, generated_json = ?, "
+            "updated_at = CURRENT_TIMESTAMP WHERE course_id = ?",
+            (renamed.primary_name, metadata, generated, course_id),
+        )
+
     def mark_indexed(self, course_id: str) -> None:
         """Transition pending -> indexed. Called after FAISS write succeeds.
 
