@@ -103,7 +103,9 @@ def repair_names(db_path: str | Path, catalog_dir: str | Path, *, commit: bool =
     named = set(use_catalog_title)
     unknown = sorted(named - titles.keys())
     if unknown:
-        raise NameRepairError(f"--use-catalog-title codes not in the archive: {', '.join(unknown)}")
+        # repr() so a stray space or a lowercase letter is visible ('CS 6140 ', 'cs 6140').
+        raise NameRepairError("--use-catalog-title codes not in the archive: "
+                              + ", ".join(repr(code) for code in unknown))
     path = Path(db_path).resolve(strict=True)
     conn = sqlite3.connect(f"{path.as_uri()}?mode={'rw' if commit else 'ro'}", uri=True)
     conn.row_factory = sqlite3.Row

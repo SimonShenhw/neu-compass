@@ -305,6 +305,8 @@ def test_error_log_fields_never_raise() -> None:
     assert error_log_fields(_wrapped(_BrokenProperty(UPSTREAM_TEXT))) == {
         "exc_type": "GeminiError", "error_kind": "call_failed", "cause_type": "_BrokenProperty"}
     assert error_log_fields(_NoInitError(UPSTREAM_TEXT)) == {"exc_type": "_NoInitError", "error_kind": "error"}
+    # A kind that is not text (callers compare it against string sets) is reported as the default.
+    assert error_log_fields(GeminiError(UPSTREAM_TEXT, kind=5))["error_kind"] == "error"  # type: ignore[arg-type]
 
 
 def test_error_log_fields_read_the_status_of_an_httpx_style_response() -> None:

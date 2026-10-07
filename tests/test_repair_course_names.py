@@ -218,12 +218,49 @@ def test_a_named_code_not_in_the_archive_fails_before_the_database_is_opened(run
         repair_names(tmp_path / "missing.db", archive, commit=True, use_catalog_title=[code])
 
 
-def test_a_named_code_without_exactly_one_course_writes_nothing(runtime):
+@pytest.mark.parametrize("commit", [True, False])
+def test_a_named_code_without_exactly_one_course_writes_nothing(runtime, commit):
     path, archive = runtime  # CS 9999 is archived but not in this database.
     before = rows(path)
     with pytest.raises(ValueError, match="CS 9999: 0 courses"):
-        repair_names(path, archive, commit=True, use_catalog_title=["CS 9999"])
+        repair_names(path, archive, commit=commit, use_catalog_title=["CS 9999"])
     assert rows(path) == before  # Not even the CS 5200 repair.
+
+
+def test_a_named_code_with_two_courses_writes_nothing(runtime):
+    """The schema allows a repeated primary_code; a named rename then has no single target."""
+    path, archive = runtime
+    conn = connect(path)
+    CourseRepository(conn).insert(Course(course_id="neu-cs-6140-copy", primary_code="CS 6140",
+                                         primary_name="Machine Learning (old title)", credits=4), raw_text="Learning.")
+    conn.commit()
+    conn.close()
+    before = rows(path)
+    with pytest.raises(ValueError, match="CS 6140: 2 courses"):
+        repair_names(path, archive, commit=True, use_catalog_title=["CS 6140"])
+    assert rows(path) == before
+
+
+def test_a_named_code_that_is_also_a_sentence_is_one_repair(runtime):
+    path, archive = runtime
+    report = repair_names(path, archive, commit=True, use_catalog_title=["CS 5200", "CS 5200"])
+    assert [item["code"] for item in report["repairs"]] == ["CS 5200"] and report["named_repairs"] == []
+    assert report["repaired"] == 1 and rows(path)["neu-cs-5200"]["primary_name"] == "Database Management Systems"
+
+
+def test_every_unknown_named_code_is_listed_with_its_spelling(runtime):
+    path, archive = runtime
+    with pytest.raises(ValueError) as info:
+        repair_names(path, archive, use_catalog_title=["CS 6140 ", "cs 6140", "CS 7777"])
+    assert str(info.value) == "--use-catalog-title codes not in the archive: 'CS 6140 ', 'CS 7777', 'cs 6140'"
+
+
+def test_cli_reports_an_empty_archive_by_name(runtime, tmp_path, capsys):
+    path, _ = runtime
+    empty = tmp_path / "empty-archive"
+    empty.mkdir()
+    assert cli(["--db-path", str(path), "--catalog-dir", str(empty)]) == 1
+    assert "No JSONL catalog archives found" in capsys.readouterr().out
 
 
 def test_cli_takes_repeated_catalog_title_codes(runtime, capsys):
@@ -237,6 +274,6 @@ def test_cli_takes_repeated_catalog_title_codes(runtime, capsys):
     assert cli([*base, "--use-catalog-title", "CS 7777"]) == 1
     # The script's own failures name the code, so a misspelt one is easy to tell from a duplicate.
     assert capsys.readouterr().out.strip() == (
-        "Course name repair failed: --use-catalog-title codes not in the archive: CS 7777; no transaction committed.")
+        "Course name repair failed: --use-catalog-title codes not in the archive: 'CS 7777'; no transaction committed.")
     assert cli([*base, "--use-catalog-title", "CS 9999"]) == 1
     assert "--use-catalog-title CS 9999: 0 courses in the database, need exactly one" in capsys.readouterr().out

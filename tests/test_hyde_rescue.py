@@ -161,6 +161,22 @@ def test_error_frames_with_no_room_is_empty() -> None:
         assert error_frames(exc, limit=1)[0].startswith("test_hyde_rescue.py:")
 
 
+def test_error_frames_never_raise(monkeypatch) -> None:  # noqa: ANN001
+    """It runs inside except blocks; a failure while reading the traceback gives no frames."""
+    import traceback  # noqa: PLC0415
+
+    from api.routes.common import error_frames  # noqa: PLC0415
+
+    def broken(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise RuntimeError("summary failed")
+
+    monkeypatch.setattr(traceback.StackSummary, "extract", broken)
+    try:
+        raise RuntimeError("x")
+    except RuntimeError as exc:
+        assert error_frames(exc) == []
+
+
 def test_rescue_failure_of_another_kind_also_logs_where_it_happened() -> None:
     """A database or reranker error has no kind; where it was raised is the safe clue."""
     [entry] = _rescue_failure_log(sqlite3.OperationalError("placeholder-credential-123"))

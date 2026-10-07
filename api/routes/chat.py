@@ -18,7 +18,7 @@ Wire format: NDJSON. One JSON object per line, chunks of:
   {"type": "meta",  "matched_via": "alias|hybrid|empty",
                     "results": [{"course_id", "primary_code", "primary_name", "score"}]}
   {"type": "token", "text": "..."}     (zero or more)
-  {"type": "error", "error_type": "upstream_error|internal_error", "detail": "..."}
+  {"type": "error", "error_type": "upstream_error|no_answer|internal_error", "detail": "..."}
                                        (only on stream failure; fixed text, never the exception)
   {"type": "done", "feedback": {...}}  (optional receipt, always last)
 
@@ -144,7 +144,7 @@ def _stream_error_event(error_type: str) -> bytes:
         "was answered from hybrid retrieval instead of a guessed sequence.\n"
         "2. `{\"type\": \"token\", \"text\": \"...\"}` — zero or more, "
         "Gemini stream chunks.\n"
-        "3. `{\"type\": \"error\", \"error_type\": \"upstream_error|internal_error\", "
+        "3. `{\"type\": \"error\", \"error_type\": \"upstream_error|no_answer|internal_error\", "
         "\"detail\": \"...\"}` — only on stream failure. `detail` is fixed text, never the "
         "exception; the server log line carries the same `x-request-id`.\n"
         "4. `{\"type\": \"done\", \"feedback\": {answer_id, answer_sha256, feedback_token}}` "
@@ -375,8 +375,9 @@ def chat(
                 yield (json.dumps(payload) + "\n").encode("utf-8")
                 tokens_sent += 1
         except GeminiError as e:
-            log.warning("chat.stream_failed", tokens_sent=tokens_sent, **error_log_fields(e))
-            no_answer = getattr(e, "kind", None) in _NO_ANSWER_KINDS
+            fields = error_log_fields(e)  # Never raises; error_kind is always a str here.
+            log.warning("chat.stream_failed", tokens_sent=tokens_sent, **fields)
+            no_answer = fields["error_kind"] in _NO_ANSWER_KINDS
             yield _stream_error_event("no_answer" if no_answer else "upstream_error")
         except Exception as e:  # defensive — never crash the stream / 防御性：绝不能让流崩溃
             # Frames instead of log.exception: a rendered traceback ends with the message.
@@ -421,7 +422,7 @@ def _store_completed_answer(conn, query_log_id, text, req):
         except sqlite3.Error:
             pass
         # Never print token, answer, raw query, or exception detail.
-        log.warning('chat.feedback_capture_failed', error_type=type(exc).__name__)
+        log.warning('chat.feedback_capture_failed', exc_type=type(exc).__name__)
         return None
 
 

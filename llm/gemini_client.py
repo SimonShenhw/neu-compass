@@ -539,9 +539,10 @@ def generate_text_stream(
     response never produces text (safety block, empty completion). Per-chunk
     errors mid-stream propagate as GeminiError too — the partial output up
     to that point is what the caller already received. The SDK sends the
-    request only on the first iteration, so a failure before any text has
-    kind "stream_init_failed" whether it came from the call or from the first
-    chunk; "stream_interrupted" means some text had already been yielded.
+    request only on the first iteration, so any failure before the first
+    text has kind "stream_init_failed": from the call, or while iterating
+    before any chunk carried text. "stream_interrupted" means some text had
+    already been yielded.
 
     中文:随 Gemini 产出逐块 yield 文本。
     供 /chat 用于逐 token 的 UI 流式展示(由 app.answer_evidence_view.render_streamed_answer 渲染)。
@@ -549,9 +550,9 @@ def generate_text_stream(
     如果 SDK 在流初始化时抛错,或响应从未产出任何文本(安全拦截、空
     completion),都会抛出 GeminiError。流中途逐块出现的错误也会作为
     GeminiError 向外传播 —— 调用方在那之前已经收到的部分输出不受影响。
-    SDK 要到第一次迭代才发请求,所以在任何文字之前的失败,不论来自调用
-    还是第一个 chunk,kind 都是 "stream_init_failed";"stream_interrupted"
-    表示已经 yield 过一些文字。
+    SDK 要到第一次迭代才发请求,所以在第一段文字之前的任何失败,kind 都是
+    "stream_init_failed":来自调用,或在还没有 chunk 带文字时的迭代中。
+    "stream_interrupted" 表示已经 yield 过一些文字。
     """
     if client is None:
         client = _build_default_client()

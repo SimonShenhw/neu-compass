@@ -137,6 +137,14 @@ def test_stream_assistant_handles_error_event() -> None:
     assert state["last_chat_error"] == detail
 
 
+def test_stream_assistant_error_without_text_has_no_leading_blank_line() -> None:
+    """The stored turn goes back to the model as history; it should not start with a blank line."""
+    state: dict = {}
+    api = _FakeApi([{"type": "meta", "results": []}, {"type": "token", "text": ""},
+                    {"type": "error", "error_type": "no_answer", "detail": "notice"}])
+    assert list(stream_assistant(api, {"query": "x"}, state)) == ["⚠️ notice"]
+
+
 def test_stream_assistant_shows_the_api_error_event_end_to_end() -> None:
     """The error event as /chat writes it, read through ApiClient: the partial answer stays, the fixed
     notice follows, and no feedback receipt is kept. 中文：/chat 写出的错误事件经 ApiClient 读进来：

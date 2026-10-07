@@ -225,6 +225,30 @@ def test_chat_unexpected_error_frames_are_the_innermost_six(api_client: TestClie
     assert all(frame.endswith(" level") for frame in entry["frames"])  # boom_stream is further out.
 
 
+class _BrokenKind(GeminiError):
+    @property
+    def kind(self) -> str:  # type: ignore[override]
+        raise RuntimeError("kind lookup failed")
+
+    @kind.setter
+    def kind(self, value: str) -> None:
+        pass
+
+
+def test_chat_error_with_an_unreadable_kind_still_ends_the_stream(api_client: TestClient) -> None:
+    """Reading the kind happens inside the except block; a second error there would end the stream
+    with neither error nor done (and leave the traceback to the middleware's log.exception)."""
+
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "partial..."
+        raise _BrokenKind("upstream text")
+
+    _override_stream(api_client, boom_stream)
+    events = _parse_ndjson(api_client.post("/chat", json={"query": "x"}).text)
+    assert [e["type"] for e in events][-2:] == ["error", "done"]
+    assert next(e for e in events if e["type"] == "error")["error_type"] == "upstream_error"
+
+
 @pytest.mark.parametrize("kind", ["empty_stream", "empty_response"])
 def test_chat_empty_answer_gets_its_own_notice(api_client: TestClient, kind: str) -> None:
     """A safety block or empty completion: "ask again later" would not help."""
