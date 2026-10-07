@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import re
+import time
 
 from pydantic import ValidationError
 
@@ -34,6 +35,21 @@ WARNING_LABELS = {
     "catalog_metadata_conflict": "目录快照与课程记录的学分不一致，需向官方核实，不能静默合并。",
     "field_evidence_value_conflict": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
     "synthetic_record_not_real_course": "此记录为合成测试数据，不是实际课程推荐。",
+}
+# One-line forms of the same warnings (notice_line): cards and the top of the detail panel show
+# every applicable one in a single caption; the full sentences stay in the detailed view.
+# 中文：同一批提示的一行短句（notice_line）：卡片和详情面板顶部把适用的提示合成一行；
+# 完整句子留在详细视图里。
+SHORT_WARNING_LABELS = {
+    "catalog_source_unavailable": "没有官方目录的存档",
+    "catalog_retrieval_date_unknown": "目录的抓取日期没有记录",
+    "extracted_evidence_not_official_facts": "工作量、难度等是根据评价的估计，不是官方信息",
+    "topics_source_unavailable": "主题列表没有来源",
+    "prerequisite_logic_unavailable": "先修课之间是「都要」还是「任选」不清楚",
+    "program_seed_unverified": "培养方案关系没有核实，不是正式的 Plan of Study",
+    "catalog_metadata_conflict": "目录学分和课程记录不一致，请向学校核实",
+    "field_evidence_value_conflict": "有估计值和评价原文对不上，需要核实",
+    "synthetic_record_not_real_course": "这是测试数据，不是真实课程",
 }
 # Per-answer retrieval notices from /chat meta. Only KNOWN codes render;
 # anything else is dropped (never echoed as markdown).
@@ -88,31 +104,98 @@ def _when(value: datetime) -> str:
     return value.strftime("%Y-%m-%d %H:%M")
 
 
-# Model answers are untrusted Markdown (catalog descriptions and review quotes reach the
-# prompt). answer_markdown() keeps only links whose target is an official catalog department
-# page. Any other inline-link destination is dropped (the label stays), images become links,
-# reference definitions are disabled, and other autolinks / bare URLs lose their scheme so no
-# Markdown rule can make them clickable. Code spans get the same treatment on purpose: guessing
-# where CommonMark puts code boundaries is how filters get bypassed, and a scheme-less URL in
-# code is merely less exact. An email address may still render as a mail link (it opens a
-# mail client, not a web page).
-# 中文：模型回答是不可信的 Markdown（目录描述与评价引文都会进提示词）。只保留指向官方目录
-# 院系页的链接；其余行内链接去掉目标（保留文字），图片改为链接，引用式定义失效，其余自动
-# 链接和裸 URL 去掉协议头，任何 Markdown 规则都无法再让它们可点。代码片段同样处理，这是
-# 有意的：去猜 CommonMark 的代码边界正是过滤被绕过的常见原因，代码里的 URL 少了协议头只是
-# 不够精确。邮箱地址仍可能显示成邮件链接（只会打开邮件客户端，不会打开网页）。
-# \x00 marks placeholders, so no pattern below may match across one.
-_DESTINATION = re.compile(
-    r"\]\(\s*(<[^>\n\x00]*>|[^)\s\x00]*)(?:\s+(?:\"[^\"\n\x00]*\"|'[^'\n\x00]*'|\([^)\n\x00]*\)))?\s*\)")
-_AUTOLINK = re.compile(r"<([A-Za-z][A-Za-z0-9+.\-]{1,31}:[^<>\s\x00]*)>")
-_BARE_URL = re.compile(r"(?i:https?://|www\.)[^\s<>()\[\]`\"'\x00]+")
-_SCHEME_OR_WWW = re.compile(r"^(?:[A-Za-z][A-Za-z0-9+.\-]*:/*|www\.)", re.IGNORECASE)
-_TRAILING_PUNCTUATION = ".,;:!?。，；：！？、）」』》】”’"
+# Model answers are untrusted Markdown (catalog descriptions and review quotes reach the prompt).
+# answer_markdown() makes the renderer show the model's text as written: emphasis, lists,
+# headings, tables and code still work, official catalog department links stay clickable, and
+# nothing else can become a link, image, HTML, math, directive or shortcode. One linear pass:
+#   1. official catalog links ([label](URL), <URL>, a bare URL) are set aside under placeholders;
+#   2. every backslash is doubled, so the model's own escapes stay visible and cannot hide part
+#      of a URL from the steps below or from the renderer's decoding;
+#   3. a word joiner (U+2060: invisible, not a line-break opportunity) goes after the first
+#      letter of every http(s):// and www., so the renderer's bare-URL linking never finds one,
+#      and after the "m" of a "math" info string right after a code fence, because Streamlit
+#      renders a ```math block as KaTeX whenever the answer also has a "$...$" pair;
+#   4. a backslash goes before each character that opens something else: an entity ("&#", "&a"),
+#      HTML or an autolink ("<a", "</", "<!", "<?"), a link destination or a reference definition
+#      / footnote ("](", "]:"), an image ("![", or "!" before a kept catalog link), math ("$")
+#      and a directive or shortcode (":" before a name; a word joiner goes after that ":" too,
+#      because Streamlit swaps :name: shortcodes for emoji, icons or its logo image in the
+#      decoded text, where the backslash is already gone);
+#   5. the placeholders come back as [label](URL) / <URL> (a title or angle brackets around the
+#      URL are dropped), labels escaped like everything else.
+# Outside the kept catalog links the pass only inserts characters, and every opener is escaped,
+# so the text the renderer shows is the text checked here: decoding an escape or entity, or
+# re-rendering a directive label, cannot produce a link. The two placeholder marks (private-use
+# U+E000 / U+E001) are replaced with U+FFFD. Costs: the model's backslashes, entities, math and
+# Streamlit directives / shortcodes (":red[...]", ":smile:") show literally; other links show as
+# their Markdown source, and a copied non-catalog URL, ":name" or fence "math" info string
+# carries the invisible word joiner; inside code, inserted escapes are visible and a catalog URL
+# shows in angle brackets; a table's "\|" becomes a column break. Streamlit still applies its
+# typographic replacements ("->", "<-", "<->", "--", ">=", "<=", "~=") and the few emoji
+# shortcodes that start with punctuation (":+1:"). An email address may still become a mail link.
+# 中文：模型回答是不可信的 Markdown（目录描述与评价引文都会进提示词）。answer_markdown() 让渲染器
+# 按原样显示模型的文字：强调、列表、标题、表格、代码照常；官方目录院系页链接保持可点；其他东西都不能
+# 变成链接、图片、HTML、公式、指令或短代码。一遍线性处理：1 先把官方目录链接换成占位符；2 所有反斜杠
+# 翻倍，模型自己写的转义原样显示，不能把网址的一部分藏起来躲过后面的步骤或渲染器的解码；3 每个
+# http(s):// 和 www. 的首字母后插一个 word joiner（U+2060，不可见、不产生换行点），渲染器的裸网址识别
+# 就找不到它们；代码围栏后面紧跟的 "math" 信息串也在 "m" 后插一个（回答里只要还有一对 "$...$"，
+# Streamlit 就会把 ```math 代码块渲染成 KaTeX 公式）；4 在会开启其他结构的字符前加反斜杠：实体、
+# HTML/自动链接、链接目标、引用式定义/脚注、图片（含目录链接前的 "!"）、公式、指令和短代码（名字前的
+# ":" 后面再插一个 word joiner：Streamlit 在解码后的文字里把 :名字: 短代码换成 emoji、图标或它的 logo
+# 图片，那时反斜杠已经没了）；5 把占位符还原成 [标签](URL) / <URL>（URL 两边的尖括号和标题会去掉），
+# 标签同样经过转义。除了保留的目录链接，这一遍只插入字符，而且每个开启符都被转义，所以渲染器显示的
+# 就是这里检查过的文字：解码转义或实体、把指令标签再渲染一次，都不可能产生链接。占位符用的两个私用区
+# 字符（U+E000 / U+E001）换成 U+FFFD。代价：模型写的反斜杠、实体、公式和 Streamlit 指令/短代码原样
+# 显示；其他链接显示成 Markdown 原文，复制出的非目录网址、":名字" 和代码围栏的 "math" 信息串带着
+# 不可见的 word joiner；代码里能看到插入的转义，目录网址会带尖括号显示；表格的 "\|" 会变成分列。
+# Streamlit 的排版替换仍然生效（"->"、"<-"、"<->"、"--"、">="、"<="、"~="），以标点开头的少数
+# emoji 短代码（":+1:"）仍会变成 emoji。邮箱地址仍可能变成邮件链接。
+WORD_JOINER = "\u2060"
+_CATALOG_URL = OFFICIAL_CATALOG_URL.pattern + r"(?:#[A-Za-z0-9_-]{1,64})?"  # An in-page anchor is harmless.
+_CATALOG_LINK = re.compile(
+    r"\[([^\[\]\n]{1,200})\]\(\s{0,20}<?(" + _CATALOG_URL + r")>?(?:\s{1,20}\"[^\"\n]{0,200}\")?\s{0,20}\)")
+_CATALOG_AUTOLINK = re.compile(r"<(" + _CATALOG_URL + r")>")
+_CATALOG_BARE = re.compile(_CATALOG_URL)
+_URL_START = re.compile(r"(?i)(?:h(?=ttps?://)|w(?=ww\.))")
+_MATH_FENCE = re.compile(r"(?i)(?<=```|~~~)([ \t]*m)(?=ath)")
+# ":" before a directive or shortcode name comes first, so "]:name" also gets its word joiner.
+# A name may start with anything but ASCII whitespace or punctuation: the renderer's notion of
+# whitespace is narrower than Python's \s (which also takes U+001C-U+001F and U+0085), so the
+# class is spelled out. Escaping a ":" that needed none is harmless.
+_OPENER = re.compile(
+    r"(?P<name>:(?=[^ \t\r\n!-/:-@\[-`{-~]))|&(?=[#A-Za-z])|<(?=[A-Za-z/!?])|(?<=\])[(:]|!(?=[\[\ue000])|\$")
+_MARKS = re.compile("[\ue000\ue001]")
+_PLACEHOLDER = re.compile("\ue000(\\d+)\ue001")
+_ASCII_PUNCTUATION = re.compile(r"[!-/:-@\[-`{-~]")
 
 
-def _inert(url: str) -> str:
-    # One prefix per call; the fixed-point loop below handles "https://https://x" and "www.https://x".
-    return _SCHEME_OR_WWW.sub("", url, count=1)
+def _literal(text: str) -> str:
+    """Steps 2-4 for text that must render as written."""
+    text = text.replace("\\", "\\\\")
+    text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, text)
+    text = _MATH_FENCE.sub(lambda match: match.group(1) + WORD_JOINER, text)
+    return _OPENER.sub(lambda match: "\\" + match.group(0) + (WORD_JOINER if match.lastgroup else ""), text)
+
+
+def literal_markdown(value: object) -> str:
+    """One line of plain text for a Markdown context, e.g. a course name from the database in a
+    label: whitespace runs (line breaks included) become one space, every ASCII punctuation
+    character is escaped, and URL starts and ":" get the same word joiner as answer_markdown().
+    An e-mail address may still become a mail link.
+    中文：放进 Markdown 的一行纯文字，例如标签里来自数据库的课程名：连续空白（含换行）变成一个
+    空格，每个 ASCII 标点都转义，网址开头和 ":" 后面插入和 answer_markdown() 一样的 word joiner。
+    邮箱地址仍可能变成邮件链接。"""
+    text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, " ".join(str(value).split()))
+    return _ASCII_PUNCTUATION.sub(
+        lambda match: "\\" + match.group(0) + (WORD_JOINER if match.group(0) == ":" else ""), text)
+
+
+def _label(labels: dict[str, str], code: object) -> str:
+    """Our label for a known code; anything else is data (e.g. a field name the model wrote) and goes
+    into the Markdown as plain text. 中文：已知代码用我们的标签；其他的是数据（例如模型写的字段名），
+    按纯文字放进 Markdown。"""
+    text = str(code)
+    return labels.get(text) or literal_markdown(text)
 
 
 def answer_markdown(text: str) -> str:
@@ -120,44 +203,35 @@ def answer_markdown(text: str) -> str:
 
     def keep(fragment: str) -> str:
         kept.append(fragment)
-        return f"\x00{len(kept) - 1}\x00"
+        return f"\ue000{len(kept) - 1}\ue001"
 
-    def autolink(match: re.Match[str]) -> str:
-        url = match.group(1)
-        return keep(f"<{url}>") if OFFICIAL_CATALOG_URL.fullmatch(url) else _inert(url)
-
-    def bare(match: re.Match[str]) -> str:
-        url = match.group(0)
-        core = url.rstrip(_TRAILING_PUNCTUATION)
-        return (keep(f"<{core}>") if OFFICIAL_CATALOG_URL.fullmatch(core) else _inert(core)) + url[len(core):]
-
-    text = text.replace("\x00", "")
-    # Repeat to a fixed point: removing one construct can splice its neighbours into a new one
-    # ("[a](x)(//evil)" -> "[a](//evil)"). Each pass only shortens text or swaps a URL for a
-    # placeholder, so this terminates. An allowed URL is a placeholder by the time
-    # _DESTINATION runs, which leaves "[label](<allowed>)" intact and drops every other target.
-    while True:
-        before = text
-        text = text.replace("![", "[")  # An image would fetch its URL on render.
-        text = _AUTOLINK.sub(autolink, text)
-        text = _BARE_URL.sub(bare, text)
-        text = _DESTINATION.sub("]", text)
-        if text == before:
-            break
-    text = text.replace("]:", "]\\:")  # "\:" renders as ":" but can never start a definition.
-    # No kept fragment contains a placeholder, so a single restore pass suffices.
-    return re.sub("\x00(\\d+)\x00", lambda match: kept[int(match.group(1))], text)
+    text = _MARKS.sub("\ufffd", text)  # The model cannot forge a placeholder.
+    text = _CATALOG_LINK.sub(lambda match: keep(f"[{_literal(match.group(1))}]({match.group(2)})"), text)
+    text = _CATALOG_AUTOLINK.sub(lambda match: keep(f"<{match.group(1)}>"), text)
+    text = _CATALOG_BARE.sub(lambda match: keep(f"<{match.group(0)}>"), text)
+    return _PLACEHOLDER.sub(lambda match: kept[int(match.group(1))], _literal(text))
 
 
-def render_streamed_answer(st, chunks) -> str:
-    """Live counterpart of answer_markdown(): each partial render is filtered as a whole, so a
-    link split across tokens is never shown raw. Returns the raw text for chat history.
-    中文：流式输出时每次都对已到达的全文过滤，跨 token 的链接也不会以原样出现；返回原文存历史。"""
+def render_streamed_answer(st, chunks, *, min_interval: float = 0.1, clock=time.monotonic) -> str:
+    """Live counterpart of answer_markdown(): every render shows the filtered text so far, so a
+    link split across tokens is never shown raw. Renders at most once per `min_interval` seconds
+    and once more at the end, also when the stream fails midway (filtering the whole text again
+    for every token was quadratic). Returns the raw text for chat history.
+    中文：流式输出时每次渲染都显示已到达全文的过滤结果，跨 token 的链接也不会以原样出现。最多每
+    `min_interval` 秒渲染一次，结尾再渲染一次，流中途出错时也一样（每个 token 都重新过滤全文是
+    平方级的）。返回原文存历史。"""
     placeholder = st.empty()
-    text = ""
-    for chunk in chunks:
-        text += chunk
-        placeholder.markdown(answer_markdown(text))
+    text, shown, last = "", "", None
+    try:
+        for chunk in chunks:
+            text += chunk
+            now = clock()
+            if last is None or now - last >= min_interval:
+                placeholder.markdown(answer_markdown(text))
+                shown, last = text, now
+    finally:
+        if text != shown:
+            placeholder.markdown(answer_markdown(text))
     return text
 
 
@@ -168,7 +242,7 @@ def evidence_summary(evidence: dict, *, missing_limit: int | None = None) -> lis
         lines.append("来源：已存目录快照（非实时核验）")
     else:
         lines.append("来源：未附可追溯目录快照")
-    missing = [FIELD_LABELS.get(field, field) for field in evidence.get("missing_fields", [])]
+    missing = [_label(FIELD_LABELS, field) for field in evidence.get("missing_fields", [])]
     if missing:
         visible = missing if missing_limit is None else missing[:missing_limit]
         remainder = len(missing) - len(visible)
@@ -177,20 +251,62 @@ def evidence_summary(evidence: dict, *, missing_limit: int | None = None) -> lis
     return lines
 
 
-def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False) -> None:
+def notice_line(warnings: list, *, only: set[str] | None = None) -> str | None:
+    """Every known caveat that applies, as one short line ('⚠️ a；b。'), in the API's order.
+    Unknown codes are skipped here; the full list (unknown codes included) stays in the
+    detailed view. 中文：把适用的已知提示合成一行短句，按 API 给出的顺序；未知代码不进这一行，
+    完整列表（含未知代码）仍在详细视图里。"""
+    shown = [SHORT_WARNING_LABELS[code] for code in dict.fromkeys(warnings)
+             if code in SHORT_WARNING_LABELS and (only is None or code in only)]
+    return "⚠️ " + "；".join(shown) + "。" if shown else None
+
+
+def render_course_overview(st, evidence: dict | None) -> None:
+    """Top of the course detail panel: the recorded official description, where it comes from,
+    and one line with every caveat. The full provenance goes in render_answer_evidence(detailed).
+    中文：课程详情面板最上面：记录的官方描述、它从哪里来，以及一行汇总的提示。完整的来源信息
+    放在 render_answer_evidence(detailed) 里。"""
+    if evidence is None:
+        return  # Backward-compatible history entries may predate this contract.
+    snapshot = _catalog_snapshot(evidence)
+    if snapshot:
+        if snapshot.description:
+            st.text(snapshot.description)
+        # catalog_url passed CatalogSnapshot's official-URL and department checks.
+        st.caption(f"课程描述来自 [NEU 官方课程目录]({snapshot.catalog_url}) 的存档副本，不是实时核对。")
+    elif evidence.get("catalog"):
+        st.caption("目录存档没有通过格式或来源校验，所以不显示描述和链接。")
+    else:
+        st.caption("没有官方目录描述的存档。")
+    # The caption above already says when there is no catalog record.
+    line = notice_line([code for code in evidence.get("warnings", []) if code != "catalog_source_unavailable"])
+    if line:
+        st.caption(line)
+
+
+def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False,
+                           show_description: bool = True) -> None:
+    """Compact (cards under an answer): source line, missing fields, one caveat line.
+    Detailed (course detail, inside 来源与说明): every field, every warning in full, snapshot and
+    recorded sources. show_description=False when render_course_overview already showed it.
+    中文：紧凑模式（回答下方的卡片）：来源、缺失字段、一行提示。详细模式（课程详情的「来源与说明」
+    里）：全部字段、每条提示的完整说明、快照和记录来源。若 render_course_overview 已显示描述，
+    传 show_description=False。"""
     if evidence is None:
         return  # Backward-compatible history entries may predate this contract.
     for line in evidence_summary(evidence, missing_limit=None if detailed else 5):
         st.caption(line)
-    for warning in evidence.get("warnings", []):
-        if detailed or warning in COMPACT_WARNINGS:
-            st.caption(WARNING_LABELS.get(warning, warning))
     if not detailed:
+        line = notice_line(evidence.get("warnings", []), only=COMPACT_WARNINGS)
+        if line:
+            st.caption(line)
         return
+    for warning in evidence.get("warnings", []):
+        st.caption(_label(WARNING_LABELS, warning))
     snapshot = _catalog_snapshot(evidence)
     if snapshot:
         st.markdown(f"[官方目录来源]({snapshot.catalog_url}) · 非实时核验")
-        if snapshot.description:
+        if snapshot.description and show_description:
             st.text(snapshot.description)
         # A 64-hex digest is unreadable: show its head, keep the whole ID one hover away.
         # Captions and tooltips render Markdown, so a malformed ID is never echoed.
@@ -209,9 +325,10 @@ def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False)
 
 
 def render_field_evidence(st, snippets: list[dict]) -> None:
-    """Render supplied quotes/IDs as text, not user-controlled Markdown links."""
+    """Render supplied quotes/IDs as text, not user-controlled Markdown links. The field name is
+    model-written too (an unknown one shows as plain text)."""
     for item in snippets:
-        field = FIELD_LABELS.get(item["field"], item["field"])
+        field = _label(FIELD_LABELS, item["field"])
         kind = SOURCE_KIND_LABELS[source_kind(str(item["source_id"]))]
         st.caption(f"{field} · 抽取置信度 {item['confidence']:.2f}（不是事实概率）")
         st.text(f"支持值：{item['value']}\n来源：{kind} · {item['source_id']}\n引文：{item['quote']}")

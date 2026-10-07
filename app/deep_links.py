@@ -288,13 +288,16 @@ def _ref_label(ref: str) -> str:
     span. Streamlit blocks raw HTML, but a backtick would close the span and
     let a crafted link render arbitrary markdown (`[点这里](https://evil)`)
     inside our own warning — a phishing surface on a URL anyone can forge.
-    Strip the delimiter and cap the length.
+    Strip the delimiter, keep it on one line (a code span cannot cross a blank
+    line or a new block, so the rest of a multi-line ref would be Markdown) and
+    cap the length.
 
     中文：ref 由用户控制，而我们要把它回显进一个 markdown 代码段里。
     Streamlit 会拦掉裸 HTML，但一个反引号就能闭合代码段，让精心构造的链接
     在我们自己的警告框里渲染出任意 markdown（`[点这里](https://evil)`）——
-    这是一个任何人都能伪造 URL 的钓鱼面。去掉分隔符并限制长度。"""
-    return ref.replace("`", "")[:64]
+    这是一个任何人都能伪造 URL 的钓鱼面。去掉分隔符、留在一行里（代码段跨不过
+    空行或新的块，多行 ref 的后面部分会被当成 Markdown），并限制长度。"""
+    return " ".join(ref.replace("`", "").split())[:64]
 
 
 def _read_param(st, name: str) -> str:
@@ -364,10 +367,14 @@ def _apply_course_ref(st, ref: str, *, pages: list[str]) -> bool:
     st.session_state["selected_course_id"] = matches[0]["course_id"]
     st.session_state["nav_page"] = pages[0]
     if len(matches) > 1:
-        others = "、".join(m["primary_code"] for m in matches[1:4])
+        from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+
+        # The codes come from the database: plain text, like the prerequisite rows.
+        # 中文：课程代码来自数据库，按纯文字放进去，和先修行一样。
+        others = "、".join(literal_markdown(m["primary_code"]) for m in matches[1:4])
         st.info(
             f"🔗 `{_ref_label(ref)}` 对应多门课程，已打开 "
-            f"**{matches[0]['primary_code']}**；其他：{others}"
+            f"**{literal_markdown(matches[0]['primary_code'])}**；其他：{others}"
         )
     return True
 

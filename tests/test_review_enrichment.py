@@ -245,7 +245,10 @@ def test_enrich_merges_soft_fields_and_preserves_hard_facts() -> None:
         credits=4, prereqs=["CS 5004"],
     )
     llm_output = Course(
-        course_id="c-invented", primary_code="CS 5800", primary_name="Algorithms",
+        course_id="c-invented", primary_code="CS 5800",
+        # CS 5200's stored name became the first sentence of its description (fixed by
+        # scripts/repair_course_names.py, 2026-10-06): the name must come from the catalog.
+        primary_name="Presents the mathematical techniques used for the design of algorithms.",
         credits=None, prereqs=[],  # LLM's sources don't contain these
         topics_covered=["dynamic programming", "graphs"],
         difficulty_score=4.0,
@@ -268,6 +271,7 @@ def test_enrich_merges_soft_fields_and_preserves_hard_facts() -> None:
     assert enriched.credits == 4
     assert enriched.prereqs == ["CS 5004"]
     assert enriched.course_id == "c-cs-5800"
+    assert (enriched.primary_code, enriched.primary_name) == ("CS 5800", "Algorithms")
 
 
 def test_enrich_empty_llm_fields_keep_existing_values() -> None:

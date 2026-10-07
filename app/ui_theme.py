@@ -45,12 +45,12 @@ ALIPAY_BLUE = "#1677FF"
 # 取值集合保持一致（api/routes/search.py）：alias / hybrid / program /
 # rejected / empty。
 _BADGE_STYLES: dict[str, tuple[str, str, str]] = {
-    "alias": ("直达 · alias", "#E6F7EE", "#18A058"),
-    "hybrid": ("检索 · hybrid", "#E8F1FF", ALIPAY_BLUE),
-    "program": ("培养方案 · program", "#F0EBFF", "#7B61FF"),
-    "context": ("续聊 · context", "#E6FFFB", "#0E9A8F"),
-    "rejected": ("无匹配 · rejected", "#FFF1E6", "#E8731A"),
-    "empty": ("空结果 · empty", "#F2F3F5", "#646A73"),
+    "alias": ("按课程代码找到", "#E6F7EE", "#18A058"),
+    "hybrid": ("按内容检索", "#E8F1FF", ALIPAY_BLUE),
+    "program": ("按培养方案", "#F0EBFF", "#7B61FF"),
+    "context": ("接着上一个问题", "#E6FFFB", "#0E9A8F"),
+    "rejected": ("没找到匹配的课", "#FFF1E6", "#E8731A"),
+    "empty": ("没有结果", "#F2F3F5", "#646A73"),
 }
 
 GLOBAL_CSS = """
@@ -167,6 +167,13 @@ h3 { font-weight: 600; color: #26303E; letter-spacing: 0.2px; }
   margin-left: 6px;
 }
 
+.nc-line {
+  color: #3D4757;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0.15rem 0 0.45rem 0;
+}
+.nc-line-label { font-weight: 600; color: #1F2A3D; }
 .nc-banner {
   background: #FFFFFF;
   border: 1px solid #EBEEF5;
@@ -377,9 +384,14 @@ def hero_html(
 def guest_banner_html() -> str:
     """Soft card replacing the default st.info guest notice.
     替代默认 st.info 访客提示的柔和卡片。"""
+    # Tiers per coop_view: level 0 for everyone, 1 published contribution → interview
+    # details, 2 → salary range (a share counts once it is published, not when it is
+    # approved: db.coop_submission_repository). 中文：分级同 coop_view：0 级所有人可见，
+    # 1 条公开的贡献解锁面试细节，2 条解锁薪资区间（分享在公开时才计入，不是审核通过时）。
     return (
-        '<div class="nc-banner">🔒 当前为游客浏览 — 仅可见 level-0 (preview) '
-        "Co-op 数据。用 NEU 邮箱登录（左侧栏）解锁贡献分级内容。</div>"
+        '<div class="nc-banner">🔒 你现在是游客：课程搜索和培养方案都能用；Co-op 经验只显示'
+        "公司、职位、行业、学期和时长。用 NEU 邮箱登录（左侧栏）后分享自己的 Co-op 经验，经验公开"
+        "后解锁更多：1 条看面试细节，2 条看薪资区间。</div>"
     )
 
 
@@ -395,6 +407,14 @@ def matched_via_badge(matched_via: str) -> str:
         f'<span class="nc-badge" style="background:{bg};color:{fg};">'
         f"{html.escape(label)}</span>"
     )
+
+
+def _one_line(value: object) -> str:
+    """Escaped data for the one-block HTML these helpers build: line breaks become spaces, because
+    a blank line would end the HTML block and the rest would be read as Markdown (links included).
+    中文：这些函数拼出的单块 HTML 里的数据：转义，换行变成空格；空行会结束 HTML 块，后面的内容
+    就会被当成 Markdown（包括链接）。"""
+    return html.escape(" ".join(str(value).splitlines()))
 
 
 def course_header_html(
@@ -427,14 +447,14 @@ def course_header_html(
         chips += (
             '<div class="nc-meta-chip">'
             f'<span class="nc-meta-label">{label}</span>'
-            f'<span class="nc-meta-value">{html.escape(str(value))}</span>'
+            f'<span class="nc-meta-value">{_one_line(value)}</span>'
             "</div>"
         )
     chips_row = f'<div class="nc-meta-row">{chips}</div>' if chips else ""
     return (
         '<div class="nc-card">'
-        f'<span class="nc-card-code">{html.escape(code)}</span>'
-        f'<p class="nc-card-name">{html.escape(name)}</p>'
+        f'<span class="nc-card-code">{_one_line(code)}</span>'
+        f'<p class="nc-card-name">{_one_line(name)}</p>'
         f"{chips_row}"
         "</div>"
     )
@@ -446,7 +466,7 @@ def topic_pills_html(topics: list[str]) -> str:
     if not topics:
         return ""
     pills = "".join(
-        f'<span class="nc-pill">{html.escape(t)}</span>' for t in topics
+        f'<span class="nc-pill">{_one_line(t)}</span>' for t in topics
     )
     return f"<div>{pills}</div>"
 
@@ -469,8 +489,8 @@ def result_card_html(
     return (
         '<div class="nc-result-card">'
         f'<span class="nc-result-rank">{int(rank)}</span>'
-        f'<span class="nc-result-code">{html.escape(code)}</span> '
-        f'<span class="nc-result-name">{html.escape(name)}</span>'
+        f'<span class="nc-result-code">{_one_line(code)}</span> '
+        f'<span class="nc-result-name">{_one_line(name)}</span>'
         f'<span class="nc-score-num">{score:.3f}</span>'
         '<div class="nc-score-track">'
         f'<div class="nc-score-fill" style="width:{pct}%;"></div>'
@@ -531,7 +551,7 @@ def program_context_html(edges: list[dict]) -> str:
         )
         rows += (
             '<div class="nc-prog-row">'
-            f'<div class="nc-prog-name">🎓 {html.escape(str(e.get("program_name", "")))}</div>'
+            f'<div class="nc-prog-name">🎓 {_one_line(e.get("program_name", ""))}</div>'
             f'<div class="nc-prog-meta">{requirement_badge(str(e.get("requirement_type", "")))} '
             f"{sem_chip}</div>"
             "</div>"
@@ -543,11 +563,18 @@ def prereq_label_md(
     *, code: str | None, name: str | None, course_id: str, requirement: str,
 ) -> str:
     """Markdown line for one prerequisite row (the Open button next to it
-    is a Streamlit widget, so this stays markdown rather than HTML).
+    is a Streamlit widget, so this stays markdown rather than HTML). Code
+    and name come from the database (names have been LLM-written), so they go
+    in as literal text; the bare ID goes in a code span without backticks or
+    line breaks.
 
     一行先修课程的 markdown 文本（它旁边的 Open 按钮是 Streamlit 组件，
-    所以这里保持 markdown 形式而不是 HTML）。"""
-    shown = f"**{code}** — {name}" if code and name else f"`{course_id}`"
+    所以这里保持 markdown 形式而不是 HTML）。代码和名称来自数据库（名称曾由
+    模型写入），所以按纯文字放进去；只有 ID 时放进代码片段，去掉反引号和换行。"""
+    from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+
+    shown = (f"**{literal_markdown(code)}** — {literal_markdown(name)}" if code and name
+             else f"`{' '.join(str(course_id).replace('`', '').split())}`")
     req = _PREREQ_LABELS.get(requirement, requirement)
     return f"{shown}  \n*{req}*"
 
@@ -558,8 +585,32 @@ def empty_detail_html() -> str:
     return (
         '<div class="nc-empty">'
         '<div class="nc-empty-icon">📘</div>'
-        "点击左侧搜索结果中的课程<br>查看课程详情、培养方案定位与先修关系"
+        "点回答下方课程旁的「查看」<br>这里会显示课程详情、先修要求和培养方案定位"
         "</div>"
+    )
+
+
+def plain_text_html(text: object) -> str:
+    """Escaped text for a block-level HTML tag that STARTS the st.markdown string (see
+    labelled_line_html). Newlines become <br>, so the value stays inside one HTML block,
+    which the Markdown parser never reads as Markdown (no links, emphasis, math or
+    directives from the data). Next to Markdown text, inside a paragraph, it would still be
+    parsed, so never use it there.
+
+    中文：用于放在 st.markdown 字符串开头的块级 HTML 标签里（见 labelled_line_html）。
+    换行改成 <br>，值留在同一个 HTML 块里，Markdown 解析器不会把它当 Markdown 解析
+    （数据里的链接、强调、公式、指令都不会生效）。如果和 Markdown 文字放在同一段落里，
+    仍会被解析，所以不要那样用。"""
+    return html.escape(str(text)).replace("\r", "").replace("\n", "<br>")
+
+
+def labelled_line_html(label: str, value: object) -> str:
+    """'<label>：value' as a single escaped HTML line (the value is data, e.g. extracted
+    fields; the label is ours). 中文：「标签：值」的单行转义 HTML；值是数据（例如抽取字段），
+    标签是我们自己的文字。"""
+    return (
+        f'<div class="nc-line"><span class="nc-line-label">{html.escape(label)}：</span>'
+        f"{plain_text_html(value)}</div>"
     )
 
 
@@ -595,7 +646,9 @@ __all__ = [
     "guest_banner_html",
     "hero_html",
     "inject_theme",
+    "labelled_line_html",
     "matched_via_badge",
+    "plain_text_html",
     "prereq_label_md",
     "program_context_html",
     "requirement_badge",

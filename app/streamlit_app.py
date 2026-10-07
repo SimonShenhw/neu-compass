@@ -23,13 +23,16 @@ Run:
     uv run streamlit run app/streamlit_app.py
 
 Layout:
-    [ left: hero (first visit only) + chat history + chat_input ]
-    [ right: selected course detail ]
+    [ left: privacy notice + project selector + landing (before the first
+      question only) + chat history ]
+    [ right: selected course detail (app/course_detail_view.py) ]
+    chat_input: main body, so Streamlit pins it to the bottom of the window
     sidebar: OAuth login/logout + advanced filters expander
 
 布局：
-    [ 左：hero（仅首次访问）+ 聊天历史 + chat_input ]
-    [ 右：选中课程的详情 ]
+    [ 左：隐私说明 + 项目选择 + 落地内容（仅在第一个问题之前）+ 聊天历史 ]
+    [ 右：选中课程的详情（app/course_detail_view.py）]
+    chat_input：放在主体里，Streamlit 会把它固定在窗口底部
     侧边栏：OAuth 登录/登出 + 高级筛选折叠面板
 
 Pipeline per user message:
@@ -232,8 +235,8 @@ typed version would take.
 
 SAMPLE_QUERIES: list[tuple[str, str]] = [
     ("📘 CS 5800", "CS 5800"),
-    ("🤖 易学的 AI 选修课", "easy AI elective for ML beginner"),
-    ("📊 Database courses", "database management systems"),
+    ("🤖 适合入门的 AI 选修课", "easy AI elective for ML beginner"),
+    ("📊 数据库方向的课", "database management systems"),
     ("⚖️ 课业最轻的 ML 课", "lightest workload ML class"),
 ]
 """Hero-block sample chips. Shown only on first visit (no chat history yet).
@@ -387,16 +390,13 @@ def render() -> None:
         render_auth_sidebar,
     )
     from app.ui_theme import (  # noqa: PLC0415
-        course_header_html,
         empty_detail_html,
         footer_html,
         guest_banner_html,
         hero_html,
         inject_theme,
         matched_via_badge,
-        program_context_html,
         sidebar_brand_html,
-        topic_pills_html,
     )
 
     st.set_page_config(
@@ -452,9 +452,6 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    if not logged_in:
-        st.markdown(guest_banner_html(), unsafe_allow_html=True)
-
     # Sidebar nav (not st.tabs): chat_input must stay bottom-pinned on the
     # search page, which tabs would break. Pages: search / programs / co-op.
     # 侧边栏导航（不用 st.tabs）：搜索页的 chat_input 必须固定在页面底部，
@@ -486,6 +483,11 @@ def render() -> None:
     apply_deep_link(st, pages=pages)
 
     nav = st.sidebar.radio("页面 / Pages", pages, key="nav_page")
+    # Guests see the Co-op tier summary under the hero on every page except Co-op itself, whose
+    # own notice says the same thing. 中文：游客在除 Co-op 页以外的每个页面都会在 hero 下面看到
+    # Co-op 分级说明；Co-op 页自己的提示内容相同，不再重复。
+    if not logged_in and not nav.startswith("💼"):
+        st.markdown(guest_banner_html(), unsafe_allow_html=True)
     if nav.startswith("🎓"):
         from app.program_view import render_program_browser  # noqa: PLC0415
 
@@ -506,28 +508,46 @@ def render() -> None:
     chat_col, detail_col = st.columns([5, 3])
 
     with chat_col:
-        st.subheader("💬 Chat")
+        st.subheader("💬 提问")
+        # Privacy notice (and the optional save permission) BEFORE the input, at the top of the
+        # chat column: the input itself is pinned to the bottom of the window (06C-1).
+        # 中文：隐私说明（以及可选的保存许可）放在输入框之前、聊天列顶部：输入框本身固定在窗口
+        # 底部（06C-1）。
+        from app.answer_feedback_view import render_feedback_capture_control  # noqa: PLC0415
+        capture_allowed = render_feedback_capture_control(st)
         from app.program_plan_view import render_chat_program_selector  # noqa: PLC0415
         from app.program_view import get_programs_cached  # noqa: PLC0415
         try:
             chat_program_id = render_chat_program_selector(st, get_programs_cached(st))
         except ApiError:
             chat_program_id = None
-            st.caption("暂时无法加载项目选择；课程检索仍可使用。")
+            st.caption("暂时无法加载项目列表；课程搜索仍可使用。")
 
-        # Discovery + sample chips — only on first visit (no chat history
-        # yet). Round-3 fix for the cold-start blank screen: the landing
-        # now offers browsable CONTENT (programs / starter courses / co-op
-        # teaser), not just an empty chat box with example queries.
-        # 发现区 + 示例 chips —— 仅首次访问（尚无聊天历史）时展示。第三轮
-        # 针对冷启动白屏的修复：落地页现在提供可浏览的真实内容（培养方案 /
-        # 入门课程 / Co-op 预览），而不只是一个带示例查询的空聊天框。
-        if not get_messages(st.session_state):
+    # In the main body, not inside a column: Streamlit pins a main-body chat_input to the bottom
+    # of the window. Inside chat_col it rendered inline after the landing content, about 2.5
+    # screens down on a 375×812 phone (measured 2026-10-06).
+    # 中文：放在主体里，不放进列：Streamlit 会把主体里的 chat_input 固定在窗口底部。放在
+    # chat_col 里时它跟在落地内容后面，在 375×812 的手机上要往下翻约 2.5 屏（2026-10-06 实测）。
+    chat_input_value = st.chat_input(
+        "问任何课程问题：CS 5800 / 适合入门的 ML 课 / algo …"
+    )
+    pending_query = st.session_state.pop("pending_query", None)
+    prompt = chat_input_value or pending_query
+
+    with chat_col:
+        # Discovery + sample chips — only before the first question, and not while that first
+        # question is streaming (the answer would otherwise appear below all of it). Round-3
+        # fix for the cold-start blank screen: the landing offers browsable CONTENT
+        # (programs / starter courses / co-op teaser), not just example queries.
+        # 发现区 + 示例 chips —— 只在第一个问题之前显示，第一个问题正在回答时也不显示（否则
+        # 回答会出现在这些内容下面）。第三轮针对冷启动白屏的修复：落地页提供可浏览的真实内容
+        # （培养方案 / 入门课程 / Co-op 预览），而不只是示例查询。
+        if not get_messages(st.session_state) and not prompt:
             from app.discover_view import render_discover  # noqa: PLC0415
 
             render_discover(st)
             st.divider()
-            st.markdown("**🔍 试试这些查询 / Try these queries:**")
+            st.markdown("**🔍 试试这样问**")
             sample_cols = st.columns(2)
             for i, (label, query) in enumerate(SAMPLE_QUERIES):
                 col = sample_cols[i % 2]
@@ -537,9 +557,7 @@ def render() -> None:
                     st.session_state["pending_query"] = query
                     st.rerun()
             st.caption(
-                "💡 You can also ask in natural language: "
-                "*\"easiest 3-credit ML class with low workload\"* / "
-                "*\"course on backprop\"*"
+                "💡 也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
             )
             st.divider()
 
@@ -566,7 +584,7 @@ def render() -> None:
                 if msg.get("evidence"):
                     n_ev = len(msg["evidence"])
                     with st.expander(
-                        f"📎 Evidence ({n_ev} course{'s' if n_ev > 1 else ''})",
+                        f"📎 相关课程（{n_ev} 门）",
                         expanded=(n_ev <= 3),
                     ):
                         if msg.get("matched_via"):
@@ -607,16 +625,8 @@ def render() -> None:
                         st.session_state["pending_query"] = chip
                         st.rerun()
 
-        # New input → stream assistant response. Two paths: chat_input box
-        # OR a pending_query injected by a hero-block sample chip (above).
-        from app.answer_feedback_view import render_feedback_capture_control
-        capture_allowed = render_feedback_capture_control(st)
-        chat_input_value = st.chat_input(
-            "问我任何课程问题：CS 5800 / 易学的 ML 课 / algo …"
-        )
-        pending_query = st.session_state.pop("pending_query", None)
-        prompt = chat_input_value or pending_query
-
+        # New input → stream assistant response. Two paths: the pinned chat_input box OR a
+        # pending_query injected by a sample / follow-up chip (both read above).
         if prompt:
             # Continuity payload BEFORE the new prompt joins the history:
             # history = prior turns (the new question travels as `query`),
@@ -667,7 +677,11 @@ def render() -> None:
                         f"🧭 {e.detail}" if e.status_code == 409
                         else f"⚠️ Chat failed: {e.detail}"
                     )
-                    st.markdown(final_text)
+                    # Same filter as when history re-renders this assistant message.
+                    # 中文：和历史里重新渲染这条助手消息时用同一个过滤。
+                    from app.answer_evidence_view import answer_markdown  # noqa: PLC0415
+
+                    st.markdown(answer_markdown(final_text))
 
                 meta = st.session_state.get("last_chat_meta") or {}
                 results = meta.get("results", [])
@@ -680,9 +694,7 @@ def render() -> None:
                         matched_via=matched_via,
                     )
                     n_live = len(results)
-                    with st.expander(
-                        f"📎 Evidence ({n_live} course{'s' if n_live > 1 else ''})"
-                    ):
+                    with st.expander(f"📎 相关课程（{n_live} 门）"):
                         st.markdown(
                             matched_via_badge(matched_via),
                             unsafe_allow_html=True,
@@ -709,7 +721,7 @@ def render() -> None:
             st.rerun()
 
     with detail_col:
-        st.subheader("📘 Course Detail")
+        st.subheader("📘 课程详情")
         cid = st.session_state.get("selected_course_id")
         course: dict | None = None
         if not cid:
@@ -721,118 +733,12 @@ def render() -> None:
                 try:
                     course = api.get_course(cid)
                 except ApiError as e:
-                    st.error(f"Could not load course: {e.detail}")
+                    st.error(f"课程详情加载失败：{e.detail}")
 
         if course:
-            st.markdown(
-                course_header_html(
-                    code=course["primary_code"],
-                    name=course["primary_name"],
-                    term=course.get("term"),
-                    credits=course.get("credits"),
-                    delivery_mode=course.get("delivery_mode"),
-                ),
-                unsafe_allow_html=True,
-            )
+            from app.course_detail_view import render_course_detail  # noqa: PLC0415
 
-            if course.get("professor"):
-                st.markdown("**Professor:** " + ", ".join(course["professor"]))
-
-            from app.answer_evidence_view import render_answer_evidence, render_field_evidence  # noqa: PLC0415
-            render_answer_evidence(st, course.get("answer_evidence"), detailed=True)
-
-            # Soft fields (workload / difficulty / grading / skills) — the
-            # product's own sample chips advertise "课业最轻", so when the
-            # data exists it MUST be visible. Sections vanish when absent
-            # (enrichment coverage grows course-by-course).
-            soft_bits: list[str] = []
-            if course.get("workload_hours_per_week") is not None:
-                soft_bits.append(
-                    f"⏱️ 每周约 {course['workload_hours_per_week']:g} 小时"
-                )
-            if course.get("difficulty_score") is not None:
-                soft_bits.append(f"🎚️ 难度 {course['difficulty_score']:g}/5")
-            if soft_bits:
-                st.markdown(" · ".join(soft_bits))
-            if course.get("grading_components"):
-                parts = [
-                    f"{g['name']} {g['weight'] * 100:.0f}%"
-                    if g.get("weight") is not None else str(g["name"])
-                    for g in course["grading_components"]
-                ]
-                st.markdown("**📝 考核构成:** " + " · ".join(parts))
-
-            if course.get("topics_covered"):
-                st.markdown("**Topics:**")
-                st.markdown(
-                    topic_pills_html(course["topics_covered"]),
-                    unsafe_allow_html=True,
-                )
-            if course.get("skill_tags"):
-                st.markdown("**🛠️ 技能标签:**")
-                st.markdown(
-                    topic_pills_html(course["skill_tags"]),
-                    unsafe_allow_html=True,
-                )
-            if course.get("career_relevance"):
-                st.markdown(
-                    "**💼 职业方向:** " + " · ".join(course["career_relevance"])
-                )
-
-            # Layer 3 ontology context (UI round 2): where this course sits
-            # in seeded programs + what to take first. Both lists are []
-            # for courses outside any seeded program — sections vanish.
-            if course.get("program_context"):
-                st.markdown("**📋 培养方案定位 · Program fit**")
-                st.markdown(
-                    program_context_html(course["program_context"]),
-                    unsafe_allow_html=True,
-                )
-            from app.course_requisite_view import render_course_requisites, render_prerequisite_links  # noqa: PLC0415
-            requisite_bundle = course.get("course_requisites")
-            render_course_requisites(st, requisite_bundle, course_id=course["course_id"],
-                course_code=course["primary_code"], course_name=course["primary_name"], key=f"course-requisites-{cid}")
-            render_prerequisite_links(st, course, requisite_bundle)
-
-            if course.get("ai_policy"):
-                # Friendly rendering — the raw st.json dump was the last
-                # genuinely embarrassing element in the panel.
-                ap = course["ai_policy"]
-                with st.expander("🤖 AI 使用政策"):
-                    if ap.get("permitted_tools"):
-                        st.markdown(
-                            "✅ **允许:** " + ", ".join(ap["permitted_tools"])
-                        )
-                    if ap.get("banned_tools"):
-                        st.markdown(
-                            "🚫 **禁止:** " + ", ".join(ap["banned_tools"])
-                        )
-                    if ap.get("disclosure_required"):
-                        st.markdown("📣 使用 AI 需声明")
-                    if ap.get("notes"):
-                        st.caption(ap["notes"])
-            if course.get("evidence_snippets"):
-                with st.expander(
-                    f"Evidence ({len(course['evidence_snippets'])})"
-                ):
-                    render_field_evidence(st, course["evidence_snippets"])
-
-            # Share link — the produce half of deep links. st.code gets a
-            # hover copy button for free, which is the entire interaction.
-            # 分享链接 —— 深链的生产半边。st.code 自带 hover 复制按钮，
-            # 交互就这么多。
-            from app.deep_links import course_share_ref, share_url  # noqa: PLC0415
-            from config import settings  # noqa: PLC0415
-
-            with st.expander("🔗 分享这门课 · Share"):
-                st.code(
-                    share_url(
-                        settings.public_base_url,
-                        course=course_share_ref(course["primary_code"]),
-                    ),
-                    language=None,
-                )
-                st.caption("把链接发给同学，他们打开就直接看到这门课。")
+            render_course_detail(st, course, cid=cid)
 
     st.markdown(footer_html(), unsafe_allow_html=True)
 

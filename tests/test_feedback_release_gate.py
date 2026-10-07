@@ -180,6 +180,8 @@ def test_capture_control_shows_notice_and_fails_closed(monkeypatch, enabled, cho
         assert '不点击' in CAPTURE_NOTICE and '不会自动删除' in CAPTURE_NOTICE
     else:
         assert not st.checkboxes and CAPTURE_OPT_IN_KEY not in st.session_state
+        from app.answer_feedback_view import CAPTURE_OFF_NOTICE  # noqa: PLC0415
+        assert st.captions == [QUERY_LOG_NOTICE, CAPTURE_OFF_NOTICE]  # The query log has no answer column.
 
 
 def test_malformed_ui_selection_is_not_reused(monkeypatch):

@@ -50,8 +50,6 @@ hero's _ready_info — a 30s timeout per rerun would freeze the landing).
 
 from __future__ import annotations
 
-import html
-
 # Featured programs for the 入门推荐 row, in display order. Ids missing
 # from the seeded set silently drop out (checked against the /programs
 # listing first, so unseeded ids never trigger per-rerun 404 fetches).
@@ -80,13 +78,17 @@ def _semester1_pick(curriculum: dict) -> dict | None:
 
 
 def _starter_card_html(*, code: str, name: str, prefix: str) -> str:
-    """Compact 入门推荐 card: blue code + program pill + course name.
-    紧凑的入门推荐卡片：蓝色代码 + 培养方案 pill + 课程名称。"""
+    """Compact 入门推荐 card: blue code + program pill + course name. The values come from the
+    database, so they are escaped with line breaks turned into <br> (a blank line would end the
+    HTML block). 中文：紧凑的入门推荐卡片：蓝色代码 + 培养方案 pill + 课程名称。值来自数据库，
+    所以转义并把换行变成 <br>（空行会结束 HTML 块）。"""
+    from app.ui_theme import plain_text_html  # noqa: PLC0415
+
     return (
         '<div class="nc-result-card">'
-        f'<span class="nc-result-code">{html.escape(code)}</span> '
-        f'<span class="nc-pill">{html.escape(prefix)}</span><br>'
-        f'<span class="nc-result-name">{html.escape(name)}</span>'
+        f'<span class="nc-result-code">{plain_text_html(code)}</span> '
+        f'<span class="nc-pill">{plain_text_html(prefix)}</span><br>'
+        f'<span class="nc-result-name">{plain_text_html(name)}</span>'
         "</div>"
     )
 
@@ -107,7 +109,7 @@ def _render_program_row(st) -> None:
     if not programs:
         return
 
-    st.markdown("**🎓 按培养方案浏览 / Browse by program:**")
+    st.markdown("**🎓 按培养方案浏览**")
     cols = st.columns(min(len(programs), 4))
     for i, p in enumerate(programs):
         label = f"{p.get('prefix', '?')} · {int(p.get('course_count', 0))} 门课"
@@ -153,7 +155,7 @@ def _render_starter_row(st) -> None:
     if not picks:
         return
 
-    st.markdown("**🔥 入门推荐 / Starter picks:**")
+    st.markdown("**🔥 入门推荐**")
     cols = st.columns(len(picks))
     for col, (prefix, course) in zip(cols, picks):
         col.markdown(
@@ -198,15 +200,32 @@ def _render_coop_teaser(st) -> None:
     if not coops:
         return
 
-    st.markdown("**💼 Co-op 风向 / Recent co-ops:**")
+    from app.ui_theme import plain_text_html  # noqa: PLC0415
+
+    st.markdown("**💼 最近的 Co-op 经验**")
     for c in coops[:2]:
-        # Markdown, not raw HTML — Streamlit sanitizes markdown itself
-        # (same precedent as coop_view's listing rows).
-        # 中文:用 markdown 而非原生 HTML —— Streamlit 会自行清理
-        # markdown（与 coop_view 列表行的先例一致）。
-        st.markdown(f"- **{c.get('company', '')}** · {c.get('role', '')}")
-        if int(c.get("visibility_level", 0)) >= 1:
-            st.caption("🔒 面试细节/薪资 · 贡献解锁")
+        # Company/role include reviewed student submissions. Escaped HTML, not Markdown:
+        # Streamlit's Markdown keeps links of any scheme and other syntax.
+        # 中文：公司和职位包含审核过的学生投稿。用转义后的 HTML 而不是 Markdown：
+        # Streamlit 的 Markdown 会保留任意协议的链接和其他语法。
+        st.markdown(
+            f'<div class="nc-line">• <b>{plain_text_html(c.get("company", ""))}</b> · '
+            f'{plain_text_html(c.get("role", ""))}</div>',
+            unsafe_allow_html=True,
+        )
+        # visibility_level comes from what the row holds (schemas.coop.derive_visibility): 1 means
+        # interview details and no salary, 2 means a salary range, with or without interview
+        # details. The API leaves out what this viewer's tier has not unlocked, so only what the
+        # level guarantees is claimed. 中文：visibility_level 由这一行的内容决定：1 是有面试细节、
+        # 没有薪资，2 是有薪资区间（面试细节不一定有）。这位访客的等级还没解锁的字段 API 不会返回，
+        # 所以只说这个等级保证有的内容。
+        level = int(c.get("visibility_level", 0))
+        locked = [label for label, holds, present in (
+            ("面试细节", level == 1, c.get("interview_summary") or c.get("technical_questions")),
+            ("薪资区间", level >= 2, c.get("salary_range_usd")),
+        ) if holds and not present]
+        if locked:
+            st.caption(f"🔒 这条有{'和'.join(locked)}：你分享的经验公开后解锁")
     if st.button("去看看 →", key="disc-coop"):
         st.session_state["pending_nav_to_coop"] = True
         st.rerun()

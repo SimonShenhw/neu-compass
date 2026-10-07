@@ -9,6 +9,9 @@ from pydantic import ValidationError
 from schemas.program_plan import ProgramPlan, RequirementNode
 
 PATH_LABELS = {"standard": "普通 MS", "align": "Align", "bridge": "Bridge"}
+# The /chat 409 messages name this selector; tests keep the two in step.
+# 中文：/chat 的 409 提示里写了这个选择框的名字；测试保证两边一致。
+SELECTOR_LABEL = "你的项目（可选）"
 
 
 def render_chat_program_selector(st, programs: list[dict]) -> str | None:
@@ -20,16 +23,26 @@ def render_chat_program_selector(st, programs: list[dict]) -> str | None:
     if st.session_state.get(key) not in {None, *by_id}:
         st.session_state.pop(key, None)
     selected = st.selectbox(
-        "对话项目（可选；不是方案年度选择）", [None, *by_id], key=key,
-        format_func=lambda value: "不指定；有歧义时请明确选择" if value is None else f"{by_id[value]['full_name']} · {value}",
+        SELECTOR_LABEL, [None, *by_id], key=key,
+        format_func=lambda value: "不指定" if value is None else f"{by_id[value]['full_name']} · {value}",
+        help="选了以后，回答会按这个项目理解你的问题，比如「第一学期上什么」。问题对应好几个项目时，"
+             "系统会请你在这里选一个。它不替你选校区或 Catalog 年份。",
     )
     if selected is not None:
-        st.caption("仅区分项目；校区、Catalog 年度与个人适用性尚未由此确认。")
+        st.caption("只用来区分项目；校区、Catalog 年份和你个人的要求仍需要自己核实。")
     return selected
 
 
-def scope_label(plan: ProgramPlan) -> str:
+def scope_label(plan: ProgramPlan, *, markdown: bool = False) -> str:
+    """The plan's scope in one line. markdown=True for a caption: the concentration is free text, so
+    it goes in as plain text (campus, catalog year and pathway are validated patterns). 中文：方案范围的
+    一行文字；markdown=True 用于说明文字：concentration 是自由文本，按纯文字放进去（校区、目录年份、
+    路径都是校验过的固定格式）。"""
     concentration = plan.concentration or "共同部分／未限定 concentration"
+    if markdown and plan.concentration:
+        from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+
+        concentration = literal_markdown(plan.concentration)
     return f"{plan.campus} · Catalog {plan.catalog_year} · {PATH_LABELS[plan.pathway]} · {concentration}"
 
 
@@ -103,7 +116,7 @@ def render_program_plans(st, documents: list[dict], *, key: str, program_id: str
     if chosen is None or chosen not in by_id:
         return
     plan = by_id[chosen]
-    st.caption(scope_label(plan))
+    st.caption(scope_label(plan, markdown=True))  # Captions render Markdown.
     st.caption("入学年份／Spring-Fall 学期需另行确认；此处只展示规则，不判断注册或毕业资格。")
     coverage = "仅规则片段，不是完整培养方案" if plan.coverage == "partial" else "完整性由导入方声明，仍非个人资格审核"
     review = "来源片段已对照" if plan.review_status == "source_checked" else "尚未完成来源对照"

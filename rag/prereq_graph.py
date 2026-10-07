@@ -53,12 +53,19 @@ _EDGE_STYLE: dict[str, str] = {
 def _q(label: str) -> str:
     """DOT double-quoted string. Embedded double quotes get escaped —
     catalog course names can legally contain them, and one unescaped
-    quote breaks the entire DOT source.
+    quote breaks the entire DOT source. Backslashes become "/": Graphviz reads
+    a backslash right before a quote as an escaped quote, so a label ending in
+    one would run on into the rest of the source, and whether a doubled
+    backslash pairs up differs between Graphviz versions (labels are codes and
+    IDs, some of them model-extracted).
 
     中文:生成 DOT 用的双引号字符串。内嵌的双引号会被转义 —— 目录里的
     课程名合法地可能包含双引号,一个没转义的引号就会破坏整个 DOT 源码。
+    反斜杠换成 "/":Graphviz 把紧挨引号的反斜杠读成转义的引号,所以以反斜杠
+    结尾的标签会一直连到后面的源码,而两个反斜杠算不算一对在不同版本里不一样
+    (标签是课程代码和 ID,有些是模型抽取的)。
     """
-    return '"' + str(label).replace('"', '\\"') + '"'
+    return '"' + str(label).replace("\\", "/").replace('"', '\\"') + '"'
 
 
 def _node_label(entry: dict) -> str:

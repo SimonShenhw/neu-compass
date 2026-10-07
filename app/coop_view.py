@@ -37,6 +37,23 @@ sys.path.insert(0, str(PROJECT_ROOT))
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# What a listed row contains (visibility_level), not what the viewer has unlocked.
+# 中文：一条记录本身包含哪些内容（visibility_level），不是看的人已经解锁了什么。
+# What each level guarantees (schemas.coop.derive_visibility): level 2 is any row with a salary
+# range, with or without interview details. 中文：每个等级保证有的内容：2 级是有薪资区间的行，
+# 面试细节不一定有。
+VISIBILITY_LABELS = {0: "基础信息", 1: "含面试细节", 2: "含薪资区间"}
+# The API's industry codes, in form order; only the shown label is Chinese.
+# 中文：API 的行业代码，按表单顺序；只有显示的文字是中文。
+INDUSTRY_LABELS = {
+    "quant_fintech": "量化 / 金融科技", "big_tech": "大型科技公司", "biotech_health": "生物科技 / 医疗",
+    "startup": "创业公司", "consulting": "咨询", "other": "其他",
+}
+
+
+def industry_label(code: str) -> str:
+    return INDUSTRY_LABELS.get(code, code)
+
 
 def apply_upload_result(state, response: dict) -> None:
     """Use the server's count/state; never infer credit from HTTP 201.
@@ -96,8 +113,9 @@ def render_coop_panel(st) -> None:
     from app.api_client import ApiClient, ApiError  # noqa: PLC0415
     from app.state_manager import is_logged_in  # noqa: PLC0415
 
-    st.subheader("💼 NEU Co-op Experiences")
-    st.caption("人工脱敏审核后按不同贡献者门控公开 · private pending collection · give-to-get 解锁")
+    st.subheader("💼 NEU Co-op 经验")
+    st.caption("这里有整理好的示例记录，也有同学分享的 Co-op 经验。同学的分享先人工去掉个人信息并审核，"
+               "同一类经验至少有 2 位不同的同学分享后才公开。你分享的经验公开后，可以解锁更多细节。")
 
     # The previous upload's actual server state survives the rerun.
     # 中文：重跑后显示上一次提交的真实服务端状态，不暗示立即解锁。
@@ -108,8 +126,8 @@ def render_coop_panel(st) -> None:
     session_token = st.session_state.get("session_token")
     if not is_logged_in(st.session_state):
         st.info(
-            "Browsing as guest — public records with preview fields visible. "
-            "Log in to see interview details + salary buckets after contributing."
+            "你现在是游客：只能看到公开记录的公司、职位、行业、学期和时长。用 NEU 邮箱登录并分享自己的经验，"
+            "经验公开后能看到更多：1 条看面试细节，2 条看薪资区间。"
         )
 
     # === Listing ===
@@ -118,97 +136,104 @@ def render_coop_panel(st) -> None:
         try:
             coops = api.list_coop()
         except ApiError as e:
-            st.error(f"Could not load Co-op listing: {e.detail}")
+            st.error(f"Co-op 列表加载失败：{e.detail}")
             coops = []
 
+    from app.ui_theme import labelled_line_html, plain_text_html  # noqa: PLC0415
+
     if not coops:
-        st.warning("No Co-op records to show yet. Be the first to contribute!")
+        st.warning("还没有可以公开的 Co-op 经验，欢迎分享第一条。")
     else:
         for c in coops:
             with st.container(border=True):
                 cols = st.columns([3, 1])
+                # Reviewed student submissions: escaped HTML lines and st.text, never Markdown
+                # (Streamlit's Markdown keeps links of any scheme and other syntax).
+                # 中文：审核过的学生投稿：用转义的 HTML 行和 st.text 显示，不当 Markdown
+                # （Streamlit 的 Markdown 会保留任意协议的链接和其他语法）。
+                term = f" · {plain_text_html(c['coop_term'])}" if c.get("coop_term") else ""
                 cols[0].markdown(
-                    f"**{c['company']}** — {c['role']}"
-                    + (f" · {c['coop_term']}" if c.get("coop_term") else "")
+                    f'<div class="nc-line"><b>{plain_text_html(c["company"])}</b> — '
+                    f'{plain_text_html(c["role"])}{term}</div>',
+                    unsafe_allow_html=True,
                 )
-                cols[1].markdown(f"`level {c['visibility_level']}`")
+                cols[1].caption(VISIBILITY_LABELS.get(c["visibility_level"], f"等级 {c['visibility_level']}"))
 
                 if c.get("industry"):
-                    st.caption(f"Industry: {c['industry']}")
+                    st.markdown(labelled_line_html("行业", industry_label(c["industry"])), unsafe_allow_html=True)
                 if c.get("duration_months"):
-                    st.caption(f"Duration: {c['duration_months']} months")
+                    st.markdown(labelled_line_html("时长", f"{c['duration_months']} 个月"), unsafe_allow_html=True)
 
                 # Detail tier — the API redacts fields the caller's tier
-                # hasn't earned; visibility_level reports what the row
-                # actually contains, so absent-but-existing fields get a
-                # give-to-get unlock hint instead of silent nothing.
+                # hasn't earned; visibility_level comes from what the row
+                # holds (schemas.coop.derive_visibility: 1 = interview
+                # details and no salary, 2 = a salary range, with or without
+                # interview details), so absent-but-existing fields get a
+                # give-to-get unlock hint instead of silent nothing, and only
+                # what the level guarantees is claimed.
                 # 中文:详情分级 —— 调用方分级还没赚到的字段，API 会
-                # 直接打码；visibility_level 反映的是这一行实际包含
-                # 什么，所以"缺失但其实存在"的字段会得到一个 give-to-get
-                # 解锁提示，而不是悄无声息地什么都不显示。
+                # 直接打码；visibility_level 由这一行的内容决定（1 = 有面试
+                # 细节、没有薪资，2 = 有薪资区间，面试细节不一定有），所以
+                # "缺失但其实存在"的字段会得到一个 give-to-get 解锁提示，
+                # 并且只说这个等级保证有的内容。
                 has_detail = c.get("interview_summary") or c.get(
                     "technical_questions"
                 )
                 if c.get("interview_summary"):
-                    with st.expander("Interview summary"):
-                        st.markdown(c["interview_summary"])
+                    with st.expander("面试经过"):
+                        st.text(c["interview_summary"])
                 if c.get("technical_questions"):
-                    with st.expander("Technical questions"):
-                        st.markdown(c["technical_questions"])
-                if c["visibility_level"] >= 1 and not has_detail:
-                    st.caption("🔒 含面试细节 — 贡献 1 条记录解锁")
+                    with st.expander("技术问题"):
+                        st.text(c["technical_questions"])
+                if c["visibility_level"] == 1 and not has_detail:
+                    st.caption("🔒 这条有面试细节：你分享的经验有 1 条公开后解锁")
 
                 # Premium tier
                 if c.get("salary_range_usd"):
-                    st.markdown(f"💰 **Compensation**: {c['salary_range_usd']}")
+                    st.markdown(labelled_line_html("💰 薪资区间", c["salary_range_usd"]), unsafe_allow_html=True)
                 elif c["visibility_level"] >= 2:
-                    st.caption("🔒 含薪资区间 — 贡献 2 条记录解锁")
+                    st.caption("🔒 这条有薪资区间：你分享的经验有 2 条公开后解锁")
 
     # === Upload form (logged-in users only) ===
     # 中文:上传表单（仅限已登录用户）
     st.divider()
-    st.subheader("Submit a Co-op record")
+    st.subheader("分享你的 Co-op 经验")
 
     if not is_logged_in(st.session_state):
-        st.info("Log in with your NEU email to submit a Co-op record.")
+        st.info("用 NEU 邮箱登录后才能分享。")
         return
 
     with st.form("coop_upload"):
-        company = st.text_input("Company *")
-        role = st.text_input("Role *")
-        coop_term = st.text_input("Co-op term (e.g. 'Summer 2025')")
-        # format_func renders None as a clear "(unspecified)" prompt instead
-        # of the literal string "None" — users were confused thinking they
-        # had to pick "None" as an explicit value.
-        # 中文:format_func 把 None 渲染成清晰的"(unspecified)"提示，
-        # 而不是字面字符串"None"—— 之前用户会误以为必须显式选择
-        # "None"这个值，造成困惑。
+        company = st.text_input("公司 *")
+        role = st.text_input("职位 *")
+        coop_term = st.text_input("Co-op 学期（例如 Summer 2025）")
+        # format_func renders None as a clear "不填" prompt instead of the literal string
+        # "None" — users thought they had to pick "None" as an explicit value. The option
+        # values are the API's industry codes and stay as they are.
+        # 中文：format_func 把 None 显示成清晰的「不填」，而不是字面的 "None" —— 之前用户
+        # 以为必须显式选 "None"。选项值是 API 的行业代码，保持不变。
         industry = st.selectbox(
-            "Industry",
-            options=[None, "quant_fintech", "big_tech", "biotech_health",
-                     "startup", "consulting", "other"],
-            format_func=lambda x: (
-                "(unspecified)" if x is None
-                else x.replace("_", " ").title()
-            ),
+            "行业",
+            options=[None, *INDUSTRY_LABELS],
+            format_func=lambda x: "不填" if x is None else industry_label(x),
         )
         duration_months = st.number_input(
-            "Duration (months)", min_value=1, max_value=8, value=6, step=1,
+            "时长（月）", min_value=1, max_value=8, value=6, step=1,
         )
         related_courses = st.text_input(
-            "Related courses (comma-separated codes, e.g. 'AAI 6600, DS 5220')"
+            "相关课程（用逗号分隔课程代码，例如 AAI 6600, DS 5220）"
         )
         interview_summary = st.text_area(
-            "Interview summary (already PII-redacted)", max_chars=10_000,
+            "面试经过（请先去掉姓名、联系方式等个人信息）", max_chars=10_000,
         )
         technical_questions = st.text_area(
-            "Technical questions (already PII-redacted)", max_chars=10_000,
+            "技术问题（请先去掉个人信息）", max_chars=10_000,
         )
         salary_range_usd = st.text_input(
-            "Salary bucket (e.g. '$30-35/hr') — optional"
+            "薪资区间（例如 $30-35/hr，可不填）"
         )
 
-        submitted = st.form_submit_button("Submit")
+        submitted = st.form_submit_button("提交")
         if submitted:
             if not company.strip() or not role.strip():
                 # Client-side check for the * fields — without it an empty
@@ -217,7 +242,7 @@ def render_coop_panel(st) -> None:
                 # 中文:对带 * 的必填字段做客户端校验 —— 没有这一步，
                 # 空提交会直接暴露服务端原始的 pydantic 错误列表，
                 # 还夹杂着（此时并不相关的）k-匿名泛化建议。
-                st.error("Company 和 Role 为必填项 · both fields are required.")
+                st.error("公司和职位是必填项。")
                 return
             payload: dict = {
                 "company": company.strip(),
@@ -246,12 +271,11 @@ def render_coop_panel(st) -> None:
                         e.detail
                     ):
                         st.error(
-                            f"Submission rejected: {e.detail}\n\n"
-                            "Try generalizing one field (e.g. industry bucket "
-                            "instead of company name) and resubmit."
+                            f"提交被拒：{e.detail}\n\n"
+                            "可以把其中一项写得更笼统一些（例如写行业而不是公司名）再提交。"
                         )
                     else:
-                        st.error(f"Submission failed: {e.detail}")
+                        st.error(f"提交失败：{e.detail}")
 
 
 # `__main__` only: Streamlit sets the MAIN script's __name__ to "__main__",

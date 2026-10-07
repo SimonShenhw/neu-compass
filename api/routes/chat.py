@@ -213,7 +213,7 @@ def chat(
         # 中文：UI 会把 detail 原样展示给学生，所以中文在前。
         choices = ", ".join(p.program_id for p in exc.programs)
         raise HTTPException(status_code=409, detail=(
-            f"这个专业前缀对应多个项目，请先在上方「对话项目」里选择：{choices}。"
+            f"这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：{choices}。"
             f" ({exc})"
         )) from exc
     retrieval_ms = (time.perf_counter() - started) * 1000
@@ -519,7 +519,7 @@ def _retrieve(
         if program is not None:
             if req.program_id and extracted.program_prefix and program.prefix.upper() != extracted.program_prefix.upper():
                 raise HTTPException(status_code=409, detail=(
-                    "上方选择的对话项目与问题里的专业前缀不一致；请清空项目选择或改写问题。"
+                    "上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
                     " (Selected program_id conflicts with the detected program prefix.)"
                 ))
             if ProgramPlanRepository(conn).has_records_for_program(program.program_id):

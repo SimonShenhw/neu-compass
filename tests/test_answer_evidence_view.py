@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import json
+import random
 import re
+import time
 
 import pytest
 
 from app.answer_evidence_view import (
-    FIELD_LABELS, SOURCE_KIND_LABELS, WARNING_LABELS, _when, answer_markdown, evidence_summary,
-    render_answer_evidence, render_field_evidence, render_streamed_answer, snapshot_digest, source_summary,
+    FIELD_LABELS, SHORT_WARNING_LABELS, SOURCE_KIND_LABELS, WARNING_LABELS, _when, answer_markdown,
+    evidence_summary, notice_line, render_answer_evidence, render_course_overview, render_field_evidence,
+    render_streamed_answer, snapshot_digest, source_summary,
 )
 from app.streamlit_app import _format_evidence, _render_evidence_block
 from db.catalog_source_repository import CatalogSourceRepository
 from rag.answer_evidence import SOURCE_KIND_PREFIXES, course_answer_evidence, source_kind
+from schemas.answer_evidence import OFFICIAL_CATALOG_URL
 from schemas.course import Course
 from scrapers.neu_catalog import CatalogEntry
 
@@ -111,12 +115,52 @@ def test_compact_cards_bound_the_gap_list_but_details_keep_every_field():
 
 
 def test_compact_cards_do_not_hide_seed_conflict_or_synthetic_warnings():
+    """Cards under an answer keep every important caveat, merged into ONE line (they used to add a
+    caption per warning, several per course)."""
     data = evidence()
     data["warnings"] = ["program_seed_unverified", "catalog_metadata_conflict", "field_evidence_value_conflict",
-                        "synthetic_record_not_real_course", "extracted_evidence_not_official_facts"]
+                        "synthetic_record_not_real_course", "extracted_evidence_not_official_facts",
+                        "catalog_retrieval_date_unknown"]
     st = FakeSurface()
     render_answer_evidence(st, data)
-    assert all(WARNING_LABELS[warning] in st.captions for warning in data["warnings"])
+    notices = [line for line in st.captions if line.startswith("⚠️")]
+    assert notices == ["⚠️ " + "；".join(SHORT_WARNING_LABELS[warning] for warning in data["warnings"][:5]) + "。"]
+    assert SHORT_WARNING_LABELS["catalog_retrieval_date_unknown"] not in notices[0]  # Detail panel only.
+    assert len(st.captions) == 3  # Source line, missing fields, one caveat line.
+
+
+def test_notice_line_keeps_api_order_drops_repeats_and_unknown_codes():
+    assert notice_line([]) is None and notice_line(["not_a_known_code"]) is None
+    assert notice_line(["synthetic_record_not_real_course", "program_seed_unverified", "synthetic_record_not_real_course",
+                        "not_a_known_code"]) == (
+        "⚠️ " + SHORT_WARNING_LABELS["synthetic_record_not_real_course"] + "；"
+        + SHORT_WARNING_LABELS["program_seed_unverified"] + "。")
+    assert notice_line(["program_seed_unverified", "topics_source_unavailable"], only={"topics_source_unavailable"}) == (
+        "⚠️ " + SHORT_WARNING_LABELS["topics_source_unavailable"] + "。")
+    assert set(SHORT_WARNING_LABELS) == set(WARNING_LABELS)  # Every warning has both forms.
+
+
+def test_course_overview_shows_the_description_its_source_and_one_caveat_line():
+    data = evidence(catalog=True)
+    data["warnings"].append("program_seed_unverified")
+    st = FakeSurface()
+    render_course_overview(st, data)
+    assert st.texts == [data["catalog"]["description"]]
+    assert st.captions[0] == f"课程描述来自 [NEU 官方课程目录]({data['catalog']['catalog_url']}) 的存档副本，不是实时核对。"
+    assert st.captions[1] == notice_line(data["warnings"]) and len(st.captions) == 2
+    missing = FakeSurface()
+    render_course_overview(missing, evidence())  # No snapshot: say so once, not again in the caveat line.
+    assert missing.texts == [] and missing.captions[0] == "没有官方目录描述的存档。"
+    assert not any(SHORT_WARNING_LABELS["catalog_source_unavailable"] in line for line in missing.captions)
+    corrupt = evidence(catalog=True)
+    corrupt["catalog"]["catalog_url"] = "https://elsewhere.example/page"
+    broken = FakeSurface()
+    render_course_overview(broken, corrupt)
+    assert broken.texts == [] and broken.captions[0].startswith("目录存档没有通过格式或来源校验")
+    assert not any("elsewhere.example" in line for line in broken.captions + broken.markdowns)
+    nothing = FakeSurface()
+    render_course_overview(nothing, None)
+    assert nothing.captions == nothing.texts == []
 
 
 def test_snapshot_link_description_and_dates_have_separate_meaning():
@@ -206,6 +250,27 @@ def test_source_ids_and_quotes_are_plain_text_not_arbitrary_links():
     assert any("抽取置信度 0.80（不是事实概率）" in line for line in st.captions)
 
 
+def test_unknown_field_names_and_codes_show_as_plain_text():
+    """A snippet's field name is model-written, and an unknown missing-field or warning code is data
+    too; captions render Markdown. 中文：证据片段的字段名是模型写的，未知的缺失字段或提示码也是数据；
+    说明文字会渲染 Markdown。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    linked = "x\n\n[note](https://elsewhere.example/page)"
+    st = FakeSurface()
+    data = evidence()
+    data["missing_fields"], data["warnings"] = ["credits", linked], [linked]
+    render_answer_evidence(st, data, detailed=True)
+    render_field_evidence(st, [{"field": linked, "value": 3, "confidence": 0.8, "source_id": "rmp_review_b", "quote": "q"}])
+    with_data = [line for line in st.captions if "elsewhere" in line]
+    assert len(with_data) == 3  # Missing fields, the warning, the snippet's field.
+    for line in with_data:
+        tokens = MarkdownIt("commonmark").parse(line)
+        assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+        assert "link_open" not in [child.type for child in tokens[1].children]
+    assert st.captions[1].startswith("缺失：" + FIELD_LABELS["credits"] + "、")
+
+
 def test_detail_counts_sources_by_kind_and_keeps_the_ids_one_click_away():
     """Fifty base64 review IDs used to fill the panel; now one summary line, IDs collapsed."""
     data = evidence()
@@ -248,41 +313,266 @@ def test_every_source_kind_has_a_ui_label():
     }
 
 
-@pytest.mark.parametrize("raw, shown", [
-    # Official catalog department pages stay clickable, as an inline link or a bare URL.
-    (f"见 [NEU 官方课程目录]({CATALOG})。", f"见 [NEU 官方课程目录](<{CATALOG}>)。"),
-    (f"[目录]({CATALOG} \"CS\")", f"[目录](<{CATALOG}> \"CS\")"),
-    (f"来源：{CATALOG}。", f"来源：<{CATALOG}>。"),
-    (f"（{CATALOG}）", f"（<{CATALOG}>）"),
-    (f"<{CATALOG}>", f"<{CATALOG}>"),
-    # Anything else keeps its words and loses its target.
-    ("看[这里](https://evil.example/login)", "看[这里]"),
-    (f"[x]({CATALOG}extra)", "[x]"),
-    ("[x](http://catalog.northeastern.edu/course-descriptions/cs/)", "[x]"),
-    ("[x](https://catalog.northeastern.edu.evil.example/course-descriptions/cs/)", "[x]"),
-    ("[a [b] c](//evil.example)", "[a [b] c]"),
-    ("[x]( <https://evil.example/a b> 't' )", "[x]"),
-    ("[x](javascript:alert(1))", "[x])"),
-    ("[x](relative/path)", "[x]"),
-    ("[a](x)(//evil.example)", "[a]"),
-    ("![x](https://evil.example/p.png)", "[x]"),
-    (f"![x]({CATALOG})", f"[x](<{CATALOG}>)"),
-    ("[x][r]\n[r]: //evil.example", "[x][r]\n[r]\\: //evil.example"),
-    ("<https://[r]://evil.example>\n[x][r]", "[r]\\://evil.example\n[x][r]"),
-    ("[label<https://x](//evil.example)>", "[labelx]"),
-    ("<https://evil.example>", "evil.example"),
-    (f"<{CATALOG}x>", "catalog.northeastern.edu/course-descriptions/cs/x"),
-    ("visit https://evil.example/x, then", "visit evil.example/x, then"),
-    ("HTTPS://EVIL.EXAMPLE and www.evil.example", "EVIL.EXAMPLE and evil.example"),
-    ("https://https://evil.example www.https://evil.example", "evil.example evil.example"),
-    ("https://a.example/https://evil.example", "a.example/evil.example"),
-    ("`https://evil.example` it`s https://evil.example`", "`evil.example` it`s evil.example`"),
-    ("plain text, 中文、no links", "plain text, 中文、no links"),
-    ("a\x00b", "ab"),
+WJ = "\u2060"  # Word joiner: invisible, keeps the renderer from seeing a URL start.
+OTHER = "https://elsewhere.example/notes"
+OTHER_SHOWN = f"h{WJ}ttps://elsewhere.example/notes"
+CATALOG_HREF = re.compile(OFFICIAL_CATALOG_URL.pattern + r"(?:#[A-Za-z0-9_-]+)?")
+URL_START = re.compile(r"(?i)https?://|www\.")
+
+
+CODE_TOKENS = {"code_inline", "code_block", "fence"}
+# Streamlit-only syntax markdown-it does not model, judged on the text or the source instead:
+# shortcodes (emoji, its logo image, material icons) are swapped in the decoded text; a directive
+# can start at a ":" before anything but ASCII whitespace or punctuation; remark-math reads "$".
+# 中文：markdown-it 不认识的 Streamlit 语法，改为检查解码后的文字或源文本：短代码（emoji、logo 图片、
+# material 图标）在解码后的文字里替换；":" 后面只要不是 ASCII 空白或标点就可能开始一个指令；remark-math 读 "$"。
+SHORTCODE = re.compile(r":(?:streamlit|material/[\w-]+|[A-Za-z0-9_][\w-]*):")
+NAMED_COLON = re.compile(r"(\\*):(?=[^ \t\r\n!-/:-@\[-`{-~])")
+DOLLAR = re.compile(r"(\\*)\$")
+
+
+def rendered(markdown: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """CommonMark plus GFM tables and strikethrough as an independent judge: the (target, text) of
+    every link, and the decoded visible text outside links as (token type, text), one piece per
+    text node (a URL can only be recognised inside one). Raises on any image, raw HTML, reference
+    definition (markdown-it keeps those out of the token stream, so they are read from env) or
+    fenced block whose info string is math (Streamlit renders that as KaTeX). markdown-it accepts
+    every link target here, so it never hides one the filter let through.
+    中文：用 CommonMark（加 GFM 表格和删除线）独立判定：每个链接的（目标，文字），以及链接以外解码后的
+    可见文字（token 类型，文字），每个文本节点一段（网址只能在单个节点里被识别）。出现图片、原始 HTML、
+    引用式定义（markdown-it 不把它放进 token，从 env 里读）或信息串为 math 的代码块（Streamlit 会渲染成
+    KaTeX）就报错。这里让 markdown-it 接受任何链接目标，免得它替过滤器挡掉。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415  (locked, via rich)
+
+    md = MarkdownIt("commonmark").enable(["table", "strikethrough"])
+    md.validateLink = lambda url: True
+    env: dict = {}
+    links: list[tuple[str, str]] = []
+    outside: list[tuple[str, str]] = []
+    inside: list[str] | None = None
+    href = ""
+
+    def walk(tokens) -> None:
+        nonlocal inside, href
+        for token in tokens:
+            assert token.type not in {"image", "html_inline", "html_block"}, token.type
+            if token.type == "fence":
+                assert (token.info.split() or [""])[0].lower() != "math", token.info
+            if token.type == "link_open":
+                href, inside = str(token.attrGet("href")), []
+            elif token.type == "link_close":
+                links.append((href, "".join(inside or [])))
+                inside = None
+            elif token.children:
+                walk(token.children)
+            elif token.type in {"text", "softbreak", "hardbreak"} | CODE_TOKENS:
+                piece = "\n" if token.type.endswith("break") else token.content
+                if inside is None:
+                    outside.append((token.type, piece))
+                else:
+                    inside.append(piece)
+
+    walk(md.parse(markdown, env))
+    assert not env.get("references"), env.get("references")  # A definition turns "[x]" into a link.
+    return links, outside
+
+
+def assert_inert(markdown: str) -> str:
+    """Only catalog links (or a mail link, the accepted cost). Visible text has no URL start,
+    except a catalog autolink's own text and a kept catalog URL inside code (code is never
+    linked; it shows there in angle brackets), and no Streamlit shortcode; in the source, every
+    "$" and every ":" a directive name could follow is escaped. Returns the visible text outside
+    links. 中文：只有目录链接（或邮件链接，已接受的代价）。可见文字里没有网址开头（例外只有目录自动
+    链接自己的文字，以及代码里保留的目录网址：代码不会变成链接，那里会带尖括号显示），也没有 Streamlit
+    短代码；源文本里每个 "$"、每个后面可能跟指令名的 ":" 都已转义。返回链接以外的可见文字。"""
+    links, outside = rendered(markdown)
+    for href, text in links:
+        assert CATALOG_HREF.fullmatch(href) or href.startswith("mailto:"), href
+        assert not URL_START.search(text) or text == href, text
+    for kind, piece in outside:
+        for match in URL_START.finditer(piece):
+            assert kind in CODE_TOKENS and CATALOG_HREF.match(piece, match.start()), (kind, piece)
+        assert not SHORTCODE.search(piece), piece
+    for pattern in (NAMED_COLON, DOLLAR):  # An odd run of backslashes escapes the character.
+        assert all(len(match.group(1)) % 2 for match in pattern.finditer(markdown)), markdown
+    return "".join(piece for _, piece in outside)
+
+
+EXPECTED = [
+    # Ordinary formatting is untouched.
+    ("**CS 5800** is *hard*; see `code`.\n\n- one\n- two", None),
+    ("## 标题\n\n> 引用\n\n| a | b |\n|---|---|\n| 1 | 2 |", None),
+    ("a < b, a & b, Note: 3 hours. 中文：冒号", None),
+    ("name@elsewhere.example", None),  # A mail link may remain (the accepted cost).
+    # Official catalog links stay clickable; their labels are escaped like everything else.
+    (f"[CS 目录]({CATALOG})", None),
+    (f"[CS 5800]({CATALOG}#cs5800)", None),
+    (f'[CS](<{CATALOG}> "Catalog")', f"[CS]({CATALOG})"),
+    (f"See {CATALOG}.", f"See <{CATALOG}>."),
+    (f"<{CATALOG}>", None),
+    (f"[CS $1 &amp; <b>]({CATALOG})", f"[CS \\$1 \\&amp; \\<b>]({CATALOG})"),
+    (f"[{OTHER}]({CATALOG})", f"[{OTHER_SHOWN}]({CATALOG})"),
+    (f"![CS]({CATALOG})", f"\\![CS]({CATALOG})"),
+    # A label never spans brackets, so the text before a catalog link cannot swallow it.
+    (f"[x]({OTHER})]({CATALOG})", f"[x]\\({OTHER_SHOWN})]\\(<{CATALOG}>)"),
+    # Anything else shows as written.
+    (f"[notes]({OTHER})", f"[notes]\\({OTHER_SHOWN})"),
+    (f"![chart]({OTHER})", f"\\![chart]\\({OTHER_SHOWN})"),
+    (f"<{OTHER}>", f"\\<{OTHER_SHOWN}>"),
+    (f"{OTHER} and www.elsewhere.example", f"{OTHER_SHOWN} and w{WJ}ww.elsewhere.example"),
+    ("HTTP://ELSEWHERE.EXAMPLE WWW.ELSEWHERE.EXAMPLE", f"H{WJ}TTP://ELSEWHERE.EXAMPLE W{WJ}WW.ELSEWHERE.EXAMPLE"),
+    (f"[notes]: {OTHER}", f"[notes]\\: {OTHER_SHOWN}"),
+    ("[^1]: a note", "[^1]\\: a note"),
+    ("&#104; &amp; AT&T", "\\&#104; \\&amp; AT\\&T"),
+    ("<b>bold</b> <!-- c --> <?x?>", "\\<b>bold\\</b> \\<!-- c --> \\<?x?>"),
+    ("$x$ and $1,200", "\\$x\\$ and \\$1,200"),
+    (":red[note] :smile: ::note 3:1", f"\\:{WJ}red[note] \\:{WJ}smile: :\\:{WJ}note 3\\:{WJ}1"),
+    # Streamlit swaps shortcodes in the decoded text, so the name must not touch the colon.
+    ("a :streamlit: [x]:material/home: a", f"a \\:{WJ}streamlit: [x]\\:{WJ}material/home: a"),
+    ("a\\b \\*x\\* \\<b>", "a\\\\b \\\\*x\\\\* \\\\\\<b>"),
+    ("`a<b`", "`a\\<b`"),  # Inserted escapes are visible inside code (a cost),
+    (f"`{CATALOG}`", f"`<{CATALOG}>`"),  # and so are a kept catalog URL's angle brackets.
+    # Streamlit renders a ```math block as KaTeX when the answer has a "$...$" pair anywhere.
+    ("$x$\n\n```math\ny\n```", f"\\$x\\$\n\n```m{WJ}ath\ny\n```"),
+    ("> ~~~ Math\n> y\n> ~~~", f"> ~~~ M{WJ}ath\n> y\n> ~~~"),
+    ("$x$\n\n```\tmath\ny\n```", f"\\$x\\$\n\n```\tm{WJ}ath\ny\n```"),  # The renderer skips a tab there too.
+    # A directive name may be any non-ASCII character, and the renderer's whitespace is narrower
+    # than Python's \s (which includes U+001C).
+    ("a :中文[x] a", f"a \\:{WJ}中文[x] a"),
+    (":" + chr(0x1C) + "x[y]", f"\\:{WJ}" + chr(0x1C) + "x[y]"),
+    ("\ue0000\ue001", "\ufffd0\ufffd"),  # The model cannot forge a placeholder.
+]
+
+
+@pytest.mark.parametrize("raw, shown", EXPECTED)
+def test_answer_markdown_exact_output(raw, shown):
+    assert answer_markdown(raw) == (raw if shown is None else shown)
+
+
+@pytest.mark.parametrize("raw", [raw for raw, _ in EXPECTED])
+def test_a_markdown_parser_finds_only_catalog_links_and_no_image_or_html(raw):
+    assert_inert(answer_markdown(raw))
+
+
+def test_catalog_links_survive_and_point_where_they_said():
+    links, outside = rendered(answer_markdown(f"[CS 目录]({CATALOG}#cs5800) or {CATALOG}."))
+    assert links == [(CATALOG + "#cs5800", "CS 目录"), (CATALOG, CATALOG)]
+    assert "".join(piece for _, piece in outside) == " or ."
+
+
+# Markdown-significant fragments, combined at random with a fixed seed: an independent search for
+# any input that renders as something other than catalog links and text.
+# 中文：把 Markdown 里有意义的片段按固定种子随机拼接，独立地找有没有哪个输入会渲染出目录链接和文字以外的东西。
+FRAGMENTS = [
+    "[", "]", "(", ")", "<", ">", "!", "&", "#", ";", "\\", ":", "$", "`", "*", "_", "~", "|", "^", '"',
+    "'", "=", "-", " ", "  ", "\n", "\n\n", "a", "x", "1", "104", "x68", "amp", "h", "ttp", "s", "://",
+    "```", "~~~", "math", "streamlit", "smile", "material/home", "help", "中文",
+    "w", "ww", ".", "/", "@", "elsewhere.example", CATALOG, CATALOG[:-1], "#cs5800", "red", "\ue000",
+    "\ue001", "0",
+]
+# Without formatting characters, newlines or "@", what the parser shows is exactly the input.
+PLAIN_FRAGMENTS = [
+    "[", "]", "(", ")", "<", ">", "!", "&", "#", ";", "\\", ":", "$", '"', "'", "=", " ", "a", "x", "1",
+    "104", "x68", "amp", "h", "ttp", "s", "://", "w", "ww", ".", "/", "elsewhere.example", "red",
+    "streamlit", "smile", "material/home", "help", "中文",
+]
+
+
+def samples(fragments: list[str], seed: int, count: int = 1500, longest: int = 24) -> list[str]:
+    rng = random.Random(seed)
+    return ["".join(rng.choice(fragments) for _ in range(rng.randint(1, longest))) for _ in range(count)]
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_no_combination_of_markdown_fragments_renders_anything_but_catalog_links(seed):
+    for raw in samples(FRAGMENTS, seed):
+        assert_inert(answer_markdown(raw))
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_plain_text_renders_exactly_as_written(seed):
+    for sample in samples(PLAIN_FRAGMENTS, 100 + seed):
+        raw = f"a {sample} a"  # Nothing at the start or end of a line to strip or interpret.
+        assert assert_inert(answer_markdown(raw)).replace(WJ, "") == raw
+
+
+@pytest.mark.parametrize("unit", [
+    "[a](b", "](", "]:", "![", "<a", "&#", "&a", "\\", "$", ":a", "h", "https://", "www.", "[",
+    "[" + "a" * 199, f"[a]({CATALOG}", f"<{CATALOG}", CATALOG, "```" + " " * 97, "``` m", "\ue000",
 ])
-def test_answer_markdown_keeps_only_official_catalog_links(raw, shown):
-    assert answer_markdown(raw) == shown
-    assert answer_markdown(shown) == shown  # Stable: rendering history twice changes nothing.
+def test_filtering_takes_linear_time(unit):
+    text = (unit * (200_000 // len(unit) + 1))[:200_000]  # About three times the longest answer.
+    started = time.perf_counter()
+    answer_markdown(text)
+    assert time.perf_counter() - started < 2.0
+
+
+def test_history_filters_assistant_text_but_not_the_students_own():
+    from app.streamlit_app import _render_message_text
+
+    st = FakeSurface()
+    content = f"[notes]({OTHER}) costs $5"
+    _render_message_text(st, {"role": "assistant", "content": content})
+    _render_message_text(st, {"role": "user", "content": content})
+    assert st.markdowns == [f"[notes]\\({OTHER_SHOWN}) costs \\$5", content]
+
+
+def test_streaming_renders_at_most_once_per_interval_and_always_the_final_text():
+    st = FakeSurface()
+    chunks = ["See ", "[notes](ht", "tps://elsewhere.example/notes)", " and ", f"[CS]({CATALOG[:20]}",
+              f"{CATALOG[20:]})."]
+    times = iter([0.0, 0.05, 0.10, 0.19, 0.30, 0.31])
+    raw = render_streamed_answer(st, iter(chunks), min_interval=0.1, clock=lambda: next(times))
+    assert raw == "".join(chunks)
+    placeholder, = st.children
+    assert placeholder.markdowns == [answer_markdown("".join(chunks[:n])) for n in (1, 3, 5, 6)]
+    for shown in placeholder.markdowns:
+        assert_inert(shown)
+
+
+def test_a_link_split_across_tokens_is_never_rendered_raw():
+    st = FakeSurface()
+    raw = f"See [notes]({OTHER}) and [CS]({CATALOG})."
+    chunks = [raw[i:i + 3] for i in range(0, len(raw), 3)]
+    ticks = iter(range(len(chunks)))
+    assert render_streamed_answer(st, iter(chunks), clock=lambda: float(next(ticks))) == raw
+    placeholder, = st.children
+    assert len(placeholder.markdowns) == len(chunks)  # A slow stream renders every token.
+    for n, shown in enumerate(placeholder.markdowns, start=1):
+        assert shown == answer_markdown("".join(chunks[:n]))
+        assert_inert(shown)
+
+
+def test_the_default_interval_is_a_tenth_of_a_second():
+    st = FakeSurface()
+    times = iter([0.0, 0.05, 0.1, 0.15])
+    render_streamed_answer(st, iter(["a", "b", "c", "d"]), clock=lambda: next(times))
+    placeholder, = st.children
+    assert placeholder.markdowns == ["a", "abc", "abcd"]
+
+
+def test_a_fast_stream_renders_twice_and_an_empty_one_not_at_all():
+    st = FakeSurface()
+    assert render_streamed_answer(st, iter(["a"] * 10_000), clock=lambda: 5.0) == "a" * 10_000
+    placeholder, = st.children
+    assert placeholder.markdowns == ["a", "a" * 10_000]
+    empty = FakeSurface()
+    assert render_streamed_answer(empty, iter([])) == ""
+    assert empty.children[0].markdowns == []
+
+
+def test_a_stream_that_fails_midway_still_shows_its_text_filtered():
+    def chunks():
+        yield "[notes]("
+        yield f"{OTHER}) so far"
+        raise RuntimeError("stream ended")
+
+    st = FakeSurface()
+    times = iter([0.0, 0.01])
+    with pytest.raises(RuntimeError, match="stream ended"):
+        render_streamed_answer(st, chunks(), clock=lambda: next(times))
+    placeholder, = st.children
+    assert placeholder.markdowns == [answer_markdown("[notes]("), answer_markdown(f"[notes]({OTHER}) so far")]
 
 
 def test_live_and_history_answers_render_filtered_while_history_keeps_the_raw_text(monkeypatch):
@@ -303,7 +593,7 @@ def test_live_and_history_answers_render_filtered_while_history_keeps_the_raw_te
     import app.streamlit_auth_ui as auth  # noqa: PLC0415
     from config import settings  # noqa: PLC0415
 
-    raw = f"Details: [the page](https://elsewhere.example/page) and the [NEU course catalog]({CATALOG})."
+    raw = f"Notes: see [the notes](https://elsewhere.example/notes) and the [CS catalog]({CATALOG})."
     question = "my own [note](https://elsewhere.example/mine)"
     assert answer_markdown(raw) != raw  # The filter has something to change here.
     tokens = [raw[:20], raw[20:45], raw[45:]]  # Split inside the first link.
@@ -350,28 +640,6 @@ def test_live_and_history_answers_render_filtered_while_history_keeps_the_raw_te
     assert returned == [raw]  # Reruns render from history; nothing is streamed again.
 
 
-def test_history_filters_assistant_text_but_not_the_students_own():
-    from app.streamlit_app import _render_message_text  # noqa: PLC0415
-
-    st = FakeSurface()
-    hostile = "see [login](https://evil.example) or https://evil.example"
-    _render_message_text(st, {"role": "assistant", "content": hostile})
-    _render_message_text(st, {"role": "user", "content": hostile})
-    assert st.markdowns == ["see [login] or evil.example", hostile]
-
-
-def test_every_partial_render_of_a_streamed_answer_is_filtered():
-    st = FakeSurface()
-    chunks = ["课程描述见 [NEU 目", "录](https://evil.exa", "mple/x)，另见 ", CATALOG[:20], CATALOG[20:], " 。"]
-    raw = render_streamed_answer(st, iter(chunks))
-    assert raw == "".join(chunks)  # History keeps the model's raw text.
-    (placeholder,) = st.children
-    assert len(placeholder.markdowns) == len(chunks)
-    assert not any("https://evil" in shown for shown in placeholder.markdowns)
-    assert placeholder.markdowns[-1] == f"课程描述见 [NEU 目录]，另见 <{CATALOG}> 。"
-    assert render_streamed_answer(FakeSurface(), iter([])) == ""
-
-
 def test_old_history_without_source_contract_remains_renderable():
     st = FakeSurface()
     render_answer_evidence(st, None)
@@ -396,4 +664,4 @@ def test_live_and_history_result_cards_use_shared_provenance_renderer():
         st = FakeSurface()
         _render_evidence_block(st, [result], key_prefix=prefix)
         assert "未附可追溯" in st.children[0].captions[0]
-        assert WARNING_LABELS["program_seed_unverified"] in st.children[0].captions
+        assert notice_line(["program_seed_unverified"]) in st.children[0].captions

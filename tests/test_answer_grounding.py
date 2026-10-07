@@ -67,7 +67,7 @@ def test_prompt_and_metadata_use_the_recorded_catalog_not_mixed_text(api_client)
     conn.execute("UPDATE courses SET raw_text=? WHERE course_id=?", ("MIXED REVIEW TEXT: definitely easy", "c-cs-5800"))
     meta, prompt = capture_chat(api_client)
     evidence = meta["results"][0]["answer_evidence"]
-    assert meta["prompt_version"] == "4.2"
+    assert meta["prompt_version"] == "4.3"
     assert evidence["catalog"]["description"] == snapshot.description
     assert evidence["catalog"]["retrieved_at"] is None
     assert "catalog_retrieval_date_unknown" in evidence["warnings"]

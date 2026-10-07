@@ -99,8 +99,8 @@ def render_prerequisite_links(st, course: dict, requisite_bundle: dict | None) -
         if dot:
             st.graphviz_chart(dot)
     else:
-        st.markdown("**🔗 相关先修课程跳转（仅导航）**")
-        st.caption("只用于跳转查看；不表达 AND/OR、最低成绩或是否必修，以上方的结构化规则为准。")
+        st.markdown("**🔗 去看看这些先修课**")
+        st.caption("只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。")
     for p in prereqs:
         cols = st.columns([4, 1])
         if graph_allowed:
@@ -156,8 +156,13 @@ def rule_lines(node: RequisiteNode, depth: int = 0) -> list[str]:
 
 def render_course_requisites(st, data: dict | None, *, course_id: str, course_code: str,
                              course_name: str, key: str) -> None:
-    st.markdown("**结构化先修／共修 · 目录原规则**")
-    st.caption("展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。")
+    """The chosen edition's prerequisite/corequisite rules up front; every caveat, the credit
+    evidence, description keywords and source details folded into 先修的来源与说明, and the
+    same-year program context in its own expander. 中文：所选年份的先修/共修规则放在前面；
+    所有说明、学分证据、描述关键词和来源信息收进「先修的来源与说明」，同年度培养方案上下文
+    单独一个折叠区。"""
+    st.markdown("**🧩 先修要求**")
+    st.caption("按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。")
     if data is None:
         st.caption("当前接口尚无结构化规则；旧关系只能作未核验导航参考。")
         return
@@ -198,27 +203,14 @@ def render_course_requisites(st, data: dict | None, *, course_id: str, course_co
         # then picks the blank option keeps None — it's never re-forced.
         # 中文：只在首次渲染时初始化一次。学生之后选空选项会保持 None，不再强制。
         st.session_state[key] = next(iter(by_year))
-    chosen = st.selectbox("选择先修规则 Catalog 年度（不默认最新版本）", [None, *by_year], key=key,
-        format_func=lambda year: "请明确选择适用年度" if year is None else f"Catalog {year} · 校区/个人路径未声明")
+    chosen = st.selectbox("先修规则的 Catalog 年份（不会默认选最新）", [None, *by_year], key=key,
+        format_func=lambda year: "请选择适用的年份" if year is None else f"Catalog {year}（校区和个人路径未声明）")
     if chosen is None:
         return
     if single:
-        st.caption("目前只记录了这一个 Catalog 年度，已默认展开；它不代表你的适用年度。")
+        st.caption("目前只记录了这一个 Catalog 年份，已默认显示；它不一定是你适用的年份。")
     document: CourseRequisiteDocument = by_year[chosen]
-    st.caption(f"Catalog {document.catalog_year} · 院系页面未声明校区或个人路径 · 不是完整政策")
-    st.markdown("**目录标题学分（独立来源证据）**")
-    if document.credit_hours is None:
-        st.text("旧文档未捕获标题学分证据；不从旧整数 credits 补猜范围。")
-    else:
-        hours = document.credit_hours
-        st.text(f"原标题学分：{hours.raw_text}")
-        if hours.kind == "range":
-            st.text(f"目录范围：{hours.minimum}–{hours.maximum}；实际班次学分未声明，不取端点或平均值作为固定学分。")
-            st.caption("旧详情若有整数，也不是此范围已选定班次学分的证据。")
-        else:
-            st.text(f"目录固定值：{hours.minimum}；不是当期班次或个人学位计入的确认。")
-        st.caption("此证据不重写 Course 的整数 credits，不用于范围筛选、学分求和或资格判断。")
-    for name, label in [("prerequisite", "先修条款"), ("corequisite", "共修条款（与先修分开）")]:
+    for name, label in [("prerequisite", "先修课"), ("corequisite", "共修课（与先修分开）")]:
         section = getattr(document.requisites, name)
         st.markdown(f"**{label}**")
         if section.status == "not_listed":
@@ -231,11 +223,27 @@ def render_course_requisites(st, data: dict | None, *, course_id: str, course_co
             st.text("\n".join(rule_lines(section.rule)))
             with st.expander(f"{label}原文（仅统一空白）"):
                 st.text(section.raw_text)
-    render_description_evidence(st, document)
-    st.markdown(f"[官方院系来源]({document.source.url})")
-    st.caption(f"来源捕获 UTC {document.source.captured_at.isoformat()} · 导入 UTC {document.imported_at.isoformat()}；不是实时查询")
-    st.text(f"来源 HTML 字节摘要：{document.source.sha256}（不证明不可篡改真实性或个人适用性）")
+    with st.expander("📎 先修的来源与说明"):
+        st.caption("展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。")
+        st.caption(f"Catalog {document.catalog_year} · 院系页面未声明校区或个人路径 · 不是完整政策")
+        st.markdown("**目录标题学分（独立来源证据）**")
+        if document.credit_hours is None:
+            st.text("旧文档未捕获标题学分证据；不从旧整数 credits 补猜范围。")
+        else:
+            hours = document.credit_hours
+            st.text(f"原标题学分：{hours.raw_text}")
+            if hours.kind == "range":
+                st.text(f"目录范围：{hours.minimum}–{hours.maximum}；实际班次学分未声明，不取端点或平均值作为固定学分。")
+                st.caption("旧详情若有整数，也不是此范围已选定班次学分的证据。")
+            else:
+                st.text(f"目录固定值：{hours.minimum}；不是当期班次或个人学位计入的确认。")
+            st.caption("此证据不重写 Course 的整数 credits，不用于范围筛选、学分求和或资格判断。")
+        render_description_evidence(st, document)
+        st.markdown(f"[官方院系来源]({document.source.url})")
+        st.caption(f"来源捕获 UTC {document.source.captured_at.isoformat()} · 导入 UTC {document.imported_at.isoformat()}；不是实时查询")
+        st.text(f"来源 HTML 字节摘要：{document.source.sha256}（不证明不可篡改真实性或个人适用性）")
+        st.caption("批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。此规则未用于对话回答或生成学期安排。")
     context = next((item for item in bundle.program_contexts if item.catalog_year == chosen and item.course_code == course_code), None)
-    # Edition-specific widget keys prevent a previous path silently carrying over.
-    render_program_context(st, context, key=f"{key}-program-{chosen}")
-    st.caption("批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。此规则未用于对话回答或生成学期安排。")
+    with st.expander("🎓 同一年份培养方案里的相关要求"):
+        # Edition-specific widget keys prevent a previous path silently carrying over.
+        render_program_context(st, context, key=f"{key}-program-{chosen}")

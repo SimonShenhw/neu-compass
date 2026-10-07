@@ -51,13 +51,35 @@ def test_hero_logged_in_shows_display_name_escaped() -> None:
     assert "<b>&" not in out
 
 
+# === plain_text_html / labelled_line_html ===
+
+
+def test_plain_text_lines_escape_html_and_stay_one_html_block() -> None:
+    """Extracted fields go through these. A CommonMark parser must read the result as ONE HTML
+    block (no Markdown inside), and newlines must not end it early."""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import labelled_line_html, plain_text_html  # noqa: PLC0415
+
+    assert plain_text_html("a <b>&\"x\"</b>\r\nb\n\nc") == "a &lt;b&gt;&amp;&quot;x&quot;&lt;/b&gt;<br>b<br><br>c"
+    line = labelled_line_html("任课老师 <i>", "[x](https://elsewhere.example) **y**\n\n$z$ :help[w]")
+    assert line.startswith('<div class="nc-line"><span class="nc-line-label">任课老师 &lt;i&gt;：</span>')
+    assert "\n" not in line
+    assert [token.type for token in MarkdownIt("commonmark").parse(line)] == ["html_block"]
+
+
 # === guest_banner_html ===
 
 
 def test_guest_banner_mentions_login_path() -> None:
+    """Student wording for the give-to-get tiers in coop_view: level 0 for everyone, 1 published
+    contribution for interview details, 2 for salary ranges. A share counts when it is published
+    (it needs a peer in the same group), not when it is approved."""
     out = guest_banner_html()
     assert "nc-banner" in out
-    assert "level-0" in out
+    assert "游客" in out and "NEU 邮箱登录" in out and "经验公开后" in out and "审核" not in out
+    assert "1 条看面试细节" in out and "2 条看薪资区间" in out
+    assert "level-0" not in out and "preview" not in out
 
 
 # === matched_via_badge ===
@@ -73,6 +95,14 @@ def test_badge_known_tiers_have_distinct_styles() -> None:
 
 def test_badge_unknown_tier_falls_back_to_neutral() -> None:
     assert matched_via_badge("some_future_tier") == matched_via_badge("empty")
+
+
+def test_badge_labels_describe_the_match_for_students() -> None:
+    """The labels used to be retrieval jargon ('直达 · alias', '检索 · hybrid')."""
+    labels = {tier: matched_via_badge(tier).split(">")[1].split("<")[0] for tier in
+              ("alias", "hybrid", "program", "context", "rejected", "empty")}
+    assert labels == {"alias": "按课程代码找到", "hybrid": "按内容检索", "program": "按培养方案",
+                      "context": "接着上一个问题", "rejected": "没找到匹配的课", "empty": "没有结果"}
 
 
 # === course_header_html ===
@@ -192,6 +222,54 @@ def test_prereq_label_resolved_and_dangling() -> None:
         code=None, name=None, course_id="c-ghost", requirement="recommended",
     )
     assert "`c-ghost`" in dangling and "建议先修" in dangling
+
+
+def test_html_helpers_keep_data_inside_one_html_block() -> None:
+    """A blank line inside a value would end the HTML block, and the rest would be parsed as
+    Markdown, links included. 中文：值里的空行会结束 HTML 块，后面的内容会按 Markdown 解析（包括链接）。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import program_context_html, result_card_html  # noqa: PLC0415
+
+    linked = "x\r\n\r\n[note](https://elsewhere.example/page)"
+    outputs = [course_header_html(code=linked, name=linked, term=linked), topic_pills_html([linked]),
+               result_card_html(rank=1, code=linked, name=linked, score=0.5, pct=50),
+               program_context_html([{"program_name": linked, "requirement_type": "core"}])]
+    for out in outputs:
+        assert "\n" not in out and "\r" not in out
+        assert [token.type for token in MarkdownIt("commonmark").parse(out)] == ["html_block"]
+
+
+def test_prereq_label_shows_database_text_literally() -> None:
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import prereq_label_md  # noqa: PLC0415
+
+    label = prereq_label_md(code="CS 5800", name="Algo [note](https://elsewhere.example/page) *x*\n\n# y",
+                            course_id="neu-cs-5800", requirement="required")
+    tokens = MarkdownIt("commonmark").parse(label)
+    types = [token.type for token in tokens] + [child.type for token in tokens for child in token.children or []]
+    assert "link_open" not in types and "heading_open" not in types and "em_open" in types  # *必须先修* only.
+    assert types.count("strong_open") == 1 and types.count("em_open") == 1 and types.count("paragraph_open") == 1
+    text = "".join(child.content for token in tokens for child in token.children or [] if child.type == "text")
+    assert "Algo [note](h\u2060ttps:\u2060//elsewhere.example/page) *x* # y" in text
+
+
+def test_prereq_label_code_and_bare_id_stay_literal_too() -> None:
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import prereq_label_md  # noqa: PLC0415
+
+    label = prereq_label_md(code="CS [note](https://elsewhere.example/page)", name="Algorithms",
+                            course_id="neu-cs-5800", requirement="required")
+    tokens = MarkdownIt("commonmark").parse(label)
+    assert "link_open" not in [child.type for token in tokens for child in token.children or []]
+    dangling = prereq_label_md(code=None, name=None, course_id="c-ghost\n\n`x` [note](https://elsewhere.example/page)",
+                               requirement="recommended")
+    assert dangling.startswith("`c-ghost x [note](https://elsewhere.example/page)`")
+    tokens = MarkdownIt("commonmark").parse(dangling)
+    assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+    assert "link_open" not in [child.type for child in tokens[1].children]
 
 
 def test_empty_footer_brand_render() -> None:

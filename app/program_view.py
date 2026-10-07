@@ -46,7 +46,6 @@ app.discover_view 共用，这样落地页的预览区和本页面命中同一�
 
 from __future__ import annotations
 
-import html
 import sys
 from pathlib import Path
 
@@ -108,8 +107,10 @@ def get_curriculum_cached(st, program_id: str) -> dict:
     return curriculum
 
 
-# === Pure HTML builders (escaped — catalog names can contain & < ") ===
-# 中文:纯 HTML 构造函数（已转义 —— 目录里的名称可能含 & < 引号）
+# === Pure HTML builders (escaped and on one line — catalog names can contain & < ", and a blank
+# line inside a value would end the HTML block, so the rest would be read as Markdown) ===
+# 中文:纯 HTML 构造函数（转义并留在一行里 —— 目录里的名称可能含 & < 引号；值里的空行会结束 HTML
+# 块，后面的内容就会被当成 Markdown）
 
 
 def _program_card_html(*, prefix: str, full_name: str, course_count: int) -> str:
@@ -120,11 +121,13 @@ def _program_card_html(*, prefix: str, full_name: str, course_count: int) -> str
     培养方案卡片：大号蓝色前缀 + 全名 + 课程数量 pill。下方的查看课程表
     按钮是一个 Streamlit 组件（按钮没法活在 markdown HTML 里面），所以
     卡片本体保持不可点击。"""
+    from app.ui_theme import _one_line  # noqa: PLC0415
+
     return (
         '<div class="nc-card">'
         '<span style="color:#1677FF;font-weight:800;font-size:1.6rem;'
-        f'letter-spacing:0.5px;">{html.escape(prefix)}</span>'
-        f'<p class="nc-card-name">{html.escape(full_name)}</p>'
+        f'letter-spacing:0.5px;">{_one_line(prefix)}</span>'
+        f'<p class="nc-card-name">{_one_line(full_name)}</p>'
         f'<span class="nc-pill">{int(course_count)} 门课程</span>'
         "</div>"
     )
@@ -133,11 +136,13 @@ def _program_card_html(*, prefix: str, full_name: str, course_count: int) -> str
 def _program_header_html(*, prefix: str, full_name: str) -> str:
     """Header card for the curriculum view (selected program).
     课程表视图（已选中培养方案）的头部卡片。"""
+    from app.ui_theme import _one_line  # noqa: PLC0415
+
     return (
         '<div class="nc-card">'
         f'<span class="nc-card-code" style="font-size:1.35rem;">'
-        f"{html.escape(prefix)}</span>"
-        f'<p class="nc-card-name">{html.escape(full_name)}</p>'
+        f"{_one_line(prefix)}</span>"
+        f'<p class="nc-card-name">{_one_line(full_name)}</p>'
         "</div>"
     )
 
@@ -160,18 +165,18 @@ def _course_row_html(
     徽章来自 ui_theme.requirement_badge，这样配色才能与课程详情面板
     保持同步 —— 若在这里再复制一份 core/foundation/elective_pool/
     capstone 配色表，下次调色就会产生不一致。"""
-    from app.ui_theme import requirement_badge  # noqa: PLC0415
+    from app.ui_theme import _one_line, requirement_badge  # noqa: PLC0415
 
     note_html = ""
     if notes:
         note_html = (
             '<div style="color:#8A94A6;font-size:0.78rem;margin-top:2px;">'
-            f"{html.escape(notes)}</div>"
+            f"{_one_line(notes)}</div>"
         )
     return (
         '<div class="nc-result-card">'
-        f'<span class="nc-result-code">{html.escape(code)}</span> '
-        f'<span class="nc-result-name">{html.escape(name)}</span> '
+        f'<span class="nc-result-code">{_one_line(code)}</span> '
+        f'<span class="nc-result-name">{_one_line(name)}</span> '
         f"{requirement_badge(requirement_type)}"
         f"{note_html}"
         "</div>"
@@ -270,7 +275,9 @@ def _render_curriculum(st, program_id: str) -> None:
         unsafe_allow_html=True,
     )
     if cur.get("notes"):
-        st.caption(cur["notes"])
+        from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+
+        st.caption(literal_markdown(cur["notes"]))  # Database text: shown as written, not Markdown.
     from app.program_plan_view import render_program_plans  # noqa: PLC0415
     plan = render_program_plans(st, cur.get("plans", []), key=f"program-plan-{program_id}", program_id=program_id)
     if plan is not None:

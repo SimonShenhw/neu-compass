@@ -7,12 +7,17 @@ from config import settings
 from schemas.answer_feedback import AnswerFeedbackReceipt, AnswerFeedbackResponse
 
 CAPTURE_OPT_IN_KEY = 'answer_feedback_capture_opt_in'
-QUERY_LOG_NOTICE = '提问原文仍会写入私有查询日志；关闭回答反馈不关闭该日志。请勿输入个人信息或秘密。'
+# Shown before the input on every render (06C-1). The query log has no answer column, so with
+# capture off no answer text is kept. 中文：每次渲染都显示在输入框之前（06C-1）。查询日志没有
+# 回答列，所以关闭保存时不会留下回答内容。
+QUERY_LOG_NOTICE = '你的提问原文会记进不公开的查询日志。请不要输入个人信息或密码之类的秘密。'
+CAPTURE_OFF_NOTICE = '回答内容不会保存（回答反馈功能目前关闭）。'
 CAPTURE_NOTICE = (
-    '若服务可用，勾选后本会话后续正常完成的回答及筛选上下文会私有保存，'
-    '即使不点击 👍／👎 也会保存。历史只新增轮数，不新增完整历史文本。'
-    '7 天仅是投票凭证有效期，数据／备份／导出不会自动删除；'
-    '取消勾选、清空对话或登出不会删除已保存的数据。'
+    '勾不勾选都不影响上面的查询日志。'
+    '勾选后，如果服务可用，本次会话之后正常完成的回答和筛选条件会不公开地保存下来，'
+    '即使你不点击 👍／👎 也会保存；对话历史只多记轮数，不多存完整历史文本。'
+    '7 天只是投票凭证的有效期，数据、备份和导出不会自动删除；'
+    '取消勾选、清空对话或登出都不会删除已经保存的数据。'
 )
 
 
@@ -21,13 +26,13 @@ def render_feedback_capture_control(st):
     st.caption(QUERY_LOG_NOTICE)
     if settings.answer_feedback_enabled is not True:
         st.session_state.pop(CAPTURE_OPT_IN_KEY, None)
-        st.caption('完整回答反馈保存当前关闭；聊天与原查询日志仍按原机制运行。')
+        st.caption(CAPTURE_OFF_NOTICE)
         return False
     if CAPTURE_OPT_IN_KEY in st.session_state and type(st.session_state[CAPTURE_OPT_IN_KEY]) is not bool:
         st.session_state.pop(CAPTURE_OPT_IN_KEY, None)
     st.caption(CAPTURE_NOTICE)
-    return st.checkbox('允许本次会话后续回答保存，用于回答反馈', value=False,
-        key=CAPTURE_OPT_IN_KEY, help='默认不勾选；取消只停止后续回答保存，不撤销已有保存或投票。') is True
+    return st.checkbox('允许保存本次会话之后的回答，用于回答反馈', value=False,
+        key=CAPTURE_OPT_IN_KEY, help='默认不勾选。取消勾选只停止保存之后的回答，不会撤销已经保存的回答或投票。') is True
 
 
 def bind_feedback_receipt(receipt, content):

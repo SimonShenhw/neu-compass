@@ -267,6 +267,26 @@ def test_ref_label_is_length_capped(monkeypatch) -> None:
     assert "z" * 65 not in st.warnings[0]
 
 
+@pytest.mark.parametrize("ref", ["x\n\n[note](https://elsewhere.example/page)", "x\n- [note](https://elsewhere.example/page)",
+                                 "x\n# [note](https://elsewhere.example/page)", "x\n> [note](https://elsewhere.example/page)"])
+@pytest.mark.parametrize("param", ["course", "program"])
+def test_ref_label_stays_on_one_line(monkeypatch, ref, param) -> None:
+    """A code span cannot cross a blank line or a new block, so a line break in the ref would let
+    the rest of it render as Markdown. 中文：代码段跨不过空行或新的块，ref 里的换行会让后面的部分
+    按 Markdown 渲染。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    _fake_resolve(monkeypatch, [])
+    st = _FakeSt(**{param: ref})
+    st.session_state["_programs_cache"] = PROGRAMS  # skips the API hop
+    apply_deep_link(st, pages=PAGES)
+    (warned,) = st.warnings
+    assert "\n" not in warned and " ".join(ref.split()) in warned
+    tokens = MarkdownIt("commonmark").parse(warned)
+    assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+    assert "link_open" not in [child.type for child in tokens[1].children]
+
+
 def test_ambiguous_course_ref_opens_first_and_says_so(monkeypatch) -> None:
     _fake_resolve(monkeypatch, [
         {"course_id": "c-cs-5800", "primary_code": "CS 5800",
@@ -280,6 +300,21 @@ def test_ambiguous_course_ref_opens_first_and_says_so(monkeypatch) -> None:
     assert st.session_state["selected_course_id"] == "c-cs-5800"
     assert len(st.infos) == 1
     assert "DS 5220" in st.infos[0]
+
+
+def test_ambiguous_ref_shows_database_codes_as_plain_text(monkeypatch) -> None:
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    _fake_resolve(monkeypatch, [
+        {"course_id": "c-1", "primary_code": "CS [note](https://elsewhere.example/page)", "primary_name": "A"},
+        {"course_id": "c-2", "primary_code": "DS [note](https://elsewhere.example/page)", "primary_name": "B"},
+    ])
+    st = _FakeSt(course="ml")
+    apply_deep_link(st, pages=PAGES)
+    (shown,) = st.infos
+    tokens = MarkdownIt("commonmark").parse(shown)
+    assert "link_open" not in [child.type for token in tokens for child in token.children or []]
+    assert "strong_open" in [child.type for token in tokens for child in token.children or []]
 
 
 def test_transient_api_failure_does_not_burn_the_one_shot(monkeypatch) -> None:
