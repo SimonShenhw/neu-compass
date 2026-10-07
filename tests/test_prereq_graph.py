@@ -63,8 +63,8 @@ def test_double_quotes_in_labels_are_escaped() -> None:
 
 
 def test_backslashes_cannot_end_or_extend_a_quoted_string() -> None:
-    """Graphviz reads a backslash before a quote as an escaped quote and never pairs two
-    backslashes, so a label ending in one ran on into the next statement."""
+    """Graphviz reads a backslash before a quote as an escaped quote, so a label ending in one ran
+    on into the next statement; whether a doubled backslash pairs up differs between versions."""
     dot = build_prereq_dot(
         "CS 5800\\",
         [{"course_id": "a\\", "primary_code": None, "requirement": "required\\"},

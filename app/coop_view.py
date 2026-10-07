@@ -39,7 +39,10 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 # What a listed row contains (visibility_level), not what the viewer has unlocked.
 # 中文：一条记录本身包含哪些内容（visibility_level），不是看的人已经解锁了什么。
-VISIBILITY_LABELS = {0: "基础信息", 1: "含面试细节", 2: "含面试细节和薪资"}
+# What each level guarantees (schemas.coop.derive_visibility): level 2 is any row with a salary
+# range, with or without interview details. 中文：每个等级保证有的内容：2 级是有薪资区间的行，
+# 面试细节不一定有。
+VISIBILITY_LABELS = {0: "基础信息", 1: "含面试细节", 2: "含薪资区间"}
 # The API's industry codes, in form order; only the shown label is Chinese.
 # 中文：API 的行业代码，按表单顺序；只有显示的文字是中文。
 INDUSTRY_LABELS = {

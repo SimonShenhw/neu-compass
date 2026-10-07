@@ -302,6 +302,21 @@ def test_ambiguous_course_ref_opens_first_and_says_so(monkeypatch) -> None:
     assert "DS 5220" in st.infos[0]
 
 
+def test_ambiguous_ref_shows_database_codes_as_plain_text(monkeypatch) -> None:
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    _fake_resolve(monkeypatch, [
+        {"course_id": "c-1", "primary_code": "CS [note](https://elsewhere.example/page)", "primary_name": "A"},
+        {"course_id": "c-2", "primary_code": "DS [note](https://elsewhere.example/page)", "primary_name": "B"},
+    ])
+    st = _FakeSt(course="ml")
+    apply_deep_link(st, pages=PAGES)
+    (shown,) = st.infos
+    tokens = MarkdownIt("commonmark").parse(shown)
+    assert "link_open" not in [child.type for token in tokens for child in token.children or []]
+    assert "strong_open" in [child.type for token in tokens for child in token.children or []]
+
+
 def test_transient_api_failure_does_not_burn_the_one_shot(monkeypatch) -> None:
     """A warming API must not permanently eat the deep link — the ref has to
     survive to the next rerun (same rule as program_view's uncached failures)."""

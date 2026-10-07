@@ -208,31 +208,49 @@ def write_report(out: Path, report: dict) -> None:
     (out / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-REPORT_KEYS = ("prompt_version", "chat_v4_sha256", "model_calls", "errors", "records")
+REPORT_TYPES = {"prompt_version": str, "chat_v4_sha256": str, "model_calls": int, "errors": int, "records": list}
+OPTIONAL_REPORT_TYPES = {"planned_calls": int, "dry_run": bool}
 CONTEXT_KEYS = ("lang", "allowed_urls", "prompt_keys", "unstated_values")
+CONTEXT_FLAGS = ("has_rmp_data", "fetch_date_relevant", "no_catalog_relevant", "prereq_relevant", "program_notice")
 
 
-def load_report(results: Path) -> dict:
-    """A saved results.json, checked for the shape rescoring needs, so a bad file is a setup error
-    (exit 2) while a bug in the checks themselves keeps its traceback. 中文：读取保存的 results.json
-    并检查重评需要的形状：文件不对是准备阶段的错误（退出码 2），检查本身的错误仍保留 traceback。"""
+def _is(value: object, kind: type) -> bool:
+    return isinstance(value, kind) and not (kind is int and isinstance(value, bool))
+
+
+def _context_ok(context: object) -> bool:
+    """A saved AnswerContext as context_to_json writes it. 中文：context_to_json 写出的上下文形状。"""
     from dataclasses import fields  # noqa: PLC0415
 
     from eval.answer_checks import AnswerContext  # noqa: PLC0415
 
+    if not isinstance(context, dict) or not set(CONTEXT_KEYS) <= set(context) <= {item.name for item in fields(AnswerContext)}:
+        return False
+    return (context["lang"] in ("zh", "en")
+            and all(_is(context[name], list) and all(_is(item, str) for item in context[name])
+                    for name in ("allowed_urls", "prompt_keys"))
+            and _is(context["unstated_values"], list)
+            and all(_is(value, int) or _is(value, float) for value in context["unstated_values"])
+            and all(_is(context[flag], bool) for flag in CONTEXT_FLAGS if flag in context))
+
+
+def load_report(results: Path) -> dict:
+    """A saved results.json, checked for the shape and types rescoring needs, so a bad file is a
+    setup error (exit 2) while a bug in the checks themselves keeps its traceback. 中文：读取保存的
+    results.json 并检查重评需要的形状和类型：文件不对是准备阶段的错误（退出码 2），检查本身的错误仍
+    保留 traceback。"""
     report = json.loads(results.read_text(encoding="utf-8"))
-    if not isinstance(report, dict) or any(key not in report for key in REPORT_KEYS) or not isinstance(
-            report["records"], list):
-        raise ValueError(f"not a results.json: it needs the keys {', '.join(REPORT_KEYS)}")
-    known = {item.name for item in fields(AnswerContext)}
+    if not isinstance(report, dict) or not all(_is(report.get(key), kind) for key, kind in REPORT_TYPES.items()) or not all(
+            _is(report[key], kind) for key, kind in OPTIONAL_REPORT_TYPES.items() if key in report):
+        raise ValueError(f"not a results.json: it needs {', '.join(REPORT_TYPES)} with their types")
     for index, record in enumerate(report["records"]):
-        if not isinstance(record, dict) or "qid" not in record or "run" not in record:
-            raise ValueError(f"record {index} needs a qid and a run")
+        if not isinstance(record, dict) or not _is(record.get("qid"), str) or not _is(record.get("run"), int):
+            raise ValueError(f"record {index} needs a text qid and a numeric run")
         if "answer" in record:
-            context = record.get("context")
-            if not isinstance(record["answer"], str) or not isinstance(context, dict) or not (
-                    set(CONTEXT_KEYS) <= set(context) <= known):
+            if not _is(record["answer"], str) or not _context_ok(record.get("context")):
                 raise ValueError(f"record {index}: an answer needs to be text, with its saved context")
+        elif "checks" in record:
+            raise ValueError(f"record {index} has checks but no answer to recheck")
     return report
 
 
@@ -267,9 +285,12 @@ def validate_questions(questions: object) -> list[dict]:
         if not isinstance(question, dict) or any(key not in question for key in QUESTION_KEYS):
             raise ValueError(f"question {index} needs the keys {', '.join(QUESTION_KEYS)}")
         qid = question["qid"]
-        if not isinstance(qid, str) or not QID.fullmatch(qid) or qid in seen:
+        # Unique ignoring case too: on a case-insensitive file system (Windows, /mnt in WSL, macOS)
+        # "Q1" and "q1" would write the same files. 中文：不分大小写也要唯一：在不分大小写的文件系统上
+        # （Windows、WSL 的 /mnt、macOS），"Q1" 和 "q1" 会写到同一些文件。
+        if not isinstance(qid, str) or not QID.fullmatch(qid) or qid.casefold() in seen:
             raise ValueError(f"question {index}: qid must be unique, 1-64 letters, digits, _ or - (it names files)")
-        seen.add(qid)
+        seen.add(qid.casefold())
         if question["lang"] not in ("zh", "en") or question["route"] not in ("alias", "hybrid", "program"):
             raise ValueError(f"question {index}: lang must be zh or en, route alias, hybrid or program")
         ids = question["course_ids"]

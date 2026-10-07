@@ -204,6 +204,7 @@ def test_status_of_reports_written_before_the_plan_was_recorded():
     json.dumps([{**QUESTION, "course_ids": [5800]}]), json.dumps([{**QUESTION, "course_ids": [""]}]),
     # The qid names output files: no path separator, nothing empty, no repeats.
     json.dumps([{**QUESTION, "qid": "a/b"}]), json.dumps([{**QUESTION, "qid": ""}]), json.dumps([QUESTION, QUESTION]),
+    json.dumps([QUESTION, {**QUESTION, "qid": "q1"}]),  # Same files on a case-insensitive file system.
 ])
 def test_a_bad_questions_file_is_a_setup_error_before_any_request(questions_text, tmp_path, monkeypatch):
     monkeypatch.setattr(httpx, "Client", lambda **kwargs: pytest.fail("no request for a bad questions file"))
@@ -254,13 +255,25 @@ def test_a_bad_rescore_file_is_a_setup_error(tmp_path):
     assert main(["--rescore", str(broken)]) == 2
     run([QUESTION], PAYLOADS, out=tmp_path, runs=1, max_calls=1, stream_fn=lambda prompt: iter([PLAIN]))
     good = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
-    for change in ({"context": {"lang": "zh"}},  # A saved context missing its fields.
-                   {"answer": ["not", "text"]}, {"context": {**good["records"][0]["context"], "extra": 1}}):
-        odd = tmp_path / "odd.json"
-        odd.write_text(json.dumps({**good, "records": [{**good["records"][0], **change}]}), encoding="utf-8")
-        assert main(["--rescore", str(odd)]) == 2, change
-    odd.write_text(json.dumps({key: value for key, value in good.items() if key != "chat_v4_sha256"}), encoding="utf-8")
-    assert main(["--rescore", str(odd)]) == 2
+    record, context = good["records"][0], good["records"][0]["context"]
+    odd = tmp_path / "odd.json"
+    bad_records = [
+        {**record, "context": {"lang": "zh"}},  # A saved context missing its fields.
+        {**record, "answer": ["not", "text"]}, {**record, "context": {**context, "extra": 1}},
+        {**record, "context": {**context, "allowed_urls": 5}}, {**record, "context": {**context, "unstated_values": ["x"]}},
+        {**record, "context": {**context, "prompt_keys": [5]}}, {**record, "context": {**context, "lang": "fr"}},
+        {**record, "context": {**context, "has_rmp_data": "yes"}}, {**record, "run": "1"}, {**record, "run": True},
+        {key: value for key, value in record.items() if key != "answer"},  # Leftover checks, nothing to recheck.
+    ]
+    for bad in bad_records:
+        odd.write_text(json.dumps({**good, "records": [bad]}), encoding="utf-8")
+        assert main(["--rescore", str(odd)]) == 2, bad
+    for report in ({key: value for key, value in good.items() if key != "chat_v4_sha256"}, {**good, "chat_v4_sha256": 5},
+                   {**good, "model_calls": "1"}, {**good, "planned_calls": None}):
+        odd.write_text(json.dumps(report), encoding="utf-8")
+        assert main(["--rescore", str(odd)]) == 2
+    odd.write_text(json.dumps(good), encoding="utf-8")
+    assert main(["--rescore", str(odd)]) == 0  # The untouched report still rescores cleanly.
 
 
 def test_a_bug_in_the_checks_is_not_reported_as_a_setup_error(tmp_path, monkeypatch):

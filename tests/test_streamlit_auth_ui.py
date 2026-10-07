@@ -41,3 +41,4 @@ def test_the_callback_warns_with_the_checked_message() -> None:
     app.run(timeout=30)
     assert not app.exception
     assert [item.value for item in app.warning] == [FIXED]
+    assert not dict(app.query_params)  # Cleared, so a refresh does not show it again.

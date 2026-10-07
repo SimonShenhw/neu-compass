@@ -71,17 +71,25 @@ OTHER_COURSE = re.compile(
     r"other (?:courses?|classes)|another (?:course|class)|not necessarily (?:about |for )?(?:this|the|CS)|"
     r"not (?:specific|limited) to (?:this|the|CS)", re.I)
 
-FETCH_DATE = re.compile(
+# The saved-copy / fetch-date note. Its date and live-check wording counts anywhere; the bare words
+# (存档, 副本, snapshot, ...) also appear in the no-catalog note ("没有目录描述的存档"), so they count
+# only in a clause that is not that note. 中文：存档副本/抓取日期的说明。说日期、「不是实时」的措辞在哪里
+# 都算；单独的「存档」「副本」等词也会出现在「没有目录描述」那句里，所以只在不是那句的分句里才算。
+FETCH_DATE_DATED = re.compile(
     r"(抓取|获取|采集|检索|收录|爬取|更新)(的)?(日期|时间)[^。\n]{0,12}(未知|不明|不详|不清楚|没有记录|未记录)|"
+    r"(没有|未)记录[^。\n]{0,6}(抓取|获取|采集|检索|收录|爬取|更新)(的)?(日期|时间)|"
     r"(日期|时间)(未知|不明|不详)|不是实时|非实时|并非实时|而非实时|不是[^。\n]{0,8}实时|实时核[对查实验]|"
-    r"存档|快照|保存的?副本|副本|"
-    r"fetch(?:ed)? date|retriev\w* date|when it was (?:fetched|retrieved|captured)|saved copy|stored copy|"
-    r"copy of the catalog|not a live|not live|archived|snapshot|recorded (?:copy|version)|"
+    r"fetch(?:ed)? date|retriev\w* date|when it was (?:fetched|retrieved|captured)|not a live|not live|"
     r"may (?:have changed|be out ?of ?date|be outdated|not reflect)|not (?:necessarily )?(?:the )?current", re.I)
-# 无 but not 无法 / 无论: "无法实时核对目录" is about the saved copy, not a missing catalog.
-# 中文：「无」但不是「无法」「无论」：「无法实时核对目录」说的是存档副本，不是没有目录。
+FETCH_DATE_WORDS = re.compile(
+    r"存档|快照|保存的?副本|副本|saved copy|stored copy|copy of the catalog|archived|snapshot|recorded (?:copy|version)", re.I)
+CLAUSE_END = re.compile(r"[；;]")
+# 无 but not 无法 / 无论 ("无法实时核对目录" is about the saved copy); "无法在目录中找到" is its own
+# alternative. 中文：「无」但不是「无法」「无论」（「无法实时核对目录」说的是存档副本）；「无法在目录中
+# 找到」单独一项。
 NO_CATALOG = re.compile(
-    r"(没有|缺少|无(?!法|论)|缺乏|未找到|找不到)[^。\n]{0,10}(目录|catalog)|(目录|catalog)[^。\n]{0,10}(缺失|不可用|没有|未找到)|"
+    r"(没有|缺少|无(?!法|论)|缺乏|未找到|找不到)[^。\n]{0,10}(目录|catalog)|"
+    r"(目录|catalog)[^。\n]{0,10}(缺失|不可用|没有|未找到|找不到)|无法在?[^。\n]{0,6}(目录|catalog)[^。\n]{0,6}(找到|查到|获取)|"
     r"no (?:official |recorded )?catalog|catalog (?:record|entry|snapshot|description|data)s? (?:is |are )?"
     r"(?:not available|unavailable|missing)|lacks? (?:a |an )?(?:official )?catalog|without (?:a |an )?(?:official )?catalog", re.I)
 PREREQ_LOGIC = re.compile(
@@ -154,6 +162,12 @@ def sentences(text: str) -> list[str]:
         start = end.end()
     parts.append(text[start:])
     return [part for part in parts if part.strip()]
+
+
+def _outside_no_catalog(sentence: str, pattern: re.Pattern) -> bool:
+    """pattern in a clause (split at ；/;) of the sentence that is not the no-catalog note.
+    中文：pattern 出现在这句里不是「没有目录」说明的分句（按 ；/; 分）中。"""
+    return any(pattern.search(clause) and not NO_CATALOG.search(clause) for clause in CLAUSE_END.split(sentence))
 
 
 def review_attribution(parts: list[str], has_rmp_data: bool) -> str:
@@ -231,16 +245,14 @@ def check_answer(text: str, context: AnswerContext) -> dict:
     rmp = review_attribution(parts, context.has_rmp_data)
 
     # 4.3 asks for the saved-copy note only when a catalog description was used, which the answer
-    # shows by linking the catalog. The no-catalog sentence may say 存档 / 副本 too; it is not that
-    # note. 中文：4.3 只在用到目录描述时要求说明存档副本，回答用了就会链接目录。「没有目录描述」那句
-    # 也可能说到存档、副本，但它不是那条说明。
+    # shows by linking the catalog. 中文：4.3 只在用到目录描述时要求说明存档副本，回答用了就会链接目录。
     used_catalog = any(link["allowed_target"] for link in links)
-    catalog_sentences = "\n".join(part for part in parts if not NO_CATALOG.search(part))
-    caveats = {"fetch_date": (context.fetch_date_relevant and used_catalog, FETCH_DATE, catalog_sentences),
-               "no_catalog": (context.no_catalog_relevant, NO_CATALOG, text),
-               "prereq_logic": (context.prereq_relevant, PREREQ_LOGIC, text),
-               "program_caveat": (context.program_notice, PROGRAM_CAVEAT, text)}
-    missing = [name for name, (relevant, pattern, searched) in caveats.items() if relevant and not pattern.search(searched)]
+    fetch_date_noted = any(FETCH_DATE_DATED.search(part) or _outside_no_catalog(part, FETCH_DATE_WORDS) for part in parts)
+    caveats = {"fetch_date": (context.fetch_date_relevant and used_catalog, fetch_date_noted),
+               "no_catalog": (context.no_catalog_relevant, bool(NO_CATALOG.search(text))),
+               "prereq_logic": (context.prereq_relevant, bool(PREREQ_LOGIC.search(text))),
+               "program_caveat": (context.program_notice, bool(PROGRAM_CAVEAT.search(text)))}
+    missing = [name for name, (relevant, present) in caveats.items() if relevant and not present]
     if context.program_notice and not PROGRAMS_PAGE.search(text):
         missing.append("programs_page_pointer")
 
@@ -271,7 +283,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
         # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.
-        "saved_copy_mentions": sum(1 for part in parts if SAVED_COPY.search(part) and not NO_CATALOG.search(part)),
+        "saved_copy_mentions": sum(1 for part in parts if _outside_no_catalog(part, SAVED_COPY)),
         "chars": len(text),
     }
 

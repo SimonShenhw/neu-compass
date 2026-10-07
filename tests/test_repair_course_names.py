@@ -155,8 +155,10 @@ def test_cli_lets_other_lookup_errors_surface_as_bugs(runtime, monkeypatch):
     保留 traceback；事务照样回滚。"""
     path, archive = runtime
     before = rows(path)
+    rename = CourseRepository.rename
 
     def buggy(self, course_id, name):
+        rename(self, course_id, name)  # The write happens, so the rollback is really tested.
         raise KeyError("primary_name")
 
     monkeypatch.setattr(CourseRepository, "rename", buggy)

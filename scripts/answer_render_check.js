@@ -33,7 +33,11 @@
     if (md.querySelector('img, image, svg image, iframe, video, audio, object, embed, picture, source')) r.embedded++;
     if (md.querySelector('.katex, .katex-display, math')) r.katex++;
     const plain = [...md.querySelectorAll('span, small')].filter((element) => !streamlitOwn(element));
-    const marked = [...md.querySelectorAll('[data-testid^="stIcon"], [class*="Badge"], [class*="ColoredText"]')]
+    // Directive output in Streamlit 1.57: coloured text and background, badges, shimmer, icons, and
+    // the inline-styled span of :small[]. 中文：Streamlit 1.57 的指令产物：彩色文字和背景、徽章、
+    // 闪烁效果、图标，以及 :small[] 的内联样式 span。
+    const marked = [...md.querySelectorAll('[data-testid^="stIcon"], [class*="Badge"], [class*="ColoredText"], '
+      + '[class*="ColoredBackground"], [class*="Shimmer"], span[style]')]
       .filter((element) => !inCodeBlock(element));
     if (plain.length || marked.length) r.styled++;  // Directives, icons, coloured text or tooltips from the answer.
     for (const code of md.querySelectorAll('code')) {

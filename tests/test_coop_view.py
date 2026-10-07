@@ -73,7 +73,7 @@ def test_listing_shows_reviewed_submissions_as_plain_text(monkeypatch) -> None:
     assert len(html_lines) >= 4 and all(item.allow_html for item in html_lines)
     assert any("Acme &lt;i&gt;Co&lt;/i&gt;" in value for value in with_data)  # Escaped, not raw HTML.
     assert "Two rounds " + linked in [item.value for item in app.text]
-    assert any(item.value == "含面试细节和薪资" for item in app.caption)
+    assert any(item.value == "含薪资区间" for item in app.caption)  # Level 2 only guarantees the salary.
     assert any("行业" in item.value and "大型科技公司" in item.value for item in app.markdown)
 
 
@@ -99,4 +99,8 @@ def test_lock_captions_claim_only_what_the_level_guarantees(monkeypatch) -> None
     assert not app.exception
     assert [item.value for item in app.caption if item.value.startswith("🔒")] == [
         "🔒 这条有面试细节：你分享的经验有 1 条公开后解锁", "🔒 这条有薪资区间：你分享的经验有 2 条公开后解锁"]
+    # The level label claims only what the level guarantees, and the page says when shares unlock.
+    assert [item.value for item in app.caption if item.value in {"基础信息", "含面试细节", "含薪资区间"}] == [
+        "含面试细节", "含薪资区间", "含薪资区间", "基础信息"]
+    assert any("你分享的经验公开后，可以解锁更多细节" in item.value for item in app.caption)
     assert not any("审核通过" in item.value for item in [*app.info, *app.caption])

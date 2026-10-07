@@ -205,6 +205,25 @@ def test_the_no_catalog_sentence_is_not_the_fetch_date_note_and_wufa_is_not_wu()
     assert check_answer(twice, AnswerContext(lang="zh"))["saved_copy_mentions"] == 2
 
 
+def test_fetch_date_wording_counts_anywhere_and_only_the_no_catalog_clause_is_left_out():
+    context = AnswerContext(lang="zh", allowed_urls=frozenset({CATALOG}), fetch_date_relevant=True)
+    linked = f"CS 5800 讲算法，见 [NEU 官方课程目录]({CATALOG})。"
+    for note in ("目录的抓取日期没有记录。", "目录存档没有记录抓取日期。", "这是存档副本；CS 5200 没有目录描述。",
+                 "This is a saved copy of the catalog; there is no catalog entry for CS 5200."):
+        assert "fetch_date" not in check_answer(linked + note, context)["caveats_missing"], note
+    assert check_answer(linked + "CS 5200 没有官方目录描述的存档。", context)["caveats_missing"] == ["fetch_date"]
+    joined = "这些内容来自目录的存档副本，不是实时核对；CS 5200 没有目录描述。"
+    assert check_answer(joined, AnswerContext(lang="zh"))["saved_copy_mentions"] == 1
+
+
+def test_no_catalog_wording_with_wufa_and_wulun():
+    no_catalog = AnswerContext(lang="zh", no_catalog_relevant=True)
+    assert "no_catalog" not in check_answer("无法在目录中找到 CS 5200 的描述。", no_catalog)["caveats_missing"]
+    # 无论 is not 无: this second saved-copy sentence still counts as a repeat.
+    twice = "这些内容来自目录的存档副本，不是实时核对。无论目录怎么写，这份副本都不是实时的。"
+    assert check_answer(twice, AnswerContext(lang="zh"))["saved_copy_mentions"] == 2
+
+
 def test_more_sentence_and_review_word_cases():
     assert sentences("She has a Ph.D. in CS. Reviews say she is clear.") == [
         "She has a Ph.D. in CS.", " Reviews say she is clear."]
