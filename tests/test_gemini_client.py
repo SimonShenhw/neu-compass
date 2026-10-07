@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from llm.gemini_client import (
     GeminiError,
+    error_log_fields,
     generate_structured,
     generate_text,
     generate_text_stream,
@@ -187,6 +188,104 @@ def test_generate_text_stream_init_error_wrapped() -> None:
     fake = _FakeClient(RuntimeError("api unavailable"))
     with pytest.raises(GeminiError, match="stream init failed"):
         list(generate_text_stream("p", client=fake))
+
+
+def _interrupted_stream() -> Any:
+    yield _FakeResponse(text="partial ")
+    raise RuntimeError("connection reset")
+
+
+def test_generate_text_stream_interruption_keeps_the_earlier_chunks() -> None:
+    received: list[str] = []
+    with pytest.raises(GeminiError, match="stream interrupted") as info:
+        for chunk in generate_text_stream("p", client=_FakeClient(_interrupted_stream())):
+            received.append(chunk)
+    assert received == ["partial "]
+    assert info.value.kind == "stream_interrupted"
+
+
+# === error kinds and log-safe fields ===
+
+def _structured(client: Any) -> Any:
+    return generate_structured("p", schema=_Sample, client=client)
+
+
+def _text(client: Any) -> Any:
+    return generate_text("p", client=client)
+
+
+def _stream(client: Any) -> Any:
+    return list(generate_text_stream("p", client=client))
+
+
+@pytest.mark.parametrize(("call", "response", "kind"), [
+    (_structured, RuntimeError("x"), "call_failed"),
+    (_structured, _FakeResponse(text="not json"), "invalid_response"),
+    (_structured, _FakeResponse(text='{"wrong_field": 1}'), "invalid_response"),
+    (_structured, _FakeResponse(text=""), "empty_response"),
+    (_text, ConnectionError("x"), "call_failed"),
+    (_text, _FakeResponse(text=""), "empty_response"),
+    (_stream, RuntimeError("x"), "stream_init_failed"),
+    (_stream, [_FakeResponse(text="")], "empty_stream"),
+    (_stream, _interrupted_stream(), "stream_interrupted"),
+])
+def test_each_failure_names_its_kind(call: Any, response: Any, kind: str) -> None:
+    with pytest.raises(GeminiError) as info:
+        call(_FakeClient(response))
+    assert info.value.kind == kind
+
+
+UPSTREAM_TEXT = "POST https://upstream.example/v1/models?key=placeholder-credential-123 body=request-body-sample"
+
+
+class _StatusError(RuntimeError):
+    def __init__(self, message: str, code: Any) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class _Response:
+    status_code = 503
+
+
+class _ResponseError(RuntimeError):
+    response = _Response()
+
+
+def _wrapped(cause: BaseException) -> GeminiError:
+    error = GeminiError(f"Gemini API call failed: {type(cause).__name__}: {cause}", kind="call_failed")
+    error.__cause__ = cause
+    return error
+
+
+def test_error_log_fields_keep_types_kind_and_status_never_the_message() -> None:
+    fields = error_log_fields(_wrapped(_StatusError(UPSTREAM_TEXT, 429)))
+    assert fields == {"error_type": "GeminiError", "error_kind": "call_failed",
+                      "cause_type": "_StatusError", "upstream_status": 429}
+
+
+def test_error_log_fields_read_the_status_of_an_httpx_style_response() -> None:
+    assert error_log_fields(_wrapped(_ResponseError(UPSTREAM_TEXT)))["upstream_status"] == 503
+
+
+@pytest.mark.parametrize("code", [True, "429", None, 4.29])
+def test_error_log_fields_skip_a_status_that_is_not_an_integer(code: Any) -> None:
+    fields = error_log_fields(_wrapped(_StatusError(UPSTREAM_TEXT, code)))
+    assert "upstream_status" not in fields and fields["cause_type"] == "_StatusError"
+
+
+def test_error_log_fields_look_past_a_boolean_code_and_skip_a_boolean_status() -> None:
+    cause = _StatusError(UPSTREAM_TEXT, True)
+    cause.response = _Response()  # type: ignore[attr-defined]  # status_code 503
+    assert error_log_fields(_wrapped(cause))["upstream_status"] == 503
+    other = _StatusError(UPSTREAM_TEXT, None)
+    other.response = type("_BoolResponse", (), {"status_code": True})()  # type: ignore[attr-defined]
+    assert "upstream_status" not in error_log_fields(_wrapped(other))
+
+
+def test_error_log_fields_of_other_errors() -> None:
+    assert error_log_fields(RuntimeError(UPSTREAM_TEXT)) == {"error_type": "RuntimeError"}
+    assert error_log_fields(GeminiError(UPSTREAM_TEXT)) == {"error_type": "GeminiError", "error_kind": "error"}
 
 
 # === lazy SDK import ===

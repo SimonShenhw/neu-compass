@@ -5,13 +5,17 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
 
+import api.routes.common as common_module
 from api.routes.common import attempt_hyde_rescue
+from llm.gemini_client import GeminiError
 from rag.hyde import RESCUE_PROMPT_TEMPLATE, rescue_expand
 from rag.retriever import SearchHit
 from schemas.course import Course
 from tests.conftest import build_test_app
+from tests.log_recorder import LogRecorder
 
 
 # === rescue_expand ===
@@ -124,6 +128,26 @@ def test_rescue_llm_exception_degrades_to_none() -> None:
         hard_filters=None, pool_size=10, blend_alpha=0.4, top_k=5,
     )
     assert out is None
+
+
+def test_rescue_failure_logs_the_kind_not_the_upstream_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    recorder = LogRecorder()
+    monkeypatch.setattr(common_module, "log", recorder)
+
+    def boom(q: str) -> str | None:
+        raise GeminiError("Gemini API call failed: RuntimeError: placeholder-credential-123", kind="call_failed")
+
+    out = attempt_hyde_rescue(
+        query="x", conn=_conn_with_courses(),
+        hybrid=_FakeHybrid([_hit()]), reranker=_FakeReranker(),
+        rescue_fn=boom,
+        hard_filters=None, pool_size=10, blend_alpha=0.4, top_k=5,
+    )
+    assert out is None
+    assert recorder.events("rescue.failed") == [
+        ("warning", "rescue.failed", {"error_type": "GeminiError", "error_kind": "call_failed"}),
+    ]
+    assert "placeholder-credential-123" not in recorder.text()
 
 
 def test_rescue_empty_retrieval_returns_none() -> None:

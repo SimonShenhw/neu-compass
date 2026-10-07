@@ -176,3 +176,56 @@ def test_a_sentence_found_only_in_the_stored_raw_text_also_counts(runtime):
         entry("CS 5800", "Algorithms", "Graph algorithms."), entry("CS 6140", "Machine Learning", "Learning."),
     )) + "\n", encoding="utf-8")
     assert [item["code"] for item in repair_names(path, archive)["repairs"]] == ["CS 5200"]
+
+
+def test_a_named_mismatch_takes_the_catalog_title(runtime):
+    """--use-catalog-title is for a rename a person decided (AAI 6600 in production; CS 6140 here).
+    中文：--use-catalog-title 用于由人决定的改名（生产上是 AAI 6600，这里用 CS 6140）。"""
+    path, archive = runtime
+    before = rows(path)
+    report = repair_names(path, archive, use_catalog_title=["CS 6140"])
+    assert rows(path) == before and report["repaired"] == 0
+    assert [item["code"] for item in report["named_repairs"]] == ["CS 6140"]
+    assert report["named_repairs"][0]["catalog"] == "Machine Learning"
+    assert [item["code"] for item in report["repairs"]] == ["CS 5200"] and report["other_mismatches"] == []
+
+    report = repair_names(path, archive, commit=True, use_catalog_title=["CS 6140"])
+    after = rows(path)
+    assert report["repaired"] == 2
+    fixed, old = after["neu-cs-6140"], before["neu-cs-6140"]
+    assert fixed["primary_name"] == "Machine Learning"
+    assert json.loads(fixed["generated_json"]) == {**json.loads(old["generated_json"]),
+                                                   "primary_name": "Machine Learning"}
+    assert (fixed["raw_text"], fixed["status"], fixed["indexed_at"], fixed["metadata"]) == (
+        old["raw_text"], "indexed", old["indexed_at"], old["metadata"])
+    again = repair_names(path, archive, commit=True, use_catalog_title=["CS 6140"])
+    assert again["repaired"] == 0 and again["matched"] == 3  # Re-running changes nothing.
+    assert sync_sources(path, archive)["skipped_title_mismatch"] == 0  # Both snapshots can attach now.
+
+
+@pytest.mark.parametrize("code", ["CS6140", "CS 7777"])
+def test_a_named_code_not_in_the_archive_fails_before_the_database_is_opened(runtime, tmp_path, code):
+    path, archive = runtime
+    # A missing database would raise FileNotFoundError if it were opened first.
+    with pytest.raises(ValueError, match="not in the archive"):
+        repair_names(tmp_path / "missing.db", archive, commit=True, use_catalog_title=[code])
+
+
+def test_a_named_code_without_exactly_one_course_writes_nothing(runtime):
+    path, archive = runtime  # CS 9999 is archived but not in this database.
+    before = rows(path)
+    with pytest.raises(ValueError, match="CS 9999: 0 courses"):
+        repair_names(path, archive, commit=True, use_catalog_title=["CS 9999"])
+    assert rows(path) == before  # Not even the CS 5200 repair.
+
+
+def test_cli_takes_repeated_catalog_title_codes(runtime, capsys):
+    path, archive = runtime
+    base = ["--db-path", str(path), "--catalog-dir", str(archive), "--commit"]
+    assert cli([*base, "--use-catalog-title", "CS 6140", "--use-catalog-title", "CS 5800"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    # CS 5800 already matches: counted as matched, nothing to rename.
+    assert report["repaired"] == 2 and [item["code"] for item in report["named_repairs"]] == ["CS 6140"]
+    assert rows(path)["neu-cs-6140"]["primary_name"] == "Machine Learning"
+    assert cli([*base, "--use-catalog-title", "CS 7777"]) == 1
+    assert "no transaction committed" in capsys.readouterr().out

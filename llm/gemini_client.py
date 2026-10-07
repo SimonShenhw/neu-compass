@@ -63,8 +63,41 @@ DEFAULT_MAX_OUTPUT_TOKENS = 16384  # Week 7 §3.2: 8192 truncated CS 5800 mid-JS
 class GeminiError(Exception):
     """Wrapped error from Gemini API call or response parsing.
 
+    The message keeps upstream text (exception text, response excerpts) for operators running
+    scripts. Anything shown to clients or written to the API log uses `kind` and
+    error_log_fields() instead: that text can carry URLs, request or response bodies.
+
     中文:包装 Gemini API 调用或响应解析过程中的错误。
+    消息里保留上游文字(异常原文、响应片段),供跑脚本的人排查。发给客户端或写进 API 日志的
+    只用 `kind` 和 error_log_fields():那段文字可能带着网址、请求或响应正文。
     """
+
+    def __init__(self, message: str, *, kind: str = "error") -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
+def error_log_fields(exc: BaseException) -> dict[str, Any]:
+    """Facts about a failure that are safe to log: exception types, the GeminiError kind and the
+    upstream HTTP status. Never the message.
+
+    中文:可以安全写进日志的失败信息:异常类型、GeminiError 的 kind、上游 HTTP 状态码。
+    从不包含消息原文。
+    """
+    fields: dict[str, Any] = {"error_type": type(exc).__name__}
+    if isinstance(exc, GeminiError):
+        fields["error_kind"] = exc.kind
+    cause = exc.__cause__
+    if cause is not None:
+        fields["cause_type"] = type(cause).__name__
+        # google.genai's APIError keeps the HTTP status in .code; httpx errors on .response.
+        # 中文:google.genai 的 APIError 把 HTTP 状态码放在 .code;httpx 的错误放在 .response 上。
+        status = getattr(cause, "code", None)
+        if not isinstance(status, int) or isinstance(status, bool):
+            status = getattr(getattr(cause, "response", None), "status_code", None)
+        if isinstance(status, int) and not isinstance(status, bool):
+            fields["upstream_status"] = status
+    return fields
 
 
 class _ModelsLike(Protocol):
@@ -397,7 +430,7 @@ def generate_structured(
             config=config,
         )
     except Exception as e:
-        raise GeminiError(f"Gemini API call failed: {type(e).__name__}: {e}") from e
+        raise GeminiError(f"Gemini API call failed: {type(e).__name__}: {e}", kind="call_failed") from e
 
     response_text = _extract_text(response)
     try:
@@ -405,7 +438,8 @@ def generate_structured(
     except Exception as e:
         raise GeminiError(
             f"Response failed schema validation against {schema.__name__}: "
-            f"{type(e).__name__}: {e}\nResponse text: {response_text[:500]}"
+            f"{type(e).__name__}: {e}\nResponse text: {response_text[:500]}",
+            kind="invalid_response",
         ) from e
 
 
@@ -451,7 +485,7 @@ def generate_text(
             config=config,
         )
     except Exception as e:
-        raise GeminiError(f"Gemini API call failed: {type(e).__name__}: {e}") from e
+        raise GeminiError(f"Gemini API call failed: {type(e).__name__}: {e}", kind="call_failed") from e
 
     return _extract_text(response)
 
@@ -499,7 +533,7 @@ def generate_text_stream(
         )
     except Exception as e:
         raise GeminiError(
-            f"Gemini stream init failed: {type(e).__name__}: {e}"
+            f"Gemini stream init failed: {type(e).__name__}: {e}", kind="stream_init_failed"
         ) from e
 
     saw_any_text = False
@@ -511,12 +545,13 @@ def generate_text_stream(
                 yield str(text)
     except Exception as e:
         raise GeminiError(
-            f"Gemini stream interrupted: {type(e).__name__}: {e}"
+            f"Gemini stream interrupted: {type(e).__name__}: {e}", kind="stream_interrupted"
         ) from e
 
     if not saw_any_text:
         raise GeminiError(
-            "Gemini stream produced no text chunks (safety block or empty completion)"
+            "Gemini stream produced no text chunks (safety block or empty completion)",
+            kind="empty_stream",
         )
 
 
@@ -545,7 +580,8 @@ def _extract_text(response: Any) -> str:
 
     raise GeminiError(
         "Gemini response had no text content. "
-        f"Possible safety block or empty completion. Response: {response!r}"
+        f"Possible safety block or empty completion. Response: {response!r}",
+        kind="empty_response",
     )
 
 
@@ -554,6 +590,7 @@ __all__ = [
     "DEFAULT_MODEL",
     "DEFAULT_TEMPERATURE",
     "GeminiError",
+    "error_log_fields",
     "generate_structured",
     "generate_text",
     "generate_text_stream",

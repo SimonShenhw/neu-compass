@@ -27,6 +27,7 @@ from typing import Any, Callable, Protocol
 
 import structlog
 
+from llm.gemini_client import error_log_fields
 from rag.filters import filter_course_ids
 from rag.retriever import SearchHit
 from schemas.course import Course
@@ -192,7 +193,9 @@ def attempt_hyde_rescue(
             top_k=top_k,
         )
     except Exception as e:  # noqa: BLE001 — rescue must never 500 a request / 救援绝不能让请求 500
-        log.warning("rescue.failed", error=str(e)[:200])
+        # Types, kind and status only: a GeminiError message carries upstream text.
+        # 中文：只记类型、kind 和状态码：GeminiError 的消息里带着上游文字。
+        log.warning("rescue.failed", **error_log_fields(e))
         return None
     if not blended:
         return None

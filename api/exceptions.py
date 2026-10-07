@@ -71,7 +71,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth import OAuthError
 from db.repository import CourseNotFound
-from llm.gemini_client import GeminiError
+from llm.gemini_client import GeminiError, error_log_fields
 
 
 class ErrorResponse(BaseModel):
@@ -191,11 +191,24 @@ async def gemini_error_handler(
     """Gemini failures map to 502 (upstream), not 500. Lets clients decide
     whether to retry (502 → likely yes) vs. give up (500 → check logs).
     Gemini 失败映射到 502（上游错误），而不是 500。让客户端自己判断要不要
-    重试（502 → 大概率可以）还是放弃（500 → 该去查日志了）。"""
+    重试（502 → 大概率可以）还是放弃（500 → 该去查日志了）。
+
+    Fixed detail, like the 500 below: the message can carry upstream URLs or
+    request/response bodies. The log line keeps the safe facts (kind, upstream
+    type and status) under the same x-request-id.
+    detail 用固定文字，和下面的 500 一样：消息里可能带着上游网址、请求或
+    响应正文。日志行在同一个 x-request-id 下记录安全的信息（kind、上游类型
+    和状态码）。"""
+    _log.warning(
+        "gemini_error",
+        path=request.url.path,
+        method=request.method,
+        **error_log_fields(exc),
+    )
     return _error_response(
         status_code=502,
         error_type="upstream_error",
-        detail=f"LLM upstream failure: {exc}",
+        detail="LLM upstream failure. Retry later; the API log has the details by x-request-id.",
     )
 
 

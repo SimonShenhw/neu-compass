@@ -12,12 +12,15 @@ import json
 from collections.abc import Iterator
 from typing import Callable
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.dependencies import get_chat_stream_fn, get_db_conn
+from api.routes import chat as chat_route
 from db.program_repository import ProgramRepository
 from llm.gemini_client import GeminiError
 from schemas.program import Program, ProgramRequiredCourse
+from tests.log_recorder import LogRecorder
 
 
 def _override_stream(api_client: TestClient, fn: Callable[[str], Iterator[str]]) -> None:
@@ -120,7 +123,9 @@ def test_chat_gemini_error_emits_error_event_then_done(api_client: TestClient) -
     assert "error" in types
     assert types[-1] == "done"
     err = next(e for e in events if e["type"] == "error")
-    assert "quota" in err["detail"]
+    assert err == {"type": "error", "error_type": "upstream_error",
+                   "detail": chat_route.STREAM_ERROR_DETAIL["upstream_error"]}
+    assert "quota" not in r.text
 
 
 def test_chat_unhandled_exception_still_finishes_stream(api_client: TestClient) -> None:
@@ -134,7 +139,72 @@ def test_chat_unhandled_exception_still_finishes_stream(api_client: TestClient) 
     r = api_client.post("/chat", json={"query": "x"})
     events = _parse_ndjson(r.text)
     assert events[-1]["type"] == "done"
-    assert any(e["type"] == "error" for e in events)
+    err = next(e for e in events if e["type"] == "error")
+    assert err == {"type": "error", "error_type": "internal_error",
+                   "detail": chat_route.STREAM_ERROR_DETAIL["internal_error"]}
+    assert "unexpected" not in r.text
+
+
+# Placeholder upstream text: a credential-like value, a URL and a request body (FIX-01).
+UPSTREAM_PARTS = ("placeholder-credential-123", "https://upstream.example/v1/stream", "request-body-sample")
+
+
+class _UpstreamFailure(RuntimeError):
+    code = 429
+
+
+def _upstream_failure() -> GeminiError:
+    cause = _UpstreamFailure(f"POST {UPSTREAM_PARTS[1]}?key={UPSTREAM_PARTS[0]} body={UPSTREAM_PARTS[2]}")
+    error = GeminiError(f"Gemini stream interrupted: {type(cause).__name__}: {cause}", kind="stream_interrupted")
+    error.__cause__ = cause
+    return error
+
+
+def test_chat_upstream_failure_reaches_neither_the_client_nor_the_log(
+    api_client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = LogRecorder()
+    monkeypatch.setattr(chat_route, "log", recorder)
+
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "partial..."
+        raise _upstream_failure()
+
+    _override_stream(api_client, boom_stream)
+    r = api_client.post("/chat", json={"query": "x"})
+    events = _parse_ndjson(r.text)
+    assert [e["text"] for e in events if e["type"] == "token"] == ["partial..."]
+    assert [e["type"] for e in events][-2:] == ["error", "done"]
+    assert recorder.events("chat.stream_failed") == [("warning", "chat.stream_failed", {
+        "error_type": "GeminiError", "error_kind": "stream_interrupted",
+        "cause_type": "_UpstreamFailure", "upstream_status": 429,
+    })]
+    for part in UPSTREAM_PARTS:
+        assert part not in r.text
+        assert part not in recorder.text()
+
+
+def test_chat_unexpected_error_logs_where_it_happened_not_its_message(
+    api_client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = LogRecorder()
+    monkeypatch.setattr(chat_route, "log", recorder)
+
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "ok"
+        raise RuntimeError(f"state at {UPSTREAM_PARTS[1]} with {UPSTREAM_PARTS[0]}")
+
+    _override_stream(api_client, boom_stream)
+    r = api_client.post("/chat", json={"query": "x"})
+    [(level, _, fields)] = recorder.events("chat.stream_unhandled")
+    # error, not exception: a rendered traceback would end with the message.
+    assert level == "error"
+    assert fields["error_type"] == "RuntimeError" and "error_kind" not in fields
+    assert fields["frames"][-1].startswith("test_api_chat.py:")
+    assert fields["frames"][-1].endswith(" boom_stream")
+    for part in UPSTREAM_PARTS:
+        assert part not in r.text
+        assert part not in recorder.text()
 
 
 # === Validation ===

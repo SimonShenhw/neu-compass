@@ -403,10 +403,17 @@ One JSON object per line. Order of object types:
    ```
    Concatenate `text` fields in order to reconstruct the assistant's reply.
 
-3. **Optional — error** (Gemini stream failure):
+3. **Optional — error** (stream failure):
    ```json
-   {"type": "error", "detail": "GeminiError: rate limit exceeded"}
+   {"type": "error", "error_type": "upstream_error", "detail": "模型服务暂时出错，这条回答没有完成。请稍后再问一次。"}
    ```
+   `error_type` is `upstream_error` (the Gemini call failed) or `internal_error`
+   (anything else). `detail` is fixed text that the UI appends to the partial
+   answer; it never carries the exception message, which can hold upstream URLs
+   or request/response bodies. The server log line (`chat.stream_failed` /
+   `chat.stream_unhandled`) shares the response's `x-request-id` and records
+   only the error types, the Gemini error kind, the upstream HTTP status and,
+   for an unexpected error, where it was raised (file:line function).
 
 4. **Always last — done**:
    ```json
