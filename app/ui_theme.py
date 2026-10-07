@@ -384,12 +384,13 @@ def hero_html(
 def guest_banner_html() -> str:
     """Soft card replacing the default st.info guest notice.
     替代默认 st.info 访客提示的柔和卡片。"""
-    # Tiers per coop_view: level 0 for everyone, 1 reviewed contribution → interview
-    # details, 2 → salary range. 中文：分级同 coop_view：0 级所有人可见，1 条已审核贡献
-    # 解锁面试细节，2 条解锁薪资区间。
+    # Tiers per coop_view: level 0 for everyone, 1 published contribution → interview
+    # details, 2 → salary range (a share counts once it is published, not when it is
+    # approved: db.coop_submission_repository). 中文：分级同 coop_view：0 级所有人可见，
+    # 1 条公开的贡献解锁面试细节，2 条解锁薪资区间（分享在公开时才计入，不是审核通过时）。
     return (
         '<div class="nc-banner">🔒 你现在是游客：课程搜索和培养方案都能用；Co-op 经验只显示'
-        "公司、职位、行业、学期和时长。用 NEU 邮箱登录（左侧栏）后分享自己的 Co-op 经验，审核通过"
+        "公司、职位、行业、学期和时长。用 NEU 邮箱登录（左侧栏）后分享自己的 Co-op 经验，经验公开"
         "后解锁更多：1 条看面试细节，2 条看薪资区间。</div>"
     )
 

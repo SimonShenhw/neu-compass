@@ -8,11 +8,14 @@
   const WORD_JOINER = String.fromCharCode(0x2060);
   const r = {cases: 0, byKind: {}, noMarkdown: 0, links: {catalog: 0, mail: 0, headingAnchor: 0, other: 0},
              embedded: 0, katex: 0, styled: 0, urlInText: 0, urlInCode: 0, plainMismatch: {}};
-  // Streamlit's own markup that is not from the answer: heading anchors, code highlighting, and the
-  // copy button next to each code block. 中文：不是来自回答的 Streamlit 自带元素：标题锚点、代码高亮、
-  // 代码块旁的复制按钮。
-  const streamlitOwn = (element) => element.closest('h1,h2,h3,h4,h5,h6,pre')
+  // Streamlit's own markup that is not from the answer: the spans of each heading and its anchor,
+  // code highlighting, and the copy button next to each code block. Directive, icon and coloured-text
+  // elements count inside headings too; only code blocks are skipped for them. 中文：不是来自回答的
+  // Streamlit 自带元素：标题的 span 和锚点、代码高亮、代码块旁的复制按钮。指令、图标、彩色文字在标题里
+  // 也计数，只跳过代码块里的。
+  const inCodeBlock = (element) => element.closest('pre')
     || element.querySelector('button[aria-label="Copy to clipboard"]');
+  const streamlitOwn = (element) => inCodeBlock(element) || element.closest('h1,h2,h3,h4,h5,h6');
   for (const box of document.querySelectorAll('[class*="st-key-case-"]')) {
     const key = [...box.classList].find((name) => name.startsWith('st-key-case-')).slice(12);
     const kind = key.split('-')[0];
@@ -29,9 +32,10 @@
     }
     if (md.querySelector('img, image, svg image, iframe, video, audio, object, embed, picture, source')) r.embedded++;
     if (md.querySelector('.katex, .katex-display, math')) r.katex++;
-    const styled = [...md.querySelectorAll('span, small, [data-testid^="stIcon"], [class*="Badge"], [class*="ColoredText"]')]
-      .filter((element) => !streamlitOwn(element));
-    if (styled.length) r.styled++;  // Directives, icons, coloured text or tooltips from the answer.
+    const plain = [...md.querySelectorAll('span, small')].filter((element) => !streamlitOwn(element));
+    const marked = [...md.querySelectorAll('[data-testid^="stIcon"], [class*="Badge"], [class*="ColoredText"]')]
+      .filter((element) => !inCodeBlock(element));
+    if (plain.length || marked.length) r.styled++;  // Directives, icons, coloured text or tooltips from the answer.
     for (const code of md.querySelectorAll('code')) {
       for (const match of code.textContent.matchAll(URL_START)) {
         if (!CATALOG_AT.test(code.textContent.slice(match.index))) { r.urlInCode++; break; }

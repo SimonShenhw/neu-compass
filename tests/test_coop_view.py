@@ -75,3 +75,28 @@ def test_listing_shows_reviewed_submissions_as_plain_text(monkeypatch) -> None:
     assert "Two rounds " + linked in [item.value for item in app.text]
     assert any(item.value == "含面试细节和薪资" for item in app.caption)
     assert any("行业" in item.value and "大型科技公司" in item.value for item in app.markdown)
+
+
+def test_lock_captions_claim_only_what_the_level_guarantees(monkeypatch) -> None:
+    """derive_visibility: 1 = interview details and no salary, 2 = a salary range, with or without
+    interview details. The API leaves out what the viewer has not unlocked, and a share counts once
+    it is published. 中文：1 = 有面试细节、没有薪资，2 = 有薪资区间（面试细节不一定有）；API 不返回
+    访客还没解锁的字段；分享在公开时才计入。"""
+    import httpx
+    from streamlit.testing.v1 import AppTest
+
+    import app.api_client as api_module
+
+    rows = [{"coop_id": coop_id, "company": "Acme", "role": coop_id, "visibility_level": level, **fields}
+            for coop_id, level, fields in (("a", 1, {}), ("b", 2, {}), ("c", 2, {"salary_range_usd": "$30/hr"}),
+                                           ("d", 0, {}))]
+    original = api_module.ApiClient
+    monkeypatch.setattr(api_module, "ApiClient", lambda **kwargs: original(
+        base_url="http://synthetic-widget", transport=httpx.MockTransport(lambda request: httpx.Response(200, json=rows)),
+        **kwargs))
+    app = AppTest.from_string(
+        "import streamlit as st\nfrom app.coop_view import render_coop_panel\nrender_coop_panel(st)").run(timeout=45)
+    assert not app.exception
+    assert [item.value for item in app.caption if item.value.startswith("🔒")] == [
+        "🔒 这条有面试细节：你分享的经验有 1 条公开后解锁", "🔒 这条有薪资区间：你分享的经验有 2 条公开后解锁"]
+    assert not any("审核通过" in item.value for item in [*app.info, *app.caption])

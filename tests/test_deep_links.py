@@ -267,6 +267,26 @@ def test_ref_label_is_length_capped(monkeypatch) -> None:
     assert "z" * 65 not in st.warnings[0]
 
 
+@pytest.mark.parametrize("ref", ["x\n\n[note](https://elsewhere.example/page)", "x\n- [note](https://elsewhere.example/page)",
+                                 "x\n# [note](https://elsewhere.example/page)", "x\n> [note](https://elsewhere.example/page)"])
+@pytest.mark.parametrize("param", ["course", "program"])
+def test_ref_label_stays_on_one_line(monkeypatch, ref, param) -> None:
+    """A code span cannot cross a blank line or a new block, so a line break in the ref would let
+    the rest of it render as Markdown. 中文：代码段跨不过空行或新的块，ref 里的换行会让后面的部分
+    按 Markdown 渲染。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    _fake_resolve(monkeypatch, [])
+    st = _FakeSt(**{param: ref})
+    st.session_state["_programs_cache"] = PROGRAMS  # skips the API hop
+    apply_deep_link(st, pages=PAGES)
+    (warned,) = st.warnings
+    assert "\n" not in warned and " ".join(ref.split()) in warned
+    tokens = MarkdownIt("commonmark").parse(warned)
+    assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+    assert "link_open" not in [child.type for child in tokens[1].children]
+
+
 def test_ambiguous_course_ref_opens_first_and_says_so(monkeypatch) -> None:
     _fake_resolve(monkeypatch, [
         {"course_id": "c-cs-5800", "primary_code": "CS 5800",

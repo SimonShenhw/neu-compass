@@ -43,7 +43,7 @@ PLAIN_STREAMLIT = [
 ]
 MATH_FENCES = [
     "a $x$ a\n\n```math\ny\n```", "a $x$ a\n\n~~~ Math\ny\n~~~", "a $x$ a\n\n> ```math\n> y\n> ```",
-    "a $x$ a\n\n- ```math\n  y\n  ```", "a $x$ a\n\n```python\ny = 1\n```",
+    "a $x$ a\n\n- ```math\n  y\n  ```", "a $x$ a\n\n```python\ny = 1\n```", "a $x$ a\n\n```\tmath\ny\n```",
 ]
 
 cases = [("exact", raw) for raw, _ in EXPECTED]

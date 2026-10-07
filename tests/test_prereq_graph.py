@@ -62,6 +62,22 @@ def test_double_quotes_in_labels_are_escaped() -> None:
     assert '"CS "' not in dot
 
 
+def test_backslashes_cannot_end_or_extend_a_quoted_string() -> None:
+    """Graphviz reads a backslash before a quote as an escaped quote and never pairs two
+    backslashes, so a label ending in one ran on into the next statement."""
+    dot = build_prereq_dot(
+        "CS 5800\\",
+        [{"course_id": "a\\", "primary_code": None, "requirement": "required\\"},
+         {"course_id": "b", "primary_code": 'x\\"y', "requirement": "concurrent"}],
+        dependents=[{"course_id": "c\\", "primary_code": None}],
+    )
+    unescaped = dot.replace('\\"', "")
+    assert "\\" not in unescaped
+    for line in unescaped.splitlines():
+        assert line.count('"') % 2 == 0, line
+    assert '"a/" -> "CS 5800/"' in dot and '"CS 5800/" -> "c/";' in dot
+
+
 def test_dependents_draw_gray_with_edges_from_center() -> None:
     dot = build_prereq_dot(
         "CS 5800",

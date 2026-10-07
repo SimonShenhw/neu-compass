@@ -250,6 +250,27 @@ def test_source_ids_and_quotes_are_plain_text_not_arbitrary_links():
     assert any("抽取置信度 0.80（不是事实概率）" in line for line in st.captions)
 
 
+def test_unknown_field_names_and_codes_show_as_plain_text():
+    """A snippet's field name is model-written, and an unknown missing-field or warning code is data
+    too; captions render Markdown. 中文：证据片段的字段名是模型写的，未知的缺失字段或提示码也是数据；
+    说明文字会渲染 Markdown。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    linked = "x\n\n[note](https://elsewhere.example/page)"
+    st = FakeSurface()
+    data = evidence()
+    data["missing_fields"], data["warnings"] = ["credits", linked], [linked]
+    render_answer_evidence(st, data, detailed=True)
+    render_field_evidence(st, [{"field": linked, "value": 3, "confidence": 0.8, "source_id": "rmp_review_b", "quote": "q"}])
+    with_data = [line for line in st.captions if "elsewhere" in line]
+    assert len(with_data) == 3  # Missing fields, the warning, the snippet's field.
+    for line in with_data:
+        tokens = MarkdownIt("commonmark").parse(line)
+        assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+        assert "link_open" not in [child.type for child in tokens[1].children]
+    assert st.captions[1].startswith("缺失：" + FIELD_LABELS["credits"] + "、")
+
+
 def test_detail_counts_sources_by_kind_and_keeps_the_ids_one_click_away():
     """Fifty base64 review IDs used to fill the panel; now one summary line, IDs collapsed."""
     data = evidence()
@@ -414,6 +435,7 @@ EXPECTED = [
     # Streamlit renders a ```math block as KaTeX when the answer has a "$...$" pair anywhere.
     ("$x$\n\n```math\ny\n```", f"\\$x\\$\n\n```m{WJ}ath\ny\n```"),
     ("> ~~~ Math\n> y\n> ~~~", f"> ~~~ M{WJ}ath\n> y\n> ~~~"),
+    ("$x$\n\n```\tmath\ny\n```", f"\\$x\\$\n\n```\tm{WJ}ath\ny\n```"),  # The renderer skips a tab there too.
     # A directive name may be any non-ASCII character, and the renderer's whitespace is narrower
     # than Python's \s (which includes U+001C).
     ("a :中文[x] a", f"a \\:{WJ}中文[x] a"),

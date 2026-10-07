@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from app.program_plan_view import render_chat_program_selector, render_program_plans, rule_lines
@@ -60,15 +61,35 @@ def test_selector_starts_with_none_and_never_auto_chooses_latest():
     assert st.texts == st.markdowns == []
 
 
+def shown(markdown: str) -> str:
+    """What a caption displays: escapes resolved, word joiners dropped. 中文：说明文字显示出来的样子。"""
+    return re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", markdown).replace(chr(0x2060), "")
+
+
 def test_selected_partial_rules_scope_and_or_are_kept_explicit():
     data = document()
     st = FakeSurface(choice=data["plan_id"])
     render_program_plans(st, [data], key="view")
-    assert any("boston" in line and "2026-2027" in line and "普通 MS" in line for line in st.captions)
+    assert any("boston" in line and "2026-2027" in line and "普通 MS" in line for line in map(shown, st.captions))
     assert any("仅规则片段，不是完整培养方案" in line for line in st.captions)
     assert any("不判断注册或毕业资格" in line for line in st.captions)
     assert any("任一分支（OR）" in text and "EECE 7205" in text for text in st.texts)
     assert st.markdowns == [f"[官方目录来源]({data['source_url']})"]
+
+
+def test_scope_caption_shows_a_concentration_as_written():
+    """concentration is free text and captions render Markdown. 中文：concentration 是自由文本，说明文字会渲染 Markdown。"""
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    data = document()
+    data["concentration"] = "AI\n\n[note](https://elsewhere.example/page) *x*"
+    st = FakeSurface(choice=data["plan_id"])
+    render_program_plans(st, [data], key="view")
+    (caption,) = (line for line in st.captions if "Catalog" in line)
+    assert "AI [note](https://elsewhere.example/page) *x*" in shown(caption)
+    tokens = MarkdownIt("commonmark").parse(caption)
+    assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+    assert {child.type for child in tokens[1].children} == {"text"}
 
 
 def test_invalid_history_document_has_no_source_link():

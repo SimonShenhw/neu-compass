@@ -72,11 +72,12 @@ def test_plain_text_lines_escape_html_and_stay_one_html_block() -> None:
 
 
 def test_guest_banner_mentions_login_path() -> None:
-    """Student wording for the give-to-get tiers in coop_view: level 0 for everyone, 1 reviewed
-    contribution for interview details, 2 for salary ranges."""
+    """Student wording for the give-to-get tiers in coop_view: level 0 for everyone, 1 published
+    contribution for interview details, 2 for salary ranges. A share counts when it is published
+    (it needs a peer in the same group), not when it is approved."""
     out = guest_banner_html()
     assert "nc-banner" in out
-    assert "游客" in out and "NEU 邮箱登录" in out and "审核通过" in out
+    assert "游客" in out and "NEU 邮箱登录" in out and "经验公开后" in out and "审核" not in out
     assert "1 条看面试细节" in out and "2 条看薪资区间" in out
     assert "level-0" not in out and "preview" not in out
 
@@ -252,6 +253,23 @@ def test_prereq_label_shows_database_text_literally() -> None:
     assert types.count("strong_open") == 1 and types.count("em_open") == 1 and types.count("paragraph_open") == 1
     text = "".join(child.content for token in tokens for child in token.children or [] if child.type == "text")
     assert "Algo [note](h\u2060ttps:\u2060//elsewhere.example/page) *x* # y" in text
+
+
+def test_prereq_label_code_and_bare_id_stay_literal_too() -> None:
+    from markdown_it import MarkdownIt  # noqa: PLC0415
+
+    from app.ui_theme import prereq_label_md  # noqa: PLC0415
+
+    label = prereq_label_md(code="CS [note](https://elsewhere.example/page)", name="Algorithms",
+                            course_id="neu-cs-5800", requirement="required")
+    tokens = MarkdownIt("commonmark").parse(label)
+    assert "link_open" not in [child.type for token in tokens for child in token.children or []]
+    dangling = prereq_label_md(code=None, name=None, course_id="c-ghost\n\n`x` [note](https://elsewhere.example/page)",
+                               requirement="recommended")
+    assert dangling.startswith("`c-ghost x [note](https://elsewhere.example/page)`")
+    tokens = MarkdownIt("commonmark").parse(dangling)
+    assert [token.type for token in tokens] == ["paragraph_open", "inline", "paragraph_close"]
+    assert "link_open" not in [child.type for child in tokens[1].children]
 
 
 def test_empty_footer_brand_render() -> None:

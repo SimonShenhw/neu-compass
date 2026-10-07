@@ -112,7 +112,7 @@ def render_coop_panel(st) -> None:
 
     st.subheader("💼 NEU Co-op 经验")
     st.caption("这里有整理好的示例记录，也有同学分享的 Co-op 经验。同学的分享先人工去掉个人信息并审核，"
-               "同一类经验至少有 2 位不同的同学分享后才公开。分享自己的经验可以解锁更多细节。")
+               "同一类经验至少有 2 位不同的同学分享后才公开。你分享的经验公开后，可以解锁更多细节。")
 
     # The previous upload's actual server state survives the rerun.
     # 中文：重跑后显示上一次提交的真实服务端状态，不暗示立即解锁。
@@ -124,7 +124,7 @@ def render_coop_panel(st) -> None:
     if not is_logged_in(st.session_state):
         st.info(
             "你现在是游客：只能看到公开记录的公司、职位、行业、学期和时长。用 NEU 邮箱登录并分享自己的经验，"
-            "审核通过后能看到更多：1 条看面试细节，2 条看薪资区间。"
+            "经验公开后能看到更多：1 条看面试细节，2 条看薪资区间。"
         )
 
     # === Listing ===
@@ -162,13 +162,17 @@ def render_coop_panel(st) -> None:
                     st.markdown(labelled_line_html("时长", f"{c['duration_months']} 个月"), unsafe_allow_html=True)
 
                 # Detail tier — the API redacts fields the caller's tier
-                # hasn't earned; visibility_level reports what the row
-                # actually contains, so absent-but-existing fields get a
-                # give-to-get unlock hint instead of silent nothing.
+                # hasn't earned; visibility_level comes from what the row
+                # holds (schemas.coop.derive_visibility: 1 = interview
+                # details and no salary, 2 = a salary range, with or without
+                # interview details), so absent-but-existing fields get a
+                # give-to-get unlock hint instead of silent nothing, and only
+                # what the level guarantees is claimed.
                 # 中文:详情分级 —— 调用方分级还没赚到的字段，API 会
-                # 直接打码；visibility_level 反映的是这一行实际包含
-                # 什么，所以"缺失但其实存在"的字段会得到一个 give-to-get
-                # 解锁提示，而不是悄无声息地什么都不显示。
+                # 直接打码；visibility_level 由这一行的内容决定（1 = 有面试
+                # 细节、没有薪资，2 = 有薪资区间，面试细节不一定有），所以
+                # "缺失但其实存在"的字段会得到一个 give-to-get 解锁提示，
+                # 并且只说这个等级保证有的内容。
                 has_detail = c.get("interview_summary") or c.get(
                     "technical_questions"
                 )
@@ -178,14 +182,14 @@ def render_coop_panel(st) -> None:
                 if c.get("technical_questions"):
                     with st.expander("技术问题"):
                         st.text(c["technical_questions"])
-                if c["visibility_level"] >= 1 and not has_detail:
-                    st.caption("🔒 这条有面试细节：分享 1 条经验并通过审核后解锁")
+                if c["visibility_level"] == 1 and not has_detail:
+                    st.caption("🔒 这条有面试细节：你分享的经验有 1 条公开后解锁")
 
                 # Premium tier
                 if c.get("salary_range_usd"):
                     st.markdown(labelled_line_html("💰 薪资区间", c["salary_range_usd"]), unsafe_allow_html=True)
                 elif c["visibility_level"] >= 2:
-                    st.caption("🔒 这条有薪资区间：分享 2 条经验并通过审核后解锁")
+                    st.caption("🔒 这条有薪资区间：你分享的经验有 2 条公开后解锁")
 
     # === Upload form (logged-in users only) ===
     # 中文:上传表单（仅限已登录用户）

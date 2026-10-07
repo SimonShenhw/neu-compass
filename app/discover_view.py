@@ -213,16 +213,19 @@ def _render_coop_teaser(st) -> None:
             f'{plain_text_html(c.get("role", ""))}</div>',
             unsafe_allow_html=True,
         )
-        # visibility_level is what the row contains; the API leaves out what this viewer's tier
-        # has not unlocked. 中文：visibility_level 是这一行有什么；这位访客的等级还没解锁的
-        # 字段，API 不会返回。
+        # visibility_level comes from what the row holds (schemas.coop.derive_visibility): 1 means
+        # interview details and no salary, 2 means a salary range, with or without interview
+        # details. The API leaves out what this viewer's tier has not unlocked, so only what the
+        # level guarantees is claimed. 中文：visibility_level 由这一行的内容决定：1 是有面试细节、
+        # 没有薪资，2 是有薪资区间（面试细节不一定有）。这位访客的等级还没解锁的字段 API 不会返回，
+        # 所以只说这个等级保证有的内容。
         level = int(c.get("visibility_level", 0))
-        locked = [label for label, needs, present in (
-            ("面试细节", 1, c.get("interview_summary") or c.get("technical_questions")),
-            ("薪资区间", 2, c.get("salary_range_usd")),
-        ) if level >= needs and not present]
+        locked = [label for label, holds, present in (
+            ("面试细节", level == 1, c.get("interview_summary") or c.get("technical_questions")),
+            ("薪资区间", level >= 2, c.get("salary_range_usd")),
+        ) if holds and not present]
         if locked:
-            st.caption(f"🔒 这条有{'和'.join(locked)}：分享自己的经验并通过审核后解锁")
+            st.caption(f"🔒 这条有{'和'.join(locked)}：你分享的经验公开后解锁")
     if st.button("去看看 →", key="disc-coop"):
         st.session_state["pending_nav_to_coop"] = True
         st.rerun()

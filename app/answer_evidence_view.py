@@ -128,11 +128,11 @@ def _when(value: datetime) -> str:
 # re-rendering a directive label, cannot produce a link. The two placeholder marks (private-use
 # U+E000 / U+E001) are replaced with U+FFFD. Costs: the model's backslashes, entities, math and
 # Streamlit directives / shortcodes (":red[...]", ":smile:") show literally; other links show as
-# their Markdown source, and a copied non-catalog URL or ":name" carries the invisible word
-# joiner; inside code, inserted escapes are visible and a catalog URL shows in angle brackets; a
-# table's "\|" becomes a column break. Streamlit still applies its typographic replacements
-# ("->", "<-", "<->", "--", ">=", "<=", "~=") and the few emoji shortcodes that start with
-# punctuation (":+1:"). An email address may still become a mail link.
+# their Markdown source, and a copied non-catalog URL, ":name" or fence "math" info string
+# carries the invisible word joiner; inside code, inserted escapes are visible and a catalog URL
+# shows in angle brackets; a table's "\|" becomes a column break. Streamlit still applies its
+# typographic replacements ("->", "<-", "<->", "--", ">=", "<=", "~=") and the few emoji
+# shortcodes that start with punctuation (":+1:"). An email address may still become a mail link.
 # 中文：模型回答是不可信的 Markdown（目录描述与评价引文都会进提示词）。answer_markdown() 让渲染器
 # 按原样显示模型的文字：强调、列表、标题、表格、代码照常；官方目录院系页链接保持可点；其他东西都不能
 # 变成链接、图片、HTML、公式、指令或短代码。一遍线性处理：1 先把官方目录链接换成占位符；2 所有反斜杠
@@ -146,10 +146,10 @@ def _when(value: datetime) -> str:
 # 标签同样经过转义。除了保留的目录链接，这一遍只插入字符，而且每个开启符都被转义，所以渲染器显示的
 # 就是这里检查过的文字：解码转义或实体、把指令标签再渲染一次，都不可能产生链接。占位符用的两个私用区
 # 字符（U+E000 / U+E001）换成 U+FFFD。代价：模型写的反斜杠、实体、公式和 Streamlit 指令/短代码原样
-# 显示；其他链接显示成 Markdown 原文，复制出的非目录网址和 ":名字" 带着不可见的 word joiner；代码里
-# 能看到插入的转义，目录网址会带尖括号显示；表格的 "\|" 会变成分列。Streamlit 的排版替换仍然生效
-# （"->"、"<-"、"<->"、"--"、">="、"<="、"~="），以标点开头的少数 emoji 短代码（":+1:"）仍会变成
-# emoji。邮箱地址仍可能变成邮件链接。
+# 显示；其他链接显示成 Markdown 原文，复制出的非目录网址、":名字" 和代码围栏的 "math" 信息串带着
+# 不可见的 word joiner；代码里能看到插入的转义，目录网址会带尖括号显示；表格的 "\|" 会变成分列。
+# Streamlit 的排版替换仍然生效（"->"、"<-"、"<->"、"--"、">="、"<="、"~="），以标点开头的少数
+# emoji 短代码（":+1:"）仍会变成 emoji。邮箱地址仍可能变成邮件链接。
 WORD_JOINER = "\u2060"
 _CATALOG_URL = OFFICIAL_CATALOG_URL.pattern + r"(?:#[A-Za-z0-9_-]{1,64})?"  # An in-page anchor is harmless.
 _CATALOG_LINK = re.compile(
@@ -181,11 +181,21 @@ def literal_markdown(value: object) -> str:
     """One line of plain text for a Markdown context, e.g. a course name from the database in a
     label: whitespace runs (line breaks included) become one space, every ASCII punctuation
     character is escaped, and URL starts and ":" get the same word joiner as answer_markdown().
+    An e-mail address may still become a mail link.
     中文：放进 Markdown 的一行纯文字，例如标签里来自数据库的课程名：连续空白（含换行）变成一个
-    空格，每个 ASCII 标点都转义，网址开头和 ":" 后面插入和 answer_markdown() 一样的 word joiner。"""
+    空格，每个 ASCII 标点都转义，网址开头和 ":" 后面插入和 answer_markdown() 一样的 word joiner。
+    邮箱地址仍可能变成邮件链接。"""
     text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, " ".join(str(value).split()))
     return _ASCII_PUNCTUATION.sub(
         lambda match: "\\" + match.group(0) + (WORD_JOINER if match.group(0) == ":" else ""), text)
+
+
+def _label(labels: dict[str, str], code: object) -> str:
+    """Our label for a known code; anything else is data (e.g. a field name the model wrote) and goes
+    into the Markdown as plain text. 中文：已知代码用我们的标签；其他的是数据（例如模型写的字段名），
+    按纯文字放进 Markdown。"""
+    text = str(code)
+    return labels.get(text) or literal_markdown(text)
 
 
 def answer_markdown(text: str) -> str:
@@ -232,7 +242,7 @@ def evidence_summary(evidence: dict, *, missing_limit: int | None = None) -> lis
         lines.append("来源：已存目录快照（非实时核验）")
     else:
         lines.append("来源：未附可追溯目录快照")
-    missing = [FIELD_LABELS.get(field, field) for field in evidence.get("missing_fields", [])]
+    missing = [_label(FIELD_LABELS, field) for field in evidence.get("missing_fields", [])]
     if missing:
         visible = missing if missing_limit is None else missing[:missing_limit]
         remainder = len(missing) - len(visible)
@@ -292,7 +302,7 @@ def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False,
             st.caption(line)
         return
     for warning in evidence.get("warnings", []):
-        st.caption(WARNING_LABELS.get(warning, warning))
+        st.caption(_label(WARNING_LABELS, warning))
     snapshot = _catalog_snapshot(evidence)
     if snapshot:
         st.markdown(f"[官方目录来源]({snapshot.catalog_url}) · 非实时核验")
@@ -315,9 +325,10 @@ def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False,
 
 
 def render_field_evidence(st, snippets: list[dict]) -> None:
-    """Render supplied quotes/IDs as text, not user-controlled Markdown links."""
+    """Render supplied quotes/IDs as text, not user-controlled Markdown links. The field name is
+    model-written too (an unknown one shows as plain text)."""
     for item in snippets:
-        field = FIELD_LABELS.get(item["field"], item["field"])
+        field = _label(FIELD_LABELS, item["field"])
         kind = SOURCE_KIND_LABELS[source_kind(str(item["source_id"]))]
         st.caption(f"{field} · 抽取置信度 {item['confidence']:.2f}（不是事实概率）")
         st.text(f"支持值：{item['value']}\n来源：{kind} · {item['source_id']}\n引文：{item['quote']}")

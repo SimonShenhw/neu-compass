@@ -19,6 +19,24 @@ Two entry points page modules call:
 
 from __future__ import annotations
 
+import re
+
+# OAuth error codes (RFC 6749 and Google's) are lowercase words joined by "_".
+# 中文：OAuth 错误码（RFC 6749 和 Google 的）是用 "_" 连起来的小写单词。
+_OAUTH_ERROR_CODE = re.compile(r"[a-z_]{1,64}")
+
+
+def oauth_error_message(value: object) -> str:
+    """The warning for ?error= without ?code=. The value comes from a URL anyone can write and
+    st.warning renders Markdown, so only a well-formed error code is shown, in a code span;
+    anything else gets the fixed text.
+
+    中文：带 ?error= 而没有 ?code= 时的提示。这个值来自任何人都能写的 URL，而 st.warning
+    会渲染 Markdown，所以只显示格式正确的错误码（放在代码片段里），其他情况显示固定文字。"""
+    code = str(value)
+    shown = f"（`{code}`）" if _OAUTH_ERROR_CODE.fullmatch(code) else ""
+    return f"登录未完成{shown}。可从左侧栏重新发起登录。"
+
 
 def handle_oauth_callback() -> None:
     """If `?code=` is present in the URL, exchange it via /auth/callback,
@@ -53,9 +71,7 @@ def handle_oauth_callback() -> None:
     oauth_error = st.query_params.get("error")
     code = st.query_params.get("code")
     if oauth_error and not code:
-        st.warning(
-            f"登录未完成（{oauth_error}）。可从左侧栏重新发起登录。"
-        )
+        st.warning(oauth_error_message(oauth_error))
         st.query_params.clear()
         return
     if not code:
@@ -197,4 +213,4 @@ def render_auth_sidebar() -> None:
             st.caption("Restricted to husky.neu.edu / northeastern.edu.")
 
 
-__all__ = ["handle_oauth_callback", "render_auth_sidebar"]
+__all__ = ["handle_oauth_callback", "oauth_error_message", "render_auth_sidebar"]

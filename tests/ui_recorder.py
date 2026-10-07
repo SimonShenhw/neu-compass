@@ -58,6 +58,10 @@ class Recorder:
         self._add("expander", label)
         return Recorder(self.shared, self._where() + (label,))
 
+    def columns(self, spec, **kwargs):
+        """Columns write where their parent writes (no path of their own)."""
+        return [Recorder(self.shared, self._where()) for _ in range(spec if isinstance(spec, int) else len(spec))]
+
     def __enter__(self):
         self.shared["stack"].append(self._where())
         return self
