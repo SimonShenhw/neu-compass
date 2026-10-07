@@ -199,7 +199,11 @@ def test_status_of_reports_written_before_the_plan_was_recorded():
 
 @pytest.mark.parametrize("questions_text", [
     "not json", "[]", '[{"qid": "Q1"}]', json.dumps([{**QUESTION, "course_ids": []}]),
-    json.dumps([{**QUESTION, "route": "guess"}]),
+    json.dumps([{**QUESTION, "route": "guess"}]), json.dumps([{**QUESTION, "lang": "fr"}]),
+    json.dumps([{**QUESTION, "notices": "program_schedule_unverified"}]),
+    json.dumps([{**QUESTION, "course_ids": [5800]}]), json.dumps([{**QUESTION, "course_ids": [""]}]),
+    # The qid names output files: no path separator, nothing empty, no repeats.
+    json.dumps([{**QUESTION, "qid": "a/b"}]), json.dumps([{**QUESTION, "qid": ""}]), json.dumps([QUESTION, QUESTION]),
 ])
 def test_a_bad_questions_file_is_a_setup_error_before_any_request(questions_text, tmp_path, monkeypatch):
     monkeypatch.setattr(httpx, "Client", lambda **kwargs: pytest.fail("no request for a bad questions file"))
@@ -224,15 +228,52 @@ def test_api_problems_are_setup_errors_before_any_model_call(response, tmp_path,
     assert not (tmp_path / "out").exists()
 
 
+def test_an_out_path_that_cannot_be_a_folder_is_a_setup_error_before_any_model_call(tmp_path, monkeypatch):
+    fake_api(monkeypatch)
+    fake_model(monkeypatch, [])  # Any model call would raise StopIteration inside the run.
+    taken = tmp_path / "taken"
+    taken.write_text("a file", encoding="utf-8")
+    assert main(["--api-base", "http://api.test", "--out", str(taken), "--runs", "1"]) == 2
+
+
+def test_every_prompt_is_saved_before_the_first_model_call(tmp_path):
+    seen = []
+
+    def fake(prompt):
+        seen.append(sorted(path.name for path in (tmp_path / "prompts").iterdir()))
+        yield PLAIN
+
+    run([QUESTION, {**QUESTION, "qid": "Q2"}], PAYLOADS, out=tmp_path, runs=1, max_calls=5, stream_fn=fake)
+    assert seen[0] == ["Q1.context.json", "Q1.txt", "Q2.context.json", "Q2.txt"]
+
+
 def test_a_bad_rescore_file_is_a_setup_error(tmp_path):
     assert main(["--rescore", str(tmp_path / "missing.json")]) == 2
     broken = tmp_path / "broken.json"
     broken.write_text("{not json", encoding="utf-8")
     assert main(["--rescore", str(broken)]) == 2
-    odd = tmp_path / "odd.json"
-    odd.write_text(json.dumps({"records": [{"qid": "Q1", "run": 1, "answer": "x", "context": {"lang": "zh"}}]}),
-                   encoding="utf-8")
-    assert main(["--rescore", str(odd)]) == 2  # A saved context missing its fields.
+    run([QUESTION], PAYLOADS, out=tmp_path, runs=1, max_calls=1, stream_fn=lambda prompt: iter([PLAIN]))
+    good = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    for change in ({"context": {"lang": "zh"}},  # A saved context missing its fields.
+                   {"answer": ["not", "text"]}, {"context": {**good["records"][0]["context"], "extra": 1}}):
+        odd = tmp_path / "odd.json"
+        odd.write_text(json.dumps({**good, "records": [{**good["records"][0], **change}]}), encoding="utf-8")
+        assert main(["--rescore", str(odd)]) == 2, change
+    odd.write_text(json.dumps({key: value for key, value in good.items() if key != "chat_v4_sha256"}), encoding="utf-8")
+    assert main(["--rescore", str(odd)]) == 2
+
+
+def test_a_bug_in_the_checks_is_not_reported_as_a_setup_error(tmp_path, monkeypatch):
+    import eval.answer_checks as checks  # noqa: PLC0415
+
+    run([QUESTION], PAYLOADS, out=tmp_path, runs=1, max_calls=1, stream_fn=lambda prompt: iter([PLAIN]))
+
+    def broken(text, context):
+        raise TypeError("a bug in a check")
+
+    monkeypatch.setattr(checks, "check_answer", broken)
+    with pytest.raises(TypeError, match="a bug in a check"):
+        main(["--rescore", str(tmp_path / "results.json")])
 
 
 def test_main_redacts_the_configured_key_from_recorded_errors(tmp_path, monkeypatch):

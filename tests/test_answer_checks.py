@@ -187,6 +187,33 @@ def test_a_single_capital_letter_ends_a_sentence_but_dotted_initials_and_approx_
         "It is a U.S. course.", " It takes approx. 12 hours."]
 
 
+def test_a_hyphenated_word_that_starts_with_a_preposition_is_not_one():
+    en = AnswerContext(lang="en")
+    assert check_answer("12 in-depth reviews say it is hard.", en)["counts_fail"]
+    assert check_answer("Twelve on-campus students said it is hard.", en)["counts_fail"]
+
+
+def test_the_no_catalog_sentence_is_not_the_fetch_date_note_and_wufa_is_not_wu():
+    context = AnswerContext(lang="zh", allowed_urls=frozenset({CATALOG}), fetch_date_relevant=True,
+                            no_catalog_relevant=True)
+    linked = f"CS 5800 讲算法，见 [NEU 官方课程目录]({CATALOG})。"
+    # The no-catalog sentence says 存档 but is not the fetch-date / saved-copy note.
+    assert check_answer(linked + "CS 5200 没有官方目录描述的存档。", context)["caveats_missing"] == ["fetch_date"]
+    assert check_answer(linked + "这是存档副本，不是实时核对。CS 5200 没有官方目录描述。", context)["caveats_missing"] == []
+    # 无法 is not 无: a second saved-copy sentence worded with 无法…目录 still counts as a repeat.
+    twice = "这些内容来自目录的存档副本，不是实时核对。这份副本无法实时核对目录。"
+    assert check_answer(twice, AnswerContext(lang="zh"))["saved_copy_mentions"] == 2
+
+
+def test_more_sentence_and_review_word_cases():
+    assert sentences("She has a Ph.D. in CS. Reviews say she is clear.") == [
+        "She has a Ph.D. in CS.", " Reviews say she is clear."]
+    assert sentences("It is hard! Reviews say so.") == ["It is hard!", " Reviews say so."]
+    zh = AnswerContext(lang="zh", has_rmp_data=True)
+    # 考核评价 / 评价标准 are about grading, not reviews.
+    assert check_answer("考核评价以作业为主。评价标准见大纲。", zh)["rmp"] == "not used"
+
+
 def test_summary_counts():
     summary = summarize([check_answer(GOOD_ZH, ZH), check_answer(GOOD_ZH + " neu-cs-5800", ZH),
                          check_answer("同上。这些内容来自存档副本。" * 2, ZH)])

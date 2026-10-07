@@ -40,7 +40,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from db.repository import CourseRepository  # noqa: E402
+from db.repository import CourseNotFound, CourseRepository  # noqa: E402
 from scrapers.neu_catalog import CatalogEntry  # noqa: E402
 
 SENTENCE_ENDINGS = (".", "!", "?", "。")
@@ -125,7 +125,8 @@ def cli(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         report = repair_names(args.db_path, args.catalog_dir, commit=args.commit)
-    except (OSError, sqlite3.Error, ValueError, LookupError) as exc:  # LookupError: CourseNotFound.
+    # CourseNotFound itself, not LookupError: that would also swallow a KeyError or IndexError bug.
+    except (OSError, sqlite3.Error, ValueError, CourseNotFound) as exc:
         print(f"Course name repair failed ({type(exc).__name__}); no transaction committed.")
         return 1
     print(json.dumps(report, ensure_ascii=False))

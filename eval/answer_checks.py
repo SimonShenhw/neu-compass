@@ -45,10 +45,11 @@ COUNT_ZH = re.compile(
     r"(?:来自\s*)?(?:RateMyProfessors\s*|RMP\s*)?(?:上的?\s*)?(?:学生的?)?"
     r"(?:评价|评论|点评|评分|打分|学生|同学|反馈|用户)")
 # Up to two words between the number and the noun, but never a preposition ("3 options for
-# students" is not a count of reviews). 中文：数字和名词之间最多两个词，但不能是介词。
+# students" is not a count of reviews); a hyphenated word that starts with one ("in-depth") is not
+# a preposition. 中文：数字和名词之间最多两个词，但不能是介词；以介词开头的连字符词（in-depth）不算介词。
 COUNT_EN = re.compile(
     r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|fifty|dozens?)"
-    r"\s+(?:(?!(?:for|to|in|on|at|with|about|per|from|by|into|than)\b)[A-Za-z\-]+\s+){0,2}"
+    r"\s+(?:(?!(?:for|to|in|on|at|with|about|per|from|by|into|than)\b(?!-))[A-Za-z\-]+\s+){0,2}"
     r"(?:reviews?|reviewers?|students?|ratings?|comments?)\b", re.I)
 # The 4-digit number of a course code ("CS 5800 students") is not a count.
 COURSE_CODE_BEFORE = re.compile(r"\b[A-Z]{2,5}\s?$")
@@ -77,8 +78,10 @@ FETCH_DATE = re.compile(
     r"fetch(?:ed)? date|retriev\w* date|when it was (?:fetched|retrieved|captured)|saved copy|stored copy|"
     r"copy of the catalog|not a live|not live|archived|snapshot|recorded (?:copy|version)|"
     r"may (?:have changed|be out ?of ?date|be outdated|not reflect)|not (?:necessarily )?(?:the )?current", re.I)
+# 无 but not 无法 / 无论: "无法实时核对目录" is about the saved copy, not a missing catalog.
+# 中文：「无」但不是「无法」「无论」：「无法实时核对目录」说的是存档副本，不是没有目录。
 NO_CATALOG = re.compile(
-    r"(没有|缺少|无|缺乏|未找到|找不到)[^。\n]{0,10}(目录|catalog)|(目录|catalog)[^。\n]{0,10}(缺失|不可用|没有|未找到)|"
+    r"(没有|缺少|无(?!法|论)|缺乏|未找到|找不到)[^。\n]{0,10}(目录|catalog)|(目录|catalog)[^。\n]{0,10}(缺失|不可用|没有|未找到)|"
     r"no (?:official |recorded )?catalog|catalog (?:record|entry|snapshot|description|data)s? (?:is |are )?"
     r"(?:not available|unavailable|missing)|lacks? (?:a |an )?(?:official )?catalog|without (?:a |an )?(?:official )?catalog", re.I)
 PREREQ_LOGIC = re.compile(
@@ -98,13 +101,13 @@ PROGRAMS_PAGE = re.compile(r"培养方案|Programs page|\bPrograms\b", re.I)
 SAVED_COPY = re.compile(r"副本|saved copy|stored copy|copy of the catalog|不是实时|非实时|not a live", re.I)
 
 # A sentence ends at 。！？!?, at a line break, or at a period followed by a space or the end; not at
-# the period in 4.0, in dotted initials (U.S.) or after an abbreviation such as e.g. or approx. A
+# the period in 4.0, in dotted initials (U.S.) or after an abbreviation such as e.g., Ph.D. or approx. A
 # single capital letter does end one ("... Part A. Reviews say ..."), so a lone initial in a name
 # splits it. 中文：句子在 。！？!?、换行、或后面跟空白/结尾的英文句号处结束；4.0、U.S. 这种连续缩写
-# 和 e.g.、approx. 这类缩写不算。单个大写字母后的句号算结束（"... Part A. Reviews say ..."），所以
+# 和 e.g.、Ph.D.、approx. 这类缩写不算。单个大写字母后的句号算结束（"... Part A. Reviews say ..."），所以
 # 人名里单独的首字母会把句子分开。
 SENTENCE_END = re.compile(r"[。！？!?]+|\.(?=\s|$)|\n")
-ABBREVIATION = re.compile(r"\b(?:(?i:e\.g|i\.e|approx|vs|cf|prof|dr|mrs?|ms|fig)|(?:[A-Z]\.)+[A-Z])$")
+ABBREVIATION = re.compile(r"\b(?:(?i:e\.g|i\.e|ph\.d|approx|vs|cf|prof|dr|mrs?|ms|fig)|(?:[A-Z]\.)+[A-Z])$")
 # A pronoun in a review sentence refers the review to a person, i.e. the instructor ("RMP 上的评价说他
 # 讲得清楚"); 其他/他们/他人 are not pronouns for one person. 中文：评价句里的人称代词指的是某个人，也就是
 # 老师；其他、他们、他人不算。
@@ -228,12 +231,16 @@ def check_answer(text: str, context: AnswerContext) -> dict:
     rmp = review_attribution(parts, context.has_rmp_data)
 
     # 4.3 asks for the saved-copy note only when a catalog description was used, which the answer
-    # shows by linking the catalog. 中文：4.3 只在用到目录描述时要求说明存档副本，回答用了就会链接目录。
+    # shows by linking the catalog. The no-catalog sentence may say 存档 / 副本 too; it is not that
+    # note. 中文：4.3 只在用到目录描述时要求说明存档副本，回答用了就会链接目录。「没有目录描述」那句
+    # 也可能说到存档、副本，但它不是那条说明。
     used_catalog = any(link["allowed_target"] for link in links)
-    caveats = {"fetch_date": (context.fetch_date_relevant and used_catalog, FETCH_DATE),
-               "no_catalog": (context.no_catalog_relevant, NO_CATALOG),
-               "prereq_logic": (context.prereq_relevant, PREREQ_LOGIC), "program_caveat": (context.program_notice, PROGRAM_CAVEAT)}
-    missing = [name for name, (relevant, pattern) in caveats.items() if relevant and not pattern.search(text)]
+    catalog_sentences = "\n".join(part for part in parts if not NO_CATALOG.search(part))
+    caveats = {"fetch_date": (context.fetch_date_relevant and used_catalog, FETCH_DATE, catalog_sentences),
+               "no_catalog": (context.no_catalog_relevant, NO_CATALOG, text),
+               "prereq_logic": (context.prereq_relevant, PREREQ_LOGIC, text),
+               "program_caveat": (context.program_notice, PROGRAM_CAVEAT, text)}
+    missing = [name for name, (relevant, pattern, searched) in caveats.items() if relevant and not pattern.search(searched)]
     if context.program_notice and not PROGRAMS_PAGE.search(text):
         missing.append("programs_page_pointer")
 

@@ -149,6 +149,22 @@ def test_cli_reports_a_vanished_course_as_a_failure_without_committing(runtime, 
     assert "no transaction committed" in capsys.readouterr().out and rows(path) == before
 
 
+def test_cli_lets_other_lookup_errors_surface_as_bugs(runtime, monkeypatch):
+    """Only CourseNotFound is an expected failure; another KeyError is a bug and keeps its traceback.
+    The transaction still rolls back. 中文：只有 CourseNotFound 是预期的失败；别的 KeyError 是 bug，
+    保留 traceback；事务照样回滚。"""
+    path, archive = runtime
+    before = rows(path)
+
+    def buggy(self, course_id, name):
+        raise KeyError("primary_name")
+
+    monkeypatch.setattr(CourseRepository, "rename", buggy)
+    with pytest.raises(KeyError):
+        cli(["--db-path", str(path), "--catalog-dir", str(archive), "--commit"])
+    assert rows(path) == before
+
+
 def test_a_sentence_found_only_in_the_stored_raw_text_also_counts(runtime):
     """Archived descriptions can be missing or newer; the stored raw_text is the text the bad name
     was copied from."""

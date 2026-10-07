@@ -12,9 +12,10 @@ Run from the repo root in the project venv (config.settings reads GEMINI_API_KEY
     python scripts/eval_answers_live.py --rescore /tmp/answer-eval/results.json   # after tuning checks
 Exit code: 0 every planned answer was checked and none failed a hard check (or a dry run), 1 some
 answer failed a hard check, 2 setup, argument or input error (an unreachable API or a non-200 GET,
-a missing or malformed --questions or --rescore file, a payload that does not fit), 3 incomplete
-(a model call failed, the call cap stopped the run early, or no answer was checked). Every prompt
-is built before the first model call. --rescore keeps the original run's errors.
+a missing or malformed --questions or --rescore file, a payload that does not fit, an --out folder
+that cannot be created or written), 3 incomplete (a model call failed, the call cap stopped the run
+early, or no answer was checked). Every prompt and context is built and saved before the first
+model call. --rescore keeps the original run's errors.
 
 中文：按 /chat 的方式问真实模型，并检查回答（eval/answer_checks.py）。证据只来自线上 API 的
 GET /course/{id}（只读，并带 X-Eval-Run 标记，不会被当成学生查询）；提示词用本地的
@@ -22,8 +23,9 @@ llm/prompts/chat_v4.py，构造方式与 api/routes/chat.py 相同；回答来�
 llm.gemini_client.generate_text_stream，参数与 /chat 一样。结果写到 --out：results.json、每个
 回答一个 Markdown 文件、summary.md。不会打印 API key。退出码：0 计划的每个回答都检查过且没有硬失败
 （或空跑），1 有回答没过硬检查，2 准备阶段、参数或输入出错（API 连不上或 GET 不是 200、--questions
-或 --rescore 文件缺失或格式不对、数据对不上），3 不完整（有模型调用失败、调用上限提前停止，或没有任何
-回答可检查）。第一次调用模型之前会先构造好全部提示词。--rescore 保留原来那次运行的错误。
+或 --rescore 文件缺失或格式不对、数据对不上、--out 目录建不了或写不进），3 不完整（有模型调用失败、
+调用上限提前停止，或没有任何回答可检查）。第一次调用模型之前会先构造并保存好全部提示词和上下文。
+--rescore 保留原来那次运行的错误。
 """
 
 from __future__ import annotations
@@ -206,12 +208,40 @@ def write_report(out: Path, report: dict) -> None:
     (out / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def rescore(results: Path) -> dict:
+REPORT_KEYS = ("prompt_version", "chat_v4_sha256", "model_calls", "errors", "records")
+CONTEXT_KEYS = ("lang", "allowed_urls", "prompt_keys", "unstated_values")
+
+
+def load_report(results: Path) -> dict:
+    """A saved results.json, checked for the shape rescoring needs, so a bad file is a setup error
+    (exit 2) while a bug in the checks themselves keeps its traceback. 中文：读取保存的 results.json
+    并检查重评需要的形状：文件不对是准备阶段的错误（退出码 2），检查本身的错误仍保留 traceback。"""
+    from dataclasses import fields  # noqa: PLC0415
+
+    from eval.answer_checks import AnswerContext  # noqa: PLC0415
+
+    report = json.loads(results.read_text(encoding="utf-8"))
+    if not isinstance(report, dict) or any(key not in report for key in REPORT_KEYS) or not isinstance(
+            report["records"], list):
+        raise ValueError(f"not a results.json: it needs the keys {', '.join(REPORT_KEYS)}")
+    known = {item.name for item in fields(AnswerContext)}
+    for index, record in enumerate(report["records"]):
+        if not isinstance(record, dict) or "qid" not in record or "run" not in record:
+            raise ValueError(f"record {index} needs a qid and a run")
+        if "answer" in record:
+            context = record.get("context")
+            if not isinstance(record["answer"], str) or not isinstance(context, dict) or not (
+                    set(CONTEXT_KEYS) <= set(context) <= known):
+                raise ValueError(f"record {index}: an answer needs to be text, with its saved context")
+    return report
+
+
+def rescore(results: Path, report: dict | None = None) -> dict:
     """Re-run the current checks on saved answers (no API or model calls), e.g. after tuning a
     detector. 中文：用当前的检查重新评一遍已保存的回答（不调 API、不调模型），比如调整检测规则之后。"""
     from eval.answer_checks import check_answer  # noqa: PLC0415
 
-    report = json.loads(results.read_text(encoding="utf-8"))
+    report = load_report(results) if report is None else report
     for record in report["records"]:
         if "answer" in record:
             record["checks"] = check_answer(record["answer"], context_from_json(record["context"]))
@@ -221,6 +251,9 @@ def rescore(results: Path) -> dict:
 
 
 QUESTION_KEYS = ("qid", "lang", "query", "course_ids", "route", "notices")
+# A qid names the output files (prompts/<qid>.txt, answers/<qid>_run<n>.md).
+# 中文：qid 用作输出文件名（prompts/<qid>.txt、answers/<qid>_run<n>.md）。
+QID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 def validate_questions(questions: object) -> list[dict]:
@@ -229,9 +262,14 @@ def validate_questions(questions: object) -> list[dict]:
     的形状和 DEFAULT_QUESTIONS 一样；不合格是准备阶段的错误，在发任何请求之前就发现。"""
     if not isinstance(questions, list) or not questions:
         raise ValueError("the questions file must hold a non-empty JSON list")
+    seen: set[str] = set()
     for index, question in enumerate(questions):
         if not isinstance(question, dict) or any(key not in question for key in QUESTION_KEYS):
             raise ValueError(f"question {index} needs the keys {', '.join(QUESTION_KEYS)}")
+        qid = question["qid"]
+        if not isinstance(qid, str) or not QID.fullmatch(qid) or qid in seen:
+            raise ValueError(f"question {index}: qid must be unique, 1-64 letters, digits, _ or - (it names files)")
+        seen.add(qid)
         if question["lang"] not in ("zh", "en") or question["route"] not in ("alias", "hybrid", "program"):
             raise ValueError(f"question {index}: lang must be zh or en, route alias, hybrid or program")
         ids = question["course_ids"]
@@ -249,6 +287,17 @@ def prepare(questions: list[dict], payloads: dict[str, dict]) -> list[tuple[dict
     return [(question, *build_case(question, payloads)) for question in questions]
 
 
+def save_prompts(out: Path, cases: list[tuple[dict, str, object]]) -> None:
+    """Create the output folders and write every prompt and context, before the first model call.
+    中文：建好输出目录并写出全部提示词和上下文，在第一次调用模型之前。"""
+    for name in ("answers", "prompts"):
+        (out / name).mkdir(parents=True, exist_ok=True)
+    for question, prompt, context in cases:
+        (out / "prompts" / f"{question['qid']}.txt").write_text(prompt, encoding="utf-8")
+        (out / "prompts" / f"{question['qid']}.context.json").write_text(
+            json.dumps(context_to_json(context), ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def redact(message: str, secret: str | None) -> str:
     if secret:
         message = message.replace(secret, "[REDACTED]")
@@ -262,13 +311,9 @@ def run(questions: list[dict], payloads: dict[str, dict], *, out: Path, runs: in
     from llm.prompts.chat_v4 import PROMPT_VERSION  # noqa: PLC0415
 
     cases = prepare(questions, payloads)
-    (out / "answers").mkdir(parents=True, exist_ok=True)
-    (out / "prompts").mkdir(parents=True, exist_ok=True)
+    save_prompts(out, cases)
     records, calls = [], 0
     for question, prompt, context in cases:
-        (out / "prompts" / f"{question['qid']}.txt").write_text(prompt, encoding="utf-8")
-        (out / "prompts" / f"{question['qid']}.context.json").write_text(
-            json.dumps(context_to_json(context), ensure_ascii=False, indent=2), encoding="utf-8")
         for attempt in range(1, runs + 1 if stream_fn else 1):
             if calls >= max_calls:
                 break
@@ -323,10 +368,11 @@ def main(argv: list[str] | None = None) -> int:
     setup_errors = (OSError, ValueError, KeyError, TypeError)
     if args.rescore:
         try:
-            report = rescore(args.rescore)
+            saved = load_report(args.rescore)
         except setup_errors as exc:
             print(f"setup error: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
+        report = rescore(args.rescore, saved)  # Outside the try: a bug in the checks keeps its traceback.
         print(json.dumps({"rescored": str(args.rescore), "status": report["status"], "summary": report["summary"]},
                          ensure_ascii=False))
         return exit_code(report)
@@ -341,7 +387,8 @@ def main(argv: list[str] | None = None) -> int:
                      else DEFAULT_QUESTIONS)
         with httpx.Client(base_url=args.api_base.rstrip("/"), headers=headers, timeout=30.0) as client:
             payloads = fetch_courses(client, (cid for question in questions for cid in question["course_ids"]))
-        prepare(questions, payloads)  # Every prompt and context, before the first model call.
+        # Every prompt and context is built and saved (folders created) before the first model call.
+        save_prompts(args.out, prepare(questions, payloads))
     except (*setup_errors, RuntimeError, httpx.HTTPError) as exc:
         print(f"setup error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
