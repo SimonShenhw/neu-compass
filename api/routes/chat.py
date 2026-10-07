@@ -38,11 +38,9 @@ Streamlit 端通过 httpx.stream + iter_lines + render_streamed_answer 消费这
 from __future__ import annotations
 
 import json
-import os
 import re
 import sqlite3
 import time
-import traceback
 from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
 
@@ -64,6 +62,7 @@ from api.models import ChatRequest
 from api.routes.common import (
     attempt_hyde_rescue,
     build_hard_filters,
+    error_frames,
     fetch_texts,
     filter_courses,
     log_query,
@@ -116,22 +115,17 @@ log = structlog.get_logger("neu_compass.chat")
 # 所以既不发给客户端，也不写进日志。
 STREAM_ERROR_DETAIL = {
     "upstream_error": "模型服务暂时出错，这条回答没有完成。请稍后再问一次。",
+    # Empty completion or safety block: asking the same way again rarely helps.
+    # 中文：空回答或被安全规则拦下：照原样再问一次多半没用。
+    "no_answer": "这次模型没有给出回答，可能被它的安全规则拦下了。换个问法再试试。",
     "internal_error": "服务内部出错，这条回答没有完成。请稍后再问一次。",
 }
+_NO_ANSWER_KINDS = frozenset({"empty_stream", "empty_response"})
 
 
 def _stream_error_event(error_type: str) -> bytes:
     payload = {"type": "error", "error_type": error_type, "detail": STREAM_ERROR_DETAIL[error_type]}
     return (json.dumps(payload) + "\n").encode("utf-8")
-
-
-def _frames(exc: BaseException, limit: int = 6) -> list[str]:
-    """Where an unexpected error was raised (file:line function, innermost last); no message or locals.
-
-    中文：意外错误发生的位置（文件:行号 函数名，最内层在最后）；不含消息和局部变量。
-    """
-    tail = traceback.extract_tb(exc.__traceback__)[-limit:]
-    return [f"{os.path.basename(frame.filename)}:{frame.lineno} {frame.name}" for frame in tail]
 
 
 @router.post(
@@ -365,6 +359,7 @@ def chat(
         capture_answer = (query_log_id is not None and req.allow_feedback_capture
                           and settings.answer_feedback_enabled is True)
         feedback_receipt = None
+        tokens_sent = 0  # Logged on failure: nothing sent vs cut off mid-answer. / 失败时记录：一字未出还是中途断开。
         try:
             for chunk in stream_fn(prompt):
                 if not isinstance(chunk, str):
@@ -378,13 +373,16 @@ def chat(
                         answer_parts.clear()
                 payload = {"type": "token", "text": chunk}
                 yield (json.dumps(payload) + "\n").encode("utf-8")
+                tokens_sent += 1
         except GeminiError as e:
-            log.warning("chat.stream_failed", **error_log_fields(e))
-            yield _stream_error_event("upstream_error")
+            log.warning("chat.stream_failed", tokens_sent=tokens_sent, **error_log_fields(e))
+            no_answer = getattr(e, "kind", None) in _NO_ANSWER_KINDS
+            yield _stream_error_event("no_answer" if no_answer else "upstream_error")
         except Exception as e:  # defensive — never crash the stream / 防御性：绝不能让流崩溃
             # Frames instead of log.exception: a rendered traceback ends with the message.
             # 中文：记录调用位置而不是 log.exception：渲染出的 traceback 末尾就是消息原文。
-            log.error("chat.stream_unhandled", frames=_frames(e), **error_log_fields(e))
+            log.error("chat.stream_unhandled", tokens_sent=tokens_sent, frames=error_frames(e),
+                      **error_log_fields(e))
             yield _stream_error_event("internal_error")
 
         else:

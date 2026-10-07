@@ -14,13 +14,13 @@ from typing import Callable
 
 import pytest
 from fastapi.testclient import TestClient
+from structlog.testing import capture_logs
 
 from api.dependencies import get_chat_stream_fn, get_db_conn
 from api.routes import chat as chat_route
 from db.program_repository import ProgramRepository
 from llm.gemini_client import GeminiError
 from schemas.program import Program, ProgramRequiredCourse
-from tests.log_recorder import LogRecorder
 
 
 def _override_stream(api_client: TestClient, fn: Callable[[str], Iterator[str]]) -> None:
@@ -151,6 +151,7 @@ UPSTREAM_PARTS = ("placeholder-credential-123", "https://upstream.example/v1/str
 
 class _UpstreamFailure(RuntimeError):
     code = 429
+    status = "RESOURCE_EXHAUSTED"
 
 
 def _upstream_failure() -> GeminiError:
@@ -160,51 +161,83 @@ def _upstream_failure() -> GeminiError:
     return error
 
 
-def test_chat_upstream_failure_reaches_neither_the_client_nor_the_log(
-    api_client: TestClient, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    recorder = LogRecorder()
-    monkeypatch.setattr(chat_route, "log", recorder)
+def _logged(entries: list[dict], name: str) -> list[dict]:
+    return [entry for entry in entries if entry["event"] == name]
 
+
+def test_chat_upstream_failure_reaches_neither_the_client_nor_the_log_call(api_client: TestClient) -> None:
     def boom_stream(prompt: str) -> Iterator[str]:
         yield "partial..."
+        yield "more"
         raise _upstream_failure()
 
     _override_stream(api_client, boom_stream)
-    r = api_client.post("/chat", json={"query": "x"})
+    with capture_logs() as entries:
+        r = api_client.post("/chat", json={"query": "x"})
     events = _parse_ndjson(r.text)
-    assert [e["text"] for e in events if e["type"] == "token"] == ["partial..."]
+    assert [e["text"] for e in events if e["type"] == "token"] == ["partial...", "more"]
     assert [e["type"] for e in events][-2:] == ["error", "done"]
-    assert recorder.events("chat.stream_failed") == [("warning", "chat.stream_failed", {
-        "error_type": "GeminiError", "error_kind": "stream_interrupted",
-        "cause_type": "_UpstreamFailure", "upstream_status": 429,
-    })]
+    # The whole call: no message, no exc_info.
+    assert _logged(entries, "chat.stream_failed") == [{
+        "event": "chat.stream_failed", "log_level": "warning", "tokens_sent": 2,
+        "exc_type": "GeminiError", "error_kind": "stream_interrupted", "cause_type": "_UpstreamFailure",
+        "upstream_status": 429, "upstream_reason": "RESOURCE_EXHAUSTED",
+    }]
     for part in UPSTREAM_PARTS:
         assert part not in r.text
-        assert part not in recorder.text()
+        assert part not in repr(entries)
 
 
-def test_chat_unexpected_error_logs_where_it_happened_not_its_message(
-    api_client: TestClient, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    recorder = LogRecorder()
-    monkeypatch.setattr(chat_route, "log", recorder)
-
+def test_chat_unexpected_error_logs_where_it_happened_not_its_message(api_client: TestClient) -> None:
     def boom_stream(prompt: str) -> Iterator[str]:
         yield "ok"
         raise RuntimeError(f"state at {UPSTREAM_PARTS[1]} with {UPSTREAM_PARTS[0]}")
 
     _override_stream(api_client, boom_stream)
-    r = api_client.post("/chat", json={"query": "x"})
-    [(level, _, fields)] = recorder.events("chat.stream_unhandled")
-    # error, not exception: a rendered traceback would end with the message.
-    assert level == "error"
-    assert fields["error_type"] == "RuntimeError" and "error_kind" not in fields
-    assert fields["frames"][-1].startswith("test_api_chat.py:")
-    assert fields["frames"][-1].endswith(" boom_stream")
+    with capture_logs() as entries:
+        r = api_client.post("/chat", json={"query": "x"})
+    [entry] = _logged(entries, "chat.stream_unhandled")
+    frames = entry.pop("frames")
+    # error, not exception, and no exc_info: a rendered traceback would end with the message.
+    assert entry == {"event": "chat.stream_unhandled", "log_level": "error", "tokens_sent": 1,
+                     "exc_type": "RuntimeError"}
+    assert frames[-1].startswith("test_api_chat.py:") and frames[-1].endswith(" boom_stream")
     for part in UPSTREAM_PARTS:
         assert part not in r.text
-        assert part not in recorder.text()
+        assert part not in repr(entries)
+
+
+def test_chat_unexpected_error_frames_are_the_innermost_six(api_client: TestClient) -> None:
+    def level(depth: int) -> None:
+        if depth == 0:
+            raise RuntimeError("deep")
+        level(depth - 1)
+
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "ok"
+        level(8)
+
+    _override_stream(api_client, boom_stream)
+    with capture_logs() as entries:
+        api_client.post("/chat", json={"query": "x"})
+    [entry] = _logged(entries, "chat.stream_unhandled")
+    assert len(entry["frames"]) == 6
+    assert all(frame.endswith(" level") for frame in entry["frames"])  # boom_stream is further out.
+
+
+@pytest.mark.parametrize("kind", ["empty_stream", "empty_response"])
+def test_chat_empty_answer_gets_its_own_notice(api_client: TestClient, kind: str) -> None:
+    """A safety block or empty completion: "ask again later" would not help."""
+
+    def empty_stream(prompt: str) -> Iterator[str]:
+        raise GeminiError("Gemini produced no text", kind=kind)
+        yield  # pragma: no cover - makes this a generator
+
+    _override_stream(api_client, empty_stream)
+    events = _parse_ndjson(api_client.post("/chat", json={"query": "x"}).text)
+    err = next(e for e in events if e["type"] == "error")
+    assert err == {"type": "error", "error_type": "no_answer", "detail": chat_route.STREAM_ERROR_DETAIL["no_answer"]}
+    assert events[-1] == {"type": "done"}
 
 
 # === Validation ===

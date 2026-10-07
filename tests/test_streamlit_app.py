@@ -122,17 +122,47 @@ def test_stream_assistant_captures_meta_into_state() -> None:
 
 
 def test_stream_assistant_handles_error_event() -> None:
+    from api.routes.chat import STREAM_ERROR_DETAIL  # noqa: PLC0415
+
+    detail = STREAM_ERROR_DETAIL["upstream_error"]
     state: dict = {}
     api = _FakeApi([
         {"type": "meta", "results": []},
         {"type": "token", "text": "partial..."},
-        {"type": "error", "detail": "Gemini quota exceeded"},
+        {"type": "error", "error_type": "upstream_error", "detail": detail},
         {"type": "done"},  # never reached after error
     ])
     chunks = list(stream_assistant(api, {"query": "x"}, state))
-    assert "partial..." in chunks
-    assert any("Gemini quota exceeded" in c for c in chunks)
-    assert state["last_chat_error"] == "Gemini quota exceeded"
+    assert chunks == ["partial...", f"\n\n⚠️ {detail}"]
+    assert state["last_chat_error"] == detail
+
+
+def test_stream_assistant_shows_the_api_error_event_end_to_end() -> None:
+    """The error event as /chat writes it, read through ApiClient: the partial answer stays, the fixed
+    notice follows, and no feedback receipt is kept. 中文：/chat 写出的错误事件经 ApiClient 读进来：
+    部分回答保留，后面接固定提示，不保留反馈凭证。"""
+    import json  # noqa: PLC0415
+
+    import httpx  # noqa: PLC0415
+
+    from api.routes.chat import STREAM_ERROR_DETAIL, _stream_error_event  # noqa: PLC0415
+    from app.api_client import ApiClient  # noqa: PLC0415
+
+    body = (json.dumps({"type": "meta", "results": []}) + "\n"
+            + json.dumps({"type": "token", "text": "partial..."}) + "\n").encode("utf-8")
+    body += _stream_error_event("no_answer") + (json.dumps({"type": "done"}) + "\n").encode("utf-8")
+    posts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        posts.append(request.url.path)
+        return httpx.Response(200, content=body, headers={"content-type": "application/x-ndjson"})
+
+    api = ApiClient(base_url="http://api.test", transport=httpx.MockTransport(handler))
+    state: dict = {}
+    chunks = list(stream_assistant(api, {"query": "x", "allow_feedback_capture": True}, state))
+    assert chunks == ["partial...", f"\n\n⚠️ {STREAM_ERROR_DETAIL['no_answer']}"]
+    assert state["last_chat_error"] == STREAM_ERROR_DETAIL["no_answer"]
+    assert state["last_chat_feedback"] is None and posts == ["/chat"]
 
 
 def test_stream_assistant_resets_state_per_call() -> None:

@@ -22,17 +22,35 @@ the same rejection block and must share the same rescue semantics.
 
 from __future__ import annotations
 
+import os
 import sqlite3
+import traceback
 from typing import Any, Callable, Protocol
 
 import structlog
 
-from llm.gemini_client import error_log_fields
+from llm.gemini_client import GeminiError, error_log_fields
 from rag.filters import filter_course_ids
 from rag.retriever import SearchHit
 from schemas.course import Course
 
 log = structlog.get_logger("neu_compass.routes.common")
+
+
+def error_frames(exc: BaseException, limit: int = 6) -> list[str]:
+    """Where an error was raised: the innermost `limit` frames as "file:line function", innermost
+    last. No message, no locals, no source lines read. Never raises: it runs inside except blocks.
+
+    中文：错误发生的位置：最内层的 `limit` 帧，写成「文件:行号 函数名」，最内层在最后。不含消息、
+    不含局部变量、不读源码行。从不抛异常：它在 except 块里运行。
+    """
+    if limit <= 0:
+        return []
+    try:
+        summary = traceback.StackSummary.extract(traceback.walk_tb(exc.__traceback__), lookup_lines=False)
+        return [f"{os.path.basename(frame.filename)}:{frame.lineno} {frame.name}" for frame in summary[-limit:]]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 class _FilterableRequest(Protocol):
@@ -193,9 +211,12 @@ def attempt_hyde_rescue(
             top_k=top_k,
         )
     except Exception as e:  # noqa: BLE001 — rescue must never 500 a request / 救援绝不能让请求 500
-        # Types, kind and status only: a GeminiError message carries upstream text.
-        # 中文：只记类型、kind 和状态码：GeminiError 的消息里带着上游文字。
-        log.warning("rescue.failed", **error_log_fields(e))
+        # Types, kind and status only: a GeminiError message carries upstream text. Other errors
+        # (database, reranker) also record where they were raised.
+        # 中文：只记类型、kind 和状态码：GeminiError 的消息里带着上游文字。其他错误（数据库、
+        # reranker）另外记录发生的位置。
+        where = {} if isinstance(e, GeminiError) else {"frames": error_frames(e)}
+        log.warning("rescue.failed", **error_log_fields(e), **where)
         return None
     if not blended:
         return None

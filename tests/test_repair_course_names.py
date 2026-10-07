@@ -126,6 +126,13 @@ def test_conflicting_archive_titles_abort_before_any_change(runtime):
     assert rows(path) == before
 
 
+def test_cli_names_the_code_with_conflicting_archived_titles(runtime, capsys):
+    path, archive = runtime
+    (archive / "cs2.jsonl").write_text(entry("CS 5800", "Algorithms II").model_dump_json() + "\n", encoding="utf-8")
+    assert cli(["--db-path", str(path), "--catalog-dir", str(archive)]) == 1
+    assert "Conflicting archived titles for CS 5800" in capsys.readouterr().out
+
+
 def test_cli_defaults_to_read_only_and_fails_closed(runtime, tmp_path, capsys):
     path, archive = runtime
     assert cli(["--db-path", str(path), "--catalog-dir", str(archive)]) == 0
@@ -228,4 +235,8 @@ def test_cli_takes_repeated_catalog_title_codes(runtime, capsys):
     assert report["repaired"] == 2 and [item["code"] for item in report["named_repairs"]] == ["CS 6140"]
     assert rows(path)["neu-cs-6140"]["primary_name"] == "Machine Learning"
     assert cli([*base, "--use-catalog-title", "CS 7777"]) == 1
-    assert "no transaction committed" in capsys.readouterr().out
+    # The script's own failures name the code, so a misspelt one is easy to tell from a duplicate.
+    assert capsys.readouterr().out.strip() == (
+        "Course name repair failed: --use-catalog-title codes not in the archive: CS 7777; no transaction committed.")
+    assert cli([*base, "--use-catalog-title", "CS 9999"]) == 1
+    assert "--use-catalog-title CS 9999: 0 courses in the database, need exactly one" in capsys.readouterr().out

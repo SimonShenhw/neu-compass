@@ -56,12 +56,21 @@ SENTENCE_ENDINGS = (".", "!", "?", "。")
 MIN_SENTENCE_CHARS = 25  # Short titles ending in a period ("... of the U.S.") are not sentences.
 
 
+class NameRepairError(ValueError):
+    """A failure this script detects itself. Its message holds only course codes and counts, so the
+    CLI prints it; other errors print only their type (an archive parse error can quote the file).
+
+    中文：本脚本自己检查出的失败。消息里只有课程代码和数量，所以 CLI 会打印出来；其他错误只打印
+    类型（存档解析错误可能引用文件内容）。
+    """
+
+
 def load_titles(catalog_dir: str | Path) -> dict[str, CatalogEntry]:
     """Every archived entry by course code; two different titles for one code abort the run."""
     archive = Path(catalog_dir).resolve(strict=True)
     files = sorted(archive.glob("*.jsonl"))
     if not files:
-        raise ValueError("No JSONL catalog archives found")
+        raise NameRepairError("No JSONL catalog archives found")
     entries: dict[str, CatalogEntry] = {}
     for source in files:
         with source.open(encoding="utf-8-sig") as handle:
@@ -71,7 +80,7 @@ def load_titles(catalog_dir: str | Path) -> dict[str, CatalogEntry]:
                 entry = CatalogEntry.model_validate_json(line)
                 previous = entries.get(entry.course_code)
                 if previous is not None and previous.course_name != entry.course_name:
-                    raise ValueError(f"Conflicting archived titles for {entry.course_code}")
+                    raise NameRepairError(f"Conflicting archived titles for {entry.course_code}")
                 entries.setdefault(entry.course_code, entry)
     return entries
 
@@ -94,7 +103,7 @@ def repair_names(db_path: str | Path, catalog_dir: str | Path, *, commit: bool =
     named = set(use_catalog_title)
     unknown = sorted(named - titles.keys())
     if unknown:
-        raise ValueError(f"--use-catalog-title codes not in the archive: {', '.join(unknown)}")
+        raise NameRepairError(f"--use-catalog-title codes not in the archive: {', '.join(unknown)}")
     path = Path(db_path).resolve(strict=True)
     conn = sqlite3.connect(f"{path.as_uri()}?mode={'rw' if commit else 'ro'}", uri=True)
     conn.row_factory = sqlite3.Row
@@ -107,8 +116,8 @@ def repair_names(db_path: str | Path, catalog_dir: str | Path, *, commit: bool =
                                 (code,)).fetchall()
             if len(rows) != 1:
                 if code in named:
-                    raise ValueError(f"--use-catalog-title {code}: {len(rows)} courses in the database, "
-                                     "need exactly one")
+                    raise NameRepairError(f"--use-catalog-title {code}: {len(rows)} courses in the database, "
+                                          "need exactly one")
                 report["skipped_unknown_or_ambiguous"] += 1
                 continue
             row = rows[0]
@@ -149,6 +158,9 @@ def cli(argv: list[str] | None = None) -> int:
     try:
         report = repair_names(args.db_path, args.catalog_dir, commit=args.commit,
                               use_catalog_title=args.use_catalog_title)
+    except NameRepairError as exc:  # Codes and counts only: says which code to fix.
+        print(f"Course name repair failed: {exc}; no transaction committed.")
+        return 1
     # CourseNotFound itself, not LookupError: that would also swallow a KeyError or IndexError bug.
     except (OSError, sqlite3.Error, ValueError, CourseNotFound) as exc:
         print(f"Course name repair failed ({type(exc).__name__}); no transaction committed.")

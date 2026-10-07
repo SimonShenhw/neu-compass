@@ -195,6 +195,17 @@ def _interrupted_stream() -> Any:
     raise RuntimeError("connection reset")
 
 
+def _failing_before_text() -> Any:
+    """The real SDK sends the request on the first iteration, so its errors come from next()."""
+    raise RuntimeError("upstream status 429")
+    yield  # pragma: no cover - makes this a generator
+
+
+def _textless_then_failing() -> Any:
+    yield _FakeResponse(text="")
+    raise RuntimeError("connection reset")
+
+
 def test_generate_text_stream_interruption_keeps_the_earlier_chunks() -> None:
     received: list[str] = []
     with pytest.raises(GeminiError, match="stream interrupted") as info:
@@ -226,6 +237,8 @@ def _stream(client: Any) -> Any:
     (_text, ConnectionError("x"), "call_failed"),
     (_text, _FakeResponse(text=""), "empty_response"),
     (_stream, RuntimeError("x"), "stream_init_failed"),
+    (_stream, _failing_before_text(), "stream_init_failed"),  # Before any text, as with the real SDK.
+    (_stream, _textless_then_failing(), "stream_init_failed"),
     (_stream, [_FakeResponse(text="")], "empty_stream"),
     (_stream, _interrupted_stream(), "stream_interrupted"),
 ])
@@ -260,8 +273,38 @@ def _wrapped(cause: BaseException) -> GeminiError:
 
 def test_error_log_fields_keep_types_kind_and_status_never_the_message() -> None:
     fields = error_log_fields(_wrapped(_StatusError(UPSTREAM_TEXT, 429)))
-    assert fields == {"error_type": "GeminiError", "error_kind": "call_failed",
+    assert fields == {"exc_type": "GeminiError", "error_kind": "call_failed",
                       "cause_type": "_StatusError", "upstream_status": 429}
+
+
+@pytest.mark.parametrize(("status", "logged"), [
+    ("RESOURCE_EXHAUSTED", "RESOURCE_EXHAUSTED"),
+    ("Bad Gateway", None),  # google.genai's fallback for a body that is not JSON: a reason phrase.
+    ("A" * 41, None),
+    (429, None),
+])
+def test_error_log_fields_keep_only_a_status_name(status: Any, logged: str | None) -> None:
+    cause = _StatusError(UPSTREAM_TEXT, 429)
+    cause.status = status  # type: ignore[attr-defined]
+    assert error_log_fields(_wrapped(cause)).get("upstream_reason") == logged
+
+
+class _BrokenProperty(RuntimeError):
+    @property
+    def code(self) -> int:
+        raise RuntimeError("property failed")
+
+
+class _NoInitError(GeminiError):
+    def __init__(self, message: str) -> None:  # Skips GeminiError.__init__, so no .kind.
+        Exception.__init__(self, message)
+
+
+def test_error_log_fields_never_raise() -> None:
+    """It runs inside except blocks: a second error there would cut the chat stream off."""
+    assert error_log_fields(_wrapped(_BrokenProperty(UPSTREAM_TEXT))) == {
+        "exc_type": "GeminiError", "error_kind": "call_failed", "cause_type": "_BrokenProperty"}
+    assert error_log_fields(_NoInitError(UPSTREAM_TEXT)) == {"exc_type": "_NoInitError", "error_kind": "error"}
 
 
 def test_error_log_fields_read_the_status_of_an_httpx_style_response() -> None:
@@ -284,8 +327,8 @@ def test_error_log_fields_look_past_a_boolean_code_and_skip_a_boolean_status() -
 
 
 def test_error_log_fields_of_other_errors() -> None:
-    assert error_log_fields(RuntimeError(UPSTREAM_TEXT)) == {"error_type": "RuntimeError"}
-    assert error_log_fields(GeminiError(UPSTREAM_TEXT)) == {"error_type": "GeminiError", "error_kind": "error"}
+    assert error_log_fields(RuntimeError(UPSTREAM_TEXT)) == {"exc_type": "RuntimeError"}
+    assert error_log_fields(GeminiError(UPSTREAM_TEXT)) == {"exc_type": "GeminiError", "error_kind": "error"}
 
 
 # === lazy SDK import ===

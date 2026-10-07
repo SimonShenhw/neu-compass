@@ -45,6 +45,7 @@ quota retries cost real money. Caller logs + decides.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from functools import lru_cache
 from typing import Any, Protocol, TypeVar
@@ -77,26 +78,55 @@ class GeminiError(Exception):
         self.kind = kind
 
 
-def error_log_fields(exc: BaseException) -> dict[str, Any]:
-    """Facts about a failure that are safe to log: exception types, the GeminiError kind and the
-    upstream HTTP status. Never the message.
+# A status name such as RESOURCE_EXHAUSTED. google.genai puts the HTTP reason phrase ("Bad Gateway")
+# in the same attribute when the body is not JSON; that one is not logged.
+# 中文:RESOURCE_EXHAUSTED 这样的状态名。响应体不是 JSON 时,google.genai 会在同一个属性里放
+# HTTP 原因短语("Bad Gateway"),那种不记。
+_UPSTREAM_REASON = re.compile(r"[A-Z_]{1,40}")
 
-    中文:可以安全写进日志的失败信息:异常类型、GeminiError 的 kind、上游 HTTP 状态码。
-    从不包含消息原文。
+
+def _attr(obj: Any, name: str) -> Any:
+    """getattr that never raises: a property on a third-party error object can fail by itself.
+
+    中文:永不抛异常的 getattr:第三方错误对象上的属性本身就可能出错。
     """
-    fields: dict[str, Any] = {"error_type": type(exc).__name__}
+    try:
+        return getattr(obj, name, None)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _status_code(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def error_log_fields(exc: BaseException) -> dict[str, Any]:
+    """Facts about a failure that are safe to log: the exception types, the GeminiError kind, and
+    the upstream HTTP status and status name. Never the message. Never raises either: it runs inside
+    except blocks, where a second error would cut the chat stream off.
+
+    中文:可以安全写进日志的失败信息:异常类型、GeminiError 的 kind、上游 HTTP 状态码和状态名。
+    从不包含消息原文;也从不抛异常:它在 except 块里运行,再出一个错会把聊天流截断。
+    """
+    fields: dict[str, Any] = {"exc_type": type(exc).__name__}
     if isinstance(exc, GeminiError):
-        fields["error_kind"] = exc.kind
+        kind = _attr(exc, "kind")
+        fields["error_kind"] = kind if isinstance(kind, str) else "error"
     cause = exc.__cause__
     if cause is not None:
         fields["cause_type"] = type(cause).__name__
-        # google.genai's APIError keeps the HTTP status in .code; httpx errors on .response.
-        # 中文:google.genai 的 APIError 把 HTTP 状态码放在 .code;httpx 的错误放在 .response 上。
-        status = getattr(cause, "code", None)
-        if not isinstance(status, int) or isinstance(status, bool):
-            status = getattr(getattr(cause, "response", None), "status_code", None)
-        if isinstance(status, int) and not isinstance(status, bool):
+        # google.genai's APIError keeps the HTTP status in .code and its name in .status; httpx
+        # errors keep the status on .response.
+        # 中文:google.genai 的 APIError 把 HTTP 状态码放在 .code、状态名放在 .status;httpx 的
+        # 错误把状态码放在 .response 上。
+        status = _status_code(_attr(cause, "code"))
+        if status is None:
+            status = _status_code(_attr(_attr(cause, "response"), "status_code"))
+        if status is not None:
             fields["upstream_status"] = status
+        reason = _attr(cause, "status")
+        if isinstance(reason, str) and _UPSTREAM_REASON.fullmatch(reason):
+            fields["upstream_reason"] = reason
     return fields
 
 
@@ -508,7 +538,10 @@ def generate_text_stream(
     GeminiError surfaces if the SDK raises during stream init OR if the
     response never produces text (safety block, empty completion). Per-chunk
     errors mid-stream propagate as GeminiError too — the partial output up
-    to that point is what the caller already received.
+    to that point is what the caller already received. The SDK sends the
+    request only on the first iteration, so a failure before any text has
+    kind "stream_init_failed" whether it came from the call or from the first
+    chunk; "stream_interrupted" means some text had already been yielded.
 
     中文:随 Gemini 产出逐块 yield 文本。
     供 /chat 用于逐 token 的 UI 流式展示(由 app.answer_evidence_view.render_streamed_answer 渲染)。
@@ -516,6 +549,9 @@ def generate_text_stream(
     如果 SDK 在流初始化时抛错,或响应从未产出任何文本(安全拦截、空
     completion),都会抛出 GeminiError。流中途逐块出现的错误也会作为
     GeminiError 向外传播 —— 调用方在那之前已经收到的部分输出不受影响。
+    SDK 要到第一次迭代才发请求,所以在任何文字之前的失败,不论来自调用
+    还是第一个 chunk,kind 都是 "stream_init_failed";"stream_interrupted"
+    表示已经 yield 过一些文字。
     """
     if client is None:
         client = _build_default_client()
@@ -544,8 +580,12 @@ def generate_text_stream(
                 saw_any_text = True
                 yield str(text)
     except Exception as e:
+        if saw_any_text:
+            raise GeminiError(
+                f"Gemini stream interrupted: {type(e).__name__}: {e}", kind="stream_interrupted"
+            ) from e
         raise GeminiError(
-            f"Gemini stream interrupted: {type(e).__name__}: {e}", kind="stream_interrupted"
+            f"Gemini stream init failed: {type(e).__name__}: {e}", kind="stream_init_failed"
         ) from e
 
     if not saw_any_text:

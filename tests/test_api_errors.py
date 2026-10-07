@@ -20,12 +20,12 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-import api.exceptions as exceptions_module
+from structlog.testing import capture_logs
+
 from api.exceptions import register_exception_handlers
 from app.auth import OAuthError
 from db.repository import CourseNotFound
 from llm.gemini_client import GeminiError
-from tests.log_recorder import LogRecorder
 
 
 @pytest.fixture
@@ -117,19 +117,19 @@ def test_course_not_found_maps_to_404(client: TestClient) -> None:
     assert "neu-cs-9999" in body["detail"]
 
 
-def test_gemini_error_maps_to_502_upstream(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    recorder = LogRecorder()
-    monkeypatch.setattr(exceptions_module, "_log", recorder)
-    r = client.get("/raise-gemini")
+def test_gemini_error_maps_to_502_upstream(client: TestClient) -> None:
+    with capture_logs() as entries:
+        r = client.get("/raise-gemini")
     assert r.status_code == 502
     body = r.json()
     assert body["error_type"] == "upstream_error"
     # Fixed text: a GeminiError message can carry upstream URLs or bodies; the log keeps safe facts.
     assert body["detail"] == "LLM upstream failure. Retry later; the API log has the details by x-request-id."
-    assert recorder.calls == [("warning", "gemini_error", {
-        "path": "/raise-gemini", "method": "GET", "error_type": "GeminiError", "error_kind": "error",
-    })]
-    assert "rate limit" not in r.text and "rate limit" not in recorder.text()
+    assert [entry for entry in entries if entry["event"] == "gemini_error"] == [{
+        "event": "gemini_error", "log_level": "warning", "path": "/raise-gemini", "method": "GET",
+        "exc_type": "GeminiError", "error_kind": "error",
+    }]
+    assert "rate limit" not in r.text and "rate limit" not in repr(entries)
 
 
 # === Unhandled fallback ===
