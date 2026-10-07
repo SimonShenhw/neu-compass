@@ -144,6 +144,7 @@ def stream_assistant(
     state['last_chat_feedback'] = None
     import hashlib
     answer_hash = hashlib.sha256()
+    sent_text = False
     for event in api.chat_stream(body):
         etype = event.get("type")
         if etype == "meta":
@@ -152,11 +153,15 @@ def stream_assistant(
             text = event.get("text", "")
             if text:
                 answer_hash.update(text.encode('utf-8'))
+                sent_text = True
                 yield text
         elif etype == "error":
             detail = event.get("detail", "unknown error")
             state["last_chat_error"] = detail
-            yield f"\n\n⚠️ {detail}"
+            # The blank line only separates the notice from text; with no text the stored turn
+            # (sent back as history) would start with it. 中文：空行只用来和前面的文字隔开；
+            # 没有文字时，存下的这一轮（会作为历史再发回去）会以空行开头。
+            yield f"\n\n⚠️ {detail}" if sent_text else f"⚠️ {detail}"
             return
         elif etype == "done":
             if body.get('allow_feedback_capture') is not True:

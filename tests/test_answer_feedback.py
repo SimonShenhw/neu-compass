@@ -177,10 +177,16 @@ def test_capture_failure_rolls_back_only_the_new_answer_and_keeps_chat(api_clien
         original(self, **kwargs)
         raise sqlite3.OperationalError('secret capture error')
     monkeypatch.setattr(AnswerFeedbackRepository,'store_completed',fail)
-    events = chat(api_client)
+    from structlog.testing import capture_logs
+    with capture_logs() as entries:
+        events = chat(api_client)
     assert events[-1] == {'type':'done'} and not any(e['type']=='error' for e in events)
     assert not empty_db.execute('SELECT * FROM chat_answers').fetchall()
     assert QueryLogRepository(empty_db).count() == 1
+    # Same field name as the other chat log lines; the error text stays out.
+    assert [e for e in entries if e['event'] == 'chat.feedback_capture_failed'] == [
+        {'event': 'chat.feedback_capture_failed', 'log_level': 'warning', 'exc_type': 'OperationalError'}]
+    assert 'secret capture error' not in repr(entries)
 
 
 def test_failed_vote_commit_never_claims_success(api_client, empty_db, monkeypatch):

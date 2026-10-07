@@ -235,12 +235,14 @@ def test_exchange_code_verifier_exception_wraps_to_oauth_error() -> None:
     http = _mock_token_endpoint({"id_token": "x"})
 
     def bad_verifier(t: str) -> dict:
-        raise ValueError("bad signature")
+        raise ValueError("bad signature in placeholder-token-segment for audience placeholder-aud")
 
     with http:
-        with pytest.raises(OAuthError, match="ID token verification failed"):
+        with pytest.raises(OAuthError, match="ID token verification failed") as info:
             exchange_code_for_token("c", http_client=http,
                                     id_token_verifier=bad_verifier)
+    # Type only: the verifier's text (token segments, audience values) reaches the 401 and the log.
+    assert str(info.value) == "ID token verification failed: ValueError"
 
 
 def test_exchange_code_network_error_raises_oauth_error() -> None:

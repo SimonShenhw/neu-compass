@@ -1719,3 +1719,187 @@
 - 界面、过滤器和提示词 4.3 都要等下次部署才生效（部署前先 `chown` NAS 项目目录）。
 - 生产数据没有动。下次部署时按 `docs/answer-grounding.md` 跑：`repair_course_names.py` 报告 → 核对 → `--commit` → `sync_catalog_sources.py`；不用重建索引、不用重启。
 
+## 14 — 10-07 上线；聊天错误不再透出异常原文；AAI 6600 用目录名称（2026-10-07）
+
+### 上线记录（main `4ae60a3` = PR #2–#5，2026-10-07 11:37 UTC 起）
+
+- 部署前：NAS 约 37 小时前重启过，UGOS 又把项目目录改回 root:root（2569 个条目）。用户跑了 `sudo chown -R shenhaowei:docker /volume1/docker/neu-compass`，之后没有不属于 shenhaowei 的条目。
+- 步骤和 10-04 相同，构建与切换分开，构建失败不会影响线上：
+  1. 线上库一致性备份 `runtime-data/backups/prerelease-20261007-113628.db`（quick_check ok；courses 6469、users 2、coop_experiences 30、query_log 1499、course_catalog_sources 6467）。给运行中的镜像打回退标签 `neu-compass:rollback-20261007`（`57464a30d708`，即 10-04 的镜像）。
+  2. 上传代码，排除规则同 `deploy.ps1`。打包出来的 221 个文件逐个在 NAS 上核对 sha256，全部一致；`.env` 的哈希相同，没有覆盖。
+  3. 构建新镜像 `d8f97df9d1a4`，用时 41 秒。依赖与 10-04 的线上完全相同：openvino 2026.4.1、torch 2.12.0+cpu、transformers 4.57.6、optimum 2.2.0、optimum-intel 2.0.0。镜像里的提示词是 4.3。
+  4. 切换后 API、UI 健康。只读探针：ready 6469/6469、Co-op 审核表可用、方案 2/4/2、政策 12 条、CS 5004 先修文档。日志里只有旧索引缺 manifest 的警告，和 10-04 一样。
+- 评测：`eval_via_api`、同一测试集、带评测标记，116/116 完成。
+
+  | 指标 | 10-07 | 10-04 |
+  |---|---|---|
+  | R@5 | 0.8647 | 0.8609 |
+  | MRR | 0.9309 | 0.9362 |
+  | alias / hybrid / 拒答 | 31 / 75 / 10 | 31 / 75 / 10 |
+  | 服务端 p50 / p95 | 824 / 1127 ms | 872 / 1251 ms |
+
+  逐题比，8 题的前 5 名内部换了位置：q012、q083 变好（q083 回到了 09-14 的结果），q013、q025 变差，另外 4 题分数不变。两次之间 /search 的检索代码没有改过（只动了 `rag/answer_evidence.py` 和 `rag/prereq_graph.py`），依赖也相同，所以记作运行之间的波动。/chat 检查：200、hybrid、带 `program_schedule_unverified` 提示、提示词 4.3。
+- 课程名修复（13 第 3 部分）：生产库上的报告和本地开发库一致，只有 CS 5200 可修，AAI 6600 是「其他不一致」。`--commit` 修了 CS 5200 → `sync_catalog_sources.py` 预演 matched 6468、标题不一致 1、would_store 1 → 写入 1 份快照 → 重跑写入 0。线上 CS 5200 现在叫 "Database Management Systems"，`answer_evidence.catalog` 有了目录快照；AAI 6600 仍然没有。
+- 公网 UI 只读冒烟（打开首页和 `?course=CS-5200`，没有提问）：新文案、底部固定的输入框、新的详情面板，CS 5200 显示目录描述和「存档副本」说明。
+- 回退方式：把 `neu-compass:rollback-20261007` 重新标成 latest，再 `docker compose up -d`。名称修复只改了 `primary_name`，旧代码照样能读。
+
+### 范围与原因
+
+- 13 合并后，用户 10-07 让我对三件待定的事按推荐处理。定下来的是：FIX-01 作为这一批；AAI 6600 用目录名称；10-06 的检阅记录（`docs/optimization-roadmap-2026-10-06.md`）原样入库，和 FIX-01 的修复同时提交，因为仓库是公开的，记录里写着这个问题。
+- FIX-01 核实成立：聊天流出错时，`GeminiError` 的消息原样进了 NDJSON 的 `error.detail`，同样的文字也写进了 `chat.stream_failed` 日志。这条消息是 `Gemini API call failed: <类型>: <上游异常原文>`，结构化输出失败时还带着最多 500 字的响应原文。其他异常发的是 `类型: 原文`，并用 `log.exception` 记了整个 traceback。
+- 同类的还有两处，一起改了：`gemini_error_handler`（非流式接口的 502）回的是 `LLM upstream failure: <原文>`；HyDE 救援失败的 `rescue.failed` 日志记了 `str(e)[:200]`。
+
+### 已实现
+
+1. `llm/gemini_client.py`：
+   - `GeminiError` 加了 `kind`，八个抛出点各自标上，默认是 `error`。可能的值：
+     - `call_failed`：调用失败；
+     - `invalid_response`：响应不符合 schema；
+     - `stream_init_failed`：第一段文字之前的任何失败，不论是调用本身出错，还是在还没有 chunk 带文字时迭代出错。SDK 要到第一次迭代才发请求，所以真实环境里大多是后一种；
+     - `stream_interrupted`：已经出过文字之后失败；
+     - `empty_stream`、`empty_response`：没有生成任何文字。
+   - 消息原文不变，跑富化脚本的人仍然看得到。
+   - 新的 `error_log_fields(exc)`：只返回异常类型（`exc_type`）、`kind`、上游异常的类型（`cause_type`）、HTTP 状态码（`upstream_status`）和状态名（`upstream_reason`），从不包含消息。
+     - 状态码取 google.genai 错误的 `.code`，或 httpx 风格的 `.response.status_code`，布尔值不算。
+     - 状态名只认 `RESOURCE_EXHAUSTED` 这种全大写的写法。响应体不是 JSON 时，google.genai 在同一个属性里放的是 "Bad Gateway" 这类原因短语，这种不记。
+     - 它自己从不抛异常：它在 except 块里运行，再出一个错会把聊天流截断。
+2. `/chat` 流：
+   - `error` 事件改成 `{"type": "error", "error_type": …, "detail": 固定的中文提示}`。`error_type` 有三类：
+     - `upstream_error`：调用或流失败；
+     - `no_answer`：模型没给出文字，即安全拦截或空回答，照原样再问多半没用，提示换个问法；
+     - `internal_error`：其他错误。
+   - `chat.stream_failed` 只记 `error_log_fields` 和已经发出的 token 数（`tokens_sent`），这样分得清「一个字都没出」和「中途断开」。
+   - 意外错误改成 `log.error("chat.stream_unhandled", …)`，不再用 `log.exception`：渲染出来的 traceback 末尾就是消息。除了上面那些字段，还记 `frames`：最内 6 层的 `文件名:行号 函数名`，用 `error_frames()`，不读源码行，自己也从不抛异常。
+   - 已经流出来的部分回答、最后的 `done`、出错时不发反馈凭证，这些都不变；UI 照旧把 `detail` 接在部分回答后面。
+3. `gemini_error_handler`：502 的 detail 改成固定的英文，和 500 的写法一致；另记一条 `gemini_error` 日志（路径、方法、`error_log_fields`），日志里的 `request_id` 就是响应头的 `x-request-id`。
+4. `rescue.failed`：只记 `error_log_fields`。GeminiError 以外的错误（数据库、reranker）另外记 `frames`。
+5. `app/auth.py`：ID token 校验失败的 OAuthError 只写异常类型。google-auth 的消息可能引用 token 本身或 audience 的值，而这段文字既进 401 的 detail，也进 `auth.callback.rejected` 日志。
+6. `scripts/repair_course_names.py` 新增 `--use-catalog-title CODE`（可重复），用于由人决定的改名：
+   - 把点名的「其他不一致」也改成存档里的目录标题，报告里单列为 `named_repairs`。
+   - 点名的代码不在存档里，在打开库之前就失败。在库里不是正好一门课，在写入之前失败，连句子那一类修复也不写。
+   - 已经一致的算 matched，所以重跑不会改任何东西。
+   - 脚本自己检查出的失败（`NameRepairError`：代码不在存档里、库里不是正好一门课、存档里同一代码有两个标题）会打印消息，里面只有课程代码和数量；其他错误仍只打印类型。
+   - AAI 6600 存的是 syllabus seed 的 "Introduction to Artificial Intelligence"，目录标题是 "Applied Artificial Intelligence"。用目录标题有两个理由：目录是官方来源；回填要求名称和目录标题一致，改了之后这门课才挂得上目录快照。
+7. 文档：
+   - `docs/api_contract.md`：error 事件的新格式和三类 `error_type`，以及日志里记什么。
+   - `docs/answer-grounding.md`：新选项、AAI 6600 的决定和生产步骤。
+   - `docs/optimization-roadmap-2026-10-06.md`：原样入库。FIX-02、FIX-03、FIX-04 已在 13 里做了，FIX-01 是这一批；OPT-01–06 还没做。
+8. 审查后的修正（见「审查」）。上面这些里，有几处是审查后才改成现在这样的。
+   - 第 1 轮（2 路，中途叫停）：
+     - 文字之前的失败都算 `stream_init_failed`；
+     - `no_answer`；
+     - `tokens_sent`、`upstream_reason`；
+     - `error_log_fields` 从不抛异常，日志字段名用 `exc_type`（和全局处理器的 `unhandled_exception` 一致）；
+     - rescue 的 `frames`；
+     - OAuth 的校验消息；
+     - 修复工具打印自己的错误消息。
+   - 第 2 轮（1 路）：
+     - 模块说明和 /docs 的接口说明补上 `no_answer`；
+     - `no_answer` 的判断改用 `error_log_fields` 算好的 kind，原来直接读 `e.kind`，读出错时会在 except 块里再抛一次；
+     - `chat.feedback_capture_failed` 的字段名也统一成 `exc_type`；
+     - 没有任何文字时，提示前不再加空行（UI 存下的这一轮会作为历史发回给模型）；
+     - 修复工具列出没找到的代码时用 `repr()`，多出来的空格或小写字母看得见。
+
+### 修改文件
+
+| 文件 | 修改 |
+|---|---|
+| `llm/gemini_client.py` | `GeminiError.kind`；`error_log_fields()` |
+| `api/routes/chat.py` | 固定的 error 事件（`STREAM_ERROR_DETAIL`，三类）；日志只记安全字段、`tokens_sent` 和调用位置；模块和接口说明 |
+| `api/exceptions.py`、`api/routes/common.py` | 502 的固定 detail 和 `gemini_error` 日志；`error_frames()`；`rescue.failed` |
+| `app/auth.py` | ID token 校验失败只写类型 |
+| `scripts/repair_course_names.py` | `--use-catalog-title`；`NameRepairError` |
+| `app/streamlit_app.py` | 没有文字时错误提示前不加空行 |
+| `tests/test_error_logging_pipeline.py`、`tests/test_chat_error_page.py`（均新增）、`tests/test_api_chat.py`、`tests/test_api_errors.py`、`tests/test_hyde_rescue.py`、`tests/test_gemini_client.py`、`tests/test_repair_course_names.py`、`tests/test_streamlit_app.py`、`tests/test_app_auth.py`、`tests/test_answer_feedback.py` | 见验证记录 |
+| `docs/api_contract.md`、`docs/answer-grounding.md`、`docs/optimization-roadmap-2026-10-06.md`（入库）、本文件 | 见上 |
+
+### 验证记录
+
+- 测试里的上游文字是三段占位：像凭证的值、网址、请求正文。断言它们既不在响应里，也不在日志里。日志分两层检查：
+  - 用 structlog 的 `capture_logs()` 断言每条日志调用的完整字段：多一个 `exc_info` 或一个带消息的字段都会失败。structlog 25.5 的 `capture_logs()` 是原地改 processor 列表的，已经缓存的 logger 也抓得到。第一版用的是自己写的替身记录器，理由写成了「抓不到已缓存的 logger」，审查指出这个理由不成立，替身删了。
+  - `tests/test_error_logging_pipeline.py` 走真实的日志管线：`configure_logging()` 之后，用 caplog 收下请求期间任何 logger（structlog 或 stdlib，含 exc_info）写出的每一行。在这一层断言占位文字一处都没有、事件正好记了一次、日志里的 `request_id` 等于响应头的 `x-request-id`。覆盖聊天流两类失败和 502。
+- 原来有两个测试钉着「原文出现在 detail 里」（`"quota" in detail`、`"rate limit" in detail`），改成断言固定文字、并且原文不出现。UI 的错误事件测试改用新格式，另加一个经 ApiClient（MockTransport）读 `/chat` 错误事件的端到端测试：部分回答保留、接固定提示、不保留反馈凭证、只 POST 一次。
+- `tests/test_chat_error_page.py`：用 AppTest 跑真实页面，搭法照 `test_request_admission.py` 的页面测试。
+  - 覆盖三类错误事件，有部分文字和没有文字两种情况。
+  - 断言存下的这一轮正好是「部分文字 + 固定提示」，并经过回答过滤只显示一次，不保留反馈凭证。
+  - 之后两次 rerun 都不再 POST /chat。
+  - 从示例问题按钮发出的问题也一样：只 POST 一次。把 `pop("pending_query")` 换成 `get` 的变异体（每次 rerun 都重新发问）原来所有测试都杀不掉，现在被这个测试杀掉。
+- 全量（worktree；未提交的只有文档，测试不读它们）：审查前 `081fb30` 2977 passed，第 1 轮修正后 `5132021` 2994 passed，第 2 轮修正后 `e15a84f` 3006 passed，都是 0 失败（5 个警告与之前相同）。
+- 变异检查（每个变异体在 /tmp 下由 `git archive HEAD` 加 worktree 改动组成的独立副本里跑）：
+  - 第一版 31/31：两个分支的 detail 换成消息、每条日志加上消息、`log.exception`、去掉或写全路径的 frames、意外错误标成 upstream、502 的 detail 换成消息、502 不记日志、`error_log_fields` 加消息/丢 kind/丢 cause_type/任一处收布尔值/不看 response、每个 kind 字符串、默认 kind、kind 不存，以及名称选项的 5 个。
+  - 审查修正后 23/23：先出文字与否两个方向、`_attr` 只接 AttributeError、kind 直接读或不检查、状态名不校验或前缀匹配或丢掉、旧字段名、`no_answer` 从不或漏一类、`tokens_sent` 不计数或不记、意外错误加 `exc_info`、经 stdlib logger 或另一个 structlog logger 写消息、`error_frames(limit=0)` 返回全部或取最外层、rescue 从不或总是记 frames、CLI 不打印消息、存档冲突抛普通 ValueError、OAuth 消息带回原文。审查者自己加的 7 个变异体里有 4 类存活（`exc_info`、其他 logger、帧数的两种），这些现在都在里面、都被杀了。
+  - 第 2 轮修正后 13/13：
+    - `no_answer` 直接读 `e.kind`；
+    - `feedback_capture_failed` 写回旧字段名；
+    - 点名代码只在 0 门课时报错、只在 `--commit` 时检查；
+    - 先认点名再认句子；
+    - 只列第一个没找到的代码、不用 `repr()`；
+    - 空存档抛普通 ValueError；
+    - kind 只要不是 None 就收；
+    - `error_frames` 只接 ValueError；
+    - 示例按钮的问题用 `get` 读；
+    - 总加空行、从不记下已出过文字。
+  - 其中 9 个是第 2 轮审查者报告存活的：C1、G1、E1、U3、R1–R5。
+  - 它报告的另外 2 个当作等价，没有放进来：`lookup_lines=True` 输出完全一样；错误事件后 `continue`，ApiClient 在错误事件处就已经停了。
+
+### 审查
+
+- **第 1 轮：2 路只读审查**（语义与正确性 / 测试与文档；不派生子 agent、不改仓库、不联网），用户因额度在中途叫停。两路的部分结果（审查者原话的中文整理）保存在仓库外面。
+  - 语义（0 CRITICAL、0 HIGH、1 MEDIUM、7 LOW）：
+    - 中：真实 SDK 的流要到第一次迭代才发请求，原来的写法把「一个字没出就失败」也标成 `stream_interrupted`。审查者用 google-genai 1.75 加 mock transport 离线复现过。已修，见「已实现」1。
+    - 低：
+      - `error_log_fields` 自己可能抛异常；
+      - 修复工具只打印异常类型；
+      - 空回答也提示「稍后再问」；
+      - 漏了状态名、token 数和 rescue 的调用位置；
+      - OAuth 那条已知问题写得不全；
+      - UI 测试还是旧事件；
+      - 几处小问题：字段名不一致、`limit=0`、读源码行。
+    - 都已处理。另有一条记录未改：栈很深时，最内 6 帧可能一个我们自己的帧都没有（意外错误基本出在我们自己的代码里，接受）。
+  - 测试与文档（0 CRITICAL、0 HIGH、2 MEDIUM、8 LOW）：
+    - 中：意外错误那个测试没断言完整字段，加上 `exc_info=True` 的变异体能存活；替身记录器只看得到一个模块的 logger，经别的 logger 写出的消息测不到。
+    - 低：
+      - 替身记录器的理由不成立；
+      - request id 的说法没有测试；
+      - 「最内 6 帧」没有测试；
+      - UI 测试是旧事件；
+      - 空回答的提示；
+      - 修复工具的消息；
+      - rescue 的调用位置；
+      - `error_log_fields` 读属性时可能抛异常（未核实）。
+    - 都已处理，见验证记录。roadmap 文件检查过：没有凭证、IP、主机名、邮箱、人名，21 个链接都在，FIX-04 的问题在 main 的修改记录里本来就公开写着。
+  - 叫停时没做完的有四项：「rerun 不重复 POST」、修复工具 CLI 的边界情况、给名称选项多加变异体、真实 Streamlit 页面。都在第 2 轮补完了。
+- **第 2 轮：1 路只读审查**，看 `081fb30..5132021` 并补完第 1 轮没做完的四项，同样不派生子 agent、不改仓库、不联网。
+  - 结果：0 CRITICAL、0 HIGH、0 MEDIUM、6 LOW，都核对过、成立，都已处理（「已实现」8）。
+  - 低：
+    - 两处接口说明漏了 `no_answer`；
+    - `no_answer` 的判断没有用上加固过的读法；
+    - 三处文字不准：抛出点是八个、`feedback_capture_failed` 的字段名、「第一个 chunk」的说法；
+    - 修复工具五处边界没有测试：库里有两门同代码的课、只读运行时点名一门不存在的课、既是句子又被点名、多个没找到的代码、空存档；
+    - 两处加固没有测试：kind 不是字符串、`error_frames` 读 traceback 时出错；
+    - 示例问题按钮的路径没有页面测试（这段是原来就有的代码）。
+  - 四项补查：
+    - 用 AppTest 在真实页面上试过三类错误事件和示例问题按钮，都只 POST 一次，显示也对：经过回答过滤，没有 `st.error`/`st.warning`，没有反馈凭证。
+    - CLI 碰到带空格、小写或重复的代码时行为正确。
+    - 它自己设计了 13 个变异体，11 个存活。其中 9 个是上面这些测试缺口，已补；2 个是等价的。
+  - 审查者没法检查的：生产上的上线事实、真实 SDK 的行为（不联网）、真实浏览器。
+
+### 已知、未处理
+
+1. OAuth：「域名不允许」那条带着用户自己的邮箱，这段文字也写进 `auth.callback.rejected` 日志（info 级）。Google 返回的 `error_description` 原样进 401。都没改。
+2. 全局的 `unhandled_exception_handler` 和 `RequestLogMiddleware` 仍用 `log.exception` 记完整 traceback。它们只写日志、不发给客户端，聊天流里的意外错误也不经过它们。`query_log.write_failed` 仍记 sqlite 错误文字的前 120 字。
+3. `kind` 只覆盖 `llm/gemini_client.py` 自己抛的错误。如果以后打开 SDK 的重试，SDK 自己的重试日志会把异常文字写进同一份日志（现在没开）。
+4. 意外错误只记最内 6 帧；栈很深时可能看不到我们自己的那一帧。
+
+### 发布状态
+
+- 这一批随一个 PR 提交，合并由用户点。最后一个代码提交 `e15a84f` 的全量：3006 passed、0 failed（main 2951）。
+- 聊天错误、502、rescue 日志、OAuth 消息的改动都要等下次部署才生效。NAS 重启过的话，部署前先 `chown` 项目目录。
+- 生产数据：10-07 上线时已经修了 CS 5200（见上线记录）。AAI 6600 还没改，下次部署之后按 `docs/answer-grounding.md` 做：
+  1. `repair_course_names.py --use-catalog-title "AAI 6600"` 出报告，核对；
+  2. 加 `--commit`；
+  3. `sync_catalog_sources.py` 预演，确认 AAI 6600 变成 matched、`would_store` 是 1；
+  4. 再加 `--commit`。
+
+  不用重建索引，也不用重启。
+

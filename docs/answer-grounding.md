@@ -90,14 +90,17 @@ python scripts/sync_catalog_sources.py --db-path "H:/neu-compass-backup/rehearsa
 - 默认只读，列出所有与存档目录标题不一致的课程；
 - `--commit` 只修「存的名称以句号等结尾、原样出现在这门课自己的描述或 `raw_text` 里」的记录，其他不一致（改名、版本差异）只列出、不改；
 - 修复走 `CourseRepository.rename()`：名称列和 Course JSON 一起改，status 不变。两个索引都不读名称（FAISS 嵌入 `raw_text`，BM25 索引 `raw_text` + `search_expansion`），所以不用重建索引，课程也不会从搜索里消失。
+- `--use-catalog-title CODE`（可重复，2026-10-07 加）：把点名的「其他不一致」也改成存档里的目录标题，报告里单列为 `named_repairs`。点名的代码不在存档里，在打开库之前就失败；在库里不是正好一门课，在写入任何东西之前失败；已经一致的算 matched，重跑不改。
 
-本地开发库（7 月的副本）只报出 CS 5200 一门；另有 AAI 6600 被列为其他不一致（存的是 syllabus seed 的 "Introduction to Artificial Intelligence"，目录标题是 "Applied Artificial Intelligence"），需要人来定，不自动改。
+本地开发库（7 月的副本）只报出 CS 5200 一门；另有 AAI 6600 被列为其他不一致：存的是 syllabus seed 的 "Introduction to Artificial Intelligence"，目录标题是 "Applied Artificial Intelligence"。2026-10-07 定为用目录标题：目录是官方来源，而且名称对上之后，这门课才挂得上目录快照。生产上用 `--use-catalog-title "AAI 6600"` 点名改，工具不会自己改这一类。
 
-下次部署时在生产库上照这个顺序做（先 `chown` NAS 项目目录、做好部署前备份）：
+生产库上的顺序（先 `chown` NAS 项目目录、做好部署前备份）：
 1. `python scripts/repair_course_names.py --db-path <生产库> --catalog-dir <v1.4 回填用的同一份存档>`，看报告；
-2. 确认后加 `--commit`；
-3. `python scripts/sync_catalog_sources.py --db-path <生产库> --catalog-dir <同一份存档>`，确认 CS 5200 变成 matched、`would_store` 符合预期，再加 `--commit`；
+2. 确认后加 `--commit`（要点名改的再加 `--use-catalog-title <代码>`）；
+3. `python scripts/sync_catalog_sources.py --db-path <生产库> --catalog-dir <同一份存档>`，确认改过的课变成 matched、`would_store` 符合预期，再加 `--commit`；
 4. 不需要重建索引，也不需要重启 API：`/course` 和回答每次请求都从库里读名称和快照。
+
+2026-10-07 上线时已经在生产库上做过一遍（存档是 NAS `runtime-data/raw/neu_catalog`，容器里是 `/data/raw/neu_catalog`）：报告只有 CS 5200 可修、AAI 6600 是其他不一致；修了 CS 5200，同步写入 1 份快照，重跑写入 0。AAI 6600 要等带 `--use-catalog-title` 的版本部署之后，在第 2 步加 `--use-catalog-title "AAI 6600"`，再做第 3 步。
 
 普通 `ingest_neu_catalog.py` 现在同时存来源快照，并在缺表或来源不合格时失败。**不要用它给既有富化课程补来源**：原摄取会重写 Course、把状态置为 pending 并要求重建索引。回填工具就是为避开这些副作用而单独提供的。
 

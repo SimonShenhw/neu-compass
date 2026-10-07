@@ -12,9 +12,12 @@ import json
 from collections.abc import Iterator
 from typing import Callable
 
+import pytest
 from fastapi.testclient import TestClient
+from structlog.testing import capture_logs
 
 from api.dependencies import get_chat_stream_fn, get_db_conn
+from api.routes import chat as chat_route
 from db.program_repository import ProgramRepository
 from llm.gemini_client import GeminiError
 from schemas.program import Program, ProgramRequiredCourse
@@ -120,7 +123,9 @@ def test_chat_gemini_error_emits_error_event_then_done(api_client: TestClient) -
     assert "error" in types
     assert types[-1] == "done"
     err = next(e for e in events if e["type"] == "error")
-    assert "quota" in err["detail"]
+    assert err == {"type": "error", "error_type": "upstream_error",
+                   "detail": chat_route.STREAM_ERROR_DETAIL["upstream_error"]}
+    assert "quota" not in r.text
 
 
 def test_chat_unhandled_exception_still_finishes_stream(api_client: TestClient) -> None:
@@ -134,7 +139,129 @@ def test_chat_unhandled_exception_still_finishes_stream(api_client: TestClient) 
     r = api_client.post("/chat", json={"query": "x"})
     events = _parse_ndjson(r.text)
     assert events[-1]["type"] == "done"
-    assert any(e["type"] == "error" for e in events)
+    err = next(e for e in events if e["type"] == "error")
+    assert err == {"type": "error", "error_type": "internal_error",
+                   "detail": chat_route.STREAM_ERROR_DETAIL["internal_error"]}
+    assert "unexpected" not in r.text
+
+
+# Placeholder upstream text: a credential-like value, a URL and a request body (FIX-01).
+UPSTREAM_PARTS = ("placeholder-credential-123", "https://upstream.example/v1/stream", "request-body-sample")
+
+
+class _UpstreamFailure(RuntimeError):
+    code = 429
+    status = "RESOURCE_EXHAUSTED"
+
+
+def _upstream_failure() -> GeminiError:
+    cause = _UpstreamFailure(f"POST {UPSTREAM_PARTS[1]}?key={UPSTREAM_PARTS[0]} body={UPSTREAM_PARTS[2]}")
+    error = GeminiError(f"Gemini stream interrupted: {type(cause).__name__}: {cause}", kind="stream_interrupted")
+    error.__cause__ = cause
+    return error
+
+
+def _logged(entries: list[dict], name: str) -> list[dict]:
+    return [entry for entry in entries if entry["event"] == name]
+
+
+def test_chat_upstream_failure_reaches_neither_the_client_nor_the_log_call(api_client: TestClient) -> None:
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "partial..."
+        yield "more"
+        raise _upstream_failure()
+
+    _override_stream(api_client, boom_stream)
+    with capture_logs() as entries:
+        r = api_client.post("/chat", json={"query": "x"})
+    events = _parse_ndjson(r.text)
+    assert [e["text"] for e in events if e["type"] == "token"] == ["partial...", "more"]
+    assert [e["type"] for e in events][-2:] == ["error", "done"]
+    # The whole call: no message, no exc_info.
+    assert _logged(entries, "chat.stream_failed") == [{
+        "event": "chat.stream_failed", "log_level": "warning", "tokens_sent": 2,
+        "exc_type": "GeminiError", "error_kind": "stream_interrupted", "cause_type": "_UpstreamFailure",
+        "upstream_status": 429, "upstream_reason": "RESOURCE_EXHAUSTED",
+    }]
+    for part in UPSTREAM_PARTS:
+        assert part not in r.text
+        assert part not in repr(entries)
+
+
+def test_chat_unexpected_error_logs_where_it_happened_not_its_message(api_client: TestClient) -> None:
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "ok"
+        raise RuntimeError(f"state at {UPSTREAM_PARTS[1]} with {UPSTREAM_PARTS[0]}")
+
+    _override_stream(api_client, boom_stream)
+    with capture_logs() as entries:
+        r = api_client.post("/chat", json={"query": "x"})
+    [entry] = _logged(entries, "chat.stream_unhandled")
+    frames = entry.pop("frames")
+    # error, not exception, and no exc_info: a rendered traceback would end with the message.
+    assert entry == {"event": "chat.stream_unhandled", "log_level": "error", "tokens_sent": 1,
+                     "exc_type": "RuntimeError"}
+    assert frames[-1].startswith("test_api_chat.py:") and frames[-1].endswith(" boom_stream")
+    for part in UPSTREAM_PARTS:
+        assert part not in r.text
+        assert part not in repr(entries)
+
+
+def test_chat_unexpected_error_frames_are_the_innermost_six(api_client: TestClient) -> None:
+    def level(depth: int) -> None:
+        if depth == 0:
+            raise RuntimeError("deep")
+        level(depth - 1)
+
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "ok"
+        level(8)
+
+    _override_stream(api_client, boom_stream)
+    with capture_logs() as entries:
+        api_client.post("/chat", json={"query": "x"})
+    [entry] = _logged(entries, "chat.stream_unhandled")
+    assert len(entry["frames"]) == 6
+    assert all(frame.endswith(" level") for frame in entry["frames"])  # boom_stream is further out.
+
+
+class _BrokenKind(GeminiError):
+    @property
+    def kind(self) -> str:  # type: ignore[override]
+        raise RuntimeError("kind lookup failed")
+
+    @kind.setter
+    def kind(self, value: str) -> None:
+        pass
+
+
+def test_chat_error_with_an_unreadable_kind_still_ends_the_stream(api_client: TestClient) -> None:
+    """Reading the kind happens inside the except block; a second error there would end the stream
+    with neither error nor done (and leave the traceback to the middleware's log.exception)."""
+
+    def boom_stream(prompt: str) -> Iterator[str]:
+        yield "partial..."
+        raise _BrokenKind("upstream text")
+
+    _override_stream(api_client, boom_stream)
+    events = _parse_ndjson(api_client.post("/chat", json={"query": "x"}).text)
+    assert [e["type"] for e in events][-2:] == ["error", "done"]
+    assert next(e for e in events if e["type"] == "error")["error_type"] == "upstream_error"
+
+
+@pytest.mark.parametrize("kind", ["empty_stream", "empty_response"])
+def test_chat_empty_answer_gets_its_own_notice(api_client: TestClient, kind: str) -> None:
+    """A safety block or empty completion: "ask again later" would not help."""
+
+    def empty_stream(prompt: str) -> Iterator[str]:
+        raise GeminiError("Gemini produced no text", kind=kind)
+        yield  # pragma: no cover - makes this a generator
+
+    _override_stream(api_client, empty_stream)
+    events = _parse_ndjson(api_client.post("/chat", json={"query": "x"}).text)
+    err = next(e for e in events if e["type"] == "error")
+    assert err == {"type": "error", "error_type": "no_answer", "detail": chat_route.STREAM_ERROR_DETAIL["no_answer"]}
+    assert events[-1] == {"type": "done"}
 
 
 # === Validation ===

@@ -18,12 +18,13 @@ Wire format: NDJSON. One JSON object per line, chunks of:
   {"type": "meta",  "matched_via": "alias|hybrid|empty",
                     "results": [{"course_id", "primary_code", "primary_name", "score"}]}
   {"type": "token", "text": "..."}     (zero or more)
-  {"type": "error", "detail": "..."}   (only on Gemini failure)
+  {"type": "error", "error_type": "upstream_error|no_answer|internal_error", "detail": "..."}
+                                       (only on stream failure; fixed text, never the exception)
   {"type": "done", "feedback": {...}}  (optional receipt, always last)
 
 线路格式：NDJSON。每行一个 JSON 对象，依次是：meta（携带 matched_via 与
 results，供前端先渲染证据）、零到多个 token（逐字输出的文本片段）、
-可选的 error（上游流失败时出现）、以及总是最后出现的 done。
+可选的 error（流失败时出现；detail 是固定文字，从不带异常原文）、以及总是最后出现的 done。
 done.feedback 仅在服务端启用、本请求明确允许保存、完整非空回答及关联存储
 都成功时出现；凭证不放入 meta。默认不新增完整回答保存，原查询日志仍记录。
 
@@ -61,6 +62,7 @@ from api.models import ChatRequest
 from api.routes.common import (
     attempt_hyde_rescue,
     build_hard_filters,
+    error_frames,
     fetch_texts,
     filter_courses,
     log_query,
@@ -75,7 +77,7 @@ from db.program_repository import ProgramAmbiguous, ProgramNotFound, ProgramRepo
 from db.program_plan_repository import ProgramPlanRepository
 from db.repository import CourseRepository
 from config import settings
-from llm.gemini_client import GeminiError
+from llm.gemini_client import GeminiError, error_log_fields
 from llm.prompts.chat_v4 import PROMPT_VERSION, build_prompt
 from llm.query_filter_extractor import extract_filters_adaptive
 from rag.followup import is_followup_query
@@ -107,6 +109,24 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 log = structlog.get_logger("neu_compass.chat")
 
+# Shown to the student after the partial answer. Fixed text: the exception message can carry
+# upstream URLs or request/response bodies, so it reaches neither the client nor the log.
+# 中文：接在部分回答后面给学生看。固定文字：异常消息里可能有上游网址、请求或响应正文，
+# 所以既不发给客户端，也不写进日志。
+STREAM_ERROR_DETAIL = {
+    "upstream_error": "模型服务暂时出错，这条回答没有完成。请稍后再问一次。",
+    # Empty completion or safety block: asking the same way again rarely helps.
+    # 中文：空回答或被安全规则拦下：照原样再问一次多半没用。
+    "no_answer": "这次模型没有给出回答，可能被它的安全规则拦下了。换个问法再试试。",
+    "internal_error": "服务内部出错，这条回答没有完成。请稍后再问一次。",
+}
+_NO_ANSWER_KINDS = frozenset({"empty_stream", "empty_response"})
+
+
+def _stream_error_event(error_type: str) -> bytes:
+    payload = {"type": "error", "error_type": error_type, "detail": STREAM_ERROR_DETAIL[error_type]}
+    return (json.dumps(payload) + "\n").encode("utf-8")
+
 
 @router.post(
     "",
@@ -124,8 +144,9 @@ log = structlog.get_logger("neu_compass.chat")
         "was answered from hybrid retrieval instead of a guessed sequence.\n"
         "2. `{\"type\": \"token\", \"text\": \"...\"}` — zero or more, "
         "Gemini stream chunks.\n"
-        "3. `{\"type\": \"error\", \"detail\": \"...\"}` — only on Gemini "
-        "stream failure.\n"
+        "3. `{\"type\": \"error\", \"error_type\": \"upstream_error|no_answer|internal_error\", "
+        "\"detail\": \"...\"}` — only on stream failure. `detail` is fixed text, never the "
+        "exception; the server log line carries the same `x-request-id`.\n"
         "4. `{\"type\": \"done\", \"feedback\": {answer_id, answer_sha256, feedback_token}}` "
         "— always last; feedback is optional and issued only after a complete, "
         "non-empty answer and successful private storage. Never in meta. "
@@ -338,6 +359,7 @@ def chat(
         capture_answer = (query_log_id is not None and req.allow_feedback_capture
                           and settings.answer_feedback_enabled is True)
         feedback_receipt = None
+        tokens_sent = 0  # Logged on failure: nothing sent vs cut off mid-answer. / 失败时记录：一字未出还是中途断开。
         try:
             for chunk in stream_fn(prompt):
                 if not isinstance(chunk, str):
@@ -351,19 +373,18 @@ def chat(
                         answer_parts.clear()
                 payload = {"type": "token", "text": chunk}
                 yield (json.dumps(payload) + "\n").encode("utf-8")
+                tokens_sent += 1
         except GeminiError as e:
-            log.warning("chat.stream_failed", error=str(e))
-            yield (json.dumps({"type": "error", "detail": str(e)}) + "\n").encode(
-                "utf-8"
-            )
+            fields = error_log_fields(e)  # Never raises; error_kind is always a str here.
+            log.warning("chat.stream_failed", tokens_sent=tokens_sent, **fields)
+            no_answer = fields["error_kind"] in _NO_ANSWER_KINDS
+            yield _stream_error_event("no_answer" if no_answer else "upstream_error")
         except Exception as e:  # defensive — never crash the stream / 防御性：绝不能让流崩溃
-            log.exception("chat.stream_unhandled")
-            yield (
-                json.dumps(
-                    {"type": "error", "detail": f"{type(e).__name__}: {e}"}
-                )
-                + "\n"
-            ).encode("utf-8")
+            # Frames instead of log.exception: a rendered traceback ends with the message.
+            # 中文：记录调用位置而不是 log.exception：渲染出的 traceback 末尾就是消息原文。
+            log.error("chat.stream_unhandled", tokens_sent=tokens_sent, frames=error_frames(e),
+                      **error_log_fields(e))
+            yield _stream_error_event("internal_error")
 
         else:
             if capture_answer and ''.join(answer_parts).strip():
@@ -401,7 +422,7 @@ def _store_completed_answer(conn, query_log_id, text, req):
         except sqlite3.Error:
             pass
         # Never print token, answer, raw query, or exception detail.
-        log.warning('chat.feedback_capture_failed', error_type=type(exc).__name__)
+        log.warning('chat.feedback_capture_failed', exc_type=type(exc).__name__)
         return None
 
 

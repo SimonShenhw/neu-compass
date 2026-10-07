@@ -323,8 +323,12 @@ def exchange_code_for_token(
     except OAuthError:
         raise
     except Exception as e:
+        # Type only: google-auth's messages can quote the token or its audience values, and this
+        # text reaches both the 401 detail and the auth.callback.rejected log.
+        # 中文：只给类型：google-auth 的消息里可能引用 token 本身或 audience 的值，而这段文字会进
+        # 401 的 detail，也会进 auth.callback.rejected 日志。
         raise OAuthError(
-            f"ID token verification failed: {type(e).__name__}: {e}"
+            f"ID token verification failed: {type(e).__name__}"
         ) from e
 
     return validate_id_token_claims(claims)

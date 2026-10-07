@@ -126,6 +126,13 @@ def test_conflicting_archive_titles_abort_before_any_change(runtime):
     assert rows(path) == before
 
 
+def test_cli_names_the_code_with_conflicting_archived_titles(runtime, capsys):
+    path, archive = runtime
+    (archive / "cs2.jsonl").write_text(entry("CS 5800", "Algorithms II").model_dump_json() + "\n", encoding="utf-8")
+    assert cli(["--db-path", str(path), "--catalog-dir", str(archive)]) == 1
+    assert "Conflicting archived titles for CS 5800" in capsys.readouterr().out
+
+
 def test_cli_defaults_to_read_only_and_fails_closed(runtime, tmp_path, capsys):
     path, archive = runtime
     assert cli(["--db-path", str(path), "--catalog-dir", str(archive)]) == 0
@@ -176,3 +183,97 @@ def test_a_sentence_found_only_in_the_stored_raw_text_also_counts(runtime):
         entry("CS 5800", "Algorithms", "Graph algorithms."), entry("CS 6140", "Machine Learning", "Learning."),
     )) + "\n", encoding="utf-8")
     assert [item["code"] for item in repair_names(path, archive)["repairs"]] == ["CS 5200"]
+
+
+def test_a_named_mismatch_takes_the_catalog_title(runtime):
+    """--use-catalog-title is for a rename a person decided (AAI 6600 in production; CS 6140 here).
+    中文：--use-catalog-title 用于由人决定的改名（生产上是 AAI 6600，这里用 CS 6140）。"""
+    path, archive = runtime
+    before = rows(path)
+    report = repair_names(path, archive, use_catalog_title=["CS 6140"])
+    assert rows(path) == before and report["repaired"] == 0
+    assert [item["code"] for item in report["named_repairs"]] == ["CS 6140"]
+    assert report["named_repairs"][0]["catalog"] == "Machine Learning"
+    assert [item["code"] for item in report["repairs"]] == ["CS 5200"] and report["other_mismatches"] == []
+
+    report = repair_names(path, archive, commit=True, use_catalog_title=["CS 6140"])
+    after = rows(path)
+    assert report["repaired"] == 2
+    fixed, old = after["neu-cs-6140"], before["neu-cs-6140"]
+    assert fixed["primary_name"] == "Machine Learning"
+    assert json.loads(fixed["generated_json"]) == {**json.loads(old["generated_json"]),
+                                                   "primary_name": "Machine Learning"}
+    assert (fixed["raw_text"], fixed["status"], fixed["indexed_at"], fixed["metadata"]) == (
+        old["raw_text"], "indexed", old["indexed_at"], old["metadata"])
+    again = repair_names(path, archive, commit=True, use_catalog_title=["CS 6140"])
+    assert again["repaired"] == 0 and again["matched"] == 3  # Re-running changes nothing.
+    assert sync_sources(path, archive)["skipped_title_mismatch"] == 0  # Both snapshots can attach now.
+
+
+@pytest.mark.parametrize("code", ["CS6140", "CS 7777"])
+def test_a_named_code_not_in_the_archive_fails_before_the_database_is_opened(runtime, tmp_path, code):
+    path, archive = runtime
+    # A missing database would raise FileNotFoundError if it were opened first.
+    with pytest.raises(ValueError, match="not in the archive"):
+        repair_names(tmp_path / "missing.db", archive, commit=True, use_catalog_title=[code])
+
+
+@pytest.mark.parametrize("commit", [True, False])
+def test_a_named_code_without_exactly_one_course_writes_nothing(runtime, commit):
+    path, archive = runtime  # CS 9999 is archived but not in this database.
+    before = rows(path)
+    with pytest.raises(ValueError, match="CS 9999: 0 courses"):
+        repair_names(path, archive, commit=commit, use_catalog_title=["CS 9999"])
+    assert rows(path) == before  # Not even the CS 5200 repair.
+
+
+def test_a_named_code_with_two_courses_writes_nothing(runtime):
+    """The schema allows a repeated primary_code; a named rename then has no single target."""
+    path, archive = runtime
+    conn = connect(path)
+    CourseRepository(conn).insert(Course(course_id="neu-cs-6140-copy", primary_code="CS 6140",
+                                         primary_name="Machine Learning (old title)", credits=4), raw_text="Learning.")
+    conn.commit()
+    conn.close()
+    before = rows(path)
+    with pytest.raises(ValueError, match="CS 6140: 2 courses"):
+        repair_names(path, archive, commit=True, use_catalog_title=["CS 6140"])
+    assert rows(path) == before
+
+
+def test_a_named_code_that_is_also_a_sentence_is_one_repair(runtime):
+    path, archive = runtime
+    report = repair_names(path, archive, commit=True, use_catalog_title=["CS 5200", "CS 5200"])
+    assert [item["code"] for item in report["repairs"]] == ["CS 5200"] and report["named_repairs"] == []
+    assert report["repaired"] == 1 and rows(path)["neu-cs-5200"]["primary_name"] == "Database Management Systems"
+
+
+def test_every_unknown_named_code_is_listed_with_its_spelling(runtime):
+    path, archive = runtime
+    with pytest.raises(ValueError) as info:
+        repair_names(path, archive, use_catalog_title=["CS 6140 ", "cs 6140", "CS 7777"])
+    assert str(info.value) == "--use-catalog-title codes not in the archive: 'CS 6140 ', 'CS 7777', 'cs 6140'"
+
+
+def test_cli_reports_an_empty_archive_by_name(runtime, tmp_path, capsys):
+    path, _ = runtime
+    empty = tmp_path / "empty-archive"
+    empty.mkdir()
+    assert cli(["--db-path", str(path), "--catalog-dir", str(empty)]) == 1
+    assert "No JSONL catalog archives found" in capsys.readouterr().out
+
+
+def test_cli_takes_repeated_catalog_title_codes(runtime, capsys):
+    path, archive = runtime
+    base = ["--db-path", str(path), "--catalog-dir", str(archive), "--commit"]
+    assert cli([*base, "--use-catalog-title", "CS 6140", "--use-catalog-title", "CS 5800"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    # CS 5800 already matches: counted as matched, nothing to rename.
+    assert report["repaired"] == 2 and [item["code"] for item in report["named_repairs"]] == ["CS 6140"]
+    assert rows(path)["neu-cs-6140"]["primary_name"] == "Machine Learning"
+    assert cli([*base, "--use-catalog-title", "CS 7777"]) == 1
+    # The script's own failures name the code, so a misspelt one is easy to tell from a duplicate.
+    assert capsys.readouterr().out.strip() == (
+        "Course name repair failed: --use-catalog-title codes not in the archive: 'CS 7777'; no transaction committed.")
+    assert cli([*base, "--use-catalog-title", "CS 9999"]) == 1
+    assert "--use-catalog-title CS 9999: 0 courses in the database, need exactly one" in capsys.readouterr().out
