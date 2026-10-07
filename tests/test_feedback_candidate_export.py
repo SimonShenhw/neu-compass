@@ -370,7 +370,7 @@ def test_fsync_failure_never_publishes_partial_file(empty_db, tmp_path, monkeypa
     import scripts.export_answer_feedback as module
     def fail(descriptor):
         raise OSError('synthetic fsync failure')
-    monkeypatch.setattr(module.os, 'fsync', fail)
+    monkeypatch.setattr(os, 'fsync', fail)
     with pytest.raises(OSError):
         module.export_feedback(db, out=tmp_path / 'review.jsonl')
     assert set(tmp_path.iterdir()) == {db}
@@ -385,7 +385,7 @@ def test_publication_race_keeps_existing_destination_and_cleans_temp(empty_db, t
     def racing_link(source, destination):
         out.write_bytes(b'race-owner-data')
         return real_link(source, destination)
-    monkeypatch.setattr(module.os, 'link', racing_link)
+    monkeypatch.setattr(os, 'link', racing_link)
     with pytest.raises(OSError):
         module.export_feedback(db, out=out)
     assert out.read_bytes() == b'race-owner-data'

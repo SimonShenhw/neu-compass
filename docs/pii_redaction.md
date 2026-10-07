@@ -261,3 +261,7 @@ def auto_redact_pre(text: str) -> str:
 本批测试的缺字段错误栈曾含 Settings 配置值；本地已隐藏敏感字段 repr 和校验字符串输入，并清理本次 RED 报告的错误细节。不能撤回工具输出历史，相关凭证处置／轮换仍须由持有人确认；显式 model_dump／errors() 不自动脱敏，不记录新值。
 
 功能、迁移与测试边界见 [回答反馈说明](answer-feedback.md) 与 [联合发布验收准备](joint-release-acceptance.md)；生产数据库／留存策略修改、密钥操作仍需单独确认。
+
+## 9. 查询日志导出（OPT-01，2026-10-07）
+
+`scripts/export_query_log.py` 改成与 06B-2 相同的契约，见 [查询日志导出](query-log-export.md)：只读已有库、默认只统计；元数据文件不含查询原文和原始 user_id；原文需要成对开关和新文件；仓库内限定已忽略的 data/raw/query_log_review。旧版默认写的 `eval/query_log_export.jsonl` 已加入 Git 忽略，但忽略不替代访问控制、脱敏或留存。query_log 本身仍没有自动清理，保留期仍由运维负责。本批只在合成临时库上验证，没有导出或清理真实数据。

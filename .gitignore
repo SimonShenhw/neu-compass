@@ -52,6 +52,9 @@ data/coop_seed/*
 !data/coop_seed/template.example.json
 data/ground_truth/*.json
 !data/ground_truth/.gitkeep
+# Old default output of scripts/export_query_log.py (raw query text). The tool no longer writes
+# there; this only keeps a copy left by the old version out of commits. It is not access control.
+eval/query_log_export.jsonl
 
 # Databases & indexes
 *.db
