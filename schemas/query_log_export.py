@@ -1,7 +1,7 @@
 """Private query_log rows for offline review; returned course IDs are never ground truth."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -15,7 +15,8 @@ QueryReviewRequirement = Literal[
 
 
 class PrivateQueryText(BaseModel):
-    model_config = ConfigDict(extra='forbid', strict=True)
+    # Validation errors must not carry the query text into a caller's logs.
+    model_config = ConfigDict(extra='forbid', strict=True, hide_input_in_errors=True)
     query: str = Field(min_length=1, max_length=500, repr=False)
     rejection_reason: str | None = Field(min_length=1, max_length=1000, repr=False)
 
@@ -23,7 +24,7 @@ class PrivateQueryText(BaseModel):
 class QueryLogExportRow(BaseModel):
     """query_log keeps no filters, chat history or index snapshot; the gaps stay on every row."""
 
-    model_config = ConfigDict(extra='forbid', strict=True)
+    model_config = ConfigDict(extra='forbid', strict=True, hide_input_in_errors=True)
     format_version: Literal['1'] = '1'
     log_id: int = Field(gt=0)
     created_at: str
@@ -33,7 +34,7 @@ class QueryLogExportRow(BaseModel):
     retrieval_mode: RetrievalMode
     k: int | None = Field(ge=1, le=50)
     latency_ms: float | None = Field(ge=0, allow_inf_nan=False)
-    result_course_ids: list[str]
+    result_course_ids: list[Annotated[str, Field(min_length=1)]] = Field(max_length=1000)
     query_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
     review_state: Literal['pending'] = 'pending'
     ground_truth: Literal[False] = False

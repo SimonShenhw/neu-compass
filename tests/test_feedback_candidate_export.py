@@ -192,7 +192,8 @@ def test_limit_has_more_and_stable_order_no_unvoted_rows(empty_db, tmp_path):
     ('a.request_context', '{"context_course_ids":[1]}'),
     ('a.request_context', '{"program_id":""}'),
     ('a.created_at', 'bad-private-time-canary'),
-    ('q.result_course_ids', '{}'), ('q.result_course_ids', '[1]'),
+    ('q.result_course_ids', '{}'), ('q.result_course_ids', '[1]'), ('q.result_course_ids', '[""]'),
+    ('q.result_course_ids', '[' + ','.join(['"c"'] * 1001) + ']'),
     ('q.route', 'search'), ('q.query', 'x' * 501),
 ])
 def test_bad_selected_row_prevents_even_partial_file(empty_db, tmp_path, column, value):

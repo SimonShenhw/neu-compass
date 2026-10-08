@@ -1,6 +1,6 @@
 # OPT-01 — 查询日志的私有导出
 
-2026-10-07 本地实现；变更与测试结果记在 [开发修改记录](development-change-log.md) 第 15 节。本工具不操作生产库、不迁移表、不导入评测集，也不发布用户原文。
+2026-10-07 本地实现，10-08 按两路审查修正；变更与测试结果记在 [开发修改记录](development-change-log.md) 第 15 节。本工具不操作生产库、不迁移表、不导入评测集，也不发布用户原文。
 
 旧版 `scripts/export_query_log.py` 有四个问题：
 
@@ -13,7 +13,7 @@
 
 ## 默认行为与命令
 
-必须指定**已有**的数据库，里面要有原来的 `query_log` 表：真正的 INTEGER 主键 `log_id`，以及导出用到的列。连接用 SQLite URI `mode=ro` 加 `query_only=ON`，统计和导出在同一个读事务里完成；不建库、不迁移、不写入。路径写错、给的是目录或者表结构不对，都直接失败。
+必须指定**已有**的数据库，里面要有原来的 `query_log` 表：真正的 INTEGER 主键 `log_id`，以及导出用到的列。连接用 SQLite URI `mode=ro` 加 `query_only=ON`，统计和导出在同一个读事务里完成；不建库、不迁移、不写入。路径写错、给的是目录、路径里有 symlink 循环，或者表结构不对，都直接失败。库要放在本地磁盘上：`\\server\share` 这样的 UNC 路径打不开，先把副本复制到本地。
 
 | 参数 | 输出 |
 |---|---|
@@ -36,12 +36,15 @@ mkdir -p data/raw/query_log_review
   --db-path /tmp/neu-compass-copy.sqlite3 --since 2026-10-01 --until 2026-10-08 \
   --out data/raw/query_log_review/metadata-2026-10-07.jsonl
 
-# 原文：先确认访问控制、原文审查的授权和留存安排。
+# 原文：先确认访问控制、原文审查的授权和留存安排。目录同样要先建好。
+mkdir -p -m 700 /tmp/neu-compass-private-review
 .venv/bin/python scripts/export_query_log.py \
   --db-path /tmp/neu-compass-copy.sqlite3 \
   --include-private-text --ack-private-data \
   --out /tmp/neu-compass-private-review/query-log-2026-10-07.jsonl
 ```
+
+WSL 重启时会清空 `/tmp`，上面两个 `/tmp` 下的文件只是临时的；要保留的话，换成另一个操作者控制的私有目录。
 
 在容器里跑时，仓库目录是镜像里的 `/app`，镜像里没有 `data/raw/`。输出要写到操作者控制的目录；写进挂载的数据目录的话，它可能被同步或备份带走，要一起管。
 
@@ -55,9 +58,10 @@ mkdir -p data/raw/query_log_review
 
 ## 来源、窗口和一致性
 
-- `--origin unmarked` 是默认：`user_id IS NULL`，只表示请求没带 `X-Eval-Run`，**不证明是真人**。`eval` 只匹配非空的 `eval:<run>`；`eval:` 空值和其他值算 `unknown`，只有 `all` 会选进来。
-- `--since YYYY-MM-DD` 含当天 UTC 00:00:00，`--until` 不含，都按 `query_log.created_at`。存储时间必须是 SQLite 的 UTC 秒级格式，输出成 `YYYY-MM-DDTHH:MM:SSZ`。
-- 文件按 `log_id` 升序，最多 `--limit` 行（默认 200，范围 1–1000）；选择里还有更多时 `has_more=true`。没有游标，要缩小时间窗口。
+- `--origin unmarked` 是默认：`user_id IS NULL`，只表示请求没带 `X-Eval-Run`，**不证明是真人**。`eval` 只匹配非空的 `eval:<run>`（区分大小写）；`eval:` 空值、空字符串和其他值都算 `unknown`，只有 `all` 会选进来。SQL 的选择和逐行分类用的是同一条规则，含 NUL 字符的标记也一致。
+- `eval` 也只是自报的：任何客户端都能带 `X-Eval-Run` 头。要确认是自己跑的评测，用 `eval_run_sha256` 对照自己的评测名称。
+- `--since YYYY-MM-DD` 含当天 UTC 00:00:00，`--until` 不含，都按 `query_log.created_at`；`--since` 不早于 `--until` 时直接失败。存储时间必须是 SQLite 的 UTC 秒级格式，输出成 `YYYY-MM-DDTHH:MM:SSZ`。
+- 文件按 `log_id` 升序，最多 `--limit` 行（默认 200，范围 1–1000）；选择里还有更多时 `has_more=true`。没有游标，只能缩小时间窗口，而窗口按整天算：同一天、同一来源超过 1000 行时，后面的行导不出来。
 - 被选中的行字段不对时，**整次失败，不跳过坏行**：
   - 统计阶段检查时间格式、route、来源标记和检索模式的类型；
   - 导出阶段另外检查查询原文（1–500 字）、结果 ID（JSON 数组，≤1000 个非空字符串，≤65536 字符）、k（空值或 1–50）、耗时（空值或有限的非负数）和拒答原因（空值或 1–1000 字）。
@@ -84,9 +88,12 @@ mkdir -p data/raw/query_log_review
 
 ## 写入边界
 
-- 先验证全部选中行、检查 32 MiB 的总预算，之后才创建文件。
-- 只接受新的 `.jsonl` 文件，拒绝已有文件、symlink／hardlink、数据库路径和不存在的父目录。
-- 仓库内只允许 `data/raw/query_log_review/`（Git 和 Docker 都忽略 `data/raw/`）。旧的默认路径 `eval/query_log_export.jsonl` 和反馈导出的目录都会被拒绝。仓库外的路径由操作者负责私有目录、备份和清理。
+- 先验证要写的全部行、检查 32 MiB 的总预算（按 UTF-8 字节算），之后才创建文件。
+- 只接受新的 `.jsonl` 文件（后缀不分大小写），拒绝已有文件、symlink／hardlink、数据库路径，以及不存在或不是目录的父目录。
+- 仓库内只允许 `data/raw/query_log_review/`（Git 和 Docker 都忽略 `data/raw/`）。旧的默认路径 `eval/query_log_export.jsonl` 和反馈导出的目录都会被拒绝。
+  - 判断「在不在仓库里」时，既看路径文字，也看文件身份：WSL 的 `/mnt/<盘符>` 不分大小写，换个大小写或用 Windows 短文件名写的仓库路径，文字不同，其实是同一个目录。
+  - 父目录按输入的写法和解析后的位置各查一次，经 symlink 进出仓库都会被发现。
+  - 仓库外的路径由操作者负责私有目录、备份和清理。
 - 同目录的私有临时文件 `.query-log-review-*.tmp` 写完、fsync 后，用**不覆盖的 hard link** 发布；文件系统不支持 hard link 时直接失败，不会退回到覆盖式写入。
 - POSIX 文件系统上权限是 0600。WSL 的 `/mnt/<盘符>`（比如上面示例里的 `/mnt/h/neu-compass`）通常不保存 POSIX 权限，实际由 Windows ACL 决定；Windows 和共享盘的 ACL 都要人工核实。
 - 发布后临时文件删不掉时报告 `temporary_cleanup_incomplete=true`，written 仍是 true；异常终止也可能留下临时文件，要纳入清理检查。
@@ -95,5 +102,8 @@ mkdir -p data/raw/query_log_review
 
 - `.gitignore` 加了 `eval/query_log_export.jsonl`。新工具不再写这里，这一条只防止旧版本留下的副本被误提交；本地如果有这个文件，先确认还要不要，再按留存规则处理。
 - Git 忽略只管提交，不是访问控制、脱敏或留存：被忽略的文件照样留在磁盘、备份和同步盘里。query_log 本身的保留期和清理仍由运维负责，见 [PII 边界](pii_redaction.md)。
-- 只读连接不会冻结正在写入的 WAL 文件；需要稳定副本时，先按现有备份流程准备一致的副本。导出期间有写入方时，读到的是开始读时已经提交的内容，不会等写入方，也看不到它没提交的改动。
-- WAL 模式的库即使只读打开，SQLite 也会在库文件旁边建 `-wal`／`-shm` 两个辅助文件，关闭后可能留下；库文件本身不变。两个导出工具都是这样。
+- 只读连接不会冻结正在写入的 WAL 文件；需要稳定副本时，先按现有备份流程准备一致的副本。
+- 导出期间有写入方时：
+  - WAL 模式（生产库是这个模式）：读到的是开始读时已经提交的内容，不会等写入方，也看不到它没提交的改动；
+  - 回滚日志模式：写入方持有锁时，导出最多等 5 秒，然后失败；导出读着的时候，写入方要提交得等导出读完，等不及就会报 database is locked。
+- WAL 模式的库即使只读打开，SQLite 也会在库文件旁边建 `-wal`／`-shm` 两个辅助文件，关闭后可能留下；库文件本身不变。两个导出工具都是这样。放在只读目录里、旁边又没有这两个文件的 WAL 副本读不了，导出会以固定的一行失败；把副本放在可写的目录里。

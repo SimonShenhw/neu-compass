@@ -1,13 +1,15 @@
 """Shared contract of the private offline exporters (answer feedback, query log).
 
-The database must already exist and is read in one read-only snapshot: no file is created, nothing
-is migrated or written. Callers validate every selected row before any output exists. Output is a
-new .jsonl file published without overwriting; inside the repository only the tool's ignored
-private directory is allowed. The original X-Eval-Run marker is classified, never exported.
+The database must already exist and is read in one read-only snapshot: no database is created,
+nothing is migrated or written (SQLite may still add its -wal/-shm files next to a WAL database).
+Callers validate every row they write before any output exists. Output is a new .jsonl file
+published without overwriting; inside the repository only the tool's ignored private directory is
+allowed. The original X-Eval-Run marker is classified, never exported.
 """
 
 import argparse
 from datetime import datetime
+import errno
 import json
 import os
 from pathlib import Path
@@ -75,11 +77,12 @@ def traffic_kind(marker):
 
 
 def origin_clauses(origin, column):
-    """SQL selecting one origin ('all' adds none); it agrees with traffic_kind() on text markers."""
+    """SQL selecting one origin ('all' adds none); it agrees with traffic_kind() on every text marker.
+    length() would not: it stops at the first NUL character, len() does not."""
     if origin == 'unmarked':
         return [f'{column} IS NULL']
     if origin == 'eval':
-        return [f"substr({column},1,5)='eval:' AND length({column})>5"]
+        return [f"substr({column},1,5)='eval:' AND {column}<>'eval:'"]
     return []
 
 
@@ -90,8 +93,16 @@ def retrieval_mode(value):
     return value if value in RETRIEVAL_MODES else 'unknown'
 
 
+def _resolved(path):
+    try:
+        return Path(path).resolve(strict=True)
+    except RuntimeError:
+        # Python <= 3.12 reports a symlink loop as RuntimeError, with the path in the message.
+        raise OSError(errno.ELOOP, 'Symlink loop') from None
+
+
 def open_read_snapshot(db_path):
-    path = Path(db_path).resolve(strict=True)
+    path = _resolved(db_path)
     if not path.is_file():
         raise ValueError('Existing database file required')
     conn = sqlite3.connect(f'{path.as_uri()}?mode=ro', uri=True)
@@ -113,19 +124,36 @@ def query_log_compatible(conn, columns):
     return set(columns).issubset({row[1] for row in info}) and primary_key == [('log_id', 'INTEGER')]
 
 
+def _inside(path, directory):
+    """By path text or by file identity. On a case-insensitive filesystem (WSL /mnt/<drive>) a case
+    variant or a short name spells the same directory differently, and resolve() keeps the spelling."""
+    if path.is_relative_to(directory):
+        return True
+    try:
+        target = os.stat(directory)
+    except OSError:
+        return False
+    for candidate in (path, *path.parents):
+        try:
+            if os.path.samestat(os.stat(candidate), target):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def private_destination(out, private_directory):
     lexical = Path(out).absolute()
     if lexical.suffix.lower() != '.jsonl' or os.path.lexists(lexical):
         raise ValueError('Output must be a new JSONL file')
-    parent = lexical.parent.resolve(strict=True)
+    parent = _resolved(lexical.parent)
     if not parent.is_dir():
         raise ValueError('Existing private output directory required')
-    resolved = parent / lexical.name
-    # Both lexical and resolved paths matter if a repository directory is a symlink.
-    for path in (lexical, resolved):
-        if path.is_relative_to(ROOT) and not path.is_relative_to(private_directory):
+    # The parent as typed and as resolved both matter: a symlink may lead into or out of the repository.
+    for directory in (lexical.parent, parent):
+        if _inside(directory, ROOT) and not _inside(directory, private_directory):
             raise ValueError('Repository output must stay in the ignored private directory')
-    return resolved
+    return parent / lexical.name
 
 
 def publish_new_file(out, lines, prefix):
