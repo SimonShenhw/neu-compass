@@ -7,18 +7,24 @@ from __future__ import annotations
 
 from markdown_it import MarkdownIt
 
+from app import view_cache
 from app.discover_view import _render_coop_teaser
 from tests.ui_recorder import Recorder
 
 
+def guest_teaser(st, rows):
+    """A fresh cached listing for a guest (no session token), so no API call is made."""
+    view_cache.store(st.session_state, view_cache.COOP_TEASER_KEY, rows, scope=view_cache.GUEST_SCOPE)
+
+
 def test_coop_teaser_lines_are_escaped_html_blocks_not_markdown():
     st = Recorder()
-    st.session_state["_coop_teaser_cache"] = [  # Cached listing: no API call.
+    guest_teaser(st, [
         {"company": "Acme <i>Co</i> [note](https://elsewhere.example/page)", "role": "Data **intern**",
          "visibility_level": 1},
         {"company": "Beta", "role": "SWE", "visibility_level": 0},
         {"company": "Gamma", "role": "QR", "visibility_level": 2},  # Only the first two are shown.
-    ]
+    ])
     _render_coop_teaser(st)
     lines = [value for kind, value, _ in st.log if kind == "markdown" and value.startswith("<div")]
     assert len(lines) == 2
@@ -38,7 +44,7 @@ def test_coop_teaser_lock_names_only_what_the_row_has_and_the_viewer_lacks():
     needs no lock."""
     def captions(*rows):
         st = Recorder()
-        st.session_state["_coop_teaser_cache"] = list(rows)
+        guest_teaser(st, list(rows))
         _render_coop_teaser(st)
         return [value for kind, value, _ in st.log if kind == "caption"]
 
@@ -68,10 +74,10 @@ def test_starter_row_shows_each_card_as_escaped_html():
     from app.discover_view import _render_starter_row  # noqa: PLC0415
 
     st = Recorder()
-    st.session_state["_programs_cache"] = [{"program_id": "cs-ms", "prefix": "CS <i>MS</i>"}]
-    st.session_state["_curriculum_cache"] = {"cs-ms": {"prefix": "CS <i>MS</i>", "semesters": [{"semester": 1, "courses": [
-        {"course_id": "neu-cs-5010", "primary_code": "CS <b>5010</b>", "primary_name": "Design <u>x</u>",
-         "requirement_type": "core"}]}]}}
+    view_cache.store(st.session_state, view_cache.PROGRAMS_KEY, [{"program_id": "cs-ms", "prefix": "CS <i>MS</i>"}])
+    view_cache.store(view_cache.curricula(st.session_state), "cs-ms", {"prefix": "CS <i>MS</i>", "semesters": [
+        {"semester": 1, "courses": [{"course_id": "neu-cs-5010", "primary_code": "CS <b>5010</b>",
+                                     "primary_name": "Design <u>x</u>", "requirement_type": "core"}]}]})
     _render_starter_row(st)
     (card,) = (value for kind, value, _ in st.log if kind == "markdown" and value.startswith("<div"))
     assert card in st.html

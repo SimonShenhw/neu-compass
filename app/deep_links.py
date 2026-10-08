@@ -69,9 +69,9 @@ COURSE_PARAM = "course"
 PROGRAM_PARAM = "program"
 
 # One-shot guard. Underscore prefix = transient session bookkeeping, not
-# user state (same convention as _programs_cache / _curriculum_cache).
+# user state (same convention as the app.view_cache keys).
 # 中文：一次性守卫。下划线前缀 = 临时会话记账，而非用户状态（与
-# _programs_cache / _curriculum_cache 同一套约定）。
+# app.view_cache 的那些键同一套约定）。
 APPLIED_FLAG = "_deep_link_applied"
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -177,17 +177,17 @@ def apply_deep_link(st, *, pages: list[str]) -> None:
     the Programs page and the (more specific) course wins the landing page.
 
     Transient API failures do NOT burn the one-shot flag — the ref is
-    retried on the next rerun, mirroring the "failures are not cached so a
-    warming API recovers" rule in program_view's fetch helpers.
+    tried again on a later rerun (program_view's fetch helpers remember a
+    failure for 30 s and then fetch again, so a warming API recovers).
 
     中文：每个会话消费一次 `?course=` / `?program=`，然后路由过去。
 
     两个参数都不存在、或本会话已经应用过时，什么也不做。两个参数同时出现是
     合法的：培养方案会在 Programs 页面里备好，而更具体的课程赢得落地页。
 
-    临时性的 API 失败不会烧掉这个一次性标志 —— 下一次 rerun 会重试该 ref，
-    与 program_view 抓取辅助函数里「失败不缓存，好让预热中的 API 能恢复」
-    这条规则保持一致。
+    临时性的 API 失败不会烧掉这个一次性标志 —— 之后的 rerun 会重试该 ref
+    （program_view 的抓取辅助函数把失败记 30 秒后重新获取，预热中的 API
+    因此能恢复）。
     """
     from app.program_plan_links import has_plan_link
     if has_plan_link(st.query_params):
@@ -266,7 +266,8 @@ def _apply_plan_ref(st, *, pages: list[str]) -> None:
     settle(None if plan is not None else MESSAGES[status])
     cache = _evict_family(st, target.program_id)
     if plan is not None:
-        cache[target.program_id] = body
+        from app import view_cache
+        view_cache.store(cache, target.program_id, body)
         st.session_state['selected_program_id'] = target.program_id
         st.session_state[PENDING_KEY] = target.model_dump(mode='json')
 
@@ -274,11 +275,9 @@ def _apply_plan_ref(st, *, pages: list[str]) -> None:
 def _evict_family(st, program_id: str) -> dict:
     """Drop the family's plan widget choice and cached curriculum; return the cache.
     中文：丢弃该项目的方案组件选择和缓存的课程表；返回缓存字典。"""
+    from app import view_cache
     st.session_state.pop(f'program-plan-{program_id}', None)
-    cache = st.session_state.get('_curriculum_cache')
-    if not isinstance(cache, dict):
-        cache = {}
-        st.session_state['_curriculum_cache'] = cache
+    cache = view_cache.curricula(st.session_state)
     cache.pop(program_id, None)
     return cache
 

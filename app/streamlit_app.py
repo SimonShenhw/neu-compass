@@ -374,6 +374,18 @@ def _clear_filters_callback() -> None:
     st.session_state.pop("filter_credits", None)
 
 
+def _refresh_view_cache_callback() -> None:
+    """on_click callback for the sidebar's refresh button: the read-only page caches (app.view_cache)
+    fetch again on their next read. Chat history, pending questions and widget choices are left as
+    they are. 中文：侧边栏刷新按钮的 on_click 回调：只读页面缓存（app.view_cache）下一次读取时重新
+    获取。聊天历史、待发的问题和各组件的选择都保持原样。"""
+    import streamlit as st  # noqa: PLC0415
+
+    from app.view_cache import expire_all  # noqa: PLC0415
+
+    expire_all(st.session_state)
+
+
 def render() -> None:
     """Render the chat UI. Imported lazily so `import app.streamlit_app`
     in tests doesn't trigger Streamlit's session machinery.
@@ -434,18 +446,24 @@ def render() -> None:
     render_auth_sidebar()
     active_filters = _render_filters_sidebar(st, st.session_state)
 
-    # Corpus size for the hero pill — one /ready call per browser tab,
-    # cached in session_state. Failure (API warming) degrades to the
-    # number-free wording inside hero_html.
-    # hero 徽标里的课程总数 —— 每个浏览器标签页只调一次 /ready，缓存在
-    # session_state。失败（API 预热中）时降级为 hero_html 里不带数字的文案。
-    if "_ready_info" not in st.session_state:
-        try:
-            with ApiClient(timeout=5.0) as api:
-                st.session_state["_ready_info"] = api.ready()
-        except ApiError:
-            st.session_state["_ready_info"] = {}
-    ready_info = st.session_state.get("_ready_info") or {}
+    # Corpus size for the hero pill, from /ready through the tab's view cache (app.view_cache): a
+    # failure (503 while the API warms up) shows the number-free wording in hero_html and is tried
+    # again 30 s later instead of for the rest of the tab, and a success is fetched again after 5 min.
+    # 中文：hero 徽标里的课程总数，经标签页的页面缓存（app.view_cache）取 /ready：失败（API 预热时的
+    # 503）显示 hero_html 里不带数字的文案，30 秒后重试，而不是整个标签页都不再取；成功的结果 5 分钟后
+    # 重新获取。
+    from app import view_cache  # noqa: PLC0415
+
+    def _fetch_ready() -> object:
+        with ApiClient(timeout=5.0) as api:
+            return api.ready()
+
+    try:
+        ready_info = view_cache.cached(st.session_state, view_cache.READY_KEY, _fetch_ready)
+    except ApiError:
+        ready_info = {}
+    if not isinstance(ready_info, dict):
+        ready_info = {}
 
     logged_in = is_logged_in(st.session_state)
     st.markdown(
@@ -488,6 +506,15 @@ def render() -> None:
     apply_deep_link(st, pages=pages)
 
     nav = st.sidebar.radio("页面 / Pages", pages, key="nav_page")
+    # The callback runs before the next script run, so every cached read of that run fetches again
+    # (the hero above included). Reruns never repeat a question, a Co-op submission or a vote.
+    # 中文：回调在下一次脚本运行之前执行，所以那一次运行里每个缓存读取都会重新获取（包括上面的
+    # hero）。rerun 不会重发提问、Co-op 投稿或评价。
+    st.sidebar.button(
+        "🔄 刷新页面内容", key="view_cache_refresh", on_click=_refresh_view_cache_callback,
+        use_container_width=True,
+        help="重新获取课程总数、培养方案和 Co-op 预览；不会重新发送提问、投稿或评价。",
+    )
     # Guests see the Co-op tier summary under the hero on every page except Co-op itself, whose
     # own notice says the same thing. 中文：游客在除 Co-op 页以外的每个页面都会在 hero 下面看到
     # Co-op 分级说明；Co-op 页自己的提示内容相同，不再重复。

@@ -1,0 +1,297 @@
+"""OPT-02 on the real Streamlit page (AppTest with a mock API and a replaced view-cache clock).
+
+- While the API warms up (GET 503), the hero, program row and Co-op teaser are fetched once and then
+  left alone for 30 s; the first rerun after that brings them back, with no reload. Fresh content is
+  not fetched again on reruns, and is fetched again after 5 min.
+- The sidebar's refresh button fetches the cached content again and never repeats a POST: not the
+  question, not the vote, not the Co-op submission.
+- The Co-op teaser follows the session token: a login fetches it with the token, and dropping the
+  token never shows the member's listing again.
+
+中文：真实 Streamlit 页面上的 OPT-02（AppTest + 模拟 API + 替换过的页面缓存时钟）。API 预热期间（GET
+返回 503），hero、项目行和 Co-op 预览只取一次，然后 30 秒内不再取；之后的第一次 rerun 就能恢复，不用
+重新加载页面。有效期内的内容 rerun 时不重新获取，5 分钟后重新获取。侧边栏的刷新按钮重新获取缓存的
+内容，绝不重发任何 POST：提问、评价、Co-op 投稿都不会。Co-op 预览跟着会话 token 走：登录后带 token
+重新获取，token 没了之后绝不再显示会员看到的列表。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+
+import httpx
+import pytest
+from streamlit.testing.v1 import AppTest
+
+from app import view_cache
+
+START = 1000.0
+SCRIPT = "from app.streamlit_app import render\nrender()"
+GUEST_ROW = {"company": "Guest Visible Co", "role": "SWE", "visibility_level": 0}
+MEMBER_ROW = {"company": "Member Visible Co", "role": "Quant", "visibility_level": 0}
+PROGRAMS = [{"program_id": "cs-ms", "prefix": "CS", "full_name": "Synthetic CS", "course_count": 1, "plan_count": 0}]
+CURRICULUM = {"program_id": "cs-ms", "prefix": "CS", "full_name": "Synthetic CS", "notes": None,
+              "semesters": [{"semester": 1, "courses": [{"course_id": "neu-cs-5010", "primary_code": "CS 5010",
+                                                          "primary_name": "Synthetic starter",
+                                                          "requirement_type": "core", "notes": None}]}],
+              "plans": [], "plan_schema_available": True}
+ANSWER = "Synthetic answer."
+RECEIPT = {"answer_id": "a" * 32, "answer_sha256": hashlib.sha256(ANSWER.encode("utf-8")).hexdigest(),
+           "feedback_token": "t" * 43}
+REFRESH_KEY = "view_cache_refresh"
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = START
+
+    def __call__(self) -> float:
+        return self.now
+
+
+class Backend:
+    """MockTransport handler. GETs answer 503 while `down`; every request is recorded as
+    (method, path, Authorization header)."""
+
+    def __init__(self) -> None:
+        self.down = False
+        self.curriculum = CURRICULUM
+        self.requests: list[tuple[str, str, str | None]] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        auth = request.headers.get("authorization")
+        path = request.url.path
+        self.requests.append((request.method, path, auth))
+        if request.method == "POST":
+            body = json.loads(request.content)
+            if path == "/chat":
+                events = [{"type": "meta", "matched_via": "hybrid", "results": []},
+                          {"type": "token", "text": ANSWER}, {"type": "done", "feedback": RECEIPT}]
+                return httpx.Response(200, content="".join(json.dumps(e) + "\n" for e in events).encode())
+            if path == "/feedback":
+                return httpx.Response(200, json={"answer_id": body["answer_id"], "rating": body["rating"]})
+            if path == "/coop":
+                return httpx.Response(201, json={"coop_id": "c-synthetic", "accepted": True, "visibility_level": 0,
+                                                 "status": "pending", "duplicate": False, "contribution_count": 0})
+            return httpx.Response(404, json={"detail": "not found"})
+        if self.down:
+            return httpx.Response(503, json={"status": "warming", "courses_indexed": 0, "bm25_corpus": 0})
+        if path == "/ready":
+            return httpx.Response(200, json={"status": "ready", "courses_indexed": 4321, "bm25_corpus": 3})
+        if path == "/coop":
+            return httpx.Response(200, json=[MEMBER_ROW] if auth else [GUEST_ROW])
+        if path == "/programs":
+            return httpx.Response(200, json=PROGRAMS)
+        if path.startswith("/programs/"):
+            return httpx.Response(200, json=self.curriculum)
+        return httpx.Response(404, json={"detail": "not found"})
+
+    def gets(self) -> list[str]:
+        return sorted(path for method, path, _ in self.requests if method == "GET")
+
+    def posts(self) -> list[str]:
+        return [path for method, path, _ in self.requests if method == "POST"]
+
+
+@pytest.fixture
+def page(monkeypatch):
+    import app.answer_feedback_view as feedback_view
+    import app.api_client as api_module
+    import app.cookie_session as cookies
+    import app.streamlit_app as main
+    import app.streamlit_auth_ui as auth
+    from config import settings
+
+    clock, backend = Clock(), Backend()
+    monkeypatch.setattr(view_cache, "clock", clock)
+    monkeypatch.setattr(settings, "answer_feedback_enabled", False)
+    original = api_module.ApiClient
+    client = lambda **kwargs: original(  # noqa: E731
+        base_url="http://synthetic-widget", transport=httpx.MockTransport(backend), **kwargs)
+    monkeypatch.setattr(api_module, "ApiClient", client)
+    # answer_feedback_view binds ApiClient when it is first imported, so it gets the same stand-in.
+    # 中文：answer_feedback_view 在第一次导入时就绑定了 ApiClient，所以给它同一个替身。
+    monkeypatch.setattr(feedback_view, "ApiClient", client)
+    monkeypatch.setattr(auth, "handle_oauth_callback", lambda: None)
+    monkeypatch.setattr(auth, "render_auth_sidebar", lambda: None)
+    monkeypatch.setattr(cookies, "restore_login_from_cookie", lambda: False)
+    monkeypatch.setattr(cookies, "flush_pending_cookie", lambda: None)
+    monkeypatch.setattr(main, "_render_filters_sidebar", lambda st, state: {})
+    return clock, backend
+
+
+def run(app: AppTest) -> AppTest:
+    app.run(timeout=45)
+    assert not app.exception
+    return app
+
+
+def markdown(app: AppTest) -> str:
+    return "\n".join(item.value for item in app.markdown)
+
+
+def captions(app: AppTest) -> list[str]:
+    return [item.value for item in app.caption]
+
+
+def test_a_warming_api_is_left_alone_for_30_s_and_then_recovers_without_a_reload(page):
+    from app.discover_view import PARTIAL_NOTICE
+
+    clock, backend = page
+    backend.down = True
+    app = run(AppTest.from_string(SCRIPT))
+    assert "📚 NEU 研究生课程目录" in markdown(app) and "4,321" not in markdown(app)
+    # Three readers of the program list (chat selector, program row, starter row): one request.
+    assert backend.gets() == ["/coop", "/programs", "/ready"]
+    assert PARTIAL_NOTICE in captions(app) and "暂时无法加载项目列表；课程搜索仍可使用。" in captions(app)
+    clock.now = START + 10
+    run(app)
+    backend.down = False
+    clock.now = START + view_cache.FAILURE_TTL_SECONDS - 1
+    run(app)
+    assert len(backend.gets()) == 3 and "4,321" not in markdown(app)
+    clock.now = START + view_cache.FAILURE_TTL_SECONDS
+    run(app)
+    assert backend.gets() == ["/coop", "/coop", "/programs", "/programs", "/programs/cs-ms", "/ready", "/ready"]
+    assert "📚 4,321 门课" in markdown(app) and "Guest Visible Co" in markdown(app)
+    assert "Synthetic starter" in markdown(app) and PARTIAL_NOTICE not in captions(app)
+    loaded = START + view_cache.FAILURE_TTL_SECONDS
+    clock.now = loaded + view_cache.SUCCESS_TTL_SECONDS - 1
+    run(app)
+    assert len(backend.gets()) == 7
+    clock.now = loaded + view_cache.SUCCESS_TTL_SECONDS
+    run(app)
+    assert len(backend.gets()) == 11 and not backend.posts()
+
+
+def test_refresh_fetches_the_cached_content_again_and_never_repeats_the_question_or_the_vote(page, monkeypatch):
+    from app.answer_feedback_view import CAPTURE_OPT_IN_KEY
+    from config import settings
+
+    clock, backend = page
+    monkeypatch.setattr(settings, "answer_feedback_enabled", True)
+    app = run(AppTest.from_string(SCRIPT))
+    next(item for item in app.checkbox if item.key == CAPTURE_OPT_IN_KEY).check()
+    run(app)
+    app.chat_input[0].set_value("synthetic question")
+    run(app)
+    assert backend.posts() == ["/chat"]
+    next(item for item in app.button if item.key.endswith(f"{RECEIPT['answer_id']}-up")).click()
+    run(app)
+    assert backend.posts() == ["/chat", "/feedback"]
+    before = len(backend.gets())
+    run(app)
+    assert len(backend.gets()) == before  # A plain rerun fetches nothing.
+    app.button(key=REFRESH_KEY).click()
+    run(app)
+    # The landing is gone once there is a conversation: /ready and the selector's /programs only.
+    assert sorted(path for _, path, _ in backend.requests[-2:]) == ["/programs", "/ready"]
+    assert len(backend.gets()) == before + 2
+    run(app)
+    assert backend.posts() == ["/chat", "/feedback"] and len(backend.gets()) == before + 2
+    assert app.session_state["messages"][-1]["feedback_rating"] == "up"
+
+
+def test_refresh_never_repeats_a_coop_submission(page):
+    clock, backend = page
+    app = AppTest.from_string(SCRIPT)
+    app.session_state["user_id"] = "u-synthetic"
+    app.session_state["user_email"] = "synthetic@northeastern.edu"
+    app.session_state["session_token"] = "synthetic-session-a"
+    run(app)
+    app.radio[0].set_value("💼 Co-op 经验")
+    run(app)
+    next(item for item in app.text_input if item.label == "公司 *").input("Synthetic Co")
+    next(item for item in app.text_input if item.label == "职位 *").input("Synthetic role")
+    next(item for item in app.button if item.label == "提交").click()
+    run(app)
+    assert backend.posts() == ["/coop"]
+    assert any("c-synthetic" in item.value for item in app.success)
+    app.button(key=REFRESH_KEY).click()
+    run(app)
+    run(app)
+    assert backend.posts() == ["/coop"]
+
+
+def test_the_coop_teaser_follows_the_session_token(page):
+    clock, backend = page
+    app = run(AppTest.from_string(SCRIPT))
+    assert "Guest Visible Co" in markdown(app)
+    app.session_state["user_id"] = "u-synthetic"
+    app.session_state["user_email"] = "synthetic@northeastern.edu"
+    app.session_state["session_token"] = "synthetic-session-a"
+    run(app)
+    coop = [auth for method, path, auth in backend.requests if path == "/coop"]
+    assert coop == [None, "Bearer synthetic-session-a"]
+    assert "Member Visible Co" in markdown(app) and "Guest Visible Co" not in markdown(app)
+    backend.down = True  # Without the token the guest fetch fails: the member listing is not the fallback.
+    app.session_state["session_token"] = None
+    app.session_state["user_id"] = None
+    run(app)
+    assert [auth for method, path, auth in backend.requests if path == "/coop"][-1] is None
+    assert "Member Visible Co" not in markdown(app)
+
+
+CURRICULUM_SCRIPT = """
+import streamlit as st
+from app.program_view import _render_curriculum
+_render_curriculum(st, "cs-ms")
+"""
+
+
+@pytest.mark.parametrize("changed", [True, False])
+def test_a_refetched_curriculum_resets_the_real_plan_selectbox_only_when_its_plans_changed(page, monkeypatch, changed):
+    import app.program_policy_view as policy
+    from app.program_view import PLAN_REVISED_NOTICE
+
+    from tests.test_view_cache import curriculum, seed_plans
+
+    clock, backend = page
+    monkeypatch.setattr(policy, "load_selected_program_policy_evidence", lambda st, item: st.caption("Policy stub"))
+    backend.curriculum = curriculum(seed_plans())
+    app = run(AppTest.from_string(CURRICULUM_SCRIPT))
+    choice = seed_plans()[0]["plan_id"]
+    app.selectbox[0].set_value(choice)
+    run(app)
+    assert app.selectbox[0].value == choice and any(item.value == "Policy stub" for item in app.caption)
+    after = seed_plans()
+    if changed:
+        after[0]["notes"] += " Revised."
+    backend.curriculum = curriculum(after)
+    clock.now = START + view_cache.SUCCESS_TTL_SECONDS
+    run(app)
+    assert [path for _, path, _ in backend.requests] == ["/programs/cs-ms", "/programs/cs-ms"]
+    notices = [item.value for item in app.info if item.value == PLAN_REVISED_NOTICE]
+    if changed:
+        assert app.selectbox[0].value is None and notices == [PLAN_REVISED_NOTICE]
+        assert not any(item.value == "Policy stub" for item in app.caption)
+        run(app)  # Said once; the selection stays cleared until the student picks again.
+        assert app.selectbox[0].value is None and not [item for item in app.info if item.value == PLAN_REVISED_NOTICE]
+    else:
+        assert app.selectbox[0].value == choice and not notices
+
+
+@pytest.mark.parametrize("body", [[], "ready", {"status": "ready", "courses_indexed": None}])
+def test_an_unexpected_ready_body_shows_the_number_free_hero(page, monkeypatch, body):
+    clock, backend = page
+    original = Backend.__call__
+
+    def answer(self, request):
+        if request.url.path == "/ready":
+            self.requests.append((request.method, request.url.path, None))
+            return httpx.Response(200, json=body)
+        return original(self, request)
+
+    monkeypatch.setattr(Backend, "__call__", answer)
+    app = run(AppTest.from_string(SCRIPT))
+    assert "📚 NEU 研究生课程目录" in markdown(app)
+
+
+def test_the_refresh_button_is_in_the_sidebar_on_every_page(page):
+    clock, backend = page
+    app = run(AppTest.from_string(SCRIPT))
+    for label in ("🔍 课程搜索 · Search", "🎓 培养方案 · Programs", "💼 Co-op 经验"):
+        app.radio[0].set_value(label)
+        run(app)
+        assert [item.key for item in app.sidebar.button] == [REFRESH_KEY]

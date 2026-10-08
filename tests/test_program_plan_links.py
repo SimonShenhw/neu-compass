@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from app import view_cache
 from app.deep_links import apply_deep_link, share_url
 from db.program_plan_repository import content_hash
 from schemas.program_plan import ProgramPlan
@@ -168,7 +169,7 @@ def test_success_bypasses_stale_curriculum_cache_and_is_one_shot(monkeypatch):
     apply_deep_link(st, pages=PAGES)
     assert calls == ['cs-ms'] and st.session_state['selected_program_id'] == 'cs-ms'
     assert st.session_state['nav_page'] == PAGES[1]
-    assert st.session_state['_curriculum_cache']['cs-ms'] == body()
+    assert view_cache.peek(st.session_state['_curriculum_cache'], 'cs-ms') == body()
     assert st.session_state['_program_plan_link_pending']['plan_id'] == plan().plan_id
     st.session_state['nav_page'] = PAGES[2]
     apply_deep_link(st, pages=PAGES)
@@ -385,7 +386,7 @@ def test_success_can_replace_a_malformed_session_cache(monkeypatch):
     fake_api(monkeypatch, body())
     st = Surface(params()); st.session_state['_curriculum_cache'] = ['invalid-cache']
     apply_deep_link(st, pages=PAGES)
-    assert st.session_state['_curriculum_cache']['cs-ms'] == body()
+    assert view_cache.peek(st.session_state['_curriculum_cache'], 'cs-ms') == body()
 
 
 def test_main_entry_processes_auth_before_links_and_links_before_bound_nav():

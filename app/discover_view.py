@@ -32,20 +32,23 @@ The main app owns navigation; this module only sets flags + st.rerun():
   - selected_course_id —— 点击入门推荐的查看（停留在搜索页）
 
 Defensive by contract: every fetch is wrapped in try/except ApiError and a
-failed endpoint silently drops its section — the landing must render even
-when half the backend is warming. Program data shares program_view's
-per-tab caches (_programs_cache / _curriculum_cache) so the landing and
-the Programs page never double-fetch; the Co-op teaser keeps its own
-_coop_teaser_cache (fetched once per tab, failure cached as [] like the
-hero's _ready_info — a 30s timeout per rerun would freeze the landing).
+failed endpoint drops its section — the landing must render even when half
+the backend is warming — with one caption pointing at the sidebar's refresh
+button. Program data shares program_view's per-tab caches so the landing and
+the Programs page never double-fetch; the Co-op teaser has its own entry,
+scoped to the viewer because the API redacts /coop by tier. All of them go
+through app.view_cache: a failure is tried again 30 s later (not once per
+rerun, which would make every rerun of an outage wait on the timeouts, and
+not never, which hid recovered content for the rest of the tab).
 
 防御性是硬性约定：每次抓取都包在 try/except ApiError 里，失败的端点会
-悄悄丢弃自己的展示区块 —— 即使后端有一半还在预热，落地页也必须能渲染。
-培养方案数据与 program_view 共用按标签页的缓存
-（_programs_cache / _curriculum_cache），这样落地页和 Programs 页面
-绝不会重复抓取；Co-op 预告区块保留自己的 _coop_teaser_cache（每个
-标签页只抓一次，失败时缓存为 []，和 hero 的 _ready_info 一样 ——
-否则每次 rerun 都等 30 秒超时会冻住整个落地页）。
+丢弃自己的展示区块 —— 即使后端有一半还在预热，落地页也必须能渲染 ——
+并用一行说明指向侧边栏的刷新按钮。培养方案数据与 program_view 共用按
+标签页的缓存，这样落地页和 Programs 页面绝不会重复抓取；Co-op 预告区块
+有自己的记录，并按访客区分范围，因为 API 按等级裁剪 /coop。它们都经过
+app.view_cache：失败 30 秒后重试（不是每次 rerun 都重试——那样故障期间
+每次 rerun 都要等超时；也不是永不重试——那样恢复后的内容在这个标签页里
+一直藏着）。
 """
 
 from __future__ import annotations
@@ -93,21 +96,22 @@ def _starter_card_html(*, code: str, name: str, prefix: str) -> str:
     )
 
 
-def _render_program_row(st) -> None:
+def _render_program_row(st) -> bool:
     """🎓 chips, one per seeded program — clicking hands off to the
-    Programs page with that program pre-selected.
+    Programs page with that program pre-selected. Returns True when the
+    program list could not be loaded.
 
     🎓 chips，每个已 seed 的培养方案一个 —— 点击后交接给 Programs
-    页面，并预先选中该培养方案。"""
+    页面，并预先选中该培养方案。项目列表加载不了时返回 True。"""
     from app.api_client import ApiError  # noqa: PLC0415
     from app.program_view import get_programs_cached  # noqa: PLC0415
 
     try:
         programs = get_programs_cached(st)
     except ApiError:
-        return
+        return True
     if not programs:
-        return
+        return False
 
     st.markdown("**🎓 按培养方案浏览**")
     cols = st.columns(min(len(programs), 4))
@@ -120,16 +124,18 @@ def _render_program_row(st) -> None:
             st.session_state["selected_program_id"] = p["program_id"]
             st.session_state["pending_nav_to_programs"] = True
             st.rerun()
+    return False
 
 
-def _render_starter_row(st) -> None:
+def _render_starter_row(st) -> bool:
     """🔥 one semester-1 core/foundation course per featured program.
     Featured ids are validated against the /programs listing first so an
-    unseeded id costs nothing (no 404 round-trip per rerun).
+    unseeded id costs nothing (no 404 round-trip per rerun). Returns True
+    when a list or curriculum it needed could not be loaded.
 
     🔥 每个精选培养方案各挑一门第一学期的核心/基础课。精选 id 会先对照
     /programs 列表校验，未 seed 的 id 因此零成本（不会每次 rerun 都
-    发一次 404 往返）。"""
+    发一次 404 往返）。需要的列表或课程表加载不了时返回 True。"""
     from app.api_client import ApiError  # noqa: PLC0415
     from app.program_view import (  # noqa: PLC0415
         get_curriculum_cached,
@@ -139,8 +145,9 @@ def _render_starter_row(st) -> None:
     try:
         available = {p["program_id"] for p in get_programs_cached(st)}
     except ApiError:
-        return
+        return True
 
+    failed = False
     picks: list[tuple[str, dict]] = []  # (program prefix, course dict) / (培养方案前缀, 课程字典)
     for pid in _FEATURED_PROGRAM_IDS:
         if pid not in available:
@@ -148,12 +155,13 @@ def _render_starter_row(st) -> None:
         try:
             cur = get_curriculum_cached(st, pid)
         except ApiError:
+            failed = True
             continue
         course = _semester1_pick(cur)
         if course:
             picks.append((str(cur.get("prefix", "")), course))
     if not picks:
-        return
+        return failed
 
     st.markdown("**🔥 入门推荐**")
     cols = st.columns(len(picks))
@@ -172,33 +180,41 @@ def _render_starter_row(st) -> None:
         ):
             st.session_state["selected_course_id"] = course["course_id"]
             st.rerun()
+    return failed
 
 
-def _render_coop_teaser(st) -> None:
-    """💼 first two Co-op rows as one-liners + a hand-off button. Cached
-    once per tab in _coop_teaser_cache; an ApiError caches [] (section
-    hidden for this tab) — same degradation as the hero's _ready_info,
-    because re-fetching a down endpoint on every rerun stalls the page.
+def _render_coop_teaser(st) -> bool:
+    """💼 first two Co-op rows as one-liners + a hand-off button. The
+    listing is cached per tab under the viewer's scope (the API redacts
+    /coop by tier, so a guest's or another account's listing is never
+    reused after a login, logout or account switch); a failure hides the
+    section and is tried again 30 s later. Returns True when the listing
+    could not be loaded.
 
-    💼 展示最近两条 Co-op 记录的一句话摘要 + 一个跳转按钮。每个标签页
-    在 _coop_teaser_cache 里缓存一次；ApiError 时缓存 []（本标签页隐藏
-    该区块）—— 与 hero 的 _ready_info 采用同样的降级策略，因为每次
-    rerun 都重新抓一个挂掉的端点会拖住整个页面。"""
+    💼 展示最近两条 Co-op 记录的一句话摘要 + 一个跳转按钮。列表按访客
+    范围缓存在本标签页里（API 按等级裁剪 /coop，所以登录、登出或换账号
+    之后，绝不会沿用游客或另一个账号的列表）；失败时隐藏该区块，30 秒后
+    重试。列表加载不了时返回 True。"""
+    from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiClient, ApiError  # noqa: PLC0415
 
-    if "_coop_teaser_cache" not in st.session_state:
-        try:
-            with ApiClient(
-                session_token=st.session_state.get("session_token"),
-                timeout=5.0,
-            ) as api:
-                st.session_state["_coop_teaser_cache"] = api.list_coop()
-        except ApiError:
-            st.session_state["_coop_teaser_cache"] = []
+    # One read of the token for both the request and the scope it is stored under.
+    # 中文：请求和存放范围用同一次读到的 token。
+    token = st.session_state.get("session_token")
 
-    coops = st.session_state.get("_coop_teaser_cache") or []
-    if not coops:
-        return
+    def fetch() -> object:
+        with ApiClient(session_token=token, timeout=5.0) as api:
+            return api.list_coop()
+
+    try:
+        coops = view_cache.cached(
+            st.session_state, view_cache.COOP_TEASER_KEY, fetch,
+            scope=view_cache.viewer_scope({"session_token": token}),
+        )
+    except ApiError:
+        return True
+    if not isinstance(coops, list) or not coops:
+        return False
 
     from app.ui_theme import plain_text_html  # noqa: PLC0415
 
@@ -229,20 +245,27 @@ def _render_coop_teaser(st) -> None:
     if st.button("去看看 →", key="disc-coop"):
         st.session_state["pending_nav_to_coop"] = True
         st.rerun()
+    return False
+
+
+# Shown once when any section could not be loaded. 中文：有区块加载不了时显示一次。
+PARTIAL_NOTICE = "部分内容暂时没加载出来：稍后再操作页面时会重新获取，也可以点侧边栏的「🔄 刷新页面内容」。"
 
 
 def render_discover(st) -> None:
     """The discovery block. Caller (streamlit_app) shows it only when
     get_messages(...) is empty — once a conversation exists the chat
     history owns that space. Sections render independently; a dead
-    endpoint drops its section without touching the others.
+    endpoint drops its section without touching the others, and one
+    caption says that something is missing and how to fetch it again.
 
     发现区块本体。调用方（streamlit_app）只在 get_messages(...) 为空时
     展示它 —— 一旦对话存在，那块空间就归聊天历史所有。各区块独立渲染；
-    某个端点挂了只会丢弃自己的区块，不影响其他区块。"""
-    _render_program_row(st)
-    _render_starter_row(st)
-    _render_coop_teaser(st)
+    某个端点挂了只会丢弃自己的区块，不影响其他区块，并用一行说明告诉
+    用户少了内容、怎样重新获取。"""
+    failed = [_render_program_row(st), _render_starter_row(st), _render_coop_teaser(st)]
+    if any(failed):
+        st.caption(PARTIAL_NOTICE)
 
 
 __all__ = ["render_discover"]

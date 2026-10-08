@@ -13,6 +13,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
+from app import view_cache
 from app.deep_links import (
     APPLIED_FLAG,
     apply_deep_link,
@@ -278,7 +279,7 @@ def test_ref_label_stays_on_one_line(monkeypatch, ref, param) -> None:
 
     _fake_resolve(monkeypatch, [])
     st = _FakeSt(**{param: ref})
-    st.session_state["_programs_cache"] = PROGRAMS  # skips the API hop
+    view_cache.store(st.session_state, view_cache.PROGRAMS_KEY, PROGRAMS)  # skips the API hop
     apply_deep_link(st, pages=PAGES)
     (warned,) = st.warnings
     assert "\n" not in warned and " ".join(ref.split()) in warned
@@ -343,7 +344,7 @@ def test_transient_api_failure_does_not_burn_the_one_shot(monkeypatch) -> None:
 
 def test_program_ref_opens_curriculum() -> None:
     st = _FakeSt(program="cs-ms")
-    st.session_state["_programs_cache"] = PROGRAMS  # skips the API hop
+    view_cache.store(st.session_state, view_cache.PROGRAMS_KEY, PROGRAMS)  # skips the API hop
     apply_deep_link(st, pages=PAGES)
 
     assert st.session_state["selected_program_id"] == "cs-ms"
@@ -352,7 +353,7 @@ def test_program_ref_opens_curriculum() -> None:
 
 def test_unknown_program_ref_warns_and_stays_on_list() -> None:
     st = _FakeSt(program="cs-phd")
-    st.session_state["_programs_cache"] = PROGRAMS
+    view_cache.store(st.session_state, view_cache.PROGRAMS_KEY, PROGRAMS)
     apply_deep_link(st, pages=PAGES)
 
     assert "selected_program_id" not in st.session_state
@@ -367,7 +368,7 @@ def test_both_params_course_wins_the_landing_page(monkeypatch) -> None:
         "primary_name": "Algorithms",
     }])
     st = _FakeSt(course="CS-5800", program="cs-ms")
-    st.session_state["_programs_cache"] = PROGRAMS
+    view_cache.store(st.session_state, view_cache.PROGRAMS_KEY, PROGRAMS)
     apply_deep_link(st, pages=PAGES)
 
     assert st.session_state["selected_program_id"] == "cs-ms"
