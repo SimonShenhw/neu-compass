@@ -1,14 +1,10 @@
 """Read-only feedback candidates: counts by default, explicit private JSONL only."""
 
-import argparse
 from collections import Counter
-from datetime import datetime
 import json
-import os
 from pathlib import Path
 import sqlite3
 import sys
-import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -16,11 +12,13 @@ sys.path.insert(0, str(ROOT))
 from db.answer_feedback_repository import AnswerFeedbackRepository  # noqa: E402
 from schemas.feedback_candidate import (FeedbackCandidate, PrivateCandidateText,  # noqa: E402
     ReviewRequestContext, context_sha256, text_sha256)
+from scripts.private_export import (ORIGINS, SafeArgumentParser, date_window,  # noqa: E402
+    open_read_snapshot, origin_clauses, private_destination, publish_new_file, query_log_compatible,
+    result_course_ids, retrieval_mode, strict_json, traffic_kind, utc_timestamp)
 
 MAX_EXPORT_BYTES = 32 * 1024 * 1024
 PRIVATE_DIRECTORY = ROOT / 'data/raw/feedback_review'
 QUERY_COLUMNS = {'log_id', 'route', 'query', 'user_id', 'matched_via', 'result_course_ids', 'created_at'}
-KNOWN_MODES = {'alias', 'hybrid', 'hyde_rescued', 'context', 'program', 'empty', 'rejected'}
 
 # Do not select feedback_token_hash, expires_at, OAuth fields or arbitrary columns.
 SELECT_SQL = '''
@@ -36,57 +34,18 @@ LEFT JOIN query_log q ON q.log_id=a.query_log_id
 '''
 
 
-def _date(value):
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise ValueError('Invalid date selection')
-    parsed = datetime.strptime(value, '%Y-%m-%d')
-    if parsed.strftime('%Y-%m-%d') != value:
-        raise ValueError('Canonical date required')
-    return value + ' 00:00:00'
-
-
-def _timestamp(value):
-    if not isinstance(value, str):
-        raise ValueError('Missing timestamp')
-    parsed = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
-    if parsed.strftime('%Y-%m-%d %H:%M:%S') != value:
-        raise ValueError('Canonical SQLite UTC timestamp required')
-    return parsed.strftime('%Y-%m-%dT%H:%M:%SZ')
-
-
-def _json(value, budget):
-    if not isinstance(value, str) or len(value) > budget:
-        raise ValueError('Source JSON outside budget')
-    def unique_keys(pairs):
-        result = {}
-        for key, item in pairs:
-            if key in result:
-                raise ValueError('Duplicate JSON key')
-            result[key] = item
-        return result
-    return json.loads(value, object_pairs_hook=unique_keys)
-
-
 def _candidate(row, include_private_text):
     if row['route'] != 'chat' or row['joined_log_id'] != row['query_log_id']:
         raise ValueError('Missing original chat query')
-    context = _json(row['request_context'], 8192)
+    context = strict_json(row['request_context'], 8192)
     captured = ReviewRequestContext.model_validate(context)
     private = PrivateCandidateText(query=row['query'], answer=row['answer_text'], request_context=context)
     if text_sha256(private.answer) != row['answer_sha256']:
         raise ValueError('Stored answer hash mismatch')
-    ids = _json(row['result_course_ids'], 65536)
-    if not isinstance(ids, list) or len(ids) > 1000 or any(not isinstance(item, str) or not item for item in ids):
-        raise ValueError('Invalid result IDs')
+    ids = result_course_ids(row['result_course_ids'])
     marker = row['source_marker']
-    if marker is not None and not isinstance(marker, str):
-        raise ValueError('Invalid original traffic marker')
-    traffic = 'unmarked' if marker is None else 'eval' if marker.startswith('eval:') and len(marker) > 5 else 'unknown'
-    if row['matched_via'] is not None and not isinstance(row['matched_via'], str):
-        raise ValueError('Invalid retrieval mode type')
-    mode = row['matched_via'] if row['matched_via'] in KNOWN_MODES else 'unknown'
+    traffic = traffic_kind(marker)
+    mode = retrieval_mode(row['matched_via'])
     context_status = 'recorded' if set(context) == set(ReviewRequestContext.model_fields) else 'missing'
     requirements = ['privacy_review_required', 'usefulness_not_ground_truth', 'no_retrieval_snapshot']
     if traffic != 'eval':
@@ -104,8 +63,8 @@ def _candidate(row, include_private_text):
         rating=row['rating'], traffic_kind=traffic,
         eval_run_sha256=text_sha256(marker) if traffic == 'eval' else None,
         retrieval_mode=mode, result_course_ids=ids,
-        query_created_at=_timestamp(row['query_created_at']), answer_created_at=_timestamp(row['answer_created_at']),
-        feedback_created_at=_timestamp(row['feedback_created_at']), feedback_updated_at=_timestamp(row['feedback_updated_at']),
+        query_created_at=utc_timestamp(row['query_created_at']), answer_created_at=utc_timestamp(row['answer_created_at']),
+        feedback_created_at=utc_timestamp(row['feedback_created_at']), feedback_updated_at=utc_timestamp(row['feedback_updated_at']),
         context_status=context_status, history_turn_count=captured.history_turn_count,
         context_course_count=len(captured.context_course_ids) if captured.context_course_ids is not None else None,
         review_state='pending', ground_truth=False, review_requirements=requirements,
@@ -118,83 +77,23 @@ def _candidate(row, include_private_text):
                              private_text=private if include_private_text else None)
 
 
-def _destination(out):
-    lexical = Path(out).absolute()
-    if lexical.suffix.lower() != '.jsonl' or os.path.lexists(lexical):
-        raise ValueError('Output must be a new JSONL file')
-    parent = lexical.parent.resolve(strict=True)
-    if not parent.is_dir():
-        raise ValueError('Existing private output directory required')
-    resolved = parent / lexical.name
-    # Both lexical and resolved paths matter if a repository directory is a symlink.
-    for path in (lexical, resolved):
-        if path.is_relative_to(ROOT) and not path.is_relative_to(PRIVATE_DIRECTORY):
-            raise ValueError('Repository output must stay in the ignored private directory')
-    return resolved
-
-
-def _publish(out, lines):
-    """Complete a mode-0600 temp file, then link exclusively; never overwrite."""
-    descriptor, name = tempfile.mkstemp(prefix='.feedback-review-', suffix='.tmp', dir=out.parent)
-    temporary = Path(name)
-    published, cleanup_incomplete = False, False
-    try:
-        with os.fdopen(descriptor, 'wb') as stream:
-            if os.name == 'posix':
-                os.fchmod(stream.fileno(), 0o600)
-            for line in lines:
-                stream.write(line)
-            stream.flush()
-            os.fsync(stream.fileno())
-        # link() fails if the destination (including a symlink) exists. It does
-        # not expose a half-written final file on write failure.
-        os.link(temporary, out)
-        published = True
-    finally:
-        try:
-            temporary.unlink(missing_ok=True)
-        except OSError:
-            if not published:
-                raise
-            # The final file is complete. Do not misreport a successful publish
-            # as "no output" if removing our private staging file failed.
-            cleanup_incomplete = True
-    return cleanup_incomplete
-
-
 def export_feedback(db_path, *, out=None, origin='unmarked', since=None, until=None,
                     limit=200, include_private_text=False, ack_private_data=False):
-    if type(limit) is not int or not 1 <= limit <= 1000 or origin not in ('unmarked', 'eval', 'all'):
+    if type(limit) is not int or not 1 <= limit <= 1000 or origin not in ORIGINS:
         raise ValueError('Invalid selection')
     if type(include_private_text) is not bool or type(ack_private_data) is not bool:
         raise ValueError('Explicit boolean privacy flags required')
     if include_private_text != ack_private_data or (include_private_text and out is None):
         raise ValueError('Private text requires output and paired acknowledgement')
-    lower, upper = _date(since), _date(until)
-    if lower is not None and upper is not None and lower >= upper:
-        raise ValueError('Empty or reversed date window')
-    destination = _destination(out) if out is not None else None
-    path = Path(db_path).resolve(strict=True)
-    if not path.is_file():
-        raise ValueError('Existing database file required')
-    conn = sqlite3.connect(f'{path.as_uri()}?mode=ro', uri=True)
-    conn.row_factory = sqlite3.Row
+    lower, upper = date_window(since, until)
+    destination = private_destination(out, PRIVATE_DIRECTORY) if out is not None else None
+    conn = open_read_snapshot(db_path)
     candidates, lines, byte_count, has_more = [], [], 0, False
     try:
-        conn.execute('PRAGMA query_only=ON')
-        conn.execute('PRAGMA busy_timeout=5000')
-        conn.execute('BEGIN')  # One read snapshot; no migration, commit or DML.
-        info = list(conn.execute('PRAGMA table_info(query_log)'))
-        columns = {row[1] for row in info}
-        primary_key = [(row[1], row[2].upper()) for row in info if row[5]]
-        if (not QUERY_COLUMNS.issubset(columns) or primary_key != [('log_id', 'INTEGER')]
+        if (not query_log_compatible(conn, QUERY_COLUMNS)
             or not AnswerFeedbackRepository(conn).schema_available()):
             raise ValueError('Compatible existing feedback schema required')
-        clauses, parameters = [], []
-        if origin == 'unmarked':
-            clauses.append('q.user_id IS NULL')
-        elif origin == 'eval':
-            clauses.append("substr(q.user_id,1,5)='eval:' AND length(q.user_id)>5")
+        clauses, parameters = origin_clauses(origin, 'q.user_id'), []
         if lower is not None:
             clauses.append('f.updated_at>=?')
             parameters.append(lower)
@@ -218,7 +117,7 @@ def export_feedback(db_path, *, out=None, origin='unmarked', since=None, until=N
     finally:
         conn.close()
     # Every selected row has been validated before ANY output file is created.
-    cleanup_incomplete = _publish(destination, lines) if destination is not None else False
+    cleanup_incomplete = publish_new_file(destination, lines, '.feedback-review-') if destination is not None else False
     return dict(
         candidate_count=len(candidates), has_more=has_more, origin=origin, since=since, until=until,
         limit=limit, privacy_mode='private_text' if include_private_text else 'metadata',
@@ -229,17 +128,15 @@ def export_feedback(db_path, *, out=None, origin='unmarked', since=None, until=N
     )
 
 
-class SafeArgumentParser(argparse.ArgumentParser):
-    def error(self, message):
-        # argparse normally echoes untrusted option values, which may contain PII.
-        self.exit(2, 'Feedback export failed (arguments); no output published.\n')
+class FeedbackArgumentParser(SafeArgumentParser):
+    failure = 'Feedback export failed (arguments); no output published.\n'
 
 
 def cli(argv=None):
-    parser = SafeArgumentParser(description=__doc__)
+    parser = FeedbackArgumentParser(description=__doc__)
     parser.add_argument('--db-path', required=True)
     parser.add_argument('--out')
-    parser.add_argument('--origin', choices=('unmarked', 'eval', 'all'), default='unmarked')
+    parser.add_argument('--origin', choices=ORIGINS, default='unmarked')
     parser.add_argument('--since', help='Inclusive feedback.updated_at UTC date, YYYY-MM-DD')
     parser.add_argument('--until', help='Exclusive feedback.updated_at UTC date, YYYY-MM-DD')
     parser.add_argument('--limit', type=int, default=200)
