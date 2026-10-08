@@ -1903,3 +1903,170 @@
 
   不用重建索引，也不用重启。
 
+## 15 — 查询日志导出改用私有导出的统一契约（OPT-01，2026-10-07／08）
+
+### 范围与原因
+
+- PR #6 合并（main `da9cf87`）后，用户说继续推进。按 10-06 检阅记录的顺序，这一批做 OPT-01。只改离线导出工具、它的数据模型和文档；不改 API、UI 和库结构，不碰生产数据，也不部署。
+- 读代码核实，检阅记录里的四条都成立：
+  - 旧 `scripts/export_query_log.py` 用 `db.connection.connect()`，也就是普通的 `sqlite3.connect(path)`，路径写错会建出一个空库；
+  - `SELECT *` 导出全部列，含查询原文和原始 `user_id`；
+  - 默认写 `eval/query_log_export.jsonl`，`git check-ignore` 确认这个路径没被忽略；
+  - `open("w")` 直接覆盖已有文件。
+
+  仓库里没有代码读这份输出。
+- 反馈候选导出（06B-2）已经有更严格的规则。这一批把那套规则搬进共用模块，两个工具都用它。
+
+### 已实现
+
+1. `scripts/private_export.py`（新）：从 `scripts/export_answer_feedback.py` 原样搬出来的共用契约。
+   - 打开已有的库：`resolve(strict=True)`、必须是文件、URI `mode=ro`、`query_only=ON`，一个 `BEGIN` 读快照。
+   - 规范的 UTC 日期和秒级时间；严格 JSON，重复键失败；结果 ID 列表（≤1000 个非空字符串，≤65536 字符）。
+   - 来源分类 `traffic_kind()`：NULL 是 unmarked，非空的 `eval:<run>` 是 eval，其余是 unknown；SQL 里的 `origin_clauses()` 与它一致。
+   - 检索模式不在已知集合里时记成 unknown，不原样输出。
+   - `query_log_compatible()`：导出用到的列都在，并且有真正的 INTEGER 主键 `log_id`。
+   - 输出目标只接受新的 `.jsonl`，拒绝已有文件、symlink、hardlink，以及不存在或不是目录的父目录。仓库内只允许各工具自己的被忽略目录。
+   - 发布：同目录的 0600 临时文件写完、fsync，再用不覆盖的 hard link 发布。
+   - 参数解析出错时只打印一行固定文字。
+2. `scripts/export_query_log.py`（重写），参数和反馈导出一致：
+   - 只给 `--db-path`：stdout 一行统计。`selected_row_count` 覆盖整个选择（来源 + 时间窗口），不受 `--limit` 限制；`traffic_counts`、`route_counts`、`retrieval_mode_counts` 各自加起来都等于它。统计只读 `log_id`、`created_at`、`route`、`matched_via`、`user_id` 五列。
+   - `--out`：新的元数据 JSONL，按 `log_id` 升序，最多 `--limit` 行（1–1000）；`has_more` 表示选择里还有更多。没有查询原文、拒答原因和原始来源标记。
+   - `--include-private-text --ack-private-data`（两个都要，并且要有 `--out`）：再加 `private_text`，即查询原文和拒答原因。
+   - 被选中的行字段不对时整次失败；要写的行全部验证完、检查完 32 MiB 预算之后才创建文件。
+   - 仓库内只允许 `data/raw/query_log_review/`；旧的默认路径和反馈导出的目录都会被拒绝。
+3. `schemas/query_log_export.py`（新）：strict 的 `QueryLogExportRow`，多一个字段就失败。
+   - 每行固定是 pending，不是 ground truth。
+   - 带上 query_log 补不上的缺口：不记筛选条件、chat 不记对话历史、没有检索快照、非 eval 来源未经验证、未知模式。
+   - 原文模式下，查询原文必须对得上 `query_sha256`。
+4. `scripts/export_answer_feedback.py` 改用共用模块，搬过去时 SQL、提示文字和输出都不变。它的测试只改了两处：`module.os.fsync`、`module.os.link` 改成直接 patch `os`，因为模块不再 import os。
+5. `.gitignore` 加了 `eval/query_log_export.jsonl`。新工具不再写这里，这一条只防旧版本留下的副本被误提交。
+6. 文档：`docs/query-log-export.md`（新）；`docs/feedback-review-export.md` 加一段，说明共用模块和审查后的加固；`docs/pii_redaction.md` 加第 9 节。
+7. 审查后的修正（见「审查」）：
+   - 「在不在仓库里」「在不在私有目录里」都按路径文字或文件身份判断：对父目录和它的每一级上级做 `os.path.samestat`。父目录按输入的写法和解析后的位置各查一次。
+   - symlink 循环在共用的 `_resolved()` 里统一成 `OSError(ELOOP)`，用 `from None` 丢掉带路径的原消息，两个 CLI 都只打印固定的一行。
+   - `origin_clauses()` 的 eval 子句改成 `substr(c,1,5)='eval:' AND c<>'eval:'`，对含 NUL 的标记也和 `traffic_kind()` 一致，两个工具都用它。
+   - 行 schema：结果 ID 必须是非空字符串、最多 1000 个；两个模型都设了 `hide_input_in_errors`，校验错误不带输入值。
+   - 文档：WAL 与回滚日志模式的区别、eval 是自报的、UNC 路径、按整天的窗口导不全的情况、大小写和短文件名、第三个示例先建目录、WSL 重启会清空 `/tmp`、空窗口和倒置窗口直接失败。模块说明改成「不建库（WAL 库旁边可能多出 -wal／-shm）」。
+   - 测试：B 的 21 个探针按测试文件现有的写法改写进来，另加这几处修复的测试。仓库目录的测试对两个导出工具都跑；旧默认路径放进假仓库里测，不再受本地有没有旧文件影响。
+
+### 修改文件
+
+| 文件 | 修改 |
+|---|---|
+| `scripts/private_export.py`（新） | 两个私有导出共用的契约，含审查后的三处加固 |
+| `scripts/export_query_log.py` | 重写：默认只统计、元数据文件、成对开关的原文 |
+| `schemas/query_log_export.py`（新） | `QueryLogExportRow`、`PrivateQueryText` |
+| `scripts/export_answer_feedback.py` | 改用共用模块 |
+| `.gitignore` | 旧的默认输出路径 |
+| `tests/test_query_log_export.py`（新）、`tests/test_feedback_candidate_export.py` | 见验证记录 |
+| `docs/query-log-export.md`（新）、`docs/feedback-review-export.md`、`docs/pii_redaction.md`、本文件 | 见上 |
+
+### 验证记录
+
+- 只用合成的临时库，没有打开任何真实的库。
+- `tests/test_query_log_export.py`（132 个用例）覆盖：
+  - 默认只统计：库的字节不变，目录里不多文件，报告里没有查询原文、来源标记和未知模式字符串。
+  - 统计覆盖三类来源，加起来对得上，`--limit` 不影响统计。大写的 `EVAL:`、空字符串、紧跟在 `eval:` 后面的 NUL：SQL 的选择和逐行分类一致。
+  - 元数据文件逐字段核对；原文文件除 `private_text` 外与元数据完全相同。
+  - 开关不成对、不是布尔值、没有 `--out` 都失败，不留文件。
+  - 时间窗口的两端；文件按 `log_id` 排序，时间顺序和 ID 顺序相反时也是；limit 与 `has_more`。
+  - 坏字段：
+    - 分类字段（时间、route、来源标记、模式类型）坏了，统计和导出都失败。
+    - 导出字段（原文、结果 ID、k、耗时、拒答原因、`log_id`）坏了，导出失败、不留文件，统计照常。
+    - 窗口外、来源不符和排在 limit 之后的行不读这些字段。
+  - 边界值都能通过：500 字、1000 字、1000 个 ID、65536 字符（按字符算，不是字节）、k 为 1 和 50、耗时 0 和空值。
+  - 输出目标：
+    - 已有文件、库文件本身、symlink、悬空 symlink、hardlink、父目录不存在、父目录是文件、后缀不对，异常类型逐个钉住；`.JSONL` 可以。
+    - 两个导出工具在仓库内都只能写自己的目录：另一个工具的目录、经 symlink 进出仓库、经仓库内 symlink 的相对路径（从仓库根目录和从 `data/raw` 出发各测一次），都被拒绝。
+    - ROOT 换一种写法（模拟 WSL 上的大小写和短文件名）时，按文件身份也认得出仓库。
+  - 库：不存在不创建；给目录失败；路径里带 `#`、`?`、`%` 时打开的就是那个文件，不多建文件；缺表、缺列、没有主键、复合主键都失败，不迁移；小写的 integer 主键可以。
+  - trace：只有 SELECT／PRAGMA／BEGIN，URI 是 `mode=ro`；统计那条 SELECT 只有五列，导出那条是显式列表，没有 `SELECT *`。
+  - CLI（不带 PYTHONPATH 的子进程）：
+    - 默认 origin 是 unmarked、limit 是 200，`--db-path` 必填；
+    - 成功时不回显输出路径；
+    - 参数错误、输入错误、symlink 循环（两个工具，`--db-path` 和 `--out` 各一）、深层嵌套 JSON 的 RecursionError，都只打印固定的一行，不回显值。
+  - 写入：0600 权限；输出预算按 UTF-8 字节算，正好等于上限时可以；fsync 失败；发布竞争；发布后清理失败。
+  - schema：拒绝身份字段、真值、丢失或重复的缺口、不规范时间、NaN、字符串 k、两种哈希格式、嵌套的多余字段、来源和模式之外的值、空 ID、1001 个 ID；原文不能移植；三处校验错误都不带输入值。
+  - 快照：WAL 副本上，统计和导出两遍之间有写入方提交，两遍都看不到它。
+  - 其他：哈希覆盖原文的首尾空格；`.gitignore` 的两条规则；真实的 `/search`、`/chat` 写出的行分类正确；WAL 副本和导出期间有写入方（见下）。
+- `tests/test_feedback_candidate_export.py`（88 个用例）：除了上面说的两处 patch，坏结果 ID 里加了空字符串和 1001 个两种（见下面的变异检查）。
+- 两个导出测试文件：最终 220 passed（`d74dde8` 时 194）。
+- 全量：最终 3140 passed、0 failed；`d74dde8` 3113 passed（那次在加 WAL 用例之前开始跑）；main 3006。
+- 变异检查：每个变异体都在 /tmp 下由 `git archive HEAD` 加 worktree 改动组成的独立副本里跑。
+  - 第一版 92/92 被杀：
+    - 共用模块 37 个：日期和时间的规范与类型检查、空窗口、JSON 预算差一、重复键、ID 上限差一、空 ID、来源前缀、长度和类型、两条 SQL 子句、未知模式原样输出、模式类型、词表缺项、读写 URI、库路径非严格、目录当库、去掉 query_only 或 BEGIN、主键和列检查、目标的每条规则、link 换成 replace、去掉 fsync、临时文件不删、清理失败不报告、parser 回显、忽略 until。
+    - 查询导出 35 个：私有目录、统计读原文、`SELECT *`、route 和时间不查、各个缺口、eval 哈希、原文总带或从不带、丢拒答原因、哈希算错、计数、来源列、窗口两端、limit 加一、`has_more` 的两种错法、预算、`privacy_mode`、schema 检查用错列、去掉排序、两个计数互换、CLI 文字、普通 argparse、ValueError 不捕获、布尔 limit、开关不成对或不要 `--out`、开关类型、统计模式读整行、临时文件前缀、两个 Counter 记错键。
+    - schema 16 个；反馈导出 3 个（临时文件前缀、来源子句丢失、普通 argparse）；`.gitignore` 1 个。
+  - 审查修正后 123/123，组成：
+    - 上面 92 个，其中 9 个的锚点随修改后的代码更新；
+    - B 报告存活的 22 个真实缺口，加上它的快照变异体 b17（原来只靠 trace 杀掉）；
+    - 每处修正一个：只看路径文字、不查上级目录、eval 子句改回 `length()`、RuntimeError 漏出、schema 不查空 ID、不限 ID 个数、两个模型的错误带回输入值。
+  - 第一次跑是 120/123。存活的 3 个都是真实缺口：
+    - 共用的结果 ID 检查上限差一、放行空 ID：查询导出现在有 schema 兜底，反馈导出没有，它的测试也没覆盖这两种值；
+    - 不把 `--out` 转成绝对路径：当前目录在仓库更深一层时，经指向仓库外的 symlink 写出的相对路径会漏过检查。B 的探针是从仓库根目录跑的，身份检查兜住了。
+
+    补了反馈导出的两个坏值和从 `data/raw` 出发的相对路径后，这 3 个重跑都被杀。
+- WAL 实测：
+  - WAL 模式的库在只读打开时，SQLite 也会在库旁边建 `-wal`（0 字节）和 `-shm`，关闭后留下；库文件本身不变。反馈导出原来就是这样。
+  - 导出期间有写入方时，读到的是已提交的内容，不等待，也看不到没提交的。
+  - 这些写进了文档，并加了测试。
+- ruff 0.5.0（F/E9/B）对改动的文件：干净。
+
+### 审查
+
+两路只读审查，看 `main..d74dde8`：A 看语义与隐私，B 看测试、变异体与文档。两路都不派生子 agent、不改仓库、只用合成的临时库、不联网，都完整跑完。两路的进度文件和 B 的探针、变异脚本放在仓库外。
+
+- **A（语义与隐私）**：0 CRITICAL、0 HIGH、1 MEDIUM、5 LOW，另有两条文档措辞。都核对过、成立，都已处理。
+  - 中：WSL 的 `/mnt/h` 不分大小写，换了大小写或用 8.3 短文件名写的仓库路径，不会被「仓库内只能写私有目录」拦下。审查者在自己的副本里把文件写进了被跟踪的 `eval/` 和 `docs/`。我在 worktree 上核实过：大小写不同的路径存在，`samefile` 为真，`realpath` 保留输入的大小写。Windows 原生的 Python 不受影响。反馈导出原来就是这样。已修（「已实现」7）。
+  - 低：
+    - Python 3.12 上，symlink 循环让 `Path.resolve()` 抛 RuntimeError，两个 CLI 都没接住，打印出带路径的 traceback；
+    - 含 NUL 的来源标记：SQLite 的 `length()` 数到 NUL 为止，`--origin eval` 和 `--origin all` 的 eval 数对不上。接口写不出这种值，也不泄露任何东西；
+    - 「导出不会等写入方」只在 WAL 模式成立；
+    - 行 schema 单独用时，接受空 ID 和超过 1000 个 ID；
+    - eval 标记是自报的头，任何客户端都能带。按文档处理，见「已知、未处理」5。
+  - 文档措辞：「先验证全部选中行」应是要写的行；`PrivateQueryText` 的校验错误里带着查询原文，CLI 不显示，但 Python 调用方记日志时会带出去。
+  - 它核对过没问题的：
+    - 反馈导出的行为不变：逐句对照，另跑了 7 种库 × 18 组参数共 126 个 CLI 用例的差分，退出码、stdout、stderr、输出字节和目录内容全部一致；
+    - 路径里带 `?`、`#`、`%`、空格时也不建库；
+    - 统计和文件来自同一个快照；
+    - WAL 副本；发布不覆盖；
+    - 接口实际写出的行，两个阶段都能通过（按建表以来的历史核对过）。
+- **B（测试、变异体与文档）**：0 CRITICAL、0 HIGH、3 MEDIUM，其余是 LOW。都核对过、成立，都已处理。
+  - 中：
+    - 大小写绕过，同 A；
+    - 库路径的 URI 编码没有测试。去掉编码的变异体能存活，而它会把 `copy #1.sqlite3` 里的 `#` 当成 URI 片段，读写打开并新建另一个空库；
+    - CLI 的默认值没有测试：`--origin`、`--limit` 的默认值和 `--db-path` 必填。
+  - 低：
+    - symlink 循环，同 A；
+    - 反馈导出自己的目录规则，重构后几乎没测；
+    - 行 schema 的几条约束没测：两种哈希的格式、嵌套的多余字段、来源和模式的取值。我原来说的「schema 的每个校验都做了变异」不准确；
+    - 标记的大小写、空字符串和 NUL；
+    - 预算按字节还是字符算、上限算不算在内；
+    - 深层嵌套 JSON 的 RecursionError；
+    - `--out` 成功时不回显路径；
+    - 复合主键；`.JSONL`；经 symlink 的相对 `--out`；
+    - 哈希覆盖原文的首尾空格；
+    - 文档：按整天的窗口导不全、只读目录里的 WAL 副本、模块说明里的「不建任何文件」、UNC 路径、第三个示例没建目录、空窗口和倒置窗口的报错；
+    - 一个测试在本地有旧输出文件时，走的是「文件已存在」那条路。
+  - 它自己设计了 25 个变异体，23 个在两个测试文件上存活。其中 22 个是真实缺口；b06 与原代码等价（SQLite 总把类型名报成大写）。它写的 21 个探针在 `d74dde8` 上全部通过，并能杀掉那 22 个。另有 3 个它判为等价的：去掉 `fchmod`（mkstemp 本来就是 0600）、去掉 `busy_timeout`（connect 默认就是 5 秒）、去掉 fsync 前的 flush。
+  - 它核对过没问题的：
+    - 同一快照：两遍之间提交的写入，两遍都看不到；
+    - 反馈导出的行为不变；
+    - 文档和代码一致：四个旧问题、参数表、五列统计、来源和窗口、预算、发布方式、权限、两个忽略文件；
+    - 规模：20 万行统计 9.8 秒，1000 行导出 1.5 秒。
+- 两路都没法检查的：真实 uvicorn／cloudflared 对头里 NUL 的处理、macOS、NAS／SMB 共享、容器里运行、Linux 上的 Python 3.13+、真实的库。
+
+### 已知、未处理
+
+1. WAL 模式的库只读打开会留下 `-wal`／`-shm` 辅助文件，库本身不变，见验证记录。
+2. 时间窗口只按整天，没有游标；同一天、同一来源超过 1000 行时导不全。
+3. query_log 本身没有保留期和自动清理，仍由运维负责。
+4. 0600 只在 POSIX 文件系统上成立；WSL 的 `/mnt/<盘符>` 和 Windows 上由 ACL 决定。
+5. eval 行不带 `unverified_traffic_origin`，和反馈导出的格式一致；但 `X-Eval-Run` 是自报的，任何客户端都能带。文档要求用 `eval_run_sha256` 对照自己的评测名称再确认，格式没有改。
+
+### 发布状态
+
+- 这一批随一个 PR 提交，合并由用户点。
+- 只是离线工具，不部署也能在本地副本上用；镜像里的脚本要等下次部署才更新。生产上要导出时，先按备份流程准备一致的副本，在副本上跑。
+- 本批没有动生产数据。AAI 6600 仍按 14 的「发布状态」，等下次部署后再做。
+
