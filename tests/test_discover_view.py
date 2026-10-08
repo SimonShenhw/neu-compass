@@ -5,11 +5,26 @@
 
 from __future__ import annotations
 
+import pytest
 from markdown_it import MarkdownIt
 
 from app import view_cache
 from app.discover_view import _render_coop_teaser
 from tests.ui_recorder import Recorder
+
+
+@pytest.fixture(autouse=True)
+def no_real_api(monkeypatch):
+    """These tests seed the view cache; a miss must fail here, not reach API_BASE_URL (reviewer B,
+    batch 16, saw real GETs to its own listener under two mutants).
+    中文：这些测试预先填好页面缓存；没命中时要在这里失败，不能发到 API_BASE_URL。"""
+    import app.api_client as api_module
+
+    class Unreachable:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("unexpected real API request in a test that seeds the view cache")
+
+    monkeypatch.setattr(api_module, "ApiClient", Unreachable)
 
 
 def guest_teaser(st, rows):

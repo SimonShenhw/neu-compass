@@ -99,19 +99,26 @@ def get_programs_cached(st) -> list[dict]:
 def get_curriculum_cached(st, program_id: str) -> dict:
     """GET /programs/{id} through the tab's view cache
     (_curriculum_cache[program_id]; public). Raises ApiError while a failure
-    is fresh and nothing was loaded before (including 404 for unseeded ids) —
-    callers decide how loud to be.
+    is fresh and no earlier success may be served: a definite answer such as
+    404 (an unseeded id) always, a transient failure only when nothing was
+    loaded before (view_cache.transient) — callers decide how loud to be.
 
-    A refetch whose plans differ from the last ones loaded drops the family's
-    plan choice, as the refresh button does: a changed revision must be
-    chosen again, never silently kept.
+    A refetch whose plans differ from the last ones loaded clears the family's
+    plan choice, as the family refresh button below does: a changed revision
+    must be chosen again, never silently kept. The choice is set to None, not popped:
+    a popped key sends nothing to the browser, which keeps showing the old
+    option and sends it back with the next rerun. Callers run this before the
+    plan selectbox exists in the run (setting it afterwards would raise).
 
     经标签页的页面缓存（_curriculum_cache[program_id]；公开内容）取
-    GET /programs/{id}。失败仍有效、之前又没加载成功过时抛出 ApiError
-    （包括未 seed 的 id 导致的 404）—— 具体报错多响亮由调用方决定。
+    GET /programs/{id}。失败仍有效、又不能给出之前的成功结果时抛出 ApiError：
+    明确的答复（例如未 seed 的 id 导致的 404）总是抛出，暂时性失败只在之前
+    没加载成功过时抛出（view_cache.transient）—— 具体报错多响亮由调用方决定。
 
-    重新获取到的方案和上次加载的不同时，清掉这个项目的方案选择，和刷新
-    按钮一样：版本变了就要重新选择，绝不悄悄沿用。"""
+    重新获取到的方案和上次加载的不同时，清掉这个项目的方案选择，和下面的
+    项目刷新按钮一样：版本变了就要重新选择，绝不悄悄沿用。选择是设成 None，而不是
+    删掉：删掉的键不会通知浏览器，浏览器会继续显示旧选项，并在下一次 rerun
+    时把它送回来。调用方都在这一轮的方案选择框创建之前调用（之后再设会报错）。"""
     from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiClient  # noqa: PLC0415
 
@@ -123,16 +130,17 @@ def get_curriculum_cached(st, program_id: str) -> dict:
 
     def drop_changed_choice(previous: object, current: object) -> None:
         key = f"program-plan-{program_id}"
-        if key not in st.session_state:
-            return
+        if st.session_state.get(key) is None:
+            return  # Nothing chosen: Streamlit registers the selectbox's key with None.
         same = (isinstance(previous, dict) and isinstance(current, dict)
                 and previous.get("plans") == current.get("plans"))
         if not same:
-            st.session_state.pop(key, None)
+            st.session_state[key] = None
             st.session_state[_PLAN_REVISED_KEY] = program_id
 
     return view_cache.cached(
         view_cache.curricula(st.session_state), program_id, fetch, on_success=drop_changed_choice,
+        state=st.session_state,
     )
 
 
@@ -290,7 +298,8 @@ def _render_curriculum(st, program_id: str) -> None:
     if st.button("刷新方案及政策证据", key=f"prog-refresh-{program_id}"):
         st.session_state.pop('_program_plan_link_pending', None)
         view_cache.curricula(st.session_state).pop(program_id, None)
-        st.session_state.pop(f"program-plan-{program_id}", None)
+        # Set, not popped, so the browser's selectbox is reset too (see get_curriculum_cached).
+        st.session_state[f"program-plan-{program_id}"] = None
     try:
         cur = get_curriculum_cached(st, program_id)
     except ApiError as e:

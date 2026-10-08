@@ -155,9 +155,14 @@ def resolve_plan_link(target: PlanLink, body) -> tuple[str, ProgramPlan | None]:
 
 
 def clear_plan_link_selection(state) -> None:
+    """Clear the previous family's plan choice and any pending link; runs before the widgets exist.
+
+    Plan choices are set to None, never popped: a popped widget key leaves the browser showing (and
+    sending back) the old option. 中文：方案选择设成 None，绝不删掉：删掉组件的键，浏览器会继续
+    显示（并送回）旧选项。"""
     previous = state.get('selected_program_id')
     if isinstance(previous, str):
-        state.pop(f'program-plan-{previous}', None)
+        state[f'program-plan-{previous}'] = None
     state.pop(PENDING_KEY, None)
     state['selected_program_id'] = None
 
@@ -167,7 +172,7 @@ def consume_plan_selection(st, documents, *, key: str, program_id: str) -> None:
     data = st.session_state.pop(PENDING_KEY, None)
     if data is None:
         return
-    st.session_state.pop(key, None)
+    st.session_state[key] = None  # Set, not popped (see clear_plan_link_selection).
     try:
         target = PlanLink.model_validate(data)
         if target.program_id != program_id:

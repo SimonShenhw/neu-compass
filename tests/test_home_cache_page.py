@@ -56,6 +56,8 @@ class Backend:
 
     def __init__(self) -> None:
         self.down = False
+        self.expired = False  # A token is sent but the API no longer accepts it (401 on /coop).
+        self.not_json: set[str] = set()  # GET paths answered 200 with an HTML page.
         self.curriculum = CURRICULUM
         self.requests: list[tuple[str, str, str | None]] = []
 
@@ -77,6 +79,10 @@ class Backend:
             return httpx.Response(404, json={"detail": "not found"})
         if self.down:
             return httpx.Response(503, json={"status": "warming", "courses_indexed": 0, "bm25_corpus": 0})
+        if path in self.not_json:
+            return httpx.Response(200, content=b"<html>synthetic maintenance page</html>")
+        if path == "/coop" and auth and self.expired:
+            return httpx.Response(401, json={"detail": "Invalid or expired session token"})
         if path == "/ready":
             return httpx.Response(200, json={"status": "ready", "courses_indexed": 4321, "bm25_corpus": 3})
         if path == "/coop":
@@ -231,6 +237,74 @@ def test_the_coop_teaser_follows_the_session_token(page):
     run(app)
     assert [auth for method, path, auth in backend.requests if path == "/coop"][-1] is None
     assert "Member Visible Co" not in markdown(app)
+    assert not backend.posts()
+
+
+def test_logging_in_and_out_repeats_no_question(page):
+    """Roadmap OPT-02: switching identity must not resend a POST (reviewer B, batch 16, probe a5)."""
+    clock, backend = page
+    app = run(AppTest.from_string(SCRIPT))
+    app.chat_input[0].set_value("synthetic question")
+    run(app)
+    assert backend.posts() == ["/chat"]
+    app.session_state["user_id"] = "u-synthetic"
+    app.session_state["user_email"] = "synthetic@northeastern.edu"
+    app.session_state["session_token"] = "synthetic-session-a"
+    run(app)
+    app.session_state["session_token"] = None
+    app.session_state["user_id"] = None
+    run(app)
+    app.button(key=REFRESH_KEY).click()
+    run(app)
+    assert backend.posts() == ["/chat"]
+
+
+def test_an_outage_longer_than_one_failure_window_keeps_retrying_and_recovers(page):
+    """The API's cold start takes 70-100 s, two or three of the documented 30 s windows (reviewer B,
+    batch 16). Literal seconds here pin the documented window."""
+    from app.discover_view import PARTIAL_NOTICE
+
+    clock, backend = page
+    backend.down = True
+    app = run(AppTest.from_string(SCRIPT))
+    assert len(backend.gets()) == 3
+    for elapsed, gets in ((15, 3), (30, 6), (45, 6), (60, 9), (90, 12)):
+        clock.now = START + elapsed
+        run(app)  # Never a traceback, however many windows fail.
+        assert len(backend.gets()) == gets and "4,321" not in markdown(app)
+        assert PARTIAL_NOTICE in captions(app)
+    backend.down = False
+    clock.now = START + 120
+    run(app)
+    assert "📚 4,321 门课" in markdown(app) and "Synthetic starter" in markdown(app)
+    assert PARTIAL_NOTICE not in captions(app)
+    clock.now = START + 120 + 299
+    run(app)
+    assert len(backend.gets()) == 16  # 12 + /ready, /programs, /coop, /programs/cs-ms; fresh for 5 min.
+
+
+def test_the_sidebar_refresh_keeps_an_unchanged_plan_choice(page, monkeypatch):
+    """Reviewer B (batch 16): only expire_all() direct calls were tested, not the button on the page."""
+    import app.program_policy_view as policy
+    from app.program_view import PLAN_REVISED_NOTICE
+
+    from tests.test_view_cache import curriculum, seed_plans
+
+    clock, backend = page
+    monkeypatch.setattr(policy, "load_selected_program_policy_evidence", lambda st, item: st.caption("Policy stub"))
+    backend.curriculum = curriculum(seed_plans())
+    app = AppTest.from_string(SCRIPT)
+    app.session_state["selected_program_id"] = "cs-ms"
+    app.session_state["nav_page"] = "🎓 培养方案 · Programs"
+    run(app)
+    choice = seed_plans()[0]["plan_id"]
+    app.selectbox[0].set_value(choice)
+    run(app)
+    app.button(key=REFRESH_KEY).click()
+    run(app)
+    assert [path for _, path, _ in backend.requests].count("/programs/cs-ms") == 2
+    assert app.selectbox[0].value == choice and any(item.value == "Policy stub" for item in app.caption)
+    assert not [item for item in app.info if item.value == PLAN_REVISED_NOTICE]
 
 
 CURRICULUM_SCRIPT = """
@@ -289,9 +363,103 @@ def test_an_unexpected_ready_body_shows_the_number_free_hero(page, monkeypatch, 
 
 
 def test_the_refresh_button_is_in_the_sidebar_on_every_page(page):
+    from app.discover_view import PARTIAL_NOTICE
+
     clock, backend = page
     app = run(AppTest.from_string(SCRIPT))
     for label in ("🔍 课程搜索 · Search", "🎓 培养方案 · Programs", "💼 Co-op 经验"):
         app.radio[0].set_value(label)
         run(app)
         assert [item.key for item in app.sidebar.button] == [REFRESH_KEY]
+        # The landing's notice names the button by its label (reviewer B, batch 16).
+        assert [item.label for item in app.sidebar.button] == [view_cache.REFRESH_LABEL]
+    assert f"「{view_cache.REFRESH_LABEL}」" in PARTIAL_NOTICE
+
+
+def test_changed_plans_with_nothing_chosen_on_the_real_selectbox_say_nothing(page):
+    """Reviewer A (batch 16): real Streamlit registers the selectbox's key with None, so "a key is
+    present" is not "a plan was chosen"."""
+    from app.program_view import PLAN_REVISED_NOTICE
+
+    from tests.test_view_cache import curriculum, seed_plans
+
+    from app.program_plan_view import PLAN_PLACEHOLDER
+
+    clock, backend = page
+    backend.curriculum = curriculum(seed_plans())
+    app = run(AppTest.from_string(CURRICULUM_SCRIPT))
+    assert app.selectbox[0].value is None
+    # A cleared choice shows the placeholder in the browser, so it must read like the None option.
+    assert app.selectbox[0].placeholder == PLAN_PLACEHOLDER
+    after = seed_plans()
+    after[0]["notes"] += " Revised."
+    backend.curriculum = curriculum(after)
+    clock.now = START + view_cache.SUCCESS_TTL_SECONDS
+    run(app)
+    assert len(backend.requests) == 2 and not [item for item in app.info if item.value == PLAN_REVISED_NOTICE]
+
+
+def sidebar_captions(app: AppTest) -> list[str]:
+    return [item.value for item in app.sidebar.caption]
+
+
+def test_a_failed_refresh_says_the_page_shows_the_last_loaded_content(page):
+    from app.streamlit_app import FALLBACK_NOTICE
+
+    clock, backend = page
+    app = run(AppTest.from_string(SCRIPT))
+    assert "📚 4,321 门课" in markdown(app) and FALLBACK_NOTICE not in sidebar_captions(app)
+    backend.down = True
+    app.button(key=REFRESH_KEY).click()
+    run(app)
+    assert "📚 4,321 门课" in markdown(app) and "Guest Visible Co" in markdown(app)
+    assert sidebar_captions(app).count(FALLBACK_NOTICE) == 1
+    run(app)  # Still the last loaded content while the failures are fresh: still said.
+    assert FALLBACK_NOTICE in sidebar_captions(app)
+    backend.down = False
+    clock.now = START + view_cache.FAILURE_TTL_SECONDS
+    run(app)
+    assert "📚 4,321 门课" in markdown(app) and FALLBACK_NOTICE not in sidebar_captions(app)
+
+
+def test_a_refetch_that_is_not_json_keeps_the_page_working(page):
+    """Before OPT-02 a cached success was never fetched again; now it is, so a 2xx HTML page from a
+    proxy must not turn into a traceback on every page."""
+    from app.streamlit_app import FALLBACK_NOTICE
+
+    clock, backend = page
+    app = run(AppTest.from_string(SCRIPT))
+    backend.not_json = {"/ready", "/programs", "/coop"}
+    clock.now = START + view_cache.SUCCESS_TTL_SECONDS
+    run(app)  # run() asserts that the page raised nothing.
+    assert "📚 4,321 门课" in markdown(app) and "Guest Visible Co" in markdown(app)
+    assert FALLBACK_NOTICE in sidebar_captions(app) and "synthetic maintenance page" not in markdown(app)
+
+
+def test_a_first_load_that_is_not_json_shows_the_number_free_page(page):
+    from app.discover_view import PARTIAL_NOTICE
+
+    clock, backend = page
+    backend.not_json = {"/ready", "/programs", "/coop"}
+    app = run(AppTest.from_string(SCRIPT))
+    assert "📚 NEU 研究生课程目录" in markdown(app) and PARTIAL_NOTICE in captions(app)
+
+
+def test_an_expired_session_drops_the_member_teaser_and_promises_no_retry(page):
+    """Reviewer A (batch 16): a 401 is an answer, not an outage: the member listing is not kept as a
+    fallback, and the landing does not say it will load later."""
+    from app.discover_view import PARTIAL_NOTICE
+    from app.streamlit_app import FALLBACK_NOTICE
+
+    clock, backend = page
+    app = AppTest.from_string(SCRIPT)
+    app.session_state["user_id"] = "u-synthetic"
+    app.session_state["user_email"] = "synthetic@northeastern.edu"
+    app.session_state["session_token"] = "synthetic-session-a"
+    run(app)
+    assert "Member Visible Co" in markdown(app)
+    backend.expired = True
+    clock.now = START + view_cache.SUCCESS_TTL_SECONDS
+    run(app)
+    assert "Member Visible Co" not in markdown(app)
+    assert PARTIAL_NOTICE not in captions(app) and FALLBACK_NOTICE not in sidebar_captions(app)

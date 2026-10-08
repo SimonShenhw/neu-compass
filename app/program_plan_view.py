@@ -12,6 +12,9 @@ PATH_LABELS = {"standard": "普通 MS", "align": "Align", "bridge": "Bridge"}
 # The /chat 409 messages name this selector; tests keep the two in step.
 # 中文：/chat 的 409 提示里写了这个选择框的名字；测试保证两边一致。
 SELECTOR_LABEL = "你的项目（可选）"
+# The plan selector's "nothing chosen" text, as the None option and as the placeholder.
+# 中文：方案选择框「尚未选择」的文字，既是 None 选项的文字，也是 placeholder。
+PLAN_PLACEHOLDER = "请明确选择；不默认最新版本"
 
 
 def render_chat_program_selector(st, programs: list[dict]) -> str | None:
@@ -107,10 +110,17 @@ def render_program_plans(st, documents: list[dict], *, key: str, program_id: str
         return
     by_id = {plan.plan_id: plan for plan in plans}
     if st.session_state.get(key) not in {None, *by_id}:
-        st.session_state.pop(key, None)
+        # Set, not popped: a popped key leaves the browser showing the old option, which it sends back
+        # with the next rerun (matched by label, so a revision with the same scope would be picked).
+        # 中文：设成 None 而不是删掉：删掉的键会让浏览器继续显示旧选项，并在下一次 rerun 时送回来
+        # （按显示文字匹配，同一范围的新版本会被选中）。
+        st.session_state[key] = None
     chosen = st.selectbox(
         "选择目录版本与路径（不自动判定你的适用年度）", [None, *by_id],
-        format_func=lambda value: "请明确选择；不默认最新版本" if value is None else scope_label(by_id[value]),
+        format_func=lambda value: PLAN_PLACEHOLDER if value is None else scope_label(by_id[value]),
+        # A None set through session state shows the placeholder, not the None option's label.
+        # 中文：通过 session state 设成 None 时显示的是 placeholder，不是 None 选项的文字。
+        placeholder=PLAN_PLACEHOLDER,
         key=key,
     )
     if chosen is None or chosen not in by_id:

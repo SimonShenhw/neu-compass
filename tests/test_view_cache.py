@@ -138,12 +138,130 @@ def test_malformed_entries_are_fetched_again(clock, stored):
     assert view_cache.cached(state, "k", source) == ["fresh"] and source.calls == 1
 
 
-def test_errors_other_than_api_errors_are_not_cached(clock):
-    state, source = {}, Source(ValueError("synthetic"), ["fresh"])
-    with pytest.raises(ValueError):
+def test_a_response_that_is_not_json_counts_as_a_502(clock):
+    """httpx raises ValueError when a 2xx body is not JSON (a proxy or maintenance page)."""
+    state, source = {}, Source(ValueError("Expecting value: synthetic page"), ["fresh"])
+    with pytest.raises(ApiError) as first:
+        view_cache.cached(state, "k", source)
+    assert (first.value.status_code, first.value.error_type) == (502, "invalid_response")
+    assert first.value.detail == view_cache.INVALID_RESPONSE_DETAIL and "synthetic page" not in repr(state)
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", source)  # Remembered like any failure: no second request.
+    assert source.calls == 1
+    clock.now = START + FAIL_TTL
+    assert view_cache.cached(state, "k", source) == ["fresh"] and source.calls == 2
+
+
+def test_a_refetch_that_is_not_json_keeps_the_last_success(clock):
+    state, source = {}, Source(["v1"], ValueError("synthetic page"), ["v2"])
+    assert view_cache.cached(state, "k", source) == ["v1"]
+    clock.now = START + OK_TTL
+    view_cache.begin_run(state)
+    assert view_cache.cached(state, "k", source) == ["v1"] and view_cache.served_fallback(state)
+
+
+def test_other_errors_are_not_cached(clock):
+    state, source = {}, Source(RuntimeError("synthetic"), ["fresh"])
+    with pytest.raises(RuntimeError):
         view_cache.cached(state, "k", source)
     assert "k" not in state
     assert view_cache.cached(state, "k", source) == ["fresh"] and source.calls == 2
+
+
+@pytest.mark.parametrize("status, expected", [(408, True), (429, True), (500, True), (502, True), (503, True),
+                                              (504, True), (400, False), (401, False), (403, False),
+                                              (404, False), (409, False), (422, False)])
+def test_transient_failures_are_the_ones_that_can_pass(status, expected):
+    assert view_cache.transient(ApiError(status, "x")) is expected
+
+
+@pytest.mark.parametrize("error", [ApiError(404, "Program 'cs-ms' not found"),
+                                   ApiError(401, "Invalid token", error_type="unauthorized"),
+                                   ApiError(403, "forbidden"), ApiError(422, "invalid")])
+def test_a_definite_answer_drops_the_last_success(clock, error):
+    """A removed program or an expired session is an answer, not an outage: the page must not keep the
+    old content for the life of the tab."""
+    seen = []
+    state, source = {}, Source(["v1"], error, ["v2"])
+    record = lambda previous, value: seen.append(previous)  # noqa: E731
+    view_cache.cached(state, "k", source, on_success=record)
+    clock.now = START + OK_TTL
+    view_cache.begin_run(state)
+    with pytest.raises(ApiError) as raised:
+        view_cache.cached(state, "k", source, on_success=record)
+    assert raised.value is error and view_cache.peek(state, "k") is None
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", source, on_success=record)  # Still remembered for 30 s.
+    assert source.calls == 2 and not view_cache.served_fallback(state)
+    clock.now = START + OK_TTL + FAIL_TTL
+    assert view_cache.cached(state, "k", source, on_success=record) == ["v2"]
+    assert seen == [None, None]  # The dropped success is no longer anyone's previous value.
+
+
+def test_two_failures_in_a_row_without_a_success_both_raise(clock):
+    state, source = {}, Source(busy(), busy(), ["v1"])
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", source)
+    clock.now = START + FAIL_TTL
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", source)
+    assert source.calls == 2
+    clock.now = START + 2 * FAIL_TTL
+    assert view_cache.cached(state, "k", source) == ["v1"]
+
+
+def test_served_fallback_counts_the_reads_of_this_run_only(clock):
+    state, nested = {}, {}
+    source = Source(["v1"], busy(), ["v2"])
+    view_cache.begin_run(state)
+    view_cache.cached(nested, "k", source, state=state)
+    assert not view_cache.served_fallback(state)  # A plain success.
+    clock.now = START + OK_TTL
+    assert view_cache.cached(nested, "k", source, state=state) == ["v1"]  # Refetch failed.
+    assert view_cache.served_fallback(state) and view_cache.FALLBACKS_KEY not in nested
+    view_cache.begin_run(state)
+    assert not view_cache.served_fallback(state)
+    assert view_cache.cached(nested, "k", source, state=state) == ["v1"]  # The failure is still fresh.
+    assert view_cache.served_fallback(state) and source.calls == 2
+    view_cache.begin_run(state)
+    clock.now = START + OK_TTL + FAIL_TTL
+    assert view_cache.cached(nested, "k", source, state=state) == ["v2"]
+    assert not view_cache.served_fallback(state)
+
+
+def test_a_failure_without_an_earlier_success_is_not_a_fallback(clock):
+    state = {}
+    view_cache.begin_run(state)
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", Source(busy()))
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", Source(busy()))
+    assert not view_cache.served_fallback(state)
+
+
+def test_the_documented_lifetimes_and_clock():
+    """docs/view-cache.md promises 5 minutes, 30 seconds and a monotonic clock."""
+    import time
+
+    assert (view_cache.SUCCESS_TTL_SECONDS, view_cache.FAILURE_TTL_SECONDS) == (300.0, 30.0)
+    assert view_cache.clock is time.monotonic
+
+
+def test_peek_is_per_scope(clock):
+    state = {}
+    view_cache.store(state, "k", ["member row"], scope="session:a")
+    assert view_cache.peek(state, "k", scope="session:a") == ["member row"]
+    assert view_cache.peek(state, "k", scope=view_cache.GUEST_SCOPE) is None
+
+
+def test_a_failure_entry_holds_no_exception_object(clock):
+    """Keeping the exception would keep its traceback and the frames' locals alive in the session."""
+    state = {}
+    with pytest.raises(ApiError):
+        view_cache.cached(state, "k", Source(busy()))
+    entry = state["k"]
+    assert not any(isinstance(value, BaseException) for value in vars(entry).values())
+    assert all(not isinstance(item, BaseException) for item in entry.error)
 
 
 def test_a_clock_before_the_fetch_time_fetches_again(clock):
@@ -405,6 +523,35 @@ def test_each_program_section_reports_a_failed_list_itself(api, clock):
     assert len(api.calls) == 1
 
 
+def test_a_failed_featured_curriculum_keeps_the_cards_that_loaded(api, clock):
+    from app.discover_view import _render_starter_row
+
+    starter = {"prefix": "CS", "semesters": [{"semester": 1, "courses": [
+        {"course_id": "neu-cs-5010", "primary_code": "CS 5010", "primary_name": "Synthetic course",
+         "requirement_type": "core"}]}]}
+    api.routes = {"list_programs": [[{"program_id": "cs-ms", "prefix": "CS", "course_count": 1},
+                                     {"program_id": "ds-ms", "prefix": "DS", "course_count": 1}]],
+                  "get_program_curriculum": [starter, busy()]}
+    st = page({})
+    assert _render_starter_row(st) is True
+    assert [args for name, _, args in api.calls if name == "get_program_curriculum"] == [("cs-ms",), ("ds-ms",)]
+    assert any("CS 5010" in value for value in st.html)  # The card that loaded is still shown.
+
+
+@pytest.mark.parametrize("status, notice", [(503, True), (404, False)])
+def test_a_definite_answer_is_not_a_section_to_load_later(api, clock, status, notice):
+    from app.discover_view import _render_coop_teaser, _render_program_row, _render_starter_row
+
+    api.routes = {"list_programs": [ApiError(status, "x")], "list_coop": [ApiError(status, "x")]}
+    assert _render_program_row(page({})) is notice
+    assert _render_starter_row(page({})) is notice
+    assert _render_coop_teaser(page({})) is notice
+    # The list loads but a featured curriculum gets the same answer.
+    api.routes = {"list_programs": [[{"program_id": "cs-ms", "prefix": "CS", "course_count": 1}]],
+                  "get_program_curriculum": [ApiError(status, "x")]}
+    assert _render_starter_row(page({})) is notice
+
+
 def seed_plans():
     return [p for name in ("boston_2026_2027_extended_rules.json", "boston_2026_2027_pathway_rules.json")
             for p in json.loads((ROOT / "data/program_plan_seed" / name).read_text(encoding="utf-8"))
@@ -442,24 +589,31 @@ def test_a_curriculum_refetch_with_other_plans_drops_the_plan_choice_and_says_so
     if change == "none":
         assert state["program-plan-cs-ms"] == choice and PLAN_REVISED_NOTICE not in shown(st, "info")
     else:
-        assert "program-plan-cs-ms" not in state and shown(st, "info") == [PLAN_REVISED_NOTICE]
+        # Cleared to None, not popped: a popped key leaves the browser's selectbox on the old option,
+        # which it sends back with the next rerun (reviewer A, batch 16, checked in a real browser).
+        assert state["program-plan-cs-ms"] is None and shown(st, "info") == [PLAN_REVISED_NOTICE]
         st = page(state)
         _render_curriculum(st, "cs-ms")  # Said once.
         assert PLAN_REVISED_NOTICE not in shown(st, "info") and len(api.calls) == 2
 
 
-def test_changed_plans_without_a_choice_say_nothing(api, clock):
-    from app.program_view import PLAN_REVISED_NOTICE, _render_curriculum
+@pytest.mark.parametrize("registered", [False, True])
+def test_changed_plans_without_a_choice_say_nothing(api, clock, registered):
+    """Real Streamlit registers the selectbox's key with None when nothing is chosen (registered=True)."""
+    from app.program_view import _PLAN_REVISED_KEY, PLAN_REVISED_NOTICE, _render_curriculum
 
     after = seed_plans()
     after[0]["notes"] += " Revised."
     api.routes = {"get_program_curriculum": [curriculum(seed_plans()), curriculum(after)]}
     state = {}
     _render_curriculum(page(state), "cs-ms")
+    if registered:
+        state["program-plan-cs-ms"] = None
     clock.now = START + OK_TTL
     st = page(state)
     _render_curriculum(st, "cs-ms")
     assert len(api.calls) == 2 and PLAN_REVISED_NOTICE not in shown(st, "info")
+    assert _PLAN_REVISED_KEY not in state
 
 
 def test_a_choice_without_a_loaded_curriculum_is_dropped(api, clock):
@@ -470,7 +624,25 @@ def test_a_choice_without_a_loaded_curriculum_is_dropped(api, clock):
     api.routes = {"get_program_curriculum": [curriculum(plans)]}
     state = {"program-plan-cs-ms": plans[0]["plan_id"]}
     get_curriculum_cached(page(state), "cs-ms")
-    assert "program-plan-cs-ms" not in state
+    assert state["program-plan-cs-ms"] is None  # Cleared, not popped.
+
+
+def test_a_refetch_that_changes_only_other_fields_keeps_the_choice(api, clock):
+    from app.program_view import PLAN_REVISED_NOTICE, _render_curriculum
+
+    plans = seed_plans()
+    renamed = curriculum(copy.deepcopy(plans))
+    renamed["full_name"] = "Synthetic CS, renamed"
+    renamed["semesters"][0]["courses"][0]["primary_name"] = "Synthetic course, renamed"
+    api.routes = {"get_program_curriculum": [curriculum(plans), renamed]}
+    state = {}
+    _render_curriculum(page(state), "cs-ms")
+    state["program-plan-cs-ms"] = plans[0]["plan_id"]
+    clock.now = START + OK_TTL
+    st = page(state)
+    _render_curriculum(st, "cs-ms")
+    assert len(api.calls) == 2 and state["program-plan-cs-ms"] == plans[0]["plan_id"]
+    assert PLAN_REVISED_NOTICE not in shown(st, "info")
 
 
 def test_the_notice_is_only_for_the_family_whose_choice_was_dropped(api, clock):
@@ -492,18 +664,30 @@ def test_refresh_keeps_an_unchanged_plan_choice_and_a_failed_refetch_keeps_the_p
     _render_curriculum(page(state), "cs-ms")
     state["program-plan-cs-ms"] = plans[0]["plan_id"]
     view_cache.expire_all(state)
+    view_cache.begin_run(state)
     st = page(state)
     _render_curriculum(st, "cs-ms")  # The refetch fails: the loaded curriculum stays on the page.
     assert not shown(st, "error") and state["program-plan-cs-ms"] == plans[0]["plan_id"]
+    # Counted in the session state, where the page's sidebar notice looks (not in the curricula dict).
+    assert view_cache.served_fallback(state)
     view_cache.expire_all(state)
+    view_cache.begin_run(state)
     st = page(state)
     _render_curriculum(st, "cs-ms")
     assert len(api.calls) == 3 and state["program-plan-cs-ms"] == plans[0]["plan_id"]
-    assert PLAN_REVISED_NOTICE not in shown(st, "info")
+    assert PLAN_REVISED_NOTICE not in shown(st, "info") and not view_cache.served_fallback(state)
+
+
+def test_a_choice_no_longer_among_the_plans_is_cleared_not_popped():
+    from app.program_plan_view import render_program_plans
+
+    state = {"program-plan-cs-ms": "a-plan-that-was-removed"}
+    render_program_plans(page(state), seed_plans(), key="program-plan-cs-ms", program_id="cs-ms")
+    assert state["program-plan-cs-ms"] is None  # Set, so the browser's selectbox is reset too.
 
 
 def test_the_family_refresh_button_still_drops_the_choice_and_refetches(api, clock, monkeypatch):
-    from app.program_view import _render_curriculum
+    from app.program_view import PLAN_REVISED_NOTICE, _render_curriculum
 
     plans = seed_plans()
     api.routes = {"get_program_curriculum": [curriculum(plans)]}
@@ -513,7 +697,23 @@ def test_the_family_refresh_button_still_drops_the_choice_and_refetches(api, clo
     st = page(state)
     monkeypatch.setattr(Recorder, "button", lambda self, label, **kwargs: label == "刷新方案及政策证据")
     _render_curriculum(st, "cs-ms")
-    assert len(api.calls) == 2 and "program-plan-cs-ms" not in state
+    assert len(api.calls) == 2 and state["program-plan-cs-ms"] is None  # Cleared, not popped.
+    # The student asked for it: no "the plans were revised" notice on top.
+    assert PLAN_REVISED_NOTICE not in shown(st, "info")
+
+
+def test_the_family_refresh_never_falls_back_to_the_old_curriculum(api, clock, monkeypatch):
+    """docs/program-policy-evidence.md: a failure after the family refresh keeps nothing loaded before."""
+    from app.program_view import _render_curriculum
+
+    plans = seed_plans()
+    api.routes = {"get_program_curriculum": [curriculum(plans), busy()]}
+    state = {}
+    _render_curriculum(page(state), "cs-ms")
+    st = page(state)
+    monkeypatch.setattr(Recorder, "button", lambda self, label, **kwargs: label == "刷新方案及政策证据")
+    _render_curriculum(st, "cs-ms")
+    assert len(api.calls) == 2 and shown(st, "error") and not shown(st, "selectbox")
 
 
 def test_logout_drops_the_teaser_key_the_view_cache_uses():

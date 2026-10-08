@@ -53,6 +53,8 @@ app.view_cache：失败 30 秒后重试（不是每次 rerun 都重试——那�
 
 from __future__ import annotations
 
+from app import view_cache as _view_cache  # Module level only for REFRESH_LABEL in PARTIAL_NOTICE.
+
 # Featured programs for the 入门推荐 row, in display order. Ids missing
 # from the seeded set silently drop out (checked against the /programs
 # listing first, so unseeded ids never trigger per-rerun 404 fetches).
@@ -99,17 +101,20 @@ def _starter_card_html(*, code: str, name: str, prefix: str) -> str:
 def _render_program_row(st) -> bool:
     """🎓 chips, one per seeded program — clicking hands off to the
     Programs page with that program pre-selected. Returns True when the
-    program list could not be loaded.
+    program list could not be loaded for a reason that can pass
+    (view_cache.transient), so that trying again later makes sense.
 
     🎓 chips，每个已 seed 的培养方案一个 —— 点击后交接给 Programs
-    页面，并预先选中该培养方案。项目列表加载不了时返回 True。"""
+    页面，并预先选中该培养方案。项目列表因为可能自己恢复的原因
+    （view_cache.transient）加载不了、稍后重试有意义时返回 True。"""
+    from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiError  # noqa: PLC0415
     from app.program_view import get_programs_cached  # noqa: PLC0415
 
     try:
         programs = get_programs_cached(st)
-    except ApiError:
-        return True
+    except ApiError as exc:
+        return view_cache.transient(exc)
     if not programs:
         return False
 
@@ -131,11 +136,14 @@ def _render_starter_row(st) -> bool:
     """🔥 one semester-1 core/foundation course per featured program.
     Featured ids are validated against the /programs listing first so an
     unseeded id costs nothing (no 404 round-trip per rerun). Returns True
-    when a list or curriculum it needed could not be loaded.
+    when a list or curriculum it needed could not be loaded for a reason
+    that can pass (view_cache.transient).
 
     🔥 每个精选培养方案各挑一门第一学期的核心/基础课。精选 id 会先对照
     /programs 列表校验，未 seed 的 id 因此零成本（不会每次 rerun 都
-    发一次 404 往返）。需要的列表或课程表加载不了时返回 True。"""
+    发一次 404 往返）。需要的列表或课程表因为可能自己恢复的原因
+    （view_cache.transient）加载不了时返回 True。"""
+    from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiError  # noqa: PLC0415
     from app.program_view import (  # noqa: PLC0415
         get_curriculum_cached,
@@ -144,8 +152,8 @@ def _render_starter_row(st) -> bool:
 
     try:
         available = {p["program_id"] for p in get_programs_cached(st)}
-    except ApiError:
-        return True
+    except ApiError as exc:
+        return view_cache.transient(exc)
 
     failed = False
     picks: list[tuple[str, dict]] = []  # (program prefix, course dict) / (培养方案前缀, 课程字典)
@@ -154,8 +162,8 @@ def _render_starter_row(st) -> bool:
             continue
         try:
             cur = get_curriculum_cached(st, pid)
-        except ApiError:
-            failed = True
+        except ApiError as exc:
+            failed = failed or view_cache.transient(exc)
             continue
         course = _semester1_pick(cur)
         if course:
@@ -187,14 +195,18 @@ def _render_coop_teaser(st) -> bool:
     """💼 first two Co-op rows as one-liners + a hand-off button. The
     listing is cached per tab under the viewer's scope (the API redacts
     /coop by tier, so a guest's or another account's listing is never
-    reused after a login, logout or account switch); a failure hides the
+    reused after a login, logout or account switch). A transient failure
+    keeps the viewer's last listing if there is one; otherwise it hides the
     section and is tried again 30 s later. Returns True when the listing
-    could not be loaded.
+    could not be loaded for a reason that can pass (view_cache.transient);
+    a 401 for an expired session hides the section without promising a retry.
 
     💼 展示最近两条 Co-op 记录的一句话摘要 + 一个跳转按钮。列表按访客
     范围缓存在本标签页里（API 按等级裁剪 /coop，所以登录、登出或换账号
-    之后，绝不会沿用游客或另一个账号的列表）；失败时隐藏该区块，30 秒后
-    重试。列表加载不了时返回 True。"""
+    之后，绝不会沿用游客或另一个账号的列表）。暂时性失败时，这位访客上次
+    有列表就继续显示，没有就隐藏该区块，30 秒后重试。列表因为可能自己恢复
+    的原因（view_cache.transient）加载不了时返回 True；会话过期导致的 401
+    只隐藏区块，不说稍后会重试。"""
     from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiClient, ApiError  # noqa: PLC0415
 
@@ -211,8 +223,8 @@ def _render_coop_teaser(st) -> bool:
             st.session_state, view_cache.COOP_TEASER_KEY, fetch,
             scope=view_cache.viewer_scope({"session_token": token}),
         )
-    except ApiError:
-        return True
+    except ApiError as exc:
+        return view_cache.transient(exc)
     if not isinstance(coops, list) or not coops:
         return False
 
@@ -249,7 +261,8 @@ def _render_coop_teaser(st) -> bool:
 
 
 # Shown once when any section could not be loaded. 中文：有区块加载不了时显示一次。
-PARTIAL_NOTICE = "部分内容暂时没加载出来：稍后再操作页面时会重新获取，也可以点侧边栏的「🔄 刷新页面内容」。"
+PARTIAL_NOTICE = ("部分内容暂时没加载出来：稍后再操作页面时会重新获取，也可以点侧边栏的"
+                  f"「{_view_cache.REFRESH_LABEL}」。")
 
 
 def render_discover(st) -> None:

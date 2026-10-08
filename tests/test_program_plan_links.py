@@ -164,7 +164,8 @@ def test_current_api_identity_scope_and_revision_are_all_required(change, status
 def test_success_bypasses_stale_curriculum_cache_and_is_one_shot(monkeypatch):
     calls = fake_api(monkeypatch, body())
     st = Surface(params())
-    st.session_state['_curriculum_cache'] = {'cs-ms': {'plans': []}}
+    # A fresh cached curriculum without the linked plan (stored the way the view cache stores it).
+    view_cache.store(view_cache.curricula(st.session_state), 'cs-ms', {'plans': []})
     original = copy.deepcopy(st.query_params)
     apply_deep_link(st, pages=PAGES)
     assert calls == ['cs-ms'] and st.session_state['selected_program_id'] == 'cs-ms'
@@ -183,7 +184,8 @@ def test_transient_failures_retry_without_old_selection(monkeypatch, code):
     calls = fake_api(monkeypatch, ApiError(code, 'private detail'))
     st = Surface(params()); st.session_state['program-plan-cs-ms'] = 'previous-choice'
     apply_deep_link(st, pages=PAGES)
-    assert calls == ['cs-ms'] and 'program-plan-cs-ms' not in st.session_state
+    # Cleared to None, not popped: a popped key leaves the browser's selectbox on the old option.
+    assert calls == ['cs-ms'] and st.session_state['program-plan-cs-ms'] is None
     assert '_program_plan_link_applied' not in st.session_state
     assert 'private detail' not in ' '.join(st.warnings)
     fake_api(monkeypatch, body()); apply_deep_link(st, pages=PAGES)
@@ -231,7 +233,7 @@ def test_invalid_plan_conflict_does_not_fetch_or_echo_untrusted_text(monkeypatch
     st.session_state['program-plan-cs-ms'] = 'old'
     apply_deep_link(st, pages=PAGES)
     assert calls == [] and st.warnings and st.session_state.get('selected_program_id') is None
-    assert 'program-plan-cs-ms' not in st.session_state
+    assert st.session_state['program-plan-cs-ms'] is None  # Cleared, not popped.
     assert not any('evil.test' in warning for warning in st.warnings)
 
 
@@ -289,7 +291,8 @@ def test_pending_target_is_revalidated_before_any_widget_selection(change):
     elif change == 'family': current['program_id'] = 'ds-ms'
     elif change == 'bad-pending': st.session_state['_program_plan_link_pending'] = {'url': 'https://evil.test'}
     consume_plan_selection(st, docs, key='selected', program_id='cs-ms')
-    assert 'selected' not in st.session_state and '_program_plan_link_pending' not in st.session_state
+    # Cleared to None, not popped, so the browser's selectbox is reset too.
+    assert st.session_state['selected'] is None and '_program_plan_link_pending' not in st.session_state
     assert st.captions and st.texts == st.markdowns == []
 
 
@@ -438,10 +441,16 @@ def test_stale_link_evicts_only_its_family_cache_before_manual_browsing(monkeypa
     current = body()
     next(d for d in current['plans'] if d['plan_id'] == plan().plan_id)['notes'] += ' Changed'
     fake_api(monkeypatch, current)
-    st = Surface(params()); st.session_state['_curriculum_cache'] = {'cs-ms': body(), 'ds-ms': {'sentinel': True}}
+    st = Surface(params())
+    st.session_state['program-plan-cs-ms'] = 'old-choice'  # The linked family's earlier choice.
+    cache = view_cache.curricula(st.session_state)
+    view_cache.store(cache, 'cs-ms', body())
+    view_cache.store(cache, 'ds-ms', {'sentinel': True})
     apply_deep_link(st, pages=PAGES)
-    assert st.session_state['_curriculum_cache'] == {'ds-ms': {'sentinel': True}}
+    assert list(st.session_state['_curriculum_cache']) == ['ds-ms']
+    assert view_cache.peek(st.session_state['_curriculum_cache'], 'ds-ms') == {'sentinel': True}
     assert st.session_state.get('selected_program_id') is None
+    assert st.session_state['program-plan-cs-ms'] is None  # Cleared by _evict_family, not popped.
 
 
 def test_producer_cannot_use_an_unvalidated_dictionary():

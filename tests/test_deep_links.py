@@ -33,6 +33,20 @@ PROGRAMS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def no_real_api(monkeypatch):
+    """Tests either stub ApiClient (_fake_resolve) or seed the view cache; a miss must fail here, not
+    reach API_BASE_URL (reviewer B, batch 16, saw real GETs to its own listener under two mutants).
+    中文：测试要么替换 ApiClient，要么预先填好页面缓存；没命中时要在这里失败，不能发到 API_BASE_URL。"""
+    import app.api_client as api_module
+
+    class Unreachable:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("unexpected real API request in a test that stubs or seeds the API")
+
+    monkeypatch.setattr(api_module, "ApiClient", Unreachable)
+
+
 # ===========================================================================
 # Pure helpers
 # ===========================================================================

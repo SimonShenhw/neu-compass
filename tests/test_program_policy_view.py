@@ -45,7 +45,8 @@ def test_removed_plan_selection_is_cleared_without_a_fallback():
     st = FakeSurface(choice="removed-plan")
     st.session_state["selected"] = "removed-plan"
     assert render_program_plans(st, [data], key="selected") is None
-    assert "selected" not in st.session_state and not st.texts
+    # Cleared to None, not popped, so the browser's selectbox is reset too (OPT-02 review).
+    assert st.session_state["selected"] is None and not st.texts
 
 
 def test_selected_policy_route_exists_without_reactivating_legacy_guesses(api_client, empty_db):
