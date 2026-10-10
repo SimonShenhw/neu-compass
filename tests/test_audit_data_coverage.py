@@ -337,6 +337,8 @@ def test_field_categories_cover_every_in_scope_course(seeded):
     assert cs["catalog_description"] == {"empty_in_usable_snapshot": 1, "no_usable_snapshot": 1, "present": 1}
     assert cs["answer_warnings"] == {"catalog_metadata_conflict": 1, "catalog_retrieval_date_unknown": 1,
                                      "catalog_source_unavailable": 1, "prerequisite_logic_unavailable": 3}
+    # Zero counts are left out here too: no DS course has a usable snapshot without a description.
+    assert fields["by_department"]["DS"]["catalog_description"] == {"no_usable_snapshot": 2, "present": 1}
     assert "categories" not in fields
 
 
@@ -480,12 +482,22 @@ def test_null_ids_name_nothing(tmp_path):
     put_snapshot(conn, None, snapshot("CS 5800", "Algorithms").model_dump_json())
     for program in (None, None, "cs-ms"):
         conn.execute("INSERT INTO programs(program_id, full_name, prefix) VALUES(?, 'n', 'N')", (program,))
+    item = plan("cs-ms-boston-2026-2027-standard", "cs-ms")  # Stored with a NULL plan_id.
+    conn.execute("INSERT INTO program_plans(plan_id, program_id, campus, catalog_year, pathway, concentration, "
+                 "document, content_hash) VALUES(NULL, 'cs-ms', 'boston', '2026-2027', 'standard', '', ?, ?)",
+                 (item.model_dump_json(), plan_hash(item)))
     conn.commit()
     conn.execute("PRAGMA journal_mode=DELETE")
     conn.close()
-    report = audit.build_report(path)
+    # The legacy tables' ID columns are NOT NULL; a NULL there fails the integrity check (see the NOT NULL test).
+    report = audit.build_report(path, details=True)
     courses = section(report, "courses")
     assert (courses["counts"]["in_scope"], courses["counts"]["identity_mismatch"]) == (1, 2)
+    # Only well-formed column values are named: the rows' code, the program with a usable ID; NULLs name nothing.
+    assert listed(report["details"], "courses", "identity_mismatch", "CS") == ["CS 5800", "CS 5800"]
+    assert report["details"]["program_plans"] == {
+        "identity_mismatch": {"items": [], "omitted": 0, "unlisted_malformed": 1},
+        "programs_without_usable_plan": {"items": ["cs-ms"], "omitted": 0, "unlisted_malformed": 0}}
     assert section(report, "catalog_snapshots")["snapshot_rows"] == {
         "denominator": {"snapshot_rows": 1}, "rows_for_courses_in_scope": 0, "rows_for_courses_out_of_scope": 0,
         "orphan_rows": 1, "rows_with_text_not_utf8": 0}
@@ -528,7 +540,6 @@ def test_program_ids_that_look_like_report_keys_are_data(seeded):
     assert section(report, "program_plans")["by_program"]["status"]["by_catalog_year"]["2026-2027"]["usable"] == 1
 
 
-
 def aliased_copy(path, numbers):
     """A copy whose programs table shares the users table's b-tree: every name passes, the pages do not."""
     conn = sqlite3.connect(path)
@@ -567,6 +578,55 @@ def test_a_copy_with_shared_pages_is_refused_before_any_row_is_read(tmp_path):
     assert run_cli("--db-copy", str(path), cwd=tmp_path).returncode == 1
 
 
+def swapped_copy(path, user_ids):
+    """A copy whose programs and users tables trade b-trees: every page is used once and every NOT NULL column of
+    users still has a value, so quick_check passes, but the users table no longer matches its own indexes."""
+    conn = sqlite3.connect(path)
+    conn.executescript((ROOT / "db/init.sql").read_text(encoding="utf-8"))
+    for user_id in user_ids:
+        conn.execute("INSERT INTO users(user_id, email, domain) VALUES(?, ?, 'husky.neu.edu')",
+                     (user_id, f"{user_id}@husky.neu.edu"))
+    conn.execute("DROP TABLE program_required_courses")
+    conn.execute("DROP TABLE programs")
+    conn.execute("CREATE TABLE programs(program_id TEXT, c2, c3, c4, c5, c6, c7)")  # As many columns as users.
+    conn.execute("INSERT INTO programs VALUES('cs-ms', 'a', 'b', 'c', 0, '2026-10-01', 'd')")
+    conn.commit()
+    roots = dict(conn.execute("SELECT name, rootpage FROM sqlite_schema WHERE type='table'").fetchall())
+    version = conn.execute("PRAGMA schema_version").fetchone()[0]
+    conn.execute("PRAGMA writable_schema=ON")
+    conn.execute("UPDATE sqlite_schema SET rootpage=? WHERE name='programs'", (roots["users"],))
+    conn.execute("UPDATE sqlite_schema SET rootpage=? WHERE name='users'", (roots["programs"],))
+    conn.execute(f"PRAGMA schema_version={version + 1}")
+    conn.execute("PRAGMA writable_schema=OFF")
+    conn.commit()
+    conn.execute("PRAGMA journal_mode=DELETE")
+    conn.close()
+    return path
+
+
+def test_a_copy_whose_tables_trade_b_trees_is_refused(tmp_path):
+    user_ids = ["u-alpha-7f3a", "u-beta-7f3a"]  # The ID form the output would name.
+    path = swapped_copy(tmp_path / "swapped.sqlite3", user_ids)
+    check = sqlite3.connect(f"{path.as_uri()}?mode=ro&immutable=1", uri=True)
+    assert check.execute("PRAGMA quick_check(1)").fetchone() == ("ok",)  # Why quick_check is not enough.
+    assert check.execute("PRAGMA integrity_check(1)").fetchone() != ("ok",)
+    assert sorted(row[0] for row in check.execute("SELECT program_id FROM programs")) == user_ids
+    check.close()
+    report = audit.build_report(path, details=True)
+    assert report["database"] == {"status": "failed", "code": "database_integrity_failed"}
+    assert "details" not in report and not any(user_id in json.dumps(report) for user_id in user_ids)
+
+
+@pytest.mark.parametrize("keep", ["half", "all_but_one_page"])
+def test_a_copy_cut_short_fails_the_integrity_check(seeded, keep):
+    data = seeded.read_bytes()
+    seeded.write_bytes(data[: len(data) // 2] if keep == "half" else data[:-4096])
+    report = audit.build_report(seeded)
+    # The check itself finds the file corrupt; a file that is not SQLite at all stays database_error.
+    assert report["database"] == {"status": "failed", "code": "database_integrity_failed"}
+    assert not report["complete"] and "details" not in report
+
+
 def test_numeric_ids_are_counted_never_named(seeded):
     """An ID with no letter (an account number, say) is never printed, even in a well-formed column."""
     number, plan_number = "104729000000000000001", "2026000000000001"
@@ -585,6 +645,8 @@ def test_numeric_ids_are_counted_never_named(seeded):
         values = (number, plan_number, usable_number, course_number)
         assert not [value for value in values if value in json.dumps(report)]
     assert {"code": "CS 5800", "course_id": None} in listed(report["details"], "catalog_snapshots", "absent", "CS")
+    assert listed(report["details"], "courses", "duplicate_codes", "CS") == [{"code": "CS 5800",
+                                                                             "course_ids": ["c-cs5800", None]}]
     legacy = section(report, "legacy_rows")["program_required_courses"]
     assert legacy["rows_with_unlisted_program_id"] == 1
     assert section(report, "program_plans")["counts"]["usable"] == 4
@@ -600,18 +662,34 @@ def test_numeric_ids_are_counted_never_named(seeded):
                                                                            "unlisted_malformed": 2}
 
 
+def test_course_ids_next_to_a_shared_code_are_checked_whole(seeded):
+    """A course ID is named whole or not at all: one that only starts well-formed is not, one of 100 characters is."""
+    long_id, tailed = "c-" + "x" * 98, "c-cs5800-copy <free text>"
+    with writing(seeded) as conn:
+        for course_id in (long_id, tailed):  # Two more CS 5800 records.
+            CourseRepository(conn).insert(Course(course_id=course_id, primary_code="CS 5800",
+                                                 primary_name="Algorithms"), raw_text=SENTINEL)
+    report = audit.build_report(seeded, details=True)
+    assert "free text" not in json.dumps(report)
+    assert listed(report["details"], "courses", "duplicate_codes", "CS") == [
+        {"code": "CS 5800", "course_ids": ["c-cs5800", long_id, None]}]
+    assert listed(report["details"], "catalog_snapshots", "absent", "CS") == [
+        {"code": "CS 5800", "course_id": long_id}, {"code": "CS 5800", "course_id": None}]
+
+
 @pytest.mark.parametrize("value, named", [
     ("cs-ms", True), ("a" * 64, True), ("a" * 65, False), ("-cs-ms", False), ("1234", False), ("CS-MS", False),
-    ("cs ms", False), ("cs-ms\n", False), ("cs-ms <free text>", False)])
+    ("cs ms", False), ("cs-ms\n", False), ("cs-ms <free text>", False), ("2026-msai", True)])
 def test_program_id_form(value, named):
     assert audit._listable_id(value) == (value if named else None)
 
 
 @pytest.mark.parametrize("value, named", [
     ("cs-ms-boston-2026-2027-standard", True), ("a" * 100, True), ("a" * 101, False), ("2026000000000001", False),
-    ("cs-ms-boston-2026-2027-x <free text>", False)])
+    ("cs-ms-boston-2026-2027-x <free text>", False), ("2026-cs-ms-boston", True)])
 def test_plan_id_form(value, named):
     assert bool(audit.PLAN_ID.fullmatch(value)) is named and audit.COURSE_ID is audit.PLAN_ID
+    assert audit._listable_plan_id(value) == (value if named else None)
 
 
 @pytest.mark.parametrize("value, listed", [(" CS 5800 ", "CS 5800"), ("cs5800", "CS 5800"), ("CS 5800 x", None),
@@ -634,6 +712,22 @@ def test_ids_and_editions_that_only_start_well_formed_are_not_named(seeded):
     assert report["details"]["program_plans"]["identity_mismatch"]["unlisted_malformed"] == 1
     assert listed(report["details"], "requisite_documents", "invalid_json", "CS") == [
         {"catalog_year": "unrecognized", "code": "CS 5800"}]
+
+
+def test_only_editions_the_app_accepts_are_named(seeded):
+    """The app accepts YYYY-YYYY with consecutive years only, so any other eight digits stay unnamed."""
+    with writing(seeded) as conn:
+        conn.execute("PRAGMA ignore_check_constraints=ON")
+        put_requisite(conn, "c-gone", "0012-3456", "{not json")  # An orphan row.
+        put_requisite(conn, "c-cs5800", "1234-5678", "{not json")
+    report = audit.build_report(seeded, details=True)
+    assert "0012-3456" not in json.dumps(report) and "1234-5678" not in json.dumps(report)
+    editions = section(report, "requisite_documents")["by_catalog_year"]
+    assert editions["unrecognized"]["unusable"] == 2 and set(editions) == {"2025-2026", "2026-2027", "unrecognized"}
+    assert listed(report["details"], "requisite_documents", "invalid_json", "CS") == [
+        {"catalog_year": "unrecognized", "code": "CS 5800"}]
+    assert [audit._edition(value) for value in ("2026-2027", "2026-2028", "2027-2026", None)] == [
+        "2026-2027", "unrecognized", "unrecognized", "unrecognized"]
 
 
 # Keys whose children are data (departments, editions, program IDs, field and table names) or enumerated
@@ -673,8 +767,17 @@ def walk_names(node, path, rules, found, missing):
 
 def test_every_reported_name_has_a_rule(seeded):
     assert unexplained(audit.build_report(seeded)) == ([], set())
-    modify(seeded, "DROP TABLE course_catalog_sources")
-    missing, _ = unexplained(audit.build_report(seeded))  # Not compared: fewer names, all of them explained.
+
+
+@pytest.mark.parametrize("statements", [
+    ("DROP TABLE course_catalog_sources",),  # Not compared: fewer names, all of them explained.
+    ("DROP TABLE programs",),
+    ("PRAGMA ignore_check_constraints=ON", "INSERT INTO schema_versions(version) VALUES(CAST(x'ff' AS TEXT))",
+     "UPDATE course_catalog_sources SET snapshot=CAST(x'7bff7d' AS TEXT) WHERE course_id='c-cs5800'",
+     "UPDATE program_plans SET document=CAST(x'7bff7d' AS TEXT) WHERE plan_id='ds-ms-boston-2026-2027-standard'")])
+def test_every_name_in_a_partial_or_damaged_report_has_a_rule(seeded, statements):
+    modify(seeded, *statements)
+    missing, _ = unexplained(audit.build_report(seeded))
     assert missing == []
 
 
@@ -686,23 +789,30 @@ def assert_adds_up(report):
     assert sum(courses["status_column"].values()) == total(courses)
     in_scope = courses["in_scope_courses"]
     assert total(in_scope) == courses["counts"]["in_scope"] == sum(in_scope["by_department"].values())
+    sizes = in_scope["by_department"]  # Every per-department block has these departments, of these sizes.
     catalog = sections["catalog_snapshots"]
     rows = catalog["snapshot_rows"]
     assert rows["rows_for_courses_in_scope"] + rows["rows_for_courses_out_of_scope"] + rows["orphan_rows"] == total(rows)
     usable = catalog["usable_snapshots"]
     assert total(usable) == catalog["counts"]["usable"] == usable["retrieval_date_known"] + usable["retrieval_date_unknown"]
-    for item in catalog["by_department"].values():
-        assert sum(value for key, value in item.items() if key != "courses_in_scope") == item["courses_in_scope"]
-    assert sum(item["courses_in_scope"] for item in catalog["by_department"].values()) == total(catalog)
+    assert {name: item["courses_in_scope"] for name, item in catalog["by_department"].items()} == sizes
+    for name, item in catalog["by_department"].items():
+        assert sum(value for key, value in item.items() if key != "courses_in_scope") == sizes[name]
+    for category, count in catalog["counts"].items():
+        assert count == sum(item.get(category, 0) for item in catalog["by_department"].values()), category
     fields = sections["fields"]
     for counts in fields["fields"].values():
         assert sum(counts.values()) == total(fields)
     assert sum(fields["catalog_description"].values()) == total(fields)
-    assert sum(item["courses_in_scope"] for item in fields["by_department"].values()) == total(fields)
+    assert {name: item["courses_in_scope"] for name, item in fields["by_department"].items()} == sizes
     for item in fields["by_department"].values():
         for counts in item["fields"].values():
             assert sum(counts.values()) == item["courses_in_scope"]
         assert sum(item["catalog_description"].values()) == item["courses_in_scope"]
+    for field, counts in fields["fields"].items():
+        per_department = [item["fields"][field] for item in fields["by_department"].values()]
+        for category, count in counts.items():
+            assert count == sum(item.get(category, 0) for item in per_department), (field, category)
     for state in fields["catalog_description"]:
         assert fields["catalog_description"][state] == sum(
             item["catalog_description"].get(state, 0) for item in fields["by_department"].values())
@@ -715,7 +825,8 @@ def assert_adds_up(report):
         for key in ("prerequisite", "corequisite", "description_evidence", "credit_hours_vs_course_credits"):
             assert sum(stats[key].values()) == stats["usable"]
     departments = documents["by_department"].values()
-    assert sum(item["courses_in_scope"] for item in departments) == total(documents["in_scope_courses"])
+    assert {name: item["courses_in_scope"] for name, item in documents["by_department"].items()} == sizes
+    assert sum(sizes.values()) == total(documents["in_scope_courses"])
     for item in departments:
         for stats in item["by_catalog_year"].values():
             for key in ("prerequisite", "corequisite", "credit_hours_vs_course_credits"):
@@ -1160,6 +1271,99 @@ def test_a_bad_snapshot_row_is_found_even_next_to_a_duplicate(seeded):
     assert (counts["usable"], counts["text_not_utf8"], counts["duplicate_rows"]) == (2, 1, 0)
 
 
+def test_a_bad_course_id_is_still_the_key_its_rows_share(seeded):
+    modify(seeded, "PRAGMA ignore_check_constraints=ON",
+           "UPDATE courses SET course_id=CAST(x'632d636166e9' AS TEXT) WHERE course_id='c-invalid'",
+           "INSERT INTO course_catalog_sources(course_id, snapshot) VALUES(CAST(x'632d636166e9' AS TEXT), '{}')")
+    rows = section(audit.build_report(seeded), "catalog_snapshots")["snapshot_rows"]
+    # SQLite compares the bytes, so the row belongs to an excluded course, not to no course.
+    assert (rows["orphan_rows"], rows["rows_for_courses_out_of_scope"], rows["rows_with_text_not_utf8"]) == (1, 2, 1)
+
+
+def test_bad_rows_of_an_excluded_course_are_listed(seeded):
+    modify(seeded, "PRAGMA ignore_check_constraints=ON",
+           "UPDATE course_catalog_sources SET snapshot=CAST(x'7bff7d' AS TEXT) WHERE course_id='synth-0001'",
+           "UPDATE course_requisite_documents SET document=CAST(x'7bff7d' AS TEXT) WHERE course_id='synth-0001'")
+    report = audit.build_report(seeded, details=True)
+    catalog = section(report, "catalog_snapshots")
+    assert catalog["counts"]["text_not_utf8"] == 0 and catalog["snapshot_rows"]["rows_with_text_not_utf8"] == 1
+    # The app still serves the synthetic course, and every batch with it fails: the rows can be found.
+    assert listed(report["details"], "catalog_snapshots", "rows_with_text_not_utf8", "SYN") == ["SYN 1000"]
+    assert listed(report["details"], "requisite_documents", "text_not_utf8", "SYN") == [
+        {"catalog_year": "2026-2027", "code": "SYN 1000"}]
+
+
+def test_an_excluded_course_with_a_free_text_code_names_nothing(seeded):
+    modify(seeded, "PRAGMA ignore_check_constraints=ON",
+           f"UPDATE courses SET primary_code='{SENTINEL}' WHERE course_id='synth-0001'",
+           "UPDATE course_catalog_sources SET snapshot=CAST(x'7bff7d' AS TEXT) WHERE course_id='synth-0001'")
+    report = audit.build_report(seeded, details=True)
+    assert SENTINEL not in json.dumps(report)
+    assert report["details"]["catalog_snapshots"]["rows_with_text_not_utf8"] == {"unlisted_malformed": 1,
+                                                                                 "by_department": {}}
+
+
+def test_blank_catalog_codes_list_nothing(seeded):
+    modify(seeded, "UPDATE course_catalog_sources SET snapshot=json_set(snapshot, '$.prereq_codes', "
+                   "json_array('   ', '')) WHERE course_id='c-cs5200'")
+    report = audit.build_report(seeded, details=True)
+    assert section(report, "catalog_snapshots")["usable_snapshots"]["prereq_codes_listed"] == 1  # CS 5800 only.
+    prereqs = section(report, "fields")["fields"]["prereqs"]
+    assert (prereqs["catalog_only"], prereqs["catalog_lists_none"]) == (0, 1)  # CS 5200's catalog lists nothing.
+    assert listed(report["details"], "fields", "prereqs.catalog_lists_none", "CS") == ["CS 5200"]
+
+
+@pytest.mark.parametrize("statement, block", [
+    # Any read column decides, not only the JSON one, and ahead of the orphan, scope and identity checks.
+    ("UPDATE courses SET status=CAST(x'ff' AS TEXT) WHERE course_id='c-cs5200'", ("courses", "counts")),
+    ("UPDATE course_catalog_sources SET snapshot=CAST(x'7bff7d' AS TEXT) WHERE course_id='c-gone'",
+     ("catalog_snapshots", "snapshot_rows")),
+    ("UPDATE course_requisite_documents SET content_hash=CAST(x'ff' AS TEXT) WHERE course_id='c-cs5200'",
+     ("requisite_documents", "counts")),
+    ("UPDATE course_requisite_documents SET document=CAST(x'7bff7d' AS TEXT) WHERE course_id='c-gone'",
+     ("requisite_documents", "counts")),
+    ("UPDATE program_plans SET campus=CAST(x'ff' AS TEXT) WHERE plan_id='ds-ms-boston-2026-2027-standard'",
+     ("program_plans", "counts")),
+    ("UPDATE program_plans SET document=CAST(x'7bff7d' AS TEXT) WHERE plan_id='gone-ms-boston-2026-2027-standard'",
+     ("program_plans", "counts"))])
+def test_a_bad_value_in_any_read_column_counts_first(seeded, statement, block):
+    modify(seeded, "PRAGMA ignore_check_constraints=ON", statement)
+    name, key = block
+    counts = section(audit.build_report(seeded), name)[key]
+    assert counts["rows_with_text_not_utf8" if key == "snapshot_rows" else "text_not_utf8"] == 1
+
+
+def test_a_bad_row_among_duplicate_course_ids_is_counted_as_not_utf8(seeded):
+    without_keys(seeded, "courses")
+    modify(seeded, "INSERT INTO courses SELECT * FROM courses WHERE course_id='c-info6105'",
+           "UPDATE courses SET primary_name=CAST(x'4e616dff' AS TEXT) WHERE rowid=(SELECT max(rowid) FROM courses)")
+    counts = section(audit.build_report(seeded), "courses")["counts"]
+    assert (counts["in_scope"], counts["duplicate_id"], counts["text_not_utf8"]) == (7, 1, 1)
+
+
+def test_a_bad_requisite_row_next_to_a_duplicate_is_counted_as_not_utf8(seeded):
+    without_keys(seeded, "course_requisite_documents")
+    modify(seeded, "INSERT INTO course_requisite_documents(course_id, catalog_year, document, content_hash) "
+                   "VALUES('c-cs5800', '2026-2027', CAST(x'7bff7d' AS TEXT), 'x')")
+    counts = section(audit.build_report(seeded), "requisite_documents")["counts"]
+    # The course page's query fails on the bad row whether or not the edition has another one.
+    assert (counts["usable"], counts["duplicate_rows"], counts["text_not_utf8"]) == (2, 1, 1)
+
+
+def test_blob_values_are_not_counted_as_not_utf8(seeded):
+    # A BLOB is not TEXT: the app reads it without failing, so it never counts as text that is not UTF-8.
+    modify(seeded, "INSERT INTO schema_versions(version) VALUES(x'ff')",
+           "INSERT INTO program_required_courses(program_id, course_id, requirement_type) "
+           "VALUES(x'ff', 'c-cs5800', 'core')",
+           "INSERT INTO course_prerequisites(course_id, prereq_course_id) VALUES('c-cs5800', x'ff')")
+    report = audit.build_report(seeded)
+    versions = section(report, "schema")["schema_versions"]
+    assert (versions["other_rows"], versions["rows_with_text_not_utf8"]) == (1, 0)
+    legacy = section(report, "legacy_rows")
+    assert legacy["program_required_courses"]["rows_with_text_not_utf8"] == 0
+    assert legacy["course_prerequisites"]["rows_with_text_not_utf8"] == 0
+
+
 def test_undecodable_values_compare_by_their_bytes():
     first, again, other = audit._Undecodable(b"\xfe"), audit._Undecodable(b"\xfe"), audit._Undecodable(b"\xff")
     assert first == again and hash(first) == hash(again) and first != other
@@ -1257,7 +1461,8 @@ def test_missing_categories_agree_with_answer_evidence(seeded):
     (["CS 5800", "CS 5004"], ["CS 5004", "CS 5800"], "catalog_consistent"),
     (["CS 5800"], ["CS 5800", "CS 5004"], "catalog_conflict"),
     (["CS5004"], ["CS 5004"], "catalog_consistent"), (["cs5004", "CS 5800"], ["CS 5004", "CS 5800"], "catalog_consistent"),
-    (["CS 5004", "not a code"], ["CS 5004"], "catalog_conflict")])
+    ([], ["   "], "catalog_lists_none"), (["CS 5800"], ["CS 5800", ""], "catalog_consistent"),
+    (["CS 5004", "not a code"], ["CS 5004"], "catalog_conflict"), (["CS 5800"], ["cs5800"], "catalog_consistent")])
 def test_prerequisite_code_sets(stored, listed, expected):
     course = Course(course_id="c", primary_code="CS 6140", primary_name="Machine Learning", prereqs=stored)
     listed_snapshot = snapshot("CS 6140", "Machine Learning", prereqs=listed)
@@ -1477,7 +1682,8 @@ def test_details_are_off_by_default_and_bounded(seeded):
     assert details["max_codes"] == audit.DEFAULT_MAX_CODES
     assert details["courses"]["invalid_json"] == {"unlisted_malformed": 0,
                                                   "by_department": {"CS": {"items": ["CS 9999"], "omitted": 0}}}
-    assert listed(details, "courses", "duplicate_codes", "DS") == ["DS 5220"]
+    assert listed(details, "courses", "duplicate_codes", "DS") == [{"code": "DS 5220",
+                                                                   "course_ids": ["c-ds5220a", "c-ds5220b"]}]
     assert listed(details, "courses", "identity_mismatch", "CS") == ["CS 9996"]
     assert "SYN 1000" not in json.dumps(details["courses"])  # Synthetic rows are excluded, not gaps.
     assert listed(details, "catalog_snapshots", "identity_mismatch", "AAI") == ["AAI 6600"]
@@ -1512,6 +1718,48 @@ def test_details_are_off_by_default_and_bounded(seeded):
     assert bounded["fields"]["prereqs.missing"]["by_department"] == {
         "AAI": {"items": ["AAI 6600"], "omitted": 0}, "DS": {"items": ["DS 5110"], "omitted": 1},
         "INFO": {"items": ["INFO 6105"], "omitted": 0}}
+
+
+def test_every_list_names_the_record_of_a_shared_code(seeded):
+    with writing(seeded) as conn:
+        for course_id, code, name in (("c-cs5200-copy", "CS 5200", "Database Management Systems"),
+                                      ("c-ds5110-copy", "DS 5110", "Data Management")):
+            CourseRepository(conn).insert(Course(course_id=course_id, primary_code=code, primary_name=name),
+                                          raw_text=SENTINEL)
+    details = audit.build_report(seeded, details=True)["details"]
+    cs5200, ds5110 = {"code": "CS 5200", "course_id": "c-cs5200"}, {"code": "DS 5110", "course_id": "c-ds5110"}
+    assert listed(details, "fields", "catalog_description.empty_in_usable_snapshot", "CS") == [cs5200]
+    assert listed(details, "fields", "field_evidence_value_conflict", "DS") == [ds5110]
+    for key in ("prerequisite_unparsed", "credit_hours_conflict"):
+        assert listed(details, "requisite_documents", key, "CS") == [{**cs5200, "catalog_year": "2026-2027"}]
+
+
+def test_a_code_shared_only_with_an_excluded_course_is_not_shared(seeded):
+    with writing(seeded) as conn:
+        CourseRepository(conn).insert(Course(course_id="synth-0002", primary_code="CS 5800", primary_name="Algorithms",
+                                             source_review_ids=["synthetic_seed_2"]), raw_text=SENTINEL)
+    report = audit.build_report(seeded, details=True)
+    assert section(report, "courses")["in_scope_courses"]["duplicate_code_groups"] == 1  # DS 5220 only.
+    workload = listed(report["details"], "fields", "workload_hours_per_week.missing", "CS")
+    assert workload == ["CS 5200", "CS 5800", "CS 6140"]
+
+
+def test_the_bound_keeps_the_records_of_a_code_together(tmp_path):
+    """Items sort by code: a code two courses share is not pushed behind the plain codes and cut off."""
+    path = tmp_path / "shared.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.executescript((ROOT / "db/init.sql").read_text(encoding="utf-8"))
+    repo = CourseRepository(conn)
+    for course_id, code in (("c-b", "CS 5001"), ("c-a", "CS 5001"), ("c-2", "CS 5002"), ("c-3", "CS 5003"),
+                            ("c-4", "CS 5004")):
+        repo.insert(Course(course_id=course_id, primary_code=code, primary_name=f"Course {code}"))
+    conn.commit()
+    conn.execute("PRAGMA journal_mode=DELETE")
+    conn.close()
+    gaps = audit.build_report(path, details=True, max_codes=3)["details"]["fields"]["credits.missing"]
+    assert gaps["by_department"]["CS"] == {"items": [
+        {"code": "CS 5001", "course_id": "c-a"}, {"code": "CS 5001", "course_id": "c-b"}, "CS 5002"], "omitted": 2}
 
 
 def test_every_department_is_listed_within_the_bound(tmp_path):
@@ -1559,6 +1807,14 @@ def test_value_conflicts_are_listed_without_the_catalog(seeded):
     modify(seeded, "DROP TABLE course_catalog_sources")
     details = audit.build_report(seeded, details=True)["details"]
     assert listed(details, "fields", "field_evidence_value_conflict", "DS") == ["DS 5110"]
+
+
+def test_department_blocks_say_nothing_about_an_uncompared_catalog(seeded):
+    modify(seeded, "DROP TABLE course_catalog_sources")
+    departments = section(audit.build_report(seeded), "fields")["by_department"].values()
+    # An empty catalog_description or answer_warnings would read as "none found".
+    assert all(set(item) == {"courses_in_scope", "fields"} for item in departments)
+    assert not any({"credits", "prereqs"} & set(item["fields"]) for item in departments)
 
 
 @pytest.mark.parametrize("value", [0, audit.MAX_CODES_LIMIT + 1, "5"])
@@ -1687,8 +1943,13 @@ def test_connection_is_one_read_only_snapshot(seeded, monkeypatch):
     connect = sqlite3.connect
     statements, opened = [], []
 
+    class Recording(sqlite3.Connection):
+        def set_progress_handler(self, handler, n):
+            statements.append("<budget handler>")
+            return super().set_progress_handler(handler, n)
+
     def tracked(database, *args, **kwargs):
-        conn = connect(database, *args, **kwargs)
+        conn = connect(database, *args, factory=Recording, **kwargs)
         opened.append((database, kwargs))
         conn.set_trace_callback(statements.append)
         return conn
@@ -1698,13 +1959,39 @@ def test_connection_is_one_read_only_snapshot(seeded, monkeypatch):
     assert audit.build_report(seeded)["complete"] is True
     assert len(opened) == 1 and opened[0][0].endswith("?mode=ro&immutable=1") and opened[0][1]["uri"] is True
     begin = statements.index("BEGIN")
-    assert statements[:4] == ["PRAGMA query_only=ON", "PRAGMA trusted_schema=OFF", "PRAGMA quick_check(1)",
-                              "PRAGMA main.table_list"]
-    assert statements[4:begin] == [f"PRAGMA main.table_xinfo({table})" for table in audit.DATA_TABLES]
+    # The budget is in place before the integrity check, which reads every page of the file.
+    assert statements[:5] == ["PRAGMA query_only=ON", "PRAGMA trusted_schema=OFF", "<budget handler>",
+                              "PRAGMA integrity_check(1)", "PRAGMA main.table_list"]
+    assert statements[5:begin] == [f"PRAGMA main.table_xinfo({table})" for table in audit.DATA_TABLES]
     assert statements.count("BEGIN") == 1 and all(sql.startswith("SELECT ") for sql in statements[begin + 1:])
     # The authorizer was installed after the PRAGMAs and before BEGIN, so it saw no PRAGMA at all.
     assert calls[0][:2] == (sqlite3.SQLITE_TRANSACTION, "BEGIN")
     assert not any(action == sqlite3.SQLITE_PRAGMA for action, *_ in calls)
+
+
+def declare(path, table, sql):
+    """Store another CREATE statement for a table, its rows untouched, as a hand-edited file might have it."""
+    with writing(path) as conn:
+        version = conn.execute("PRAGMA schema_version").fetchone()[0]
+        conn.execute("PRAGMA writable_schema=ON")
+        conn.execute("UPDATE sqlite_schema SET sql=? WHERE type='table' AND name=?", (sql, table))
+        conn.execute(f"PRAGMA schema_version={version + 1}")
+        conn.execute("PRAGMA writable_schema=OFF")
+
+
+def test_a_null_in_a_not_null_column_refuses_the_whole_copy(seeded):
+    """A known limitation: the integrity check reports such a row, so the copy is refused instead of the row being
+    counted. CHECK constraints are not checked: SQLite does not load them for a read-only database, so rows stored
+    past them (the fixture's bad JSON) are counted one by one."""
+    assert audit.build_report(seeded)["complete"] is True
+    conn = sqlite3.connect(seeded)
+    (declared,) = conn.execute("SELECT sql FROM sqlite_schema WHERE name='course_catalog_sources'").fetchone()
+    conn.close()
+    assert declared.count("JSON NOT NULL") == 1
+    declare(seeded, "course_catalog_sources", declared.replace("JSON NOT NULL", "JSON"))
+    modify(seeded, "INSERT INTO course_catalog_sources(course_id, snapshot) VALUES('c-ds5110', NULL)")
+    declare(seeded, "course_catalog_sources", declared)
+    assert audit.build_report(seeded)["database"] == {"status": "failed", "code": "database_integrity_failed"}
 
 
 def test_missing_copy_is_not_created(tmp_path):
@@ -1905,38 +2192,76 @@ sqlite3.connect = traced_connect
 sys.addaudithook(audit)
 sys.path.insert(0, sys.argv[2])
 import scripts.audit_data_coverage as module
-if os.environ.get("AUDIT_GUARD_FAIL_FIELDS"):
+FAULT = os.environ.get("AUDIT_GUARD_FAULT", "")
+
+
+def raising(error):
     def broken(*args, **kwargs):
-        raise ValueError("injected")
-    module.field_category = broken  # The fields section then ends in its unexpected-error branch.
+        raise error
+    return broken
+
+
+# Each fault sends the run down one failure branch, so the guard watches that branch as well.
+if FAULT == "section_error":
+    module.field_category = raising(ValueError("injected"))  # The fields section's unexpected-error branch.
+elif FAULT == "section_sqlite_error":
+    module._Audit.fields = raising(sqlite3.OperationalError("injected"))
+elif FAULT == "row_budget":
+    module.MAX_ROWS = 1
+elif FAULT == "budget_at_open":
+    module.MAX_VM_STEPS, module.PROGRESS_INTERVAL = 0, 1  # The integrity check runs out of steps.
+elif FAULT == "changed":
+    module.Inputs.unchanged = raising(module.PreflightError("inputs_changed"))
+elif FAULT == "crash":
+    module.build_report = raising(ValueError("injected"))
 raise SystemExit(module.cli(sys.argv[3:]))
 '''
 
 
-@pytest.mark.parametrize("scenario, arguments, exit_code", [
-    ("checked", ["--details"], 0),
-    ("table_missing", ["--details"], 2),  # The not_checked branches of require() and of unavailable().
-    ("section_failed", ["--details"], 2),
-    ("bad_arguments", ["--max-codes", "0"], 1)])
+@pytest.mark.parametrize("scenario, arguments, exit_code, expected", [
+    ("checked", ["--details"], 0, None),
+    ("table_missing", ["--details"], 2, None),  # The not_checked branches of require() and of unavailable().
+    ("section_error", ["--details"], 2, ("fields", "section_failed")),
+    ("section_sqlite_error", ["--details"], 2, ("fields", "database_error")),
+    ("row_budget", ["--details"], 2, ("courses", "row_budget")),
+    ("integrity_failed", ["--details"], 1, "database_integrity_failed"),
+    ("not_a_database", [], 1, "database_error"),
+    ("budget_at_open", [], 1, "sqlite_budget"),
+    ("changed", ["--details"], 1, "inputs_changed_during_check"),
+    ("sidecar", [], 1, "offline_copy_sidecars_present"),
+    ("copy_missing", [], 1, "database_copy_missing"),
+    ("crash", [], 1, "audit_failed"),
+    ("bad_arguments", ["--max-codes", "0"], 1, "invalid_arguments")])
 def test_fresh_process_has_no_config_env_network_subprocess_or_writes(seeded, tmp_path, scenario, arguments,
-                                                                     exit_code):
+                                                                     exit_code, expected):
+    """Every branch, the refusals and failures too, runs without config, .env, network, subprocesses or writes."""
+    copy = seeded
     if scenario == "table_missing":
         modify(seeded, "DROP TABLE programs")
-    expected = seeded.resolve().as_uri() + "?mode=ro&immutable=1"
+    elif scenario == "integrity_failed":
+        copy = aliased_copy(tmp_path / "aliased.sqlite3", ["104729000000000000001"])
+    elif scenario == "not_a_database":
+        seeded.write_bytes(b"not a database " * 300)
+    elif scenario == "sidecar":
+        Path(f"{seeded}-journal").write_bytes(b"synthetic sidecar")
+    elif scenario == "copy_missing":
+        copy = tmp_path / "absent.sqlite3"
+    uri = copy.resolve().as_uri() + "?mode=ro&immutable=1"
     before = snapshot_dir(tmp_path)
-    environment = {**os.environ, "AUDIT_GUARD_FAIL_FIELDS": "1" if scenario == "section_failed" else ""}
-    run = subprocess.run([sys.executable, "-B", "-c", GUARD, expected, str(ROOT), "--db-copy", str(seeded),
-                          *arguments], cwd=tmp_path, text=True, capture_output=True, timeout=120, env=environment)
+    environment = {**os.environ, "AUDIT_GUARD_FAULT": scenario}
+    run = subprocess.run([sys.executable, "-B", "-c", GUARD, uri, str(ROOT), "--db-copy", str(copy), *arguments],
+                         cwd=tmp_path, text=True, capture_output=True, timeout=120, env=environment)
     assert run.returncode == exit_code, run.stderr[-2000:]
     assert run.stderr == ""  # A blocked action writes here even when the code catches the error.
     report = json.loads(run.stdout)
     assert SENTINEL not in run.stdout and snapshot_dir(tmp_path) == before
     if scenario == "checked":
         assert report["complete"] is True
-    elif scenario == "section_failed":
-        assert report["sections"]["fields"] == {"status": "failed", "code": "section_failed"}
-    elif scenario == "bad_arguments":
-        assert report["code"] == "invalid_arguments"
+    elif isinstance(expected, tuple):
+        name, code = expected
+        assert report["sections"][name] == {"status": "failed", "code": code}
+    elif expected is not None:
+        assert (report["database"]["code"] if "database" in report else report["code"]) == expected
 
 
 def test_the_guard_sees_actions_the_code_swallows(seeded, tmp_path):

@@ -1,9 +1,10 @@
 """Read-only data coverage, conflict and source report over an explicit offline SQLite copy.
 
-Answers "which course and which field to fill next" with counts, not a single course total. Every
-block of counts names its denominator, and every name a section reports has a one-line rule in
-that section's `rules`. The categories under `counts`, and the per-field categories, are exclusive
-and add up to their denominator; a rule says "not exclusive" where counts overlap. A section, or a
+Answers "which course and which field to fill next" with counts, not a single course total. Each
+section and its main blocks of counts name their denominator (the rules give those of the per-department,
+per-edition and per-program groups), and every name a section reports has a one-line rule in that
+section's `rules`. The categories under `counts`, and the per-field categories, are exclusive and add
+up to their denominator; a rule says "not exclusive" where counts overlap. A section, or a
 part of one, whose table is missing or unreadable (or whose input section could not be checked) is
 "not_checked" with a code, so a check that did not run never reads as "checked, nothing found", and
 `complete` is true only when no part anywhere is not_checked or failed. Default output is aggregate
@@ -11,35 +12,38 @@ counts only; --details adds lists of course codes (bounded per department) and p
 
 The copy is opened like release_preflight.py opens it: an existing local file without -wal/-shm/
 -journal sidecars, mode=ro&immutable=1, query_only, trusted_schema=OFF, a time/VM-step budget, one
-BEGIN snapshot, and a fingerprint compared before and after. Before any row is read, quick_check
-refuses a damaged file (one whose b-tree pages are shared between tables could otherwise show another
-table's bytes under an allowed name), and PRAGMA table_list/table_xinfo say which data tables are
-ordinary tables whose read columns are stored columns; views, virtual tables and generated columns are
-never read. A SQLite authorizer then allows only the listed columns of the course, catalog, requisite
-and program tables and denies everything else, including SQL functions, PRAGMAs and reads through views
-or triggers. These checks work on names: user tables (users, query_log, Co-op, chat answers, feedback)
-and courses.raw_text are never read, but values someone copied into an allowed column are read like
-any other, so the output itself names only counts, fixed strings and well-formed codes, IDs and
-editions. No writes, no network,
-no Settings/.env. Unknown catalog retrieval dates stay unknown; a hash or a source_checked review is
-never counted as officially correct or currently applicable, and a partial plan is never counted as
-complete.
+BEGIN snapshot, and a fingerprint compared before and after. Before any row is read, integrity_check
+refuses a damaged file (pages shared between tables, a table whose b-tree disagrees with its indexes, a
+file cut short), which could otherwise show another table's bytes under an allowed name, and PRAGMA
+table_list/table_xinfo say which data tables are ordinary tables whose read columns are stored columns;
+views, virtual tables and generated columns are never read. A SQLite authorizer then allows only the
+listed columns of the course, catalog, requisite and program tables and denies everything else, including
+SQL functions, PRAGMAs and reads through views or triggers. These checks work on names: user tables
+(users, query_log, Co-op, chat answers, feedback) and courses.raw_text are never queried (only the
+integrity check reads their pages, and it prints nothing), but values someone copied into an allowed
+column, or a file rebuilt consistently with other data under allowed names, are read like any other, so
+the output itself names only counts, fixed strings, well-formed codes, IDs and editions, and dates of
+validated records. No writes, no network, no Settings/.env. Unknown catalog retrieval dates stay
+unknown; a hash or a source_checked review is never counted as officially correct or currently
+applicable, and a partial plan is never counted as complete.
 
 中文：对显式给出的离线 SQLite 副本做只读的数据覆盖、冲突与来源报告，回答「下一批补哪门课、
-哪个字段」。每一组计数都写明分母，每一节报告的每个名字都在该节的 rules 里附一句规则；counts
-下的类别和各字段的类别互斥、相加等于分母，计数有重叠时规则里写明「不互斥」。表不存在或不能
-读（或依赖的上一节没查成）时，该节或该部分是 not_checked 并带原因码，不会把「没查」写成「查了、
-没问题」；任何一处 not_checked 或 failed，complete 都是 false。默认只输出汇总计数；--details
-才附上课程代码（按院系各自限量）和方案 ID。打开方式与 release_preflight.py 相同：已存在、无旁
-文件的本地副本，mode=ro&immutable=1、query_only、trusted_schema=OFF、执行预算、一次 BEGIN 快照，
-前后核对文件指纹。读任何一行之前，quick_check 拒绝损坏的文件（b-tree 页被几张表共用的文件，否则可能
-以允许的名字读到别的表的字节），再用 PRAGMA table_list/table_xinfo 确认要读的表是普通表、要读的列
-是存储列；视图、虚拟表、生成列一概不读。之后 SQLite 授权回调只允许读列出的课程、目录、先修和培养
-方案表的指定列，其余一律拒绝，包括 SQL 函数、PRAGMA 和经由视图/触发器的读取。这些检查都按名字：
-用户表（users、query_log、Co-op、聊天回答、反馈）和 courses.raw_text 从不读取，但有人抄进允许的列里
-的值照样会读到，所以输出本身只有计数、固定文字和格式合格的代码、ID、年度。不写入、不联网、不读
-Settings/.env。抓取日期未知就写未知；hash 或 source_checked 不算官方正确或当前适用；partial
-方案不算完整。
+哪个字段」。每一节和主要的计数块都写明分母（按院系、年度、项目的分组，分母见规则），每一节报告的
+每个名字都在该节的 rules 里附一句规则；counts 下的类别和各字段的类别互斥、相加等于分母，计数有
+重叠时规则里写明「不互斥」。表不存在或不能读（或依赖的上一节没查成）时，该节或该部分是
+not_checked 并带原因码，不会把「没查」写成「查了、没问题」；任何一处 not_checked 或 failed，
+complete 都是 false。默认只输出汇总计数；--details 才附上课程代码（按院系各自限量）和方案 ID。
+打开方式与 release_preflight.py 相同：已存在、无旁文件的本地副本，mode=ro&immutable=1、query_only、
+trusted_schema=OFF、执行预算、一次 BEGIN 快照，前后核对文件指纹。读任何一行之前，integrity_check
+拒绝损坏的文件（页被几张表共用、表的 b-tree 和自己的索引对不上、文件被截断；否则可能以允许的名字
+读到别的表的字节），再用 PRAGMA table_list/table_xinfo 确认要读的表是普通表、要读的列是存储列；
+视图、虚拟表、生成列一概不读。之后 SQLite 授权回调只允许读列出的课程、目录、先修和培养方案表的
+指定列，其余一律拒绝，包括 SQL 函数、PRAGMA 和经由视图/触发器的读取。这些检查都按名字：用户表
+（users、query_log、Co-op、聊天回答、反馈）和 courses.raw_text 从不查询（只有完整性检查会读到它们
+的页，什么都不输出），但有人抄进允许的列里的值，或者把别的数据一致地重建在允许名字下的文件，照样会
+读到，所以输出本身只有计数、固定文字、格式合格的代码、ID、年度，以及校验过的记录里的日期。不写入、
+不联网、不读 Settings/.env。抓取日期未知就写未知；hash 或 source_checked 不算官方正确或当前适用；
+partial 方案不算完整。
 """
 
 from __future__ import annotations
@@ -161,7 +165,8 @@ RULES = {
         "rows_with_text_not_utf8": _ROWS_NOT_UTF8,
     },
     "courses": {
-        "text_not_utf8": _NOT_UTF8,
+        "text_not_utf8": f"{_NOT_UTF8}. The app answers from generated_json alone, so with the bad value in another "
+                         "column (primary_name, status) it may still serve the course that the report excludes",
         "duplicate_id": "the course_id is shared with another row (possible only without the table's primary key); "
                         "none of these rows is used, while the app's lookups by ID and in batches may each pick a "
                         "different one",
@@ -176,8 +181,9 @@ RULES = {
         "course_rows": "every row of courses: the denominator of counts and status_column",
         "in_scope_courses": "the in-scope courses",
         "courses_in_scope": "in-scope courses (the in_scope count)",
-        "duplicate_code_groups": "course codes that more than one in-scope course has; --details lists those courses "
-                                 "with their course_id wherever it lists the code",
+        "duplicate_code_groups": "course codes that more than one in-scope course has; --details lists each such code "
+                                 "with the course_ids that share it (null for an ID not fit to print), and gives each "
+                                 "of those courses its course_id wherever it lists the course",
         "duplicate_code_rows": "in-scope courses whose code another in-scope course also has (not exclusive)",
         "by_department": "in-scope courses per department (the subject prefix of the code)",
         "status_column": "course rows by their status column: pending, indexed, failed or other; adds up to "
@@ -185,7 +191,8 @@ RULES = {
     },
     "catalog_snapshots": {
         "usable": "exactly one snapshot row, accepted by the CatalogSnapshot model, whose code and title equal the "
-                  "course's: the rules under which the answer path attaches it",
+                  "course's: the answer path attaches such a snapshot (it may also attach one the report does not use: "
+                  "see duplicate_rows and oversize)",
         "absent": "no snapshot row for the course",
         "text_not_utf8": "a snapshot row of the course holds TEXT that is not valid UTF-8: the app's catalog query "
                          "for any batch that includes the course fails as a whole, so fix these first; decided "
@@ -201,7 +208,9 @@ RULES = {
         "rows_for_courses_in_scope": "rows whose course_id is an in-scope course: the rows the per-course counts use",
         "rows_for_courses_out_of_scope": "rows whose course_id is in courses but excluded from scope",
         "orphan_rows": "rows whose course_id is not a course_id in courses (NULL and non-text values included)",
-        "rows_with_text_not_utf8": _ROWS_NOT_UTF8,
+        "rows_with_text_not_utf8": f"{_ROWS_NOT_UTF8}. The app's catalog query fails for any batch with that course, "
+                                   "in scope or not (an excluded course such as a synthetic one is still served), so "
+                                   "--details lists each of these rows by its course's code",
         "usable_snapshots": "the usable snapshots",
         "retrieval_date_known": "usable snapshots with retrieved_at",
         "retrieval_date_unknown": "usable snapshots without retrieved_at; import time is never used instead",
@@ -209,7 +218,7 @@ RULES = {
         "description_missing": "usable snapshots without description text (not exclusive)",
         "credits_missing": "usable snapshots without a whole-number credit value: the catalog lists none, a range or "
                            "a fraction (not exclusive)",
-        "prereq_codes_listed": "usable snapshots that list at least one prerequisite code (not exclusive)",
+        "prereq_codes_listed": "usable snapshots that list at least one non-blank prerequisite code (not exclusive)",
         "by_department": "per department: courses_in_scope and the categories above, zero counts omitted",
         "courses_in_scope": "in-scope courses (of the department, under by_department)",
     },
@@ -217,12 +226,15 @@ RULES = {
         "catalog_only": "no stored value, and the usable catalog snapshot has one (credits, prereqs): can be filled "
                         "from the catalog",
         "catalog_lists_none": "no stored value, and the usable catalog snapshot was compared and has none either "
-                              "(credits: no whole-number value, such as a range; prereqs: no codes listed)",
+                              "(credits: no whole-number value, such as a range; prereqs: no non-blank code "
+                              "listed)",
         "catalog_conflict": "stored value differs from the usable catalog snapshot (credits, when the snapshot has a "
-                            "value: the answer path's catalog_metadata_conflict; prereq code sets, each code compared "
-                            "in its normalized form: the report's own comparison, with no answer-path warning)",
+                            "value: the answer path's catalog_metadata_conflict; prereq code sets, each code in its "
+                            "normalized form: the report's own comparison, with no answer-path warning). A normalized "
+                            "code is a well-formed one as the app's pattern reads it, anything else upper-cased with "
+                            "whitespace collapsed; blank entries are dropped",
         "catalog_consistent": "stored value equals the usable catalog snapshot (credits; prereq code sets, each code "
-                              "compared in its normalized form)",
+                              "in its normalized form, as for catalog_conflict)",
         "missing": "no stored value (None or empty list; 0 counts as a value); for credits and prereqs also no "
                    "usable catalog snapshot to compare",
         "extracted_estimate": "stored value with an evidence snippet for the field: extracted, not official",
@@ -239,12 +251,15 @@ RULES = {
         "catalog_comparison": "whether credits and prereqs were compared with the catalog (that needs a checked "
                               "catalog_snapshots section)",
         "catalog_description": "in-scope courses by catalog description; empty_in_usable_snapshot and "
-                               "no_usable_snapshot together are the answer path's missing catalog_description",
+                               "no_usable_snapshot together are the answer path's missing catalog_description when it "
+                               "attaches the report's usable snapshot (it may attach a duplicate or oversize one)",
         "present": "the usable snapshot has description text",
         "empty_in_usable_snapshot": "a usable snapshot without description text",
         "no_usable_snapshot": "no usable catalog snapshot",
-        "answer_warnings": "in-scope courses per warning that course_answer_evidence gives them with their usable "
-                           "snapshot; a course can have several (not exclusive)",
+        "answer_warnings": "in-scope courses per warning that course_answer_evidence gives them with the report's "
+                           "usable snapshot (the app may attach a duplicate or oversize one); program_seed_unverified, "
+                           "which depends on how the course was reached, is not counted; a course can have several "
+                           "(not exclusive)",
     },
     "requisite_documents": {
         "text_not_utf8": _NOT_UTF8,
@@ -262,7 +277,8 @@ RULES = {
         "course_identity_mismatch": "document code or title differs from the course's",
         "content_hash_mismatch": "stored content hash differs from the document's",
         "document_rows": "every row of course_requisite_documents: the denominator of counts",
-        "by_catalog_year": "per edition of the row (catalog_year; a value that is not YYYY-YYYY is 'unrecognized'): "
+        "by_catalog_year": "per edition of the row (catalog_year; a value that is not YYYY-YYYY with consecutive "
+                           "years, as the app requires, is 'unrecognized'): "
                            "usable and unusable rows, which add up to the edition's rows, and statistics over its "
                            "usable documents",
         "unusable": "rows of the edition in any category other than usable",
@@ -303,8 +319,9 @@ RULES = {
         "content_hash_mismatch": "stored content hash differs from the document's",
         "duplicate_scope_or_id": "rows that would be usable but share a scope or plan ID (possible only without the "
                                  "table's keys); the report uses none. list_for_program would list each; "
-                                 "course_context drops drafts and plans that do not name the course before its own "
-                                 "duplicate check, so it can still show a source_checked plan whose twin is a draft",
+                                 "course_context reads one catalog year at a time and drops drafts and plans that do "
+                                 "not name the course before its own duplicate check, so it can still show a "
+                                 "source_checked plan whose twin is a draft or in another year",
         "plan_rows": "every row of program_plans: the denominator of counts",
         "usable_plans": "the usable plans",
         "coverage": "usable plans by coverage: partial or complete",
@@ -459,12 +476,21 @@ def _listable_plan_id(value) -> str | None:
     return value if isinstance(value, str) and PLAN_ID.fullmatch(value) else None
 
 
+def _edition(value) -> str:
+    """A requisite row's edition as the app accepts one (YYYY-YYYY, consecutive years), else 'unrecognized'."""
+    if isinstance(value, str) and EDITION.fullmatch(value) and int(value[5:]) == int(value[:4]) + 1:
+        return value
+    return "unrecognized"
+
+
 def _codes(values) -> set[str]:
-    # A well-formed code in its normalized form ("cs5004" is "CS 5004", as the app's code pattern reads it);
-    # anything else as written, so it still differs from every real code.
-    # 中文：合格的课程代码按规范形式比较（"cs5004" 就是 "CS 5004"，和应用的代码模式一致）；其他值照原样，
-    # 所以仍然不等于任何真实代码。
-    return {_listable_code(value) or " ".join(str(value).split()).upper() for value in values}
+    # A well-formed code in its normalized form ("cs5004" is "CS 5004", as the app's code pattern reads it); anything
+    # else upper-cased with its whitespace collapsed (so "cs  5800" is "CS 5800" too); a blank entry lists nothing.
+    # 中文：合格的课程代码按规范形式比较（"cs5004" 就是 "CS 5004"，和应用的代码模式一致）；其他值转成大写、去掉
+    # 多余空白后比较（所以 "cs  5800" 也是 "CS 5800"）；空白项不算列出的代码。
+    codes = {_listable_code(value) or " ".join(str(value).split()).upper() for value in values}
+    codes.discard("")
+    return codes
 
 
 def field_category(course: Course, field: str, snapshot: CatalogSnapshot | None) -> str:
@@ -570,12 +596,22 @@ def _prepare(conn: sqlite3.Connection, reads: _Reads, budget: dict) -> dict[str,
         return int(budget["exceeded"])
 
     conn.set_progress_handler(bounded, PROGRESS_INTERVAL)
-    # The authorizer and the layout check names only. A damaged or crafted file whose b-tree pages are shared
-    # (a data table's root page pointing into a user table, say) passes both and would read other tables'
-    # bytes under allowed names; quick_check finds such pages, as release_preflight's integrity check does.
-    # 中文：授权回调和表结构检查都只看名字。b-tree 页被共用的损坏或伪造文件（比如数据表的根页指向用户表）
-    # 两关都能过，会以允许的名字读到别的表的字节；quick_check 能查出这类页，和发布预检的完整性检查一样。
-    check = conn.execute("PRAGMA quick_check(1)").fetchone()
+    # The authorizer and the layout check names only. A damaged file whose tables share pages, or whose table
+    # b-trees were swapped (a data table's root page pointing at a user table's b-tree, say), passes both and
+    # would read other tables' bytes under allowed names. integrity_check finds shared pages, tables that
+    # disagree with their indexes, and a file cut short (the check itself then fails as corrupt); quick_check,
+    # which release_preflight runs, does not compare indexes with their tables, so it misses a swap. A file
+    # rebuilt consistently passes any check: the output filter stays the boundary.
+    # 中文：授权回调和表结构检查都只看名字。页被几张表共用、或者表的 b-tree 被换过（比如数据表的根页指向用户表
+    # 的 b-tree）的损坏文件两关都能过，会以允许的名字读到别的表的字节。integrity_check 能查出共用的页、和索引
+    # 对不上的表，以及被截断的文件（这时检查本身报文件损坏）；发布预检用的 quick_check 不核对索引内容，查不出
+    # 互换。一致地重建过的文件任何检查都能过，所以最后一道边界仍是输出过滤。
+    try:
+        check = conn.execute("PRAGMA integrity_check(1)").fetchone()
+    except sqlite3.DatabaseError as exc:
+        if (getattr(exc, "sqlite_errorcode", None) or 0) & 0xFF == sqlite3.SQLITE_CORRUPT:
+            raise PreflightError("database_integrity_failed") from None
+        raise  # Not a database at all, or the budget ran out: build_report says which.
     if check is None or tuple(check) != ("ok",):
         raise PreflightError("database_integrity_failed")
     layout = _layout(conn)
@@ -590,7 +626,8 @@ class _Audit:
         self.sections: dict[str, dict] = {}
         self.details: dict[str, dict] = defaultdict(dict)
         self.scope: dict[str, Course] = {}  # In-scope courses by course_id.
-        self.known_ids: set[str] = set()  # Every text course_id in courses, decodable or not.
+        self.known_ids: set = set()  # Every TEXT course_id in courses, decodable or not.
+        self.row_codes: dict[str, str | None] = {}  # Readable course_id -> its row's listable code, in scope or not.
         self.snapshots: dict[str, CatalogSnapshot] = {}  # Usable snapshots by course_id.
         self.documents: dict[str, set[str]] = defaultdict(set)  # course_id -> editions with a usable document.
         self.program_values: list | None = None  # Every program_id value in programs, once read.
@@ -654,6 +691,11 @@ class _Audit:
             extra["course_id"] = course.course_id if COURSE_ID.fullmatch(course.course_id) else None
         return {"code": course.primary_code, **extra} if extra else course.primary_code
 
+    def row_item(self, course_id, **extra):
+        """A --details item for a row whose course is out of scope: that course's own code column, if listable."""
+        code = self.row_codes.get(course_id) if isinstance(course_id, str) else None
+        return None if code is None else ({"code": code, **extra} if extra else code)
+
     # --- sections -------------------------------------------------------------------------------
 
     def schema(self):
@@ -677,8 +719,13 @@ class _Audit:
     def courses(self):
         self.require("courses")
         rows = self.rows("SELECT course_id, primary_code, primary_name, status, generated_json FROM courses")
-        ids = Counter(row["course_id"] for row in rows if isinstance(row["course_id"], str))
-        self.known_ids = set(ids)  # Text IDs only: a NULL or non-text key names no course.
+        ids = Counter(row["course_id"] for row in rows if isinstance(row["course_id"], (str, _Undecodable)))
+        self.known_ids = set(ids)  # TEXT IDs, valid UTF-8 or not (by their bytes); a NULL or a number names no course.
+        # Each readable ID's own listable code, for --details items of rows whose course is out of scope.
+        self.row_codes = {}
+        for row in rows:
+            if isinstance(row["course_id"], str):
+                self.row_codes.setdefault(row["course_id"], _listable_code(row["primary_code"]))
         counts, statuses, departments = Counter(), Counter(), Counter()
         for row in rows:
             statuses[row["status"] if row["status"] in COURSE_STATUSES else "other"] += 1
@@ -706,7 +753,12 @@ class _Audit:
         duplicates = {code: count for code, count in codes.items() if count > 1}
         self.duplicate_codes = set(duplicates)
         for code in duplicates:
-            self.note("courses", "duplicate_codes", code)
+            # The courses that share the code, so the reader can tell which records to fix; null for an ID not fit
+            # to print (listed last).
+            ids = [course.course_id for course in self.scope.values() if course.primary_code == code]
+            shown = sorted(value for value in ids if COURSE_ID.fullmatch(value))
+            self.note("courses", "duplicate_codes",
+                      {"code": code, "course_ids": shown + [None] * (len(ids) - len(shown))})
         return {
             "denominator": {"course_rows": len(rows)},
             "counts": _all(COURSE_CATEGORIES, counts),
@@ -724,7 +776,12 @@ class _Audit:
         rows = self.rows("SELECT course_id, snapshot FROM course_catalog_sources")
         per_course, row_counts = defaultdict(list), Counter()
         for row in rows:
-            row_counts["rows_with_text_not_utf8"] += _undecodable(row)
+            if _undecodable(row):
+                # Any batch with this course fails in the app, in scope or not (a synthetic course is still served).
+                row_counts["rows_with_text_not_utf8"] += 1
+                course = self.scope.get(row["course_id"])
+                self.note("catalog_snapshots", "rows_with_text_not_utf8",
+                          self.item(course) if course else self.row_item(row["course_id"]))
             if row["course_id"] not in self.known_ids:
                 row_counts["orphan_rows"] += 1
             elif row["course_id"] not in self.scope:
@@ -769,7 +826,7 @@ class _Audit:
                 "retrieved_on": _day_range(value.date().isoformat() for value in known),
                 "description_missing": sum(not snapshot.description for snapshot in usable),
                 "credits_missing": sum(snapshot.credits is None for snapshot in usable),
-                "prereq_codes_listed": sum(bool(snapshot.prereq_codes) for snapshot in usable),
+                "prereq_codes_listed": sum(bool(_codes(snapshot.prereq_codes)) for snapshot in usable),
             },
             "by_department": {name: {"courses_in_scope": sum(counter.values()), **_nonzero(counter)}
                               for name, counter in sorted(departments.items())},
@@ -793,7 +850,7 @@ class _Audit:
             if "field_evidence_value_conflict" in evidence.warnings:  # Independent of the catalog.
                 self.note("fields", "field_evidence_value_conflict", self.item(course))
             if compared:
-                # The same warnings the chat prompt and the course page get for this course.
+                # What course_answer_evidence gives with the report's usable snapshot; the rule says where chat differs.
                 warnings.update(set(evidence.warnings))
                 department_warnings[department].update(set(evidence.warnings))
                 state = ("no_usable_snapshot" if snapshot is None else
@@ -848,8 +905,7 @@ class _Audit:
                      "credit_hours_vs_course_credits": Counter()})})
         for row in rows:
             course_id = row["course_id"]
-            edition = row["catalog_year"] if isinstance(row["catalog_year"], str) and EDITION.fullmatch(
-                row["catalog_year"]) else "unrecognized"
+            edition = _edition(row["catalog_year"])
             document = None
             if _undecodable(row):
                 category = "text_not_utf8"
@@ -876,6 +932,8 @@ class _Audit:
                 editions[edition]["unusable"] += 1
                 if course_id in self.scope:
                     self.note("requisite_documents", category, self.item(self.scope[course_id], catalog_year=edition))
+                elif category == "text_not_utf8":  # The course page of an excluded course fails as well.
+                    self.note("requisite_documents", category, self.row_item(course_id, catalog_year=edition))
                 continue
             course = self.scope[course_id]
             stats = editions[edition]
@@ -1064,14 +1122,21 @@ def _capped(items: list, limit: int) -> dict:
     return {"items": items[:limit], "omitted": max(len(items) - limit, 0)}
 
 
+def _order(item) -> tuple:
+    """Sort key of a --details item: its course code first, so the records of one code stay together and a bound
+    favours neither form of item (a plain code, or one with its course_id); then the whole item (edition, course_id)."""
+    if isinstance(item, str):
+        return item, ""
+    return item.get("code") or "", json.dumps(item, sort_keys=True)
+
+
 def _bounded(details: dict, limit: int) -> dict:
-    """Sorted, bounded --details lists; course items are listed per department, each department up to the limit."""
+    """Bounded --details lists in _order; course items are listed per department, each department up to the limit."""
     output = {}
     for section, groups in sorted(details.items()):
         output[section] = {}
         for key, items in sorted(groups.items()):
-            listed = sorted((item for item in items if item is not None),
-                            key=lambda item: json.dumps(item, sort_keys=True))
+            listed = sorted((item for item in items if item is not None), key=_order)
             entry = {"unlisted_malformed": len(items) - len(listed)}
             if section in COURSE_DETAIL_SECTIONS:
                 departments = defaultdict(list)
