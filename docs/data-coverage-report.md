@@ -1,6 +1,6 @@
 # OPT-03 — 数据覆盖、冲突与来源报告
 
-2026-10-08 本地实现，10-09／10 按三轮审查修订；变更、审查与测试结果记在 [开发修改记录](development-change-log.md) 第 17 节。只新增一个离线脚本 `scripts/audit_data_coverage.py`，API、界面、数据库和部署都不变。
+2026-10-08 本地实现，10-09／10 按三轮审查修订；变更、审查与测试结果记在 [开发修改记录](development-change-log.md) 第 17 节。第 18 批（提示词 4.4）让字段类别和回答警告也用上年度先修规则，和聊天一致，见第 18 节。只新增一个离线脚本 `scripts/audit_data_coverage.py`，API、界面、数据库和部署都不变。
 
 这份报告回答「下一批到底补哪门课、哪个字段」：不只给课程总数，而是按院系、按字段列出缺什么、和目录冲突的是哪些、来源是什么，先修文档和培养方案按年度／范围统计。
 
@@ -49,7 +49,7 @@
 每一节、节里能单独没查成的部分，都有 `status`：
 
 - `checked`：查过了。计数是 0 就是「查了、没有这一类」。
-- `not_checked`：没查，`code` 说明原因：`table_missing`（表不存在）、`table_not_plain`（同名对象是视图、虚拟表，或要读的列是生成列）、`column_missing`、`courses_not_checked`（依赖的课程一节没查成）、`catalog_snapshots_not_checked`（目录快照一节没查成，学分和先修代码因此没法和目录比）、`database_unavailable`（副本没读成）。
+- `not_checked`：没查，`code` 说明原因：`table_missing`（表不存在）、`table_not_plain`（同名对象是视图、虚拟表，或要读的列是生成列）、`column_missing`、`courses_not_checked`（依赖的课程一节没查成）、`catalog_snapshots_not_checked`（目录快照一节没查成，学分和先修代码因此没法和目录比）、`requisite_documents_not_checked`（先修文档一节没查成，先修字段和回答警告因此没法定）、`database_unavailable`（副本没读成）。
 - `failed`：查的时候失败，只给固定的原因码：`row_budget`（单表超过 20 万行，不截断）、`sqlite_budget`、`read_outside_allowlist`（副本的结构让查询碰到了允许范围以外的列）、`database_error`、`section_failed`。
 
 `complete` 只有在任何一节、任何一部分都是 `checked` 时才为 true；某一节里有一部分 `not_checked`（比如 `programs` 表不在，`legacy_rows` 的按项目统计就没查），`complete` 也是 false，退出码 2。
@@ -91,6 +91,7 @@
 
 | 类别 | 规则 |
 |---|---|
+| `year_rules` | 只用于先修：这门课有可用的年度先修文档，回答路径给出那一年的规则，不用存储的代码列表，所以先修既不算缺失，也不和目录比；最先判断 |
 | `catalog_only` | 课程记录没有值，可用快照有（学分、先修代码）：可以直接从目录补 |
 | `catalog_lists_none` | 课程记录没有值，可用快照比过了也没有（学分：目录写的是范围、小数或没写；先修：目录没列先修代码）：目录里没有可补的 |
 | `catalog_conflict` | 课程记录的值和可用快照不同（学分：快照有整数学分时；先修代码按集合比，快照一个都没列而记录有也算） |
@@ -100,11 +101,11 @@
 | `course_sources_only` | 有值，没有这个字段的证据，但课程记录了来源 ID；这些 ID 不说明支撑哪个字段 |
 | `no_recorded_source` | 有值，没有字段证据、没有来源 ID、也没和目录比过 |
 
-有可用快照时先和目录比：学分只在快照有整数学分时才比，先修代码集合即使快照一个都没列也比；之后看字段证据，最后看来源 ID。先修代码按规范形式比较：合格的代码规整成 `CS 5004` 这样（`cs5004` 和 `CS 5004` 是同一个），其他值转成大写、去掉多余空白后比较（所以 `cs  5800` 也等于 `CS 5800`）；空白项不算列出的代码。所以只差空格或大小写不算冲突。`missing`、`catalog_only`、`catalog_lists_none` 加起来正好是回答路径 `missing_fields` 里的这个字段，学分的 `catalog_conflict` 正好是回答路径的 `catalog_metadata_conflict`，测试逐门课核对这两点。这两点的前提是应用挂的也是报告认可的那份快照：应用挂了报告不用的重复或超长快照时，两边会不同。先修代码集合的冲突是报告自己的比较，回答路径没有对应的警告。
+先修有可用的年度先修文档时最先归为 `year_rules`。其余的，有可用快照时先和目录比：学分只在快照有整数学分时才比，先修代码集合即使快照一个都没列也比；之后看字段证据，最后看来源 ID。先修代码按规范形式比较：合格的代码规整成 `CS 5004` 这样（`cs5004` 和 `CS 5004` 是同一个），其他值转成大写、去掉多余空白后比较（所以 `cs  5800` 也等于 `CS 5800`）；空白项不算列出的代码。所以只差空格或大小写不算冲突。`missing`、`catalog_only`、`catalog_lists_none` 加起来正好是回答路径 `missing_fields` 里的这个字段，学分的 `catalog_conflict` 正好是回答路径的 `catalog_metadata_conflict`，测试逐门课核对这两点，也直接拿聊天路径（`build_answer_evidence`）核对整节的缺口数和警告数。这两点的前提是应用挂的也是报告认可的那份快照：应用挂了报告不用的重复或超长快照时，两边会不同。先修代码集合的冲突是报告自己的比较，回答路径没有对应的警告。
 
-另外给出：课程的目录描述（`catalog_description`：可用快照有描述、可用快照没有描述、没有可用快照；后两项就是回答路径缺的 `catalog_description`），以及 `course_answer_evidence` 对这些课会给出的警告各有几门（`answer_warnings`，一门课可以有好几个；用的是报告认可的快照；`program_seed_unverified` 取决于这门课是怎么查到的，不计）。目录快照一节没查成时，学分和先修代码这两个字段、`catalog_comparison`、`catalog_description`、`answer_warnings` 都标 `not_checked`（`catalog_snapshots_not_checked`），因为那时分不清「没有快照可比」和「快照里也没有」；其他字段照常统计。
+另外给出：课程的目录描述（`catalog_description`：可用快照有描述、可用快照没有描述、没有可用快照；后两项就是回答路径缺的 `catalog_description`），以及 `course_answer_evidence` 对这些课会给出的警告各有几门（`answer_warnings`，一门课可以有好几个；`program_seed_unverified` 取决于这门课是怎么查到的，不计）。给它的是报告认可的快照和年度先修证据，按聊天的方式构造：这门课的可用文档（最多 3 个年度，新的在前）和不可用的行数；有不是合法 UTF-8 的行时，这门课一条年度规则都没有，和聊天的查询失败时一样。目录快照一节没查成时，学分和先修代码这两个字段、`catalog_comparison`、`catalog_description`、`answer_warnings` 都标 `not_checked`（`catalog_snapshots_not_checked`），因为那时分不清「没有快照可比」和「快照里也没有」；先修文档一节没查成时，先修和 `answer_warnings` 标 `not_checked`（`requisite_documents_not_checked`），因为那时分不清「缺先修」和「有年度规则」；其他字段照常统计。
 
-`by_department` 每个院系给出课程数、`fields` 下每个字段的类别（省略为 0 的类别；没和目录比时不含学分和先修代码），和目录比过时还有这个院系的 `catalog_description` 和 `answer_warnings`（同样省略为 0 的）。
+`by_department` 每个院系给出课程数、`fields` 下每个字段的类别（省略为 0 的类别；上面标 `not_checked` 的字段不含），和目录比过时还有这个院系的 `catalog_description`，目录和年度文档都读了时还有 `answer_warnings`（同样省略为 0 的）。
 
 「人工核对」只有培养方案有（见下面的 `source_checked`）；课程记录本身没有逐字段的人工核对标记，报告不替它编一个。
 
@@ -142,7 +143,7 @@
 
 1. **超长的值不解码**：快照超过 10 万字符、课程 JSON 超过 100 万字符、方案超过 20 万字符时记 `oversize`，不算可用。应用挂快照（`get_batch`）、读课程（`get`）、列方案（`list_for_program`）都没有长度上限，可能照样用；先修文档和 `course_context` 的上限与报告相同。
 2. **重复行一个都不用**：只有表缺了主键或唯一约束才会出现。应用挂快照时会用最后一个有效的，课程详情页会把同一年度的几份文档都显示出来，`list_for_program` 会把重复的方案都列出来；`course_context` 一次只读一个年度，先去掉草稿和不含这门课的方案再查重复，所以孪生方案是草稿或在另一个年度时，它仍会显示那份 `source_checked` 的。同一 `course_id` 的几行课程，应用按 ID 查和批量查拿到的可能不是同一行。
-3. **不是合法 UTF-8 的 TEXT 只算一行**：报告把这一行记成 `text_not_utf8`，其余照常统计；应用取到这个值的查询整条失败，影响同一查询里的其他行，被排除的课程（比如合成课程）的坏快照行也一样会让应用失败（明细里同样列出）。这时报告比应用乐观，所以这类行要最先修。反过来，坏值在 `primary_name`、`status` 这类列时，应用答题只读 `generated_json`，可能照样给出这门课，报告却把它排除在外，这时报告比应用保守。
+3. **不是合法 UTF-8 的 TEXT 只算一行**：报告把这一行记成 `text_not_utf8`，其余照常统计；应用取到这个值的查询整条失败，影响同一查询里的其他行，被排除的课程（比如合成课程）的坏快照行也一样会让应用失败（明细里同样列出）。年度先修规则也是这样：有这种行的课，报告按聊天的结果算它一条年度规则都没有，和它同一批查询的别的课，报告照常算。这时报告比应用乐观，所以这类行要最先修。反过来，坏值在 `primary_name`、`status` 这类列时，应用答题只读 `generated_json`，可能照样给出这门课，报告却把它排除在外，这时报告比应用保守。
 4. **孤儿方案不算可用**：`program_id` 不在 `programs` 里的方案，培养方案页面确实到不了；但 `course_context` 不查 `programs`，这样的方案只要有效且 `source_checked`，课程页的方案上下文照样会显示。
 5. **先修代码集合的冲突**（`catalog_conflict`）是报告自己的比较，回答路径没有这个警告。
 6. **名字只差大小写的表或列**（比如建表时写成 `Courses`）：报告的结构检查按原样比较名字，记作 `missing`／`column_missing`，这一部分 `not_checked`。目录快照、先修文档、方案这三张表，应用自己检查表在不在时也按原样比较名字，同样当作没有；`courses` 这类表 SQLite 和应用照样能读，这时报告比应用保守。宁可不查，不会把没查的写成查过。
@@ -153,7 +154,7 @@
 
 - 课程：不能用的课程行（`text_not_utf8`、`duplicate_id`、`oversize`、`invalid_json`、`invalid_record`、`identity_mismatch`），以及重复代码（`duplicate_codes`）；
 - 目录快照：`usable` 以外的每个类别；`rows_with_text_not_utf8`：每一行有坏值的快照，按它的课程代码列出，被排除的课程也列；
-- 字段：每个字段除 `catalog_consistent` 以外的每个类别，键名形如 `credits.missing`，也就是每一门要补、要和目录核对或要核实来源的课；可用快照没有描述的课程（`catalog_description.empty_in_usable_snapshot`）；存储值和自己的抽取证据不一致的课程（`field_evidence_value_conflict`）；
+- 字段：每个字段除 `catalog_consistent` 和 `year_rules` 以外的每个类别，键名形如 `credits.missing`，也就是每一门要补、要和目录核对或要核实来源的课；可用快照没有描述的课程（`catalog_description.empty_in_usable_snapshot`）；存储值和自己的抽取证据不一致的课程（`field_evidence_value_conflict`）；
 - 先修文档：在范围内课程的不可用文档（按类别，带年度），以及被排除课程的 `text_not_utf8` 行（按它自己那一行的课程代码）、先修／同修条款未解析（`prerequisite_unparsed`／`corequisite_unparsed`）、学时冲突（`credit_hours_conflict`）、只有旧先修列表的课程（`legacy_prereqs_without_usable_document`）；
 - 方案：不可用的方案（按类别，含 `duplicate_scope_or_id`）、可用方案的范围（`usable_scopes`）、没有可用方案的项目（`programs_without_usable_plan`）。
 

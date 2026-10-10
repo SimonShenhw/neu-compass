@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import sqlite3
+from collections import Counter
 
 from db.catalog_source_repository import CatalogSourceRepository
-from schemas.answer_evidence import CatalogSnapshot, CourseAnswerEvidence
+from db.course_requisite_repository import CourseRequisiteRepository
+from schemas.answer_evidence import (
+    CLAUSE_LIMIT, MAX_REQUISITE_EDITIONS, CatalogSnapshot, CourseAnswerEvidence, RequisiteEdition,
+    RequisiteEvidence, RequisiteSectionEvidence,
+)
 from schemas.course import Course
+from schemas.course_requisite_document import CourseRequisiteDocument
+from schemas.course_requisites import RequisiteSection
 
 AVAILABILITY_FIELDS = (
     "credits", "term", "delivery_mode", "professor", "prereqs", "topics_covered",
@@ -26,9 +33,54 @@ def source_kind(source_id: str) -> str:
     return next((kind for prefix, kind in SOURCE_KIND_PREFIXES if source_id.startswith(prefix)), "other")
 
 
+def _section(section: RequisiteSection) -> RequisiteSectionEvidence:
+    text = section.raw_text
+    return RequisiteSectionEvidence(
+        status=section.status, rule=section.rule, clause_text=None if text is None else text[:CLAUSE_LIMIT],
+        clause_truncated=text is not None and len(text) > CLAUSE_LIMIT, unparsed_reason=section.reason)
+
+
+def requisite_edition(document: CourseRequisiteDocument) -> RequisiteEdition:
+    return RequisiteEdition(
+        catalog_year=document.catalog_year, catalog_url=document.source.url, captured_at=document.source.captured_at,
+        prerequisite=_section(document.requisites.prerequisite), corequisite=_section(document.requisites.corequisite))
+
+
+def requisite_evidence(course: Course, documents: list[CourseRequisiteDocument], unusable: int = 0) -> RequisiteEvidence:
+    """The editions an answer may use, from documents that already passed the repository's checks.
+    A document for another course code or title than the course being answered about, and every
+    document of a catalog year that has more than one, are counted unusable; none is chosen.
+    中文：回答可用的年度规则，输入是已通过仓库核对的文档。代码或名称和这门课对不上的文档，以及同一
+    年度有不止一份时这一年度的全部文档，都算不可用；不从中选一份。"""
+    own = [document for document in documents
+           if (document.course_id, document.course_code, document.course_name)
+           == (course.course_id, course.primary_code, course.primary_name)]
+    years = Counter(document.catalog_year for document in own)
+    usable = sorted((document for document in own if years[document.catalog_year] == 1),
+                    key=lambda document: document.catalog_year, reverse=True)
+    return RequisiteEvidence(
+        storage="available", editions=[requisite_edition(document) for document in usable[:MAX_REQUISITE_EDITIONS]],
+        editions_omitted=max(0, len(usable) - MAX_REQUISITE_EDITIONS),
+        unusable_records=unusable + len(documents) - len(usable))
+
+
+def _rules(edition: RequisiteEdition) -> tuple:
+    def key(section: RequisiteSectionEvidence):
+        # An unparsed clause is compared by its text; a parsed one by its tree.
+        return (section.status, section.rule.model_dump_json() if section.rule else None,
+                section.clause_text if section.status == "unparsed" else None)
+    return key(edition.prerequisite), key(edition.corequisite)
+
+
 def course_answer_evidence(course: Course, catalog: CatalogSnapshot | None = None,
-                           *, program_seed: bool = False) -> CourseAnswerEvidence:
-    missing = [field for field in AVAILABILITY_FIELDS if getattr(course, field) is None or getattr(course, field) == []]
+                           *, program_seed: bool = False, requisites: RequisiteEvidence | None = None) -> CourseAnswerEvidence:
+    # With a usable year document, that year's rule is known even when the flat prereqs list is
+    # empty, and its AND/OR logic is available: neither gap applies. Without one, nothing changes.
+    # 中文：有可用的年度文档时，即使平铺的 prereqs 为空，那一年的规则也是已知的，AND/OR 也有：这两项
+    # 缺口都不成立。没有时和以前完全一样。
+    editions = requisites.editions if requisites else []
+    missing = [field for field in AVAILABILITY_FIELDS
+               if (getattr(course, field) is None or getattr(course, field) == []) and not (field == "prereqs" and editions)]
     warnings = []
     if catalog is None or not catalog.description:
         missing.insert(0, "catalog_description")
@@ -47,20 +99,32 @@ def course_answer_evidence(course: Course, catalog: CatalogSnapshot | None = Non
         snippet.field == "topics_covered" for snippet in course.evidence_snippets
     ):
         warnings.append("topics_source_unavailable")
-    if course.prereqs or (catalog and catalog.prereq_codes):
+    if (course.prereqs or (catalog and catalog.prereq_codes)) and not editions:
         warnings.append("prerequisite_logic_unavailable")
+    if len({_rules(edition) for edition in editions}) > 1:
+        warnings.append("requisites_differ_by_catalog_year")
+    if any(section.status == "unparsed" for edition in editions for section in (edition.prerequisite, edition.corequisite)):
+        warnings.append("requisite_clause_unparsed")
+    if requisites and (requisites.unusable_records or requisites.storage == "schema_unusable"):
+        warnings.append("structured_requisites_unusable")
     if program_seed:
         warnings.append("program_seed_unverified")
     if course.course_id.startswith("synth-") or any(source.startswith("synthetic_seed_") for source in course.source_review_ids):
         warnings.append("synthetic_record_not_real_course")
     return CourseAnswerEvidence(
         catalog=catalog, field_evidence=course.evidence_snippets,
-        source_review_ids=course.source_review_ids, missing_fields=missing, warnings=warnings,
+        source_review_ids=course.source_review_ids, missing_fields=missing, warnings=warnings, requisites=requisites,
     )
 
 
 def build_answer_evidence(conn: sqlite3.Connection, courses: list[Course],
                           *, program_seed: bool = False) -> dict[str, CourseAnswerEvidence]:
     catalogs = CatalogSourceRepository(conn).get_batch(courses)
-    return {course.course_id: course_answer_evidence(course, catalogs.get(course.course_id), program_seed=program_seed)
-            for course in courses}
+    batch = CourseRequisiteRepository(conn).read_batch([course.course_id for course in courses])
+    evidence = {}
+    for course in courses:
+        requisites = (requisite_evidence(course, batch.documents.get(course.course_id, []), batch.unusable[course.course_id])
+                      if batch.storage == "available" else RequisiteEvidence(storage=batch.storage))
+        evidence[course.course_id] = course_answer_evidence(
+            course, catalogs.get(course.course_id), program_seed=program_seed, requisites=requisites)
+    return evidence

@@ -63,8 +63,8 @@ if str(ROOT) not in sys.path:
 
 from db.course_requisite_repository import content_hash as requisite_content_hash  # noqa: E402
 from db.program_plan_repository import content_hash as plan_content_hash  # noqa: E402
-from rag.answer_evidence import AVAILABILITY_FIELDS, course_answer_evidence  # noqa: E402
-from schemas.answer_evidence import CatalogSnapshot  # noqa: E402
+from rag.answer_evidence import AVAILABILITY_FIELDS, course_answer_evidence, requisite_evidence  # noqa: E402
+from schemas.answer_evidence import CatalogSnapshot, RequisiteEvidence  # noqa: E402
 from schemas.catalog_credit_hours import CatalogCreditHours  # noqa: E402
 from schemas.course import COURSE_CODE_PATTERN, Course  # noqa: E402
 from schemas.course_requisite_document import CourseRequisiteDocument  # noqa: E402
@@ -116,8 +116,9 @@ COURSE_CATEGORIES = ("in_scope", "synthetic", "identity_mismatch", "invalid_reco
 SNAPSHOT_CATEGORIES = ("usable", "absent", "duplicate_rows", "identity_mismatch", "invalid_record", "invalid_json",
                        "oversize", "text_not_utf8")
 CATALOG_FIELDS = ("credits", "prereqs")  # The fields compared with the usable catalog snapshot.
-FIELD_CATEGORIES = ("catalog_only", "catalog_lists_none", "catalog_conflict", "catalog_consistent", "missing",
-                    "extracted_estimate", "course_sources_only", "no_recorded_source")
+RULES_FIELD = "prereqs"  # The field a usable year-scoped requisite document answers instead of the stored list.
+FIELD_CATEGORIES = ("year_rules", "catalog_only", "catalog_lists_none", "catalog_conflict", "catalog_consistent",
+                    "missing", "extracted_estimate", "course_sources_only", "no_recorded_source")
 # Every category that asks for work: something to fill, to check against the catalog, or to verify.
 LISTED_FIELD_CATEGORIES = ("missing", "catalog_only", "catalog_lists_none", "catalog_conflict", "extracted_estimate",
                            "course_sources_only", "no_recorded_source")
@@ -131,6 +132,7 @@ PLAN_CATEGORIES = ("usable", "orphan_rows", "oversize", "invalid_json", "invalid
                    "content_hash_mismatch", "duplicate_scope_or_id", "text_not_utf8")
 COURSE_DETAIL_SECTIONS = frozenset({"courses", "catalog_snapshots", "fields", "requisite_documents"})
 NOT_COMPARED = {"status": "not_checked", "code": "catalog_snapshots_not_checked"}
+NO_YEAR_RULES = {"status": "not_checked", "code": "requisite_documents_not_checked"}
 
 LIMITATIONS = (
     "offline_copy_consistency_is_not_proven",
@@ -223,6 +225,9 @@ RULES = {
         "courses_in_scope": "in-scope courses (of the department, under by_department)",
     },
     "fields": {
+        "year_rules": "prereqs only: the course has a usable year-scoped requisite document, so the answer path gives "
+                      "that year's rules and leaves the stored code list out; neither missing nor compared with the "
+                      "catalog; decided first",
         "catalog_only": "no stored value, and the usable catalog snapshot has one (credits, prereqs): can be filled "
                         "from the catalog",
         "catalog_lists_none": "no stored value, and the usable catalog snapshot was compared and has none either "
@@ -236,17 +241,18 @@ RULES = {
         "catalog_consistent": "stored value equals the usable catalog snapshot (credits; prereq code sets, each code "
                               "in its normalized form, as for catalog_conflict)",
         "missing": "no stored value (None or empty list; 0 counts as a value); for credits and prereqs also no "
-                   "usable catalog snapshot to compare",
+                   "usable catalog snapshot to compare, and for prereqs no usable year document",
         "extracted_estimate": "stored value with an evidence snippet for the field: extracted, not official",
         "course_sources_only": "stored value without field evidence; the course records source IDs, which do not say "
                                "which field they support",
         "no_recorded_source": "stored value with no field evidence, no source IDs and no catalog comparison",
         "fields": "per field of the answer path's availability list: the categories above, which add up to "
-                  "courses_in_scope; credits and prereqs are not_checked when catalog_snapshots was not checked",
+                  "courses_in_scope; credits and prereqs are not_checked when catalog_snapshots was not checked, and "
+                  "prereqs also when requisite_documents was not checked (its year rules decide the category)",
         "by_department": "per department: courses_in_scope; under fields, the same categories per field with zero "
-                         "counts omitted (credits and prereqs left out when the catalog was not compared); and, when "
-                         "the catalog was compared, catalog_description and answer_warnings for the department's "
-                         "courses, zero counts omitted",
+                         "counts omitted (a field that is not_checked above is left out); catalog_description when "
+                         "the catalog was compared, and answer_warnings when the year documents were read as well, "
+                         "for the department's courses, zero counts omitted",
         "courses_in_scope": "in-scope courses (of the department, under by_department)",
         "catalog_comparison": "whether credits and prereqs were compared with the catalog (that needs a checked "
                               "catalog_snapshots section)",
@@ -257,9 +263,10 @@ RULES = {
         "empty_in_usable_snapshot": "a usable snapshot without description text",
         "no_usable_snapshot": "no usable catalog snapshot",
         "answer_warnings": "in-scope courses per warning that course_answer_evidence gives them with the report's "
-                           "usable snapshot (the app may attach a duplicate or oversize one); program_seed_unverified, "
-                           "which depends on how the course was reached, is not counted; a course can have several "
-                           "(not exclusive)",
+                           "usable snapshot (the app may attach a duplicate or oversize one) and their year-scoped "
+                           "requisite evidence, built as the chat path builds it; program_seed_unverified, which "
+                           "depends on how the course was reached, is not counted; a course can have several (not "
+                           "exclusive); not_checked when catalog_snapshots or requisite_documents was not checked",
     },
     "requisite_documents": {
         "text_not_utf8": _NOT_UTF8,
@@ -493,17 +500,21 @@ def _codes(values) -> set[str]:
     return codes
 
 
-def field_category(course: Course, field: str, snapshot: CatalogSnapshot | None) -> str:
+def field_category(course: Course, field: str, snapshot: CatalogSnapshot | None,
+                   requisites: RequisiteEvidence | None = None) -> str:
     """The FIELD_CATEGORIES entry for one stored field; RULES['fields'] says what each means.
 
-    With a usable snapshot, credits and prereqs are compared first: a value only one side has, equal or
-    different values, or neither side having one. Credits are compared only when the snapshot has a
-    whole number; prereq code sets are compared even when the snapshot lists none. Then the field's
-    own evidence, then the course's recorded sources.
-    中文：有可用目录快照时先比学分和先修代码：只有一边有值、相同、不同，或两边都没有。学分只在
-    快照有整数学分时才比；先修代码集合即使快照一个都没列也比。之后看该字段的抽取证据，最后看课程
-    记录的来源 ID。
+    Prereqs with a usable year-scoped requisite document come first: the answer path gives that
+    year's rules and leaves the stored list out. With a usable snapshot, credits and prereqs are
+    compared next: a value only one side has, equal or different values, or neither side having one.
+    Credits are compared only when the snapshot has a whole number; prereq code sets are compared even
+    when the snapshot lists none. Then the field's own evidence, then the course's recorded sources.
+    中文：先修有可用的年度先修文档时最先归类：回答路径给出那一年的规则，不用存储的代码列表。之后
+    有可用目录快照时比学分和先修代码：只有一边有值、相同、不同，或两边都没有。学分只在快照有整数
+    学分时才比；先修代码集合即使快照一个都没列也比。之后看该字段的抽取证据，最后看课程记录的来源 ID。
     """
+    if field == RULES_FIELD and requisites is not None and requisites.editions:
+        return "year_rules"
     value = getattr(course, field)
     if snapshot is not None and field == "credits":
         if snapshot.credits is not None:
@@ -632,6 +643,7 @@ class _Audit:
         self.documents: dict[str, set[str]] = defaultdict(set)  # course_id -> editions with a usable document.
         self.program_values: list | None = None  # Every program_id value in programs, once read.
         self.duplicate_codes: set[str] = set()  # Codes more than one in-scope course has.
+        self.requisites: dict[str, RequisiteEvidence] = {}  # The year rules chat gets, by in-scope course_id.
 
     # --- plumbing -------------------------------------------------------------------------------
 
@@ -836,8 +848,12 @@ class _Audit:
     def fields(self):
         self.require_section("courses")
         compared = self.sections.get("catalog_snapshots", {}).get("status") == "checked"
-        # Without checked snapshots the catalog categories cannot be told apart from missing: not checked.
-        names = tuple(field for field in AVAILABILITY_FIELDS if compared or field not in CATALOG_FIELDS)
+        with_rules = self.sections.get("requisite_documents", {}).get("status") == "checked"
+        # Without checked snapshots the catalog categories cannot be told apart from missing, and without the year
+        # documents a prereq gap cannot be told apart from a year rule: those fields are not checked.
+        names = tuple(field for field in AVAILABILITY_FIELDS
+                      if (compared or field not in CATALOG_FIELDS) and (with_rules or field != RULES_FIELD))
+        warned = compared and with_rules  # The answer path's warnings depend on both.
         table = {field: Counter() for field in names}
         departments = defaultdict(lambda: {field: Counter() for field in names})
         sizes, warnings, description = Counter(), Counter(), Counter()
@@ -846,13 +862,16 @@ class _Audit:
             department = _department(course.primary_code)
             sizes[department] += 1
             snapshot = self.snapshots.get(course_id) if compared else None
-            evidence = course_answer_evidence(course, snapshot)
-            if "field_evidence_value_conflict" in evidence.warnings:  # Independent of the catalog.
+            requisites = self.requisites.get(course_id) if with_rules else None
+            evidence = course_answer_evidence(course, snapshot, requisites=requisites)
+            if "field_evidence_value_conflict" in evidence.warnings:  # Independent of the catalog and year rules.
                 self.note("fields", "field_evidence_value_conflict", self.item(course))
-            if compared:
-                # What course_answer_evidence gives with the report's usable snapshot; the rule says where chat differs.
+            if warned:
+                # What course_answer_evidence gives with the report's usable snapshot and year rules; the rule says
+                # where chat differs.
                 warnings.update(set(evidence.warnings))
                 department_warnings[department].update(set(evidence.warnings))
+            if compared:
                 state = ("no_usable_snapshot" if snapshot is None else
                          "present" if snapshot.description else "empty_in_usable_snapshot")
                 description[state] += 1
@@ -860,7 +879,7 @@ class _Audit:
                 if state == "empty_in_usable_snapshot":
                     self.note("fields", "catalog_description.empty_in_usable_snapshot", self.item(course))
             for field in names:
-                category = field_category(course, field, snapshot)
+                category = field_category(course, field, snapshot, requisites)
                 table[field][category] += 1
                 departments[department][field][category] += 1
                 if category in LISTED_FIELD_CATEGORIES:
@@ -871,10 +890,13 @@ class _Audit:
                                    "fields": {field: _nonzero(counter) for field, counter in departments[name].items()}}
             if compared:
                 by_department[name]["catalog_description"] = _nonzero(department_description[name])
+            if warned:
                 by_department[name]["answer_warnings"] = _nonzero(department_warnings[name])
+        unchecked = {field: dict(NOT_COMPARED if field in CATALOG_FIELDS and not compared else NO_YEAR_RULES)
+                     for field in AVAILABILITY_FIELDS if field not in table}
         result = {
             "denominator": {"courses_in_scope": len(self.scope)},
-            "fields": {field: _all(FIELD_CATEGORIES, table[field]) if field in table else dict(NOT_COMPARED)
+            "fields": {field: unchecked[field] if field in unchecked else _all(FIELD_CATEGORIES, table[field])
                        for field in AVAILABILITY_FIELDS},
             "by_department": by_department,
             "rules": RULES["fields"],
@@ -883,11 +905,13 @@ class _Audit:
             result["catalog_comparison"] = {"status": "checked"}
             result["catalog_description"] = _all(("present", "empty_in_usable_snapshot", "no_usable_snapshot"),
                                                  description)
-            result["answer_warnings"] = dict(sorted(warnings.items()))
         else:
-            # The catalog categories would read as zero and the warnings as "no catalog source".
-            for key in ("catalog_comparison", "catalog_description", "answer_warnings"):
+            # The catalog categories would read as zero and the description as missing everywhere.
+            for key in ("catalog_comparison", "catalog_description"):
                 result[key] = dict(NOT_COMPARED)
+        # Without both inputs the warnings would read "no catalog source" or "no prerequisite logic" for every course.
+        result["answer_warnings"] = (dict(sorted(warnings.items())) if warned
+                                     else dict(NOT_COMPARED if not compared else NO_YEAR_RULES))
         return result
 
     def requisite_documents(self):
@@ -903,6 +927,8 @@ class _Audit:
         departments = defaultdict(lambda: {"courses_in_scope": 0, "by_catalog_year": defaultdict(
             lambda: {"with_usable_document": 0, "prerequisite": Counter(), "corequisite": Counter(),
                      "credit_hours_vs_course_credits": Counter()})})
+        # Per in-scope course, what chat's read_batch would give requisite_evidence.
+        usable_documents, unusable_rows, unreadable = defaultdict(list), Counter(), set()
         for row in rows:
             course_id = row["course_id"]
             edition = _edition(row["catalog_year"])
@@ -932,10 +958,15 @@ class _Audit:
                 editions[edition]["unusable"] += 1
                 if course_id in self.scope:
                     self.note("requisite_documents", category, self.item(self.scope[course_id], catalog_year=edition))
+                    if category == "text_not_utf8":
+                        unreadable.add(course_id)
+                    else:
+                        unusable_rows[course_id] += 1
                 elif category == "text_not_utf8":  # The course page of an excluded course fails as well.
                     self.note("requisite_documents", category, self.row_item(course_id, catalog_year=edition))
                 continue
             course = self.scope[course_id]
+            usable_documents[course_id].append(document)
             stats = editions[edition]
             stats["usable"] += 1
             stats["courses"].add(course_id)
@@ -962,6 +993,14 @@ class _Audit:
             if course.prereqs and not self.documents.get(course_id):
                 legacy_only += 1
                 self.note("requisite_documents", "legacy_prereqs_without_usable_document", self.item(course))
+            # The year rules chat gets: the same editions and unusable count as requisite_evidence over read_batch
+            # (chat decodes duplicates and drops them there; they never reach usable here). Chat reads a course's
+            # rows in one query, which a value that is not UTF-8 fails, so such a course gets none.
+            # 中文：聊天拿到的年度规则，和 read_batch 加 requisite_evidence 的结果相同；有不是 UTF-8 的值时，
+            # 这门课的查询整条失败，聊天一条年度规则也拿不到。
+            self.requisites[course_id] = (
+                RequisiteEvidence(storage="schema_unusable") if course_id in unreadable
+                else requisite_evidence(course, usable_documents[course_id], unusable_rows[course_id]))
         return {
             "denominator": {"document_rows": len(rows)},
             "counts": _all(DOCUMENT_CATEGORIES, counts),
@@ -1159,7 +1198,8 @@ def _all_checked(node) -> bool:
     return all(_all_checked(value) for value in node.values())
 
 
-SECTIONS = ("schema", "courses", "catalog_snapshots", "fields", "requisite_documents", "program_plans", "legacy_rows")
+# fields needs the year rules that requisite_documents reads, so it runs after it.
+SECTIONS = ("schema", "courses", "catalog_snapshots", "requisite_documents", "fields", "program_plans", "legacy_rows")
 
 
 def build_report(db_copy, *, details: bool = False, max_codes: int = DEFAULT_MAX_CODES) -> dict:

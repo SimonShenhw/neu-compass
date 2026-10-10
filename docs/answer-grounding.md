@@ -12,10 +12,10 @@
 
 ## API、提示词和界面共用的契约
 
-- `/chat` 首个 NDJSON meta 带 `prompt_version`（当前 `"4.3"`：在 4.2 的基础上，存档副本那句每个回答只说一次，数值冲突时两个数都要写出来；4.2 从未部署），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
-- `answer_evidence` 包含 `catalog`、`field_evidence`、`source_review_ids`、`missing_fields`、`warnings`。缺失包括官方描述及常用选课字段；`None`/空列表表示记录未提供，数值 0 不当成缺失。这不是完整 syllabus 字段的覆盖率报告；全库按院系／字段的统计见 [数据覆盖、冲突与来源报告](data-coverage-report.md)（OPT-03：每个字段的 `missing`、`catalog_only`、`catalog_lists_none` 三类合起来，就是这里 `missing_fields` 里的这个字段，学分的 `catalog_conflict` 就是这里的 `catalog_metadata_conflict`；另外比较先修代码集合，这一项回答路径没有对应警告）。
+- `/chat` 首个 NDJSON meta 带 `prompt_version`（代码里当前是 `"4.4"`：在 4.3 的基础上加了按 Catalog 年度的先修规则，见下面 4.4 一条；4.3 在 4.2 的基础上让存档副本那句每个回答只说一次、数值冲突时两个数都要写出来；4.2 从未部署），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
+- `answer_evidence` 包含 `catalog`、`field_evidence`、`source_review_ids`、`missing_fields`、`warnings`、`requisites`（4.4；没查时为 `null`）。缺失包括官方描述及常用选课字段；`None`/空列表表示记录未提供，数值 0 不当成缺失。这不是完整 syllabus 字段的覆盖率报告；全库按院系／字段的统计见 [数据覆盖、冲突与来源报告](data-coverage-report.md)（OPT-03：每个字段的 `missing`、`catalog_only`、`catalog_lists_none` 三类合起来，就是这里 `missing_fields` 里的这个字段，有可用年度先修文档时先修归 `year_rules`、不算缺失；学分的 `catalog_conflict` 就是这里的 `catalog_metadata_conflict`；另外比较先修代码集合，这一项回答路径没有对应警告）。
 - v4 提示词与 SSE meta 使用同一份读取结果，避免模型拿到一套依据、界面显示另一套。课程详情涉及培养方案时另外标记未核验 seed；chat 的培养方案捷径也标记该限制。不同查询语境的警告不必逐字相同。
-- 目录与课程学分冲突、数值估计与支持值冲突时保留两边并警告，不静默改写课程或选择一个值。先修代码列表不保留 AND/OR；培养方案 seed 不等于正式 Plan of Study 或选课资格保证。
+- 目录与课程学分冲突、数值估计与支持值冲突时保留两边并警告，不静默改写课程或选择一个值。先修代码列表不保留 AND/OR（有年度规则时提示词不再给这两份列表，见 4.4）；培养方案 seed 不等于正式 Plan of Study 或选课资格保证。
 - v4 把查询、历史、来源块作为引用/JSON 数据，并要求忽略其中嵌入的指令；历史只能帮助解析所指，不能补造课程事实。移除按 5xxx/6xxx/7xxx 判断难度或首学期适合度的捷径。合成记录不应成为真实课程推荐。
 - 每门课传入最多 1200 字符目录描述、3 条各最多 300 字符引文，标记截断和省略条数；优先覆盖工作量、难度、技能的不同字段，再补重复证据。部分元数据列表也限条数。完整快照和证据可从详情查看；摘录不等于完整来源。
 - **4.2 起快照 ID 与来源 ID 不进提示词**（4.1 的回答会原样印出 `catalog:` 加 64 位摘要和 base64 评价 ID）：
@@ -32,6 +32,19 @@
     - 「培养方案」页不加链接。
   - 课程记录里的 `course_id`（例如 `neu-cs-5800`）仍在提示词里，4.2 之前就是这样。
   - meta 与课程详情里的 `answer_evidence` 不变，ID 仍可追溯。这只是改提示词输入的投影，不改契约本身。
+- **4.4 起按 Catalog 年度的先修规则进提示词**（OPT-04 第一步；还没有用真实模型复核）：
+  - 来源是课程详情面板用的同一份年度文档（`course_requisite_documents`，见 [课程先修说明](course-requisites.md)），核对和课程详情接口相同：课程行的代码和名称、年度、内容摘要、规则树；另外要求文档的课程 ID、代码、名称和被回答的这门课一致。一次回答的所有课程用两次查询读完。
+  - `answer_evidence.requisites`：`storage`（`available`／`schema_missing`／`schema_unusable`）、`editions`（可用文档，按年度从新到旧，最多 3 份；每份有年度、官方院系页 `catalog_url`、页面保存时间 `captured_at`、先修和共修两段）、`editions_omitted`（其余可用份数）、`unusable_records`（核对不过的文档，以及同一年度不止一份时这一年度的全部文档：只有缺键的副本里才会有两份，一份都不用）。新的在前只是限量，不替学生选年度。
+  - 每段给状态（`not_listed`／`parsed`／`unparsed`）、规则树（只有 `parsed` 有）、条款原文（最多 600 字符，`clause_truncated` 标记是否截断）和未解析原因。提示词里规则树写成 `all_of`／`any_of`／课程叶（只带原文写明的 `minimum_grade`、`may_be_taken_concurrently`、`level`），不给未解析原因（内部代码）和来源摘要。
+  - 有可用年度文档时：不再有 `prerequisite_logic_unavailable`，`prereqs` 不算缺失（那一年的规则已知，平铺列表为空也一样）；提示词不再给 `recorded_metadata.prereqs` 和目录快照的 `prereq_codes`，理由和课程页在年度规则旁不显示旧平铺图相同。新提示码：`requisites_differ_by_catalog_year`（列出的年度规则不同）、`requisite_clause_unparsed`（有一段没解析）、`structured_requisites_unusable`（有文档不可用，或表读不了）。没有可用年度文档时，`missing_fields`、`warnings` 和提示词里的平铺列表都和 4.3 相同。
+  - 规则要求：
+    - 规则按年度适用：只有学生在对话里说了是哪个 Catalog 年度，才把那一年的规则当成学生的；入学学期（例如 Fall 2026）不是 Catalog 年度，不互相换算；学生没说时，各年度相同就说明覆盖哪几年，不同就简短说明并问学生适用哪一年；
+    - `all_of` 是每个分支都要，`any_of` 是任一分支即可；嵌套、最低成绩、可并修和 level 标记照原样保留；共修是另一项要求，不是要先修完的课；
+    - `not_listed` 是那一年的课程块没列，不证明没有要求；`unparsed` 照记录给出原文（截断时说明），并说需要核对；
+    - 这些规则只来自课程块：不说学生有资格、满足了要求或能注册，批准、分级、转学分和项目规则都不在内；
+    - 引用方式和目录描述相同（指向该份的 `catalog_url`，同样的标签），存档副本那句每个回答仍只说一次。
+  - 课程详情面板去掉了「此规则未用于对话回答」，课程先修列表的 `warnings` 去掉了 `structured_requisites_not_used_by_chat`；回答下的证据卡片多一行「先修规则：已存 Catalog … 的课程块原文」，只读通过校验的数据块。
+  - 不在这一步：请求里没有 Catalog 年度、校区或路径字段（OPT-04 下一步和精确培养方案一起做）；不判断个人资格，不做学期安排。
 - 聊天历史保存来源/缺失结构，历史与实时卡片共用展示函数。卡片显示简短缺失列表和关键警告，详情显示完整列表、来源、导入时间及未知抓取日期。快照只显示摘要前 12 位，完整 ID 放在悬停提示里；格式不对的 ID 显示「格式异常」，不回显（说明文字和悬停提示都会渲染 Markdown）。记录来源按类型汇总条数（重复的 ID 只算一次），原始 ID 收在折叠区。旧聊天记录没有此结构时仍可显示；非法快照不显示可点击链接、不导致面板崩溃。来源 ID 与引文按纯文本展示。
 - 回答文本是模型输出，按不可信 Markdown 处理（`app.answer_evidence_view.answer_markdown`，一遍线性处理）：
   - 先把指向官方目录院系页的链接（`[标签](URL)`、`<URL>`、裸 URL）换成占位符，最后还原成 `[标签](URL)` / `<URL>`（去掉标题和 URL 两边的尖括号）。判断用与快照 URL 校验同一个正则，但不像快照那样核对院系与课程代码是否一致。

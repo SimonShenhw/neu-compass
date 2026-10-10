@@ -24,7 +24,8 @@ FIELD_NAMES = ("snapshot_id", "source_kind", "recorded_sources", "field_evidence
 CODES = ("catalog_source_unavailable", "catalog_retrieval_date_unknown", "catalog_metadata_conflict",
          "extracted_evidence_not_official_facts", "field_evidence_value_conflict", "topics_source_unavailable",
          "prerequisite_logic_unavailable", "program_seed_unverified", "synthetic_record_not_real_course",
-         "program_schedule_unverified")
+         "program_schedule_unverified", "requisites_differ_by_catalog_year", "requisite_clause_unparsed",
+         "structured_requisites_unusable")
 
 CATALOG_HEX = re.compile(r"catalog:[0-9a-fA-F]+")
 HEX_RUN = re.compile(r"[0-9a-fA-F]{12,}")

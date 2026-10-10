@@ -73,16 +73,22 @@ def fetch_courses(client, course_ids: Iterable[str]) -> dict[str, dict]:
 def course_parts(payload: dict):
     from pydantic import ValidationError  # noqa: PLC0415
 
-    from schemas.answer_evidence import CatalogSnapshot  # noqa: PLC0415
+    from schemas.answer_evidence import CatalogSnapshot, RequisiteEvidence  # noqa: PLC0415
     from schemas.course import Course  # noqa: PLC0415
 
     course = Course.model_validate({key: payload[key] for key in Course.model_fields if key in payload})
-    raw = (payload.get("answer_evidence") or {}).get("catalog")
+    evidence = payload.get("answer_evidence") or {}
     try:
-        catalog = CatalogSnapshot.model_validate(raw) if raw else None
+        catalog = CatalogSnapshot.model_validate(evidence["catalog"]) if evidence.get("catalog") else None
     except ValidationError:
         catalog = None  # The prompt then gets no snapshot, as /chat would.
-    return course, catalog
+    # The detail API builds the same year rules as /chat (4.4); an older API sends none.
+    # 中文：详情接口给出的年度规则和 /chat 相同（4.4）；旧接口没有这一项。
+    try:
+        requisites = RequisiteEvidence.model_validate(evidence["requisites"]) if evidence.get("requisites") else None
+    except ValidationError:
+        requisites = None
+    return course, catalog, requisites
 
 
 def unstated_values(courses_block: str) -> tuple[float, ...]:
@@ -122,23 +128,26 @@ def build_case(question: dict, payloads: dict[str, dict]):
     from rag.retriever import SearchHit  # noqa: PLC0415
 
     parts = {course_id: course_parts(payloads[course_id]) for course_id in question["course_ids"]}
-    hits = [SearchHit(course=course, score=1.0) for course, _ in parts.values()]
-    evidence = {course.course_id: course_answer_evidence(course, catalog, program_seed=question["route"] == "program")
-                for course, catalog in parts.values()}
+    hits = [SearchHit(course=course, score=1.0) for course, _, _ in parts.values()]
+    evidence = {course.course_id: course_answer_evidence(course, catalog, program_seed=question["route"] == "program",
+                                                         requisites=requisites)
+                for course, catalog, requisites in parts.values()}
     prompt = build_prompt(question["query"], hits, history=None, evidence=evidence,
                           retrieval_mode=question["route"], notices=question["notices"])
     block = format_courses_block(hits, evidence)
-    catalogs = [catalog for _, catalog in parts.values()]
+    catalogs = [catalog for _, catalog, _ in parts.values()]
+    edition_urls = {edition.catalog_url for _, _, requisites in parts.values() if requisites is not None
+                    for edition in requisites.editions}
     context = AnswerContext(
         lang=question["lang"],
-        allowed_urls=frozenset(catalog.catalog_url for catalog in catalogs if catalog is not None),
+        allowed_urls=frozenset({catalog.catalog_url for catalog in catalogs if catalog is not None} | edition_urls),
         has_rmp_data=any(any(source.startswith("rmp_review_") for source in course.source_review_ids)
                          or any(item.source_id.startswith("rmp_review_") for item in course.evidence_snippets)
-                         for course, _ in parts.values()),
+                         for course, _, _ in parts.values()),
         fetch_date_relevant=any(catalog is not None and catalog.retrieved_at is None for catalog in catalogs),
         no_catalog_relevant=any(catalog is None for catalog in catalogs),
-        prereq_relevant=any(course.prereqs for course, _ in parts.values())
-        or any(catalog is not None and catalog.prereq_codes for catalog in catalogs),
+        # Only where the answer gets flat code lists without a year rule (4.4).
+        prereq_relevant=any("prerequisite_logic_unavailable" in item.warnings for item in evidence.values()),
         program_notice="program_schedule_unverified" in question["notices"],
         unstated_values=unstated_values(block),
         prompt_keys=frozenset(_keys(json.loads(block), set())),

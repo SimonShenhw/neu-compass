@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections import Counter
+from dataclasses import dataclass, field
 
 import structlog
 
@@ -13,7 +15,19 @@ from db.program_plan_repository import ProgramPlanRepository
 
 log = structlog.get_logger("neu_compass.course_requisites")
 BASE_WARNINGS = ["course_block_only_not_full_policy_or_eligibility", "campus_and_personal_pathway_not_declared",
-                 "legacy_prerequisite_edges_not_verified_logic", "structured_requisites_not_used_by_chat"]
+                 "legacy_prerequisite_edges_not_verified_logic"]
+
+
+@dataclass(frozen=True)
+class RequisiteBatch:
+    """Usable documents per course (newest catalog year first) and per-course counts of stored
+    documents that failed the checks; storage is available / schema_missing / schema_unusable.
+    中文：每门课的可用文档（Catalog 年度从新到旧），以及每门课核对不过的已存文档数；storage 为
+    可用／没有表／表读不了。"""
+
+    storage: str
+    documents: dict[str, list[CourseRequisiteDocument]] = field(default_factory=dict)
+    unusable: Counter = field(default_factory=Counter)
 
 
 def content_hash(document: CourseRequisiteDocument) -> str:
@@ -73,6 +87,41 @@ class CourseRequisiteRepository:
             (document.course_id, document.catalog_year, document.model_dump_json(), content_hash(document)),
         )
         return True
+
+    def read_batch(self, course_ids: list[str]) -> RequisiteBatch:
+        """The documents of several courses for one answer, with the checks list_for_course applies
+        (the course row's code and title, the edition, the content hash and the tree), in two queries;
+        no program context. Read errors give schema_unusable instead of failing the answer.
+        中文：一次回答要用的几门课的文档，核对和 list_for_course 相同（课程行的代码和名称、年度、内容
+        hash、规则树），两次查询；不带培养方案上下文。读出错时给 schema_unusable，不让回答失败。"""
+        ids = list(dict.fromkeys(course_ids))
+        try:
+            if not self.available():
+                return RequisiteBatch("schema_missing")
+            if not ids:
+                return RequisiteBatch("available")
+            marks = ",".join("?" * len(ids))
+            names = {row["course_id"]: (row["primary_code"], row["primary_name"]) for row in self._conn.execute(
+                f"SELECT course_id,primary_code,primary_name FROM courses WHERE course_id IN ({marks})", ids)}
+            rows = self._conn.execute(
+                "SELECT course_id,catalog_year,document,content_hash FROM course_requisite_documents "
+                f"WHERE course_id IN ({marks}) ORDER BY course_id, catalog_year DESC", ids).fetchall()
+        except sqlite3.DatabaseError:
+            log.warning("course.requisite_schema_unusable", courses=len(ids))
+            return RequisiteBatch("schema_unusable")
+        batch = RequisiteBatch("available")
+        for row in rows:
+            try:
+                if row["course_id"] not in names:
+                    raise ValueError("No course row")
+                document = self._decode(row, names[row["course_id"]])
+            except (ValueError, TypeError):
+                batch.unusable[row["course_id"]] += 1
+                log.warning("course.requisite_document_unusable", course_id=row["course_id"],
+                            catalog_year=row["catalog_year"])
+            else:
+                batch.documents.setdefault(row["course_id"], []).append(document)
+        return batch
 
     def list_for_course(self, course_id: str, *, catalog_year: str | None = None) -> CourseRequisiteListing:
         bundle = CourseRequisiteListing(schema_available=self.available(), warnings=list(BASE_WARNINGS))
