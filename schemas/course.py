@@ -57,6 +57,16 @@ SCHEMA_VERSION = "1.1"
 COURSE_CODE_PATTERN = re.compile(r"^([A-Z]{2,4})\s?(\d{4}[A-Z]?)$")
 
 
+def canonical_course_code(value: str) -> str:
+    """'DEPT NNNN[L]': one space, upper case; ValueError("Invalid course code") otherwise. Course's own validator below
+    keeps its message, which quotes the value. 中文：一个空格、全大写；不合格式时 ValueError("Invalid course code")。
+    下面 Course 自己的校验器保留它自己的报错（会带出原值）。"""
+    match = COURSE_CODE_PATTERN.fullmatch(value.strip().upper())
+    if not match:
+        raise ValueError("Invalid course code")
+    return f"{match.group(1)} {match.group(2)}"
+
+
 class DataSource(StrEnum):
     CATALOG = "catalog"
     SYLLABUS = "syllabus"

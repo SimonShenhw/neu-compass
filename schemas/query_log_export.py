@@ -1,11 +1,10 @@
 """Private query_log rows for offline review; returned course IDs are never ground truth."""
 
-from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from schemas.feedback_candidate import RetrievalMode, TrafficKind, text_sha256
+from schemas.feedback_candidate import RetrievalMode, TrafficKind, canonical_utc_timestamp, text_sha256
 
 QueryReviewRequirement = Literal[
     'privacy_review_required', 'results_not_ground_truth', 'no_retrieval_snapshot',
@@ -51,10 +50,7 @@ class QueryLogExportRow(BaseModel):
     @field_validator('created_at')
     @classmethod
     def utc_timestamp(cls, value):
-        parsed = datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
-        if parsed.strftime('%Y-%m-%dT%H:%M:%SZ') != value:
-            raise ValueError('Canonical UTC timestamp required')
-        return value
+        return canonical_utc_timestamp(value)
 
     @model_validator(mode='after')
     def provenance_consistency(self):

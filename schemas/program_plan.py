@@ -12,14 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from schemas.course import COURSE_CODE_PATTERN
-
-
-def normalize_code(value: str) -> str:
-    match = COURSE_CODE_PATTERN.fullmatch(value.strip().upper())
-    if not match:
-        raise ValueError("Invalid course code")
-    return f"{match.group(1)} {match.group(2)}"
+from schemas.course import canonical_course_code as normalize_code  # The name other modules import.
 
 
 class CourseRange(BaseModel):

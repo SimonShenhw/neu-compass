@@ -2619,3 +2619,57 @@
 
 **已知、未处理与发布状态**：同上一轮。检查器仍然只认有限的写法，别的自然语言写法可能漏判或误判。没有调用模型，没有动生产数据，没有用真实账号或浏览器验收，也没有部署；只在本地提交，未合并。
 
+## 19 — 代码精简 SIM-01：一模一样的小函数只留一份（2026-10-11）
+
+### 范围与原因
+
+- 用户 2026-10-11 的代码精简计划（`docs/code-simplification-plan-2026-10-11.md`，和检阅路线 `docs/project-review-and-roadmap-2026-10-11.md` 一起放在 main 的工作区，还没有入库）建议的第一批：先合并明确重复的小型纯函数，不改任何行为。
+- 分支 `refactor/sim01-shared-helpers`，从 main 的 `751c6b1` 开出。第 16–18 批还在 `feat/data-coverage-report`、`feat/chat-structured-requisites` 两个分支上、没有合并，所以这一节排在 19。这一批改的文件和它们没有重叠：第 18 批改过的 `schemas/answer_evidence.py` 这次不动。
+- 只合并函数体、报错文字和调用方式都完全一样的副本。看起来像、但报错文字或对空值的处理不同的，原样保留，见「已知、未处理」。
+
+### 已实现
+
+1. 逐行 L2 归一化：PyTorch／FlagEmbedding（`rag/embedder.py`）、ONNX（`rag/onnx_backend.py`）、OpenVINO（`rag/openvino_backend.py`）三个后端各有一份一模一样的 `_l2_normalize`，现在只留 `rag/vectors.py` 的 `l2_normalize`（只依赖 numpy）。三个后端用原来的私有名字导入它，调用处不变；`scripts/rehearse_recovery.py` 和 6 个测试文件照旧从 `rag.embedder` 导入 `_l2_normalize`。
+2. 课程代码：`schemas/program_plan.py` 的 `normalize_code` 和 `CourseRequisiteDocument.canonical_code` 的函数体和报错（`Invalid course code`）完全一样，现在都用 `schemas/course.py` 的 `canonical_course_code`（放在 `COURSE_CODE_PATTERN` 旁边）。`program_plan.normalize_code` 这个名字保留，`schemas/course_program_context.py` 照旧从那里导入。
+3. 规范 UTC 时间：`FeedbackCandidate` 和 `QueryLogExportRow` 的 `utc_timestamp` 函数体完全一样，现在都调用 `schemas/feedback_candidate.py` 的 `canonical_utc_timestamp`；`query_log_export` 本来就从那里导入 `text_sha256` 和两个类型。字段、装饰器、报错文字都不变。
+
+### 修改文件
+
+| 文件 | 修改 |
+|---|---|
+| `rag/vectors.py`（新） | `l2_normalize` |
+| `rag/embedder.py`、`rag/onnx_backend.py`、`rag/openvino_backend.py` | 删掉各自的副本，以 `_l2_normalize` 导入共用的 |
+| `schemas/course.py` | 新增 `canonical_course_code` |
+| `schemas/program_plan.py`、`schemas/course_requisite_document.py` | 用 `canonical_course_code`；`normalize_code` 成为它的别名 |
+| `schemas/feedback_candidate.py`、`schemas/query_log_export.py` | 新增 `canonical_utc_timestamp`，两个校验器调用它 |
+| `tests/test_shared_normalizers.py`（新） | 见验证记录 |
+| 本文件 | 本节 |
+
+### 验证记录
+
+- 先写行为特征测试 `tests/test_shared_normalizers.py`，在没改动的 `751c6b1` 上跑，33 个全过：
+  - 三个后端的归一化对同一组输入给出相同结果：float32、形状不变、零行保持为零、整数输入、空输入、一维输入报错、不改原数组；
+  - 培养方案和先修文档对同一组课程代码（大小写、首尾空白、制表符、结尾字母，以及 9 种不合格的写法）给出相同结果和相同报错；
+  - 两份导出 schema 对同一组时间文本（合法、能解析但写法不规范、根本不是时间）给出相同结果，写法不规范时报错文字也相同。
+- 合并之后同一批 33 个仍全过；另加 2 个：每个旧名字都指向唯一的定义；新进程里导入 `rag.vectors` 不加载 torch、ONNX Runtime、OpenVINO 等模型运行时。共 35 个。
+- 导入了这几个模块的 62 个测试文件：2027 passed（6 个进程）。
+- 全量：3175 passed（main `751c6b1` 上是 3140，加这里的 35 个）。
+- 变异检查：13 个，跑新测试文件和 `tests/test_embedder.py`：零行不再保护、不转 float32、按列归一化、导入时加载 torch；课程代码不去空白、不转大写、报错文字改了、去掉空格；时间只解析不核对写法、时间报错文字改了；三处调用改成不校验。13/13 被杀，第一次就全杀。
+- ruff 0.5.0（F/E9/B）对改动的 .py 文件：干净；没有 CR、没有权限位改动。
+- 只用测试自己建的数据；没有真实模型调用，没有打开真实库，没有在真实的 ONNX／OpenVINO 后端上跑（三个后端现在调用的是同一个函数对象，函数体也和原来一样）；没有改任何模型参数。
+
+### 审查
+
+还没有审查。按计划要开两路只读审查（一路看行为是否等价，一路看测试和文档），等用户安排。
+
+### 已知、未处理
+
+1. 看起来相同、但没合并的：`Course._normalize_code`（报错会带出原值）、`RequisiteNode.canonical_code`（允许空值，报错是 `Invalid requisite course code`）、`CatalogSnapshot.normalize_code`（报错是 `Invalid catalog course code`；第 18 批的分支改过这个文件，等它合并后再看）；先修文档和来源的时间校验（只要求带时区并转成 UTC，报错文字也不同）。要合并它们，得先决定报错文字统一成哪一种，这会改行为，不在纯重构里做。
+2. `EMBEDDING_DIM = 1024` 在三个后端各写一次（ONNX、OpenVINO 的注释写明照抄 `rag.embedder`）；计划没列，这次没动。
+3. SIM-02（共享检索决策）和之后的批次还没开始。
+
+### 发布状态
+
+- 本地分支 `refactor/sim01-shared-helpers`，从 main 的 `751c6b1` 开出；没有 push，没有 PR，等用户要了再开。合并由用户点。
+- 纯重构，行为不变，不需要单独部署。本批没有动生产数据。
+
