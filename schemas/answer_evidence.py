@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 from typing import Literal
@@ -66,9 +67,12 @@ class CatalogSnapshot(BaseModel):
 
 class RequisiteSectionEvidence(BaseModel):
     """One prerequisite or corequisite section of a stored year document, as an answer sees it:
-    the same status and rule tree, the recorded clause text cut to CLAUSE_LIMIT characters.
+    the same status and rule tree, the recorded clause text cut to CLAUSE_LIMIT characters. An
+    unparsed section also carries the SHA-256 of its whole recorded text, which years are compared
+    by (so texts that differ only after the cut still differ); it never reaches the prompt.
     中文：已存年度文档里的一段先修或共修，回答看到的样子：状态和规则树不变，条款原文截到
-    CLAUSE_LIMIT 个字符。"""
+    CLAUSE_LIMIT 个字符。未解析的一段另带整段原文的 SHA-256，各年度按它比较（所以截断处以后才
+    不同也算不同）；它不进提示词。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -77,17 +81,27 @@ class RequisiteSectionEvidence(BaseModel):
     clause_text: str | None = Field(default=None, max_length=CLAUSE_LIMIT)
     clause_truncated: bool = False
     unparsed_reason: str | None = Field(default=None, min_length=1, max_length=100)
+    clause_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
     @model_validator(mode="after")
     def consistent_state(self) -> RequisiteSectionEvidence:
-        # The stored RequisiteSection's own rule: only a parsed section has a tree, never a partial one.
-        # 中文：沿用已存 RequisiteSection 的规则：只有 parsed 有规则树，不给部分成功的树。
+        # The stored RequisiteSection's own rule: only a parsed section has a tree, never a partial one, and an
+        # unparsed one keeps its text, which is empty for a label with no clause after it.
+        # 中文：沿用已存 RequisiteSection 的规则：只有 parsed 有规则树，不给部分成功的树；unparsed 保留原文，
+        # 标签后面没有条款时原文为空。
         if self.status == "not_listed":
             valid = self.rule is None and self.clause_text is None and not self.clause_truncated and self.unparsed_reason is None
         elif self.status == "unparsed":
-            valid = self.rule is None and bool(self.clause_text) and self.unparsed_reason is not None
+            valid = self.rule is None and self.clause_text is not None and self.unparsed_reason is not None
         else:
             valid = self.rule is not None and bool(self.clause_text) and self.unparsed_reason is None
+        # Only an unparsed section has a digest, and a text that was not cut must match its own.
+        # 中文：只有未解析的一段有摘要；没截断的原文必须和自己的摘要一致。
+        if self.clause_sha256 is not None and (
+                self.status != "unparsed" or self.clause_text is None
+                or (not self.clause_truncated
+                    and hashlib.sha256(self.clause_text.encode("utf-8")).hexdigest() != self.clause_sha256)):
+            valid = False
         if not valid:
             raise ValueError("Requisite section state is inconsistent")
         return self

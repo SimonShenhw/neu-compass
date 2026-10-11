@@ -8,6 +8,7 @@ answer-quality check (that needs real model calls, which this batch does not mak
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 
@@ -113,6 +114,24 @@ def test_a_corequisite_change_alone_is_a_difference(empty_db):
     assert "requisites_differ_by_catalog_year" in evidence_for(empty_db, record).warnings
 
 
+def test_the_same_rule_in_other_words_is_not_a_difference(empty_db):
+    """Parsed clauses are compared by their trees: "A; B" and "A and B" are one rule."""
+    record = seeded(empty_db, document("2026-2027"), document("2025-2026", prerequisite=NESTED.replace("); ", ") and ")))
+    evidence = evidence_for(empty_db, record)
+    newer, older = (edition.prerequisite for edition in evidence.requisites.editions)
+    assert newer.rule == older.rule and newer.clause_text != older.clause_text
+    assert "requisites_differ_by_catalog_year" not in evidence.warnings
+
+
+@pytest.mark.parametrize(("oldest", "code"), [("CS 5004", "requisites_differ_by_catalog_year"),
+                                              ("CS 5004 and CS 5010 or CS 5600", "requisite_clause_unparsed")])
+def test_every_listed_year_is_checked_not_only_the_newest(empty_db, oldest, code):
+    record = seeded(empty_db, document("2026-2027"), document("2025-2026"), document("2024-2025", prerequisite=oldest))
+    evidence = evidence_for(empty_db, record)
+    assert [edition.catalog_year for edition in evidence.requisites.editions] == ["2026-2027", "2025-2026", "2024-2025"]
+    assert code in evidence.warnings
+
+
 @pytest.mark.parametrize(("older", "differ"), [("CS 5004 and CS 5010 or CS 5600", False),
                                                ("CS 5004 and CS 5010 or CS 5700", True)])
 def test_unparsed_clauses_are_compared_by_their_text(empty_db, older, differ):
@@ -139,6 +158,53 @@ def test_an_unparsed_clause_keeps_its_text_and_no_tree(empty_db):
     assert section.unparsed_reason == parse_clause(mixed).reason
     assert "requisite_clause_unparsed" in evidence.warnings
     assert "requisites_differ_by_catalog_year" not in evidence.warnings
+
+
+def test_an_empty_clause_is_kept_as_recorded(empty_db):
+    """A label with no clause after it is stored as unparsed with empty text (empty and missing stay distinct); the
+    answer gets that state, not a failed answer."""
+    record = seeded(empty_db, document(prerequisite=""))
+    evidence = evidence_for(empty_db, record)
+    section = evidence.requisites.editions[0].prerequisite
+    assert (section.status, section.rule, section.clause_text, section.unparsed_reason) == (
+        "unparsed", None, "", "empty_clause")
+    assert "requisite_clause_unparsed" in evidence.warnings
+    assert projected(record, evidence)["catalog_requisites"]["editions"][0]["prerequisite"] == {
+        "status": "unparsed", "clause_text": "", "clause_truncated": False}
+
+
+def test_a_document_the_block_cannot_carry_costs_its_edition_not_the_answer(empty_db, monkeypatch):
+    """The next usable edition takes its place within the limit, and the document is counted unusable."""
+    import rag.answer_evidence as answer_evidence  # noqa: PLC0415
+
+    record = seeded(empty_db, *(document(f"{year}-{year + 1}") for year in range(2023, 2027)))
+    project = answer_evidence.requisite_edition
+
+    def refuse_newest(item):
+        if item.catalog_year == "2026-2027":
+            raise ValueError("not representable")
+        return project(item)
+
+    monkeypatch.setattr(answer_evidence, "requisite_edition", refuse_newest)
+    evidence = evidence_for(empty_db, record)
+    assert [edition.catalog_year for edition in evidence.requisites.editions] == ["2025-2026", "2024-2025", "2023-2024"]
+    assert (evidence.requisites.editions_omitted, evidence.requisites.unusable_records) == (0, 1)
+    assert "structured_requisites_unusable" in evidence.warnings
+
+
+@pytest.mark.parametrize(("tail", "differ"), [(" and CS 5010", True), (" and CS 5800", False)])
+def test_long_unparsed_clauses_are_compared_whole(empty_db, tail, differ):
+    """Years are compared by the whole recorded text (its digest), not by the cut text the prompt gets."""
+    head = " ".join(["permission"] * 70)  # Longer than the cut; not the grammar, so kept as an unparsed clause.
+    record = seeded(empty_db, document("2026-2027", prerequisite=head + tail),
+                    document("2025-2026", prerequisite=head + " and CS 5800"))
+    evidence = evidence_for(empty_db, record)
+    newer, older = (edition.prerequisite for edition in evidence.requisites.editions)
+    assert newer.status == older.status == "unparsed" and newer.clause_truncated and older.clause_truncated
+    assert newer.clause_text == older.clause_text == head[:CLAUSE_LIMIT]
+    assert ("requisites_differ_by_catalog_year" in evidence.warnings) is differ
+    block = format_courses_block([SearchHit(course=record, score=1)], {record.course_id: evidence})
+    assert newer.clause_sha256 not in block and "clause_sha256" not in block
 
 
 @pytest.mark.parametrize(("length", "truncated"), [(CLAUSE_LIMIT, False), (CLAUSE_LIMIT + 1, True)])
@@ -175,6 +241,16 @@ def test_documents_that_fail_their_checks_are_counted_never_used(empty_db):
     evidence = evidence_for(empty_db, renamed)
     assert evidence.requisites.editions == [] and evidence.requisites.unusable_records == 2
     assert "structured_requisites_unusable" in evidence.warnings
+
+
+def test_the_course_rows_code_and_title_are_checked_as_on_the_course_page(empty_db):
+    """The course row was renamed after the import but the answered record was not: the course page does not use
+    the document, and neither does the answer."""
+    record = seeded(empty_db, document())
+    empty_db.execute("UPDATE courses SET primary_name='Advanced Algorithms'")
+    assert CourseRequisiteRepository(empty_db).list_for_course(record.course_id).documents == []
+    requisites = evidence_for(empty_db, record).requisites
+    assert (requisites.editions, requisites.unusable_records) == ([], 1)
 
 
 @pytest.mark.parametrize("hit", [{"primary_name": "Algorithms (old title)"}, {"primary_code": "CS 5810"}])
@@ -218,6 +294,30 @@ def test_each_course_gets_only_its_own_documents(empty_db):
     assert [edition.catalog_year for edition in evidence[first.course_id].requisites.editions] == ["2026-2027"]
     rule = evidence[second.course_id].requisites.editions[0].prerequisite.rule
     assert (rule.kind, rule.course_code) == ("course", "CS 5800")
+    # Another course's documents are neither used nor counted as this course's unusable ones.
+    assert [evidence[key].requisites.unusable_records for key in (first.course_id, second.course_id)] == [0, 0]
+    assert not any("structured_requisites_unusable" in item.warnings for item in evidence.values())
+
+
+@pytest.mark.parametrize("unreadable", ["course_row", "document_row"])
+def test_a_value_sqlite_cannot_read_costs_only_its_own_course(empty_db, unreadable):
+    """One query reads every hit; after it fails each course is read alone, so the others keep their rules."""
+    first = seeded(empty_db, document())
+    second = course(course_id="c-cs-6140", primary_code="CS 6140", primary_name="Machine Learning")
+    CourseRepository(empty_db).insert(second, raw_text="")
+    empty_db.execute("PRAGMA ignore_check_constraints=ON")
+    if unreadable == "course_row":
+        empty_db.execute("UPDATE courses SET primary_name=CAST(x'ff' AS TEXT) WHERE course_id='c-cs-6140'")
+    else:
+        empty_db.execute("INSERT INTO course_requisite_documents VALUES "
+                         "('c-cs-6140', '2026-2027', CAST(x'7bff7d' AS TEXT), 'x')")
+    batch = CourseRequisiteRepository(empty_db).read_batch([first.course_id, second.course_id])
+    assert (batch.storage, batch.unreadable) == ("available", {second.course_id})
+    evidence = build_answer_evidence(empty_db, [first, second])
+    assert [edition.catalog_year for edition in evidence[first.course_id].requisites.editions] == ["2026-2027"]
+    assert "structured_requisites_unusable" not in evidence[first.course_id].warnings
+    assert evidence[second.course_id].requisites == RequisiteEvidence(storage="schema_unusable")
+    assert "structured_requisites_unusable" in evidence[second.course_id].warnings
 
 
 def test_two_documents_for_one_year_choose_neither(empty_db):
@@ -232,6 +332,22 @@ def test_two_documents_for_one_year_choose_neither(empty_db):
     requisites = evidence_for(empty_db, record).requisites
     assert [edition.catalog_year for edition in requisites.editions] == ["2025-2026"]
     assert requisites.unusable_records == 2
+
+
+def test_a_year_held_twice_is_counted_unusable_not_omitted(empty_db):
+    """Four usable years and one year held twice (a copy without keys): the newest three are shown, one usable year
+    is left out, and both copies of the doubled year are unusable."""
+    record = seeded(empty_db, *(document(f"{year}-{year + 1}") for year in range(2023, 2027)))
+    empty_db.executescript(
+        "CREATE TABLE loose AS SELECT * FROM course_requisite_documents;"
+        "DROP TABLE course_requisite_documents; ALTER TABLE loose RENAME TO course_requisite_documents;")
+    for clause in (NESTED, "CS 5004"):
+        twin = document("2022-2023", prerequisite=clause)
+        empty_db.execute("INSERT INTO course_requisite_documents VALUES (?,?,?,?)",
+                         (twin.course_id, twin.catalog_year, twin.model_dump_json(), content_hash(twin)))
+    requisites = evidence_for(empty_db, record).requisites
+    assert [edition.catalog_year for edition in requisites.editions] == ["2026-2027", "2025-2026", "2024-2025"]
+    assert (requisites.editions_omitted, requisites.unusable_records) == (1, 2)
 
 
 def test_missing_or_unreadable_storage_degrades_to_the_old_answer(empty_db):
@@ -255,7 +371,9 @@ def test_the_evidence_model_refuses_inconsistent_blocks():
 
     newer, older = (requisite_evidence(course(), [document(year)]).editions[0] for year in ("2026-2027", "2025-2026"))
     assert RequisiteEvidence(storage="available", editions=[newer, older]).editions == [newer, older]
+    four = [requisite_evidence(course(), [document(f"{year}-{year + 1}")]).editions[0] for year in range(2026, 2022, -1)]
     for bad in ({"storage": "available", "editions": [older, newer]},
+                {"storage": "available", "editions": four},
                 {"storage": "available", "editions": [newer, newer]},
                 {"storage": "schema_missing", "editions": [newer]},
                 {"storage": "schema_unusable", "unusable_records": 1},
@@ -268,11 +386,26 @@ def test_the_evidence_model_refuses_inconsistent_blocks():
                 {"status": "parsed", "rule": newer.prerequisite.rule, "clause_text": "x", "unparsed_reason": "r"},
                 {"status": "unparsed", "clause_text": "x"},
                 {"status": "unparsed", "rule": newer.prerequisite.rule, "clause_text": "x", "unparsed_reason": "r"},
-                {"status": "unparsed", "clause_text": "", "unparsed_reason": "r"}):
+                {"status": "unparsed", "unparsed_reason": "r"},
+                {"status": "parsed", "rule": newer.prerequisite.rule, "clause_text": "x",
+                 "clause_sha256": hashlib.sha256(b"x").hexdigest()},
+                {"status": "unparsed", "clause_text": "x", "unparsed_reason": "r", "clause_sha256": "0" * 64},
+                {"status": "parsed", "rule": newer.prerequisite.rule},
+                {"status": "parsed", "rule": newer.prerequisite.rule, "clause_text": ""},
+                {"status": "unparsed", "clause_text": "x" * (CLAUSE_LIMIT + 1), "unparsed_reason": "r"}):
         with pytest.raises(ValidationError):
             RequisiteSectionEvidence(**bad)
+    assert len(RequisiteSectionEvidence(status="unparsed", clause_text="x" * CLAUSE_LIMIT, unparsed_reason="r")
+               .clause_text) == CLAUSE_LIMIT
+    # A cut text cannot be checked against the digest of the whole one.
+    assert RequisiteSectionEvidence(status="unparsed", clause_text="x", clause_truncated=True, unparsed_reason="r",
+                                    clause_sha256="0" * 64).clause_sha256 == "0" * 64
+    # A label with no clause after it is stored as unparsed with empty text; the block carries that state.
+    assert RequisiteSectionEvidence(status="unparsed", clause_text="", unparsed_reason="empty_clause").clause_text == ""
     with pytest.raises(ValidationError):
         newer.model_validate({**newer.model_dump(), "catalog_url": "https://example.org/course-descriptions/cs/"})
+    with pytest.raises(ValidationError):
+        newer.model_validate({**newer.model_dump(), "catalog_year": "2026-27"})
 
 
 # --- prompt -------------------------------------------------------------------------------------
@@ -343,13 +476,23 @@ def test_rules_for_year_scoped_requisites():
         "Treat one year's rule as the student's only if the student named that catalog year in this conversation",
         "an entry or start term (e.g. Fall 2026) is not a catalog year, so never map one to the other",
         "if they differ, say so briefly and ask which catalog year applies to the student",
+        "If the student names a catalog year that has no entry here, say these records give no rule for that year",
+        "and never give another year's rule as theirs",
         "all_of means every branch is required and any_of means any one branch is enough",
         "A corequisite is a separate requirement, not a course to finish first",
         "status not_listed: that year's course block lists none, which does not prove there is no requirement",
-        "give its clause_text as recorded (say so when clause_truncated is true) and say it needs checking",
+        "give its clause_text as recorded (say so when clause_truncated is true;",
+        "an empty clause_text means the label has no text after it) and say it needs checking",
         "Never say the student is eligible, meets or has met a requirement, or can register",
         "structured_requisites_unusable means some recorded rules for this course could not be read",
         "Cite a rule like a description: a Markdown link to that entry's catalog_url with the same label",
+        "The link opens that page as it is now, not the saved copy, so it may show a later year's rule: "
+        "say so when you cite a rule from any entry but the newest",
+        "if every listed year has the same rule, say which catalog years it covers",
+        "keep the nesting, minimum_grade, may_be_taken_concurrently and the level mark "
+        "(Graduate/Undergraduate, as written in the clause) exactly as given",
+        "approvals, placement, transfer credit and program rules are not covered",
+        "for this course could not be read: do not treat any year as having no requirement",
         "Without catalog_requisites entries, prerequisite codes do NOT encode AND/OR logic",
     ):
         assert sentinel in rules, sentinel
@@ -403,6 +546,16 @@ def test_chat_still_answers_when_the_rules_cannot_be_read(api_client):
     assert '"catalog_requisites": {\n      "editions": [],' in prompt
 
 
+def test_an_empty_clause_does_not_fail_chat_or_the_course_page(api_client):
+    conn = api_client.app.dependency_overrides[get_db_conn]()
+    CourseRequisiteRepository(conn).store(document(prerequisite=""))
+    meta, _ = capture_chat(api_client)
+    evidence = meta["results"][0]["answer_evidence"]
+    assert evidence["requisites"]["editions"][0]["prerequisite"]["clause_text"] == ""
+    detail = api_client.get("/course/c-cs-5800")
+    assert detail.status_code == 200 and detail.json()["answer_evidence"] == evidence
+
+
 # --- UI and eval --------------------------------------------------------------------------------
 
 def test_new_codes_have_labels_and_are_never_printed_by_answers():
@@ -418,9 +571,13 @@ def test_the_evidence_card_names_the_recorded_years_only_from_a_valid_block(empt
     line = "先修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 2 个更早年份没有列出（非实时核验，不判断能否注册）"
     assert requisite_years_line(evidence) == line
     assert line in evidence_summary(evidence)
-    broken = {**evidence, "requisites": {**evidence["requisites"], "editions": [{"catalog_year": "*[x](y)*"}]}}
+    # A block whose only fault is a year that is not YYYY-YYYY: the caption renders Markdown, so it shows nothing.
+    edition = evidence["requisites"]["editions"][0]
+    broken = {"requisites": {"storage": "available", "editions": [{**edition, "catalog_year": "*[x](y)*"}]}}
     assert requisite_years_line(broken) is None
     assert requisite_years_line({"requisites": None}) is None and requisite_years_line({}) is None
+    for storage in ("available", "schema_missing"):  # No edition, no years line.
+        assert requisite_years_line({"requisites": RequisiteEvidence(storage=storage).model_dump(mode="json")}) is None
 
 
 def test_the_live_eval_builds_the_same_prompt_as_chat_from_the_course_page(api_client):

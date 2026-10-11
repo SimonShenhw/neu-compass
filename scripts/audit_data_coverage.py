@@ -266,7 +266,8 @@ RULES = {
                            "usable snapshot (the app may attach a duplicate or oversize one) and their year-scoped "
                            "requisite evidence, built as the chat path builds it; program_seed_unverified, which "
                            "depends on how the course was reached, is not counted; a course can have several (not "
-                           "exclusive); not_checked when catalog_snapshots or requisite_documents was not checked",
+                           "exclusive); not_checked when catalog_snapshots was not checked, or requisite_documents "
+                           "was not checked although its table exists (without the table chat has no year rules)",
     },
     "requisite_documents": {
         "text_not_utf8": _NOT_UTF8,
@@ -460,6 +461,22 @@ def _decode(value, budget, model):
         return "decoded", model.model_validate_json(value)
     except (ValueError, RecursionError):  # pydantic's ValidationError is a ValueError.
         return "invalid_record", None
+
+
+def _requisite_row(row, course: Course) -> tuple[str, CourseRequisiteDocument | None]:
+    """(category, document) for one stored year document of an in-scope course, with the checks the requisite
+    repository applies (the document only when the category is 'usable').
+    中文：在范围内课程的一行年度文档，按先修文档仓库的核对给出（类别，文档）；只有类别为 usable 时才有文档。"""
+    category, document = _decode(row["document"], MAX_DOCUMENT_JSON, CourseRequisiteDocument)
+    if document is None:
+        return category, None
+    if (document.course_id, document.catalog_year) != (row["course_id"], row["catalog_year"]):
+        return "row_identity_mismatch", None
+    if (document.course_code, document.course_name) != (course.primary_code, course.primary_name):
+        return "course_identity_mismatch", None
+    if requisite_content_hash(document) != row["content_hash"]:
+        return "content_hash_mismatch", None
+    return "usable", document
 
 
 def _department(code: str) -> str:
@@ -848,7 +865,11 @@ class _Audit:
     def fields(self):
         self.require_section("courses")
         compared = self.sections.get("catalog_snapshots", {}).get("status") == "checked"
-        with_rules = self.sections.get("requisite_documents", {}).get("status") == "checked"
+        documents = self.sections.get("requisite_documents", {})
+        # Without the table chat has no year rules at all (schema_missing, as in 4.3), so they are known; requisites
+        # then stay None, which gives the same gaps and warnings. 中文：没有这张表时聊天一条年度规则都没有（schema_missing，
+        # 和 4.3 相同），所以是确定的；这时 requisites 为 None，缺口和警告与它相同。
+        with_rules = documents.get("status") == "checked" or documents.get("code") == TABLE_CODES["missing"]
         # Without checked snapshots the catalog categories cannot be told apart from missing, and without the year
         # documents a prereq gap cannot be told apart from a year rule: those fields are not checked.
         names = tuple(field for field in AVAILABILITY_FIELDS
@@ -927,12 +948,15 @@ class _Audit:
         departments = defaultdict(lambda: {"courses_in_scope": 0, "by_catalog_year": defaultdict(
             lambda: {"with_usable_document": 0, "prerequisite": Counter(), "corequisite": Counter(),
                      "credit_hours_vs_course_credits": Counter()})})
-        # Per in-scope course, what chat's read_batch would give requisite_evidence.
+        # Per in-scope course, what chat's read_batch would give requisite_evidence: every row that passes the checks,
+        # duplicates included (requisite_evidence drops a year that keeps two), and how many others there are.
+        # 中文：每门在范围内的课，聊天的 read_batch 会交给 requisite_evidence 的东西：通过核对的每一行（重复行也算，
+        # requisite_evidence 会丢掉留下两份的年度），以及其余的行数。
         usable_documents, unusable_rows, unreadable = defaultdict(list), Counter(), set()
         for row in rows:
             course_id = row["course_id"]
             edition = _edition(row["catalog_year"])
-            document = None
+            document = served = None
             if _undecodable(row):
                 category = "text_not_utf8"
             elif course_id not in self.known_ids:
@@ -941,18 +965,9 @@ class _Audit:
                 category = "rows_for_courses_out_of_scope"
             elif seen[(course_id, row["catalog_year"])] > 1:
                 category = "duplicate_rows"
+                served = _requisite_row(row, self.scope[course_id])[1]
             else:
-                course = self.scope[course_id]
-                category, document = _decode(row["document"], MAX_DOCUMENT_JSON, CourseRequisiteDocument)
-                if document is not None:
-                    if (document.course_id, document.catalog_year) != (course_id, row["catalog_year"]):
-                        category = "row_identity_mismatch"
-                    elif (document.course_code, document.course_name) != (course.primary_code, course.primary_name):
-                        category = "course_identity_mismatch"
-                    elif requisite_content_hash(document) != row["content_hash"]:
-                        category = "content_hash_mismatch"
-                    else:
-                        category = "usable"
+                category, document = _requisite_row(row, self.scope[course_id])
             counts[category] += 1
             if category != "usable":
                 editions[edition]["unusable"] += 1
@@ -960,6 +975,8 @@ class _Audit:
                     self.note("requisite_documents", category, self.item(self.scope[course_id], catalog_year=edition))
                     if category == "text_not_utf8":
                         unreadable.add(course_id)
+                    elif served is not None:
+                        usable_documents[course_id].append(served)
                     else:
                         unusable_rows[course_id] += 1
                 elif category == "text_not_utf8":  # The course page of an excluded course fails as well.
@@ -993,11 +1010,10 @@ class _Audit:
             if course.prereqs and not self.documents.get(course_id):
                 legacy_only += 1
                 self.note("requisite_documents", "legacy_prereqs_without_usable_document", self.item(course))
-            # The year rules chat gets: the same editions and unusable count as requisite_evidence over read_batch
-            # (chat decodes duplicates and drops them there; they never reach usable here). Chat reads a course's
-            # rows in one query, which a value that is not UTF-8 fails, so such a course gets none.
-            # 中文：聊天拿到的年度规则，和 read_batch 加 requisite_evidence 的结果相同；有不是 UTF-8 的值时，
-            # 这门课的查询整条失败，聊天一条年度规则也拿不到。
+            # The year rules chat gets: requisite_evidence over what read_batch serves (collected above). After a
+            # failed batch query chat reads each course alone, so a course with a value that is not UTF-8 gets none.
+            # 中文：聊天拿到的年度规则：对 read_batch 会给的文档（上面收集的）调用 requisite_evidence；整批查询失败后
+            # 聊天逐门课再读，有不是 UTF-8 的值的这门课一条年度规则也拿不到。
             self.requisites[course_id] = (
                 RequisiteEvidence(storage="schema_unusable") if course_id in unreadable
                 else requisite_evidence(course, usable_documents[course_id], unusable_rows[course_id]))

@@ -40,7 +40,7 @@
 - 这些检查都是按名字做的：有人抄进允许的列里的值（比如把用户的 ID 写进 `programs.program_id`），或者一份把别的数据一致地重建在允许名字下的文件，照样会被读到。所以真正的边界是输出：输出里只有计数、固定文字，和下面说的格式合格的代码、ID、年度，以及校验过的记录里的日期（抓取、采集日期的最早和最晚一天）。
 - 课程 JSON、目录快照、先修文档、培养方案的内容会被读进来做校验，但报告里只有计数。`--details` 另外列出课程代码、方案 ID 和方案范围（校区／年度／路径／有没有方向／coverage／审核状态，方向的名字不列）；引文、描述、条款原文、审核人、备注都不输出。
 - 列里的值只有合格式才会出现在输出里：课程代码按代码格式规整后列出；方案 ID、项目 ID，以及重复代码旁边的课程 ID，必须是小写字母、数字和连字符，**并且至少有一个字母**（项目 ID 最多 64 个字符，方案 ID 和课程 ID 最多 100 个），所以抄进 ID 列的纯数字标识（比如账号）永远不会印出来；方案模型本身接受纯数字的方案 ID，所以可用方案的 ID 也要过这一关。年度必须是相邻两年的 `YYYY-YYYY`，和应用的要求一样。其余的只计数：明细里计入 `unlisted_malformed`，汇总里有各自的计数（见各节）。
-- 和应用一样，装着 UTF-8 JSON 文本的 BLOB 照常解析。存成 TEXT 却不是合法 UTF-8 的值，应用取到它的查询会整条失败，同一查询里的其他行也拿不到（比如同一批课程的快照一个都挂不上），所以这类行应当最先修。报告把这种行单独记成一类 `text_not_utf8`：在课程、先修文档、方案三节最先判断，在目录快照一节排在 `absent` 之后；`--details` 里能读出代码或 ID 的都列出来。其他计数块另有不互斥的 `rows_with_text_not_utf8`。这种行在查重复之前就归入 `text_not_utf8`，所以两个不同的坏年度不会被当成重复行；两个坏值也只有存储的字节完全相同才相等，和 SQLite 自己的比较一致。
+- 和应用一样，装着 UTF-8 JSON 文本的 BLOB 照常解析。存成 TEXT 却不是合法 UTF-8 的值，应用取到它的查询会整条失败，同一查询里的其他行也拿不到（比如同一批课程的快照一个都挂不上；聊天读年度先修文档时会在整条查询失败后逐门课再读，只有那门课拿不到），所以这类行应当最先修。报告把这种行单独记成一类 `text_not_utf8`：在课程、先修文档、方案三节最先判断，在目录快照一节排在 `absent` 之后；`--details` 里能读出代码或 ID 的都列出来。其他计数块另有不互斥的 `rows_with_text_not_utf8`。这种行在查重复之前就归入 `text_not_utf8`，所以两个不同的坏年度不会被当成重复行；两个坏值也只有存储的字节完全相同才相等，和 SQLite 自己的比较一致。
 
 ## 报告结构
 
@@ -49,7 +49,7 @@
 每一节、节里能单独没查成的部分，都有 `status`：
 
 - `checked`：查过了。计数是 0 就是「查了、没有这一类」。
-- `not_checked`：没查，`code` 说明原因：`table_missing`（表不存在）、`table_not_plain`（同名对象是视图、虚拟表，或要读的列是生成列）、`column_missing`、`courses_not_checked`（依赖的课程一节没查成）、`catalog_snapshots_not_checked`（目录快照一节没查成，学分和先修代码因此没法和目录比）、`requisite_documents_not_checked`（先修文档一节没查成，先修字段和回答警告因此没法定）、`database_unavailable`（副本没读成）。
+- `not_checked`：没查，`code` 说明原因：`table_missing`（表不存在）、`table_not_plain`（同名对象是视图、虚拟表，或要读的列是生成列）、`column_missing`、`courses_not_checked`（依赖的课程一节没查成）、`catalog_snapshots_not_checked`（目录快照一节没查成，学分和先修代码因此没法和目录比）、`requisite_documents_not_checked`（先修文档表在、但这一节没查成，先修字段和回答警告因此没法定；表不存在时聊天一条年度规则都没有，照常统计）、`database_unavailable`（副本没读成）。
 - `failed`：查的时候失败，只给固定的原因码：`row_budget`（单表超过 20 万行，不截断）、`sqlite_budget`、`read_outside_allowlist`（副本的结构让查询碰到了允许范围以外的列）、`database_error`、`section_failed`。
 
 `complete` 只有在任何一节、任何一部分都是 `checked` 时才为 true；某一节里有一部分 `not_checked`（比如 `programs` 表不在，`legacy_rows` 的按项目统计就没查），`complete` 也是 false，退出码 2。
@@ -103,7 +103,7 @@
 
 先修有可用的年度先修文档时最先归为 `year_rules`。其余的，有可用快照时先和目录比：学分只在快照有整数学分时才比，先修代码集合即使快照一个都没列也比；之后看字段证据，最后看来源 ID。先修代码按规范形式比较：合格的代码规整成 `CS 5004` 这样（`cs5004` 和 `CS 5004` 是同一个），其他值转成大写、去掉多余空白后比较（所以 `cs  5800` 也等于 `CS 5800`）；空白项不算列出的代码。所以只差空格或大小写不算冲突。`missing`、`catalog_only`、`catalog_lists_none` 加起来正好是回答路径 `missing_fields` 里的这个字段，学分的 `catalog_conflict` 正好是回答路径的 `catalog_metadata_conflict`，测试逐门课核对这两点，也直接拿聊天路径（`build_answer_evidence`）核对整节的缺口数和警告数。这两点的前提是应用挂的也是报告认可的那份快照：应用挂了报告不用的重复或超长快照时，两边会不同。先修代码集合的冲突是报告自己的比较，回答路径没有对应的警告。
 
-另外给出：课程的目录描述（`catalog_description`：可用快照有描述、可用快照没有描述、没有可用快照；后两项就是回答路径缺的 `catalog_description`），以及 `course_answer_evidence` 对这些课会给出的警告各有几门（`answer_warnings`，一门课可以有好几个；`program_seed_unverified` 取决于这门课是怎么查到的，不计）。给它的是报告认可的快照和年度先修证据，按聊天的方式构造：这门课的可用文档（最多 3 个年度，新的在前）和不可用的行数；有不是合法 UTF-8 的行时，这门课一条年度规则都没有，和聊天的查询失败时一样。目录快照一节没查成时，学分和先修代码这两个字段、`catalog_comparison`、`catalog_description`、`answer_warnings` 都标 `not_checked`（`catalog_snapshots_not_checked`），因为那时分不清「没有快照可比」和「快照里也没有」；先修文档一节没查成时，先修和 `answer_warnings` 标 `not_checked`（`requisite_documents_not_checked`），因为那时分不清「缺先修」和「有年度规则」；其他字段照常统计。
+另外给出：课程的目录描述（`catalog_description`：可用快照有描述、可用快照没有描述、没有可用快照；后两项就是回答路径缺的 `catalog_description`），以及 `course_answer_evidence` 对这些课会给出的警告各有几门（`answer_warnings`，一门课可以有好几个；`program_seed_unverified` 取决于这门课是怎么查到的，不计）。给它的是报告认可的快照和年度先修证据，按聊天的方式构造：这门课的可用文档（最多 3 个年度，新的在前）和不可用的行数；缺键的副本里同一年度有几行时，也像聊天那样逐行核对：只有一行通过就用它，几行都通过就这一年都不用（先修文档一节的 `duplicate_rows` 照旧按存储的行计）；有不是合法 UTF-8 的行时，这门课一条年度规则都没有，和聊天的查询失败时一样。目录快照一节没查成时，学分和先修代码这两个字段、`catalog_comparison`、`catalog_description`、`answer_warnings` 都标 `not_checked`（`catalog_snapshots_not_checked`），因为那时分不清「没有快照可比」和「快照里也没有」；先修文档表不存在时（运行库还没迁移到 v1.6 时就是这样），聊天一条年度规则都没有、和 4.3 相同，先修和 `answer_warnings` 照常统计；表在但这一节没查成时（不是普通表、缺列、读出错等），先修和 `answer_warnings` 标 `not_checked`（`requisite_documents_not_checked`），因为那时分不清「缺先修」和「有年度规则」；其他字段照常统计。
 
 `by_department` 每个院系给出课程数、`fields` 下每个字段的类别（省略为 0 的类别；上面标 `not_checked` 的字段不含），和目录比过时还有这个院系的 `catalog_description`，目录和年度文档都读了时还有 `answer_warnings`（同样省略为 0 的）。
 
@@ -143,7 +143,7 @@
 
 1. **超长的值不解码**：快照超过 10 万字符、课程 JSON 超过 100 万字符、方案超过 20 万字符时记 `oversize`，不算可用。应用挂快照（`get_batch`）、读课程（`get`）、列方案（`list_for_program`）都没有长度上限，可能照样用；先修文档和 `course_context` 的上限与报告相同。
 2. **重复行一个都不用**：只有表缺了主键或唯一约束才会出现。应用挂快照时会用最后一个有效的，课程详情页会把同一年度的几份文档都显示出来，`list_for_program` 会把重复的方案都列出来；`course_context` 一次只读一个年度，先去掉草稿和不含这门课的方案再查重复，所以孪生方案是草稿或在另一个年度时，它仍会显示那份 `source_checked` 的。同一 `course_id` 的几行课程，应用按 ID 查和批量查拿到的可能不是同一行。
-3. **不是合法 UTF-8 的 TEXT 只算一行**：报告把这一行记成 `text_not_utf8`，其余照常统计；应用取到这个值的查询整条失败，影响同一查询里的其他行，被排除的课程（比如合成课程）的坏快照行也一样会让应用失败（明细里同样列出）。年度先修规则也是这样：有这种行的课，报告按聊天的结果算它一条年度规则都没有，和它同一批查询的别的课，报告照常算。这时报告比应用乐观，所以这类行要最先修。反过来，坏值在 `primary_name`、`status` 这类列时，应用答题只读 `generated_json`，可能照样给出这门课，报告却把它排除在外，这时报告比应用保守。
+3. **不是合法 UTF-8 的 TEXT 只算一行**：报告把这一行记成 `text_not_utf8`，其余照常统计；应用取到这个值的查询整条失败，影响同一查询里的其他行，被排除的课程（比如合成课程）的坏快照行也一样会让应用失败（明细里同样列出）。年度先修规则也是这样：有这种行的课，报告按聊天的结果算它一条年度规则都没有，和它同一批查询的别的课，报告照常算。这时报告比应用乐观，所以这类行要最先修。反过来，坏值在 `primary_name`、`status` 这类列时，应用读课程只读 `generated_json`，可能照样给出这门课，报告却把它排除在外，这时报告比应用保守；坏值在 `primary_code` 或 `primary_name` 时，聊天给年度先修规则还要读这两列核对身份，读不了的那门课按表读不了处理（`structured_requisites_unusable`，没有年度规则），同一次回答的其他课照常。
 4. **孤儿方案不算可用**：`program_id` 不在 `programs` 里的方案，培养方案页面确实到不了；但 `course_context` 不查 `programs`，这样的方案只要有效且 `source_checked`，课程页的方案上下文照样会显示。
 5. **先修代码集合的冲突**（`catalog_conflict`）是报告自己的比较，回答路径没有这个警告。
 6. **名字只差大小写的表或列**（比如建表时写成 `Courses`）：报告的结构检查按原样比较名字，记作 `missing`／`column_missing`，这一部分 `not_checked`。目录快照、先修文档、方案这三张表，应用自己检查表在不在时也按原样比较名字，同样当作没有；`courses` 这类表 SQLite 和应用照样能读，这时报告比应用保守。宁可不查，不会把没查的写成查过。

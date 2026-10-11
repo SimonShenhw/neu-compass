@@ -2451,20 +2451,20 @@
 ### 已实现
 
 1. 证据（`schemas/answer_evidence.py`、`rag/answer_evidence.py`）：`CourseAnswerEvidence` 新增 `requisites`（没查时为 `None`，旧调用方和已存历史的输出不变）。
-   - `RequisiteEvidence`：`storage`（`available`／`schema_missing`／`schema_unusable`）、`editions`（可用文档，按年度从新到旧，最多 `MAX_REQUISITE_EDITIONS` = 3 份；新的在前只是限量，不替学生选年度）、`editions_omitted`、`unusable_records`。每份 `RequisiteEdition` 有年度、官方院系页 `catalog_url`、页面保存时间 `captured_at`，以及先修、共修两段：状态、规则树（只有 `parsed` 有）、最多 `CLAUSE_LIMIT` = 600 字符的原文和截断标记、未解析原因。模型校验年度不重复且从新到旧、表不可用时没有文档、只有超过上限才有省略数、每段的状态和内容一致。
-   - `requisite_evidence(course, documents, unusable)`：文档的课程 ID、代码、名称和被回答的课一致才用；同一年度不止一份（只有缺键的副本里才会有）时这一年度一份都不用，计入 `unusable_records`。
-   - `course_answer_evidence(..., requisites=...)`：有可用年度文档时，`prereqs` 不算缺失，也不再有 `prerequisite_logic_unavailable`。新提示码：`requisites_differ_by_catalog_year`（列出的年度规则不同；未解析的一段按原文比）、`requisite_clause_unparsed`（有一段没解析）、`structured_requisites_unusable`（有文档不可用，或表读不了）。没有可用年度文档时一切和 4.3 相同。
-   - `build_answer_evidence` 用新的 `CourseRequisiteRepository.read_batch`：一次回答的所有课用两次查询读完，核对和课程详情接口相同（课程行的代码和名称、年度、内容 hash、规则树）；读出错时 `schema_unusable`，回答照常给出，按旧逻辑。
+   - `RequisiteEvidence`：`storage`（`available`／`schema_missing`／`schema_unusable`）、`editions`（可用文档，按年度从新到旧，最多 `MAX_REQUISITE_EDITIONS` = 3 份；新的在前只是限量，不替学生选年度）、`editions_omitted`、`unusable_records`。每份 `RequisiteEdition` 有年度、官方院系页 `catalog_url`、页面保存时间 `captured_at`，以及先修、共修两段：状态、规则树（只有 `parsed` 有）、最多 `CLAUSE_LIMIT` = 600 字符的原文和截断标记、未解析原因；未解析的一段另带整段原文的 SHA-256 `clause_sha256`（审查 A18-F3 加的，不进提示词）。模型校验年度不重复且从新到旧、表不可用时没有文档、只有超过上限才有省略数、每段的状态和内容一致（未解析的一段原文可以为空：课程块的标签后面没有条款时解析器就这样存，审查 A18-F1 改的）、没截断的原文和摘要一致。
+   - `requisite_evidence(course, documents, unusable)`：文档的课程 ID、代码、名称和被回答的课一致才用；同一年度不止一份（只有缺键的副本里才会有）时这一年度一份都不用，计入 `unusable_records`。证据块表达不了的文档也计入这里并记一条日志，一份记录不会让整个回答失败（审查 A18-F1 改的）。
+   - `course_answer_evidence(..., requisites=...)`：有可用年度文档时，`prereqs` 不算缺失，也不再有 `prerequisite_logic_unavailable`。新提示码：`requisites_differ_by_catalog_year`（列出的年度规则不同；未解析的一段按整段原文的摘要 `clause_sha256` 比，第 600 字以后才不同也算，审查 A18-F3 改的）、`requisite_clause_unparsed`（有一段没解析）、`structured_requisites_unusable`（有文档不可用，或表读不了）。没有可用年度文档时和 4.3 相同，只是有不可用的文档或表读不了时多一个 `structured_requisites_unusable`（审查 A18-F5 改的说法）。
+   - `build_answer_evidence` 用新的 `CourseRequisiteRepository.read_batch`：一次回答的所有课用两次查询读完，核对和课程详情接口相同（课程行的代码和名称、年度、内容 hash、规则树）；读出错时回答照常给出：整批查询失败就逐门课再读，只有自己的行读不了的课是 `schema_unusable`、按旧逻辑，其他课照常（审查 A18-F4 改的）。
 2. 提示词 4.4（`llm/prompts/chat_v4.py`）：
-   - 每门课的 `catalog_requisites`：每个年度一项（年度、`catalog_url`、`captured_at`、先修、共修），`editions_not_shown` 是没列出的份数。规则树写成 `all_of`／`any_of`／课程叶，只带原文写明的最低成绩、可并修和 level；不给未解析原因（内部代码）和来源摘要。
+   - 每门课的 `catalog_requisites`：每个年度一项（年度、`catalog_url`、`captured_at`、先修、共修），`editions_not_shown` 是没列出的份数。规则树写成 `all_of`／`any_of`／课程叶，只带原文写明的最低成绩、可并修和 level；不给未解析原因（内部代码）、原文摘要和来源摘要。
    - 有年度规则时去掉 `recorded_metadata.prereqs` 和目录快照的 `prereq_codes`：课程页在年度规则旁边也不显示旧的平铺图。
-   - 规则：只有学生在对话里说了 Catalog 年度，才把那一年的规则当成学生的，入学学期不是 Catalog 年度；没说时，各年度相同就说明覆盖哪几年，不同就简短说明并问学生；`all_of`／`any_of`、嵌套、成绩、可并修、level 照原样，共修不是要先修完的课；`not_listed` 不证明没有要求，`unparsed` 照记录给出原文并说要核对；不说学生有资格、满足了要求或能注册；`structured_requisites_unusable` 时不能把任何年度当成没有要求；引用方式和目录描述相同，存档副本那句每个回答仍只说一次。
-3. 接口和界面：`/chat` 的 meta 和 `GET /course/{course_id}` 带同一份 `answer_evidence.requisites`。证据面板给新提示码配了完整和简短两种文字，简要卡片里也显示；卡片多一行「先修规则：已存 Catalog … 的课程块原文」，只读通过校验的数据块。课程详情面板去掉了「此规则未用于对话回答」，课程先修列表的 `warnings` 去掉了 `structured_requisites_not_used_by_chat`。
+   - 规则：只有学生在对话里说了 Catalog 年度，才把那一年的规则当成学生的，入学学期不是 Catalog 年度；没说时，各年度相同就说明覆盖哪几年，不同就简短说明并问学生；学生说的年度这里没有时，说明这些记录里没有那一年的规则，不拿别的年度代替（审查 A18-U1 加的）；`all_of`／`any_of`、嵌套、成绩、可并修、level 照原样，共修不是要先修完的课；`not_listed` 不证明没有要求，`unparsed` 照记录给出原文（原文为空表示标签后面没有条款）并说要核对；不说学生有资格、满足了要求或能注册；`structured_requisites_unusable` 时不能把任何年度当成没有要求；引用方式和目录描述相同，存档副本那句每个回答仍只说一次；链接打开的是院系页现在的样子，引用最新一份以外的年度时要说明页面可能已是更新年份的规则（审查 B18-L4 加的）。
+3. 接口和界面：`/chat` 的 meta 和 `GET /course/{course_id}` 带同一份 `answer_evidence.requisites`。证据面板给新提示码配了完整和简短两种文字，简要卡片里也显示；卡片多一行「先修规则：已存 Catalog … 的课程块原文」，只读通过校验的数据块。课程详情面板去掉了「此规则未用于对话回答」，改成说明对话回答最多引用最近 3 个已记录年份的规则、更早的只计数（审查 A18-F6 改的），课程先修列表的 `warnings` 去掉了 `structured_requisites_not_used_by_chat`。
 4. 评测：`eval/answer_checks.py` 不许回答印出新提示码；`scripts/eval_answers_live.py` 从课程详情接口的 `answer_evidence.requisites` 构造和聊天相同的证据，年度文档的 URL 算允许的链接，只有确实给了平铺列表的课才要求说明 AND/OR 不明。
 5. OPT-03 报告和聊天对齐（`scripts/audit_data_coverage.py`）：报告的字段类别和 `answer_warnings` 也调用 `course_answer_evidence`，原来不给年度规则，所以有可用年度文档的课，报告仍算先修缺失、仍算 `prerequisite_logic_unavailable`，和聊天不一致。现在：
-   - `requisite_documents` 一节在 `fields` 之前运行，给每门在范围内的课按聊天的方式构造年度先修证据：报告的可用文档和这门课不可用的行数交给 `requisite_evidence`，结果和 `read_batch` 加 `requisite_evidence` 相同（聊天把重复的两份都解码、在那里丢掉；报告在解码前就排除，结果一样）；这门课有不是合法 UTF-8 的行时给 `schema_unusable`，和聊天的查询失败时一样。
+   - `requisite_documents` 一节在 `fields` 之前运行，给每门在范围内的课按聊天的方式构造年度先修证据：报告的可用文档和这门课不可用的行数交给 `requisite_evidence`，结果和 `read_batch` 加 `requisite_evidence` 相同：重复行也逐行核对后交给 `requisite_evidence`，同一年度只有一行通过时用它，几行都通过时这一年都不用（审查 A18-F2／B18-M1 改的：原来在解码前就把重复行都排除，只有一行有效时和聊天不同）；这门课有不是合法 UTF-8 的行时给 `schema_unusable`，和聊天的查询失败时一样。
    - 先修的新类别 `year_rules`，最先判断：有可用年度文档时，回答给出那一年的规则，不用存储的代码列表，所以先修既不算缺失，也不和目录比；`missing`、`catalog_only`、`catalog_lists_none` 加起来仍正好是聊天的 `missing_fields`。明细不列这一类。
-   - 先修文档一节没查成时，先修和 `answer_warnings` 标 `not_checked`（新原因码 `requisite_documents_not_checked`）。
+   - 先修文档一节没查成时，先修和 `answer_warnings` 标 `not_checked`（新原因码 `requisite_documents_not_checked`）。表不存在时除外：那时聊天一条年度规则都没有、和 4.3 相同，所以照常统计（审查 A18-F7 改的：运行库还没有这张表，原来报告在运行库的副本上会丢掉这两项）。
 6. 文档：`docs/answer-grounding.md` 的 4.4 一条和 OPT-03 那句话；`docs/course-requisites.md` 文末「聊天回答中的年度规则」；`docs/program-plans.md` 一句；`docs/data-coverage-report.md` 的字段类别、原因码和 UTF-8 那一处差别。
 
 ### 修改文件
@@ -2478,41 +2478,69 @@
 | `app/answer_evidence_view.py`、`app/course_requisite_view.py` | 新提示码的文字、简要卡片、「先修规则」一行；详情面板的说明 |
 | `eval/answer_checks.py`、`scripts/eval_answers_live.py` | 见「已实现」第 4 条 |
 | `scripts/audit_data_coverage.py` | 见「已实现」第 5 条 |
-| `tests/test_chat_structured_requisites.py`（新）、`tests/test_audit_data_coverage.py`、`tests/test_chat_v4_prompt.py`、`tests/test_answer_grounding.py` | 见验证记录 |
+| `tests/test_chat_structured_requisites.py`（新）、`tests/test_audit_data_coverage.py`、`tests/test_chat_v4_prompt.py`、`tests/test_answer_grounding.py`、`tests/test_course_requisite_view.py` | 见验证记录 |
 | `docs/answer-grounding.md`、`docs/course-requisites.md`、`docs/program-plans.md`、`docs/data-coverage-report.md`、本文件 | 见上 |
 
 ### 验证记录
 
 - 只用测试自己建的临时库和记录提示词的模型替身；没有真实模型调用，没有打开真实库。
-- `tests/test_chat_structured_requisites.py`（新，32 个）覆盖：
+- `tests/test_chat_structured_requisites.py`（新，32 个，审查后 44 个）覆盖：
   - 缺口和提示码：有年度规则时两项缺口都不成立；年度从新到旧、超过 3 份只计数；规则不同才标（嵌套相同不算，只有共修变了也算，未解析的一段按原文比）；未解析的先修或共修都标；
   - 原文：未解析的保留原文、没有规则树；600 字符的边界，截断时规则树仍完整；
   - 不用的文档：核对不过的计数、不使用；文档的代码或名称和被回答的课不同、课程 ID 不同、没有课程行、文档不是文本；每门课只拿自己的文档；同一年度两份时一份都不用；没有表或表读不了时回到 4.3 的回答；模型拒绝不一致的数据块；
   - 提示词：规则用提示词解释过的词写出，未解析原因不进提示词，有年度规则时没有平铺列表，`editions_not_shown` 进提示词，规则的 12 句关键句逐条钉住；
   - 接口和界面：聊天 meta、课程详情和提示词用同一份年度规则；规则读不了时聊天照常回答；新提示码有文字、不许印出；证据卡片只从通过校验的数据块里取年度；在线评测从课程详情构造出和聊天相同的提示词。
-- `tests/test_audit_data_coverage.py`：170 个 → 175 个（rebase 到第三轮修复之后是 210 个 → 215 个）。种子数据里 CS 5800、CS 5200、AAI 6600 有可用的年度文档，它们的先修从 `catalog_consistent`／`catalog_only`／`missing` 变成 `year_rules`，`prerequisite_logic_unavailable` 从 4 门变成 2 门，新提示码 `requisite_clause_unparsed` 1 门、`structured_requisites_unusable` 5 门；明细和按院系的数相应改了。新加：
+  - 审查后新加：空条款照记录给出，聊天和课程详情不再返回 500；证据块表达不了的文档只丢这一份、下一份补上；长的未解析条款按整段比较；SQLite 读不了的值（在课程行或文档行）只影响自己那门课；B18 的 15 个存活变异体各有测试（重复年度时的省略数、同一规则换种写法、较早年度的不同和未解析、别的课的文档、课程行的代码和名称、证据模型的几个上限、没有年度时不显示年度那一行）；提示词新钉住 7 句（空原文、学生说的年度没有记录、链接是现在的页面、各年度相同、照原样保留、不在内的几项、读不了时不当成没有要求）。
+- `tests/test_audit_data_coverage.py`：170 个 → 175 个（rebase 到第三轮修复之后是 210 个 → 215 个，审查后 221 个）。种子数据里 CS 5800、CS 5200、AAI 6600 有可用的年度文档，它们的先修从 `catalog_consistent`／`catalog_only`／`missing` 变成 `year_rules`，`prerequisite_logic_unavailable` 从 4 门变成 2 门，新提示码 `requisite_clause_unparsed` 1 门、`structured_requisites_unusable` 5 门；明细和按院系的数相应改了。新加：
   - 和聊天对照：直接用聊天的 `build_answer_evidence`（每门课一批），逐门课核对缺口和学分冲突，并在四种情形下（原样、存成 BLOB、两个年度规则不同、一行文档不是合法 UTF-8）核对整节的 `answer_warnings`、每个字段的缺口数和 `year_rules` 的数；
   - `year_rules` 最先判断、只用于先修，没有可用年度时照旧；
-  - 先修文档表缺失时，先修和 `answer_warnings` 是 `requisite_documents_not_checked`，学分和目录描述照常。
+  - 先修文档表缺失时，先修和 `answer_warnings` 照常统计、和聊天（每门课 `schema_missing`）一致；表是视图或缺列时这两项是 `requisite_documents_not_checked`；学分和目录描述照常。
 - `tests/test_chat_v4_prompt.py`、`tests/test_answer_grounding.py`：版本号和新键。
-- 全量：3440 passed（第 17 批 `5c1b8e5` 的 3403，加新测试文件的 32 个和报告测试新加的 5 个）。rebase 到 `7ad7e65` 之后：3480 passed（第 17 批 7ad7e65 的 3443 加这里的 37）。
+- `tests/test_course_requisite_view.py`：审查后加 1 个，课程页的说明只说聊天拿得到的年度。
+- `tests/test_audit_data_coverage.py` 审查后新加：和聊天对照的情形加了重复年度只有一行有效、两行都有效、空条款；先修文档表是视图或缺列时先修不算、表不存在时照常算；表读不了时目录比较照常统计，快照也没查成时两个标记以目录在前。
+- 全量：3440 passed（第 17 批 `5c1b8e5` 的 3403，加新测试文件的 32 个和报告测试新加的 5 个）。rebase 到 `7ad7e65` 之后：3480 passed（第 17 批 7ad7e65 的 3443 加这里的 37）。审查修复后：3499 passed（3480 加审查后新加的 19 个：聊天先修 12 个、报告 6 个、课程页 1 个）。
 - 变异检查：每个变异体在 /tmp 下由 `git archive HEAD` 加 worktree 改动组成的独立副本里跑。
   - 4.4 本身：52 个，跑上面的聊天、提示词、依据、证据面板和在线评测 5 个测试文件。在 `3e26027` 上第一次就 52/52；快进到 `5c1b8e5`、加上对齐之后重跑，仍是 52/52（8 个进程：证据面板的测试里有一个 45 秒上限的 Streamlit AppTest，负载太高时会超时，超时会把变异体误算成被杀）。
   - rebase 到 `7ad7e65` 之后重跑：4.4 的 52 个 52/52（8 个进程）；OPT-03 对齐的 20 个 20/20。
-  - OPT-03 对齐：20 个，跑报告的测试文件：不给年度规则、`year_rules` 不判断或对所有字段都判断、没有年度也算、警告不带年度规则、`fields` 排回 `requisite_documents` 之前、坏 UTF-8 的课仍有年度规则或只算不可用、不可用的行不计数、可用文档丢掉、原因码写错、表缺失时仍统计先修或警告、按院系的描述和警告各自的条件、两个 `not_checked` 标记的先后、明细列出 `year_rules`、规则缺失。20/20 被杀，第一次就全杀。
+  - OPT-03 对齐：20 个，跑报告的测试文件：不给年度规则、`year_rules` 不判断或对所有字段都判断、没有年度也算、警告不带年度规则、`fields` 排回 `requisite_documents` 之前、坏 UTF-8 的课仍有年度规则或只算不可用、不可用的行不计数、可用文档丢掉、原因码写错、年度文档没查成时仍统计先修或警告、按院系的描述和警告各自的条件、两个 `not_checked` 标记的先后、明细列出 `year_rules`、规则缺失。20/20 被杀，第一次就全杀。
+  - 审查修复后重跑（8 个进程）：4.4 的变异体从 52 个加到 88 个（审查修复的 F01–F13、E25、R07–R10，以及 B18 存活变异体按新代码改写的 G01–G17 和 L4 那句的 G18；测试文件加上课程页的），88/88；OPT-03 对齐的从 20 个加到 26 个（A21–A26），第一次 22/26：A15–A18（目录描述和目录比较的条件、两个 `not_checked` 标记的先后）原来靠「先修文档表不存在」造出年度规则没查成的情形，A18-F7 之后表不存在照常统计，就分不出这四个了；改用读不了的表（视图、缺列）补了测试后 26/26。E06、E15–E18、E20–E23、R05、A08、A09 按新代码重新定位。
 - ruff 0.5.0（F/E9/B）对改动的 .py 文件：干净；没有 CR、没有权限位改动。
 
 ### 审查
 
-还没有审查。第 17 批的第三轮审查已结束；rebase 到 `7ad7e65` 之后开两路只读审查（同一时间最多 3 个审查 agent），结果和处理记在这里。
+两路只读审查，看 `7ad7e65..3b7d4d3`：A18 看正确性和与课程详情、OPT-03 报告的一致，B18 看测试、变异体、文档和有用程度。两路都不派生子 agent、不改仓库、只用自己建的临时库，都完整跑完；进度文件、探针和变异脚本放在仓库外。两份报告的每一条我都核对过，都成立，都已处理（A18 未证实的一条也处理了）：行为上的问题用审查者自己的探针在 `3b7d4d3` 上复现，修复后同一批探针不再复现；B18 的 15 个存活变异体按新代码改写后，在补测试之前的代码上确实都存活；文档的几处对照了代码。
+
+- **A18（正确性与一致）**：0 CRITICAL、1 HIGH、0 MEDIUM、6 LOW，另有 1 条未证实。
+  - 高 F1：课程块里「Prerequisite(s):」标签后面没有条款时，解析器存的是 `unparsed`、原文为空（`empty_clause`），课程详情面板照常显示；新的证据块却要求未解析的一段原文非空，于是 `/chat` 和 `GET /course/{course_id}` 返回 500，OPT-03 报告的先修文档一节整节失败。这是本批引入的回归。改成和已存的 `RequisiteSection` 同样的规则（原文不是 `None` 即可，可以为空），提示词说明空原文的意思；证据块表达不了的文档计为不可用，不再让整个回答失败。
+  - 低：
+    - F2 缺键的副本里同一年度两行、只有一行有效时，聊天用那一行，报告一行都不用：改成报告跟着聊天，见 B18 的中。A18 建议反过来让聊天也整年不用；没采纳，因为课程详情接口（`list_for_course`）本来也用那一行，聊天和课程页保持一致。
+    - F3 未解析的条款按截到 600 字的原文比较，第 600 字以后才不同的两个年度不算不同：改成按整段原文的 SHA-256 比较。
+    - F4 一次回答里有一门课的课程行或年度文档有 SQLite 读不了的值（不是合法 UTF-8），整批查询失败，所有课都拿不到年度规则：改成整批失败后逐门课再读，只有自己的行读不了的课算 `schema_unusable`。
+    - F5 文档说没有可用年度文档时和 4.3 完全相同，其实有不可用的文档或表读不了时多一个 `structured_requisites_unusable`：文档改成照实说。
+    - F6 课程页的说明说聊天会按年份引用这些规则，选了聊天拿不到的更早年度时也这样说：改成最多引用最近 3 个已记录年份。
+    - F7 先修文档表不存在时报告把先修和 `answer_warnings` 标 `not_checked`，可运行库现在还没有这张表，那时聊天和 4.3 相同：改成表不存在时照常统计；表是视图或缺列时仍是 `not_checked`。
+  - 未证实 U1：学生说了一个这里没有记录的 Catalog 年度时，提示词没说怎么办：加了一句，说明这些记录里没有那一年的规则，不拿别的年度代替。
+  - 它核对过没问题的：`read_batch` 和 `list_for_course` 用同一个解码，BLOB、整数和类型不对的 hash 两边判断一样，文档不会混到别的课；从新到旧、最多 3 份和省略数；聊天的四种检索路线都从 `CourseRepository` 取课；有可用年度时的缺口和提示码；4.4 的规则块只在 JSON 数据里，规则叶只带 `RequisiteNode` 的字段，内部代码和摘要都不进提示词，每句规则和文档一致；聊天历史保留整个数据块；证据卡片只读通过校验的数据块；在线评测构造出和聊天相同的证据和提示词，测试不联网。
+- **B18（测试、变异体、文档与有用程度）**：0 CRITICAL、1 HIGH、1 MEDIUM、4 LOW；它自己写的 52 个变异体里，37 个被杀，15 个非等价的存活（每个都跑过全量 3480 个测试）。
+  - 高 H1：同 A18 的 F1。
+  - 中 M1：同 A18 的 F2，变更记录和代码注释都说两边结果一样。报告的年度规则现在把重复行也逐行核对后交给 `requisite_evidence`，和 `read_batch` 加 `requisite_evidence` 相同；`duplicate_rows` 的计数不变。和聊天对照的测试加了这几种情形。
+  - 低：
+    - L1 两处文档和代码不符：第一处同 A18 的 F5；第二处 `course-requisites.md` 说证据不给未解析原因，其实证据块里有，只是不进提示词：改成照实说。
+    - L2 一门课的标题不是合法 UTF-8 时，同一回答的所有课都丢了年度规则（同 A18 的 F4，这里经由课程行的标题）；`data-coverage-report.md` 还说聊天只读 `generated_json`：现在给年度规则时还读课程行的代码和名称，文档改成照实说。
+    - L3 15 个存活的变异体：每个都补了测试，按新代码改写后收进变异检查（G01–G17，其中两个是同一处的变体）。
+    - L4（有用程度）每个年度的链接都是同一个院系页，打开的是现在的页面，可能已经是更新年份的规则：提示词加一句，引用最新一份以外的年度时说明这一点；文档同步。
+  - 它核对过没问题的：本节记的测试数和文件表；12 句关键句都在；没有 CR，权限位只有新测试文件的 100644；报告和聊天逐门课对照，在 BLOB、5 个年度、只有较早年度有未解析的一段、hash 坏的文档、两行都有效的重复年度、不是合法 UTF-8 的行这些情形下一致；`year_rules` 最先判断，两个 `not_checked` 标记设得对、先后对，`complete` 和退出码对；BOM、NaN、单独的代理字符报告和应用都拒绝。
+- 两路都没法检查的：真实模型（不许付费调用）；真实数据里有没有空条款和缺键的副本；那一行在真实浏览器里的样子。B18 还指出 `eval/answer_checks.py` 没有针对 4.4 的检查，见「已知、未处理」；它的环境没有 ruff，我这边查过。
 
 ### 已知、未处理
 
 1. 没有用真实模型检查 4.4 的回答（要付费调用，需要用户另行授权）。提示词里的年度规则是否被模型照原样说出，只有记录提示词的替身测过。
 2. 请求里没有 Catalog 年度、校区、路径字段；学生没说年度时，回答只能说明覆盖哪几年或问学生。聊天页要不要加 Catalog 年度选择，等用户决定（现在加，或和下一步的培养方案身份一起）。
 3. 培养方案的规则（`program_plans`）还没接进聊天；不判断个人资格，不做学期安排。
-4. 一次回答里有一门课的年度文档有不是合法 UTF-8 的值时，整批查询失败，这一次回答的所有课都拿不到年度规则（`schema_unusable`，回答照常、按旧逻辑）。OPT-03 的报告按每门课单独算，标出的是那一门课。
+4. 一门课的课程行或年度文档有不是合法 UTF-8 的值时，这门课拿不到年度规则（`schema_unusable`，回答照常、按旧逻辑）；批量查询失败后逐门课再读，同一次回答里的其他课不受影响（审查 A18-F4 改的：原来整批都拿不到）。OPT-03 的报告按每门课单独算，标出的也是那一门课。
 5. 每门课最多给 3 个年度，更早的只计数。
+6. `eval/answer_checks.py` 还没有针对 4.4 的检查：回答没写 Catalog 年度、说学生能注册，都标不出来。这里的检查都是用真实回答调出来的，要等用户授权付费调用、拿到 4.4 的真实回答再加（审查 B18 提的）。
+7. 年度规则的链接是院系页现在的样子：来源地址只能是院系页本身（`CourseRequisiteSource` 只接受这种地址），没有各年度存档页的地址。提示词要求引用较早年度时说明这一点（审查 B18-L4）；要链接到存档页，得先核实存档地址、放宽来源和链接的校验，不在本批。
 
 ### 发布状态
 

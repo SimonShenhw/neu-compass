@@ -939,13 +939,20 @@ def test_any_missing_table_makes_the_report_incomplete(seeded, table):
         assert section(report, "courses") == marker
         assert section(report, "fields") == {"status": "not_checked", "code": "courses_not_checked"}
     elif table == "course_requisite_documents":
-        # Without the year documents a prereq gap cannot be told from a year rule, and the warnings depend on them.
+        # Without the table chat has no year rules (schema_missing, as in 4.3): prereqs and the warnings still count,
+        # and agree with chat (the runtime database has no such table yet).
         fields = section(report, "fields")
-        no_rules = {"status": "not_checked", "code": "requisite_documents_not_checked"}
-        assert fields["fields"]["prereqs"] == fields["answer_warnings"] == no_rules
+        assert section(report, "requisite_documents") == marker
+        _, served = chat_evidence(seeded)
+        assert {item.requisites.storage for item in served.values()} == {"schema_missing"}
+        expected = Counter(warning for evidence in served.values() for warning in set(evidence.warnings))
+        assert fields["answer_warnings"] == dict(sorted(expected.items()))
+        counts = fields["fields"]["prereqs"]
+        assert counts["year_rules"] == 0
+        assert (counts["missing"] + counts["catalog_only"] + counts["catalog_lists_none"]
+                == sum("prereqs" in evidence.missing_fields for evidence in served.values()))
         assert fields["fields"]["credits"]["catalog_consistent"] == 2 and fields["catalog_description"]["present"] == 2
-        assert all("prereqs" not in item["fields"] and "answer_warnings" not in item and "catalog_description" in item
-                   for item in fields["by_department"].values())
+        assert all("prereqs" in item["fields"] and "answer_warnings" in item for item in fields["by_department"].values())
 
 
 def test_schema_versions_are_counted_against_the_release_migrations(seeded):
@@ -1031,6 +1038,36 @@ def test_a_missing_read_column_is_not_checked(seeded):
     report = audit.build_report(seeded)
     assert section(report, "schema")["tables"]["course_catalog_sources"] == "column_missing"
     assert section(report, "catalog_snapshots") == {"status": "not_checked", "code": "column_missing"}
+
+
+@pytest.mark.parametrize("change", [
+    ("DROP TABLE course_requisite_documents", "CREATE VIEW course_requisite_documents AS SELECT * FROM courses"),
+    ("ALTER TABLE course_requisite_documents RENAME COLUMN document TO payload",),
+])
+def test_a_requisite_table_that_cannot_be_read_leaves_prereqs_unchecked(seeded, change):
+    """A table that exists but is not read (a view, a missing column): a prereq gap cannot be told from a year rule.
+    The catalog comparison does not need the year documents, so it is counted as usual."""
+    modify(seeded, *change)
+    fields = section(audit.build_report(seeded), "fields")
+    no_rules = {"status": "not_checked", "code": "requisite_documents_not_checked"}
+    assert fields["fields"]["prereqs"] == fields["answer_warnings"] == no_rules
+    assert all("prereqs" not in item["fields"] and "answer_warnings" not in item
+               for item in fields["by_department"].values())
+    assert fields["catalog_comparison"] == {"status": "checked"} and fields["catalog_description"]["present"] == 2
+    assert fields["fields"]["credits"]["catalog_consistent"] == 2
+    assert all("catalog_description" in item for item in fields["by_department"].values())
+
+
+def test_without_snapshots_the_catalog_marker_comes_first(seeded):
+    """No snapshots and an unreadable requisite table: prereqs and the warnings name the catalog snapshots, the first
+    input they lack."""
+    modify(seeded, "DROP TABLE course_catalog_sources",
+           "ALTER TABLE course_requisite_documents RENAME COLUMN document TO payload")
+    report = audit.build_report(seeded)
+    assert section(report, "requisite_documents") == {"status": "not_checked", "code": "column_missing"}
+    fields = section(report, "fields")
+    not_compared = {"status": "not_checked", "code": "catalog_snapshots_not_checked"}
+    assert fields["fields"]["prereqs"] == fields["answer_warnings"] == not_compared
 
 
 def test_courses_failure_leaves_dependent_sections_not_checked(seeded, monkeypatch):
@@ -1479,9 +1516,12 @@ def test_missing_categories_agree_with_answer_evidence(seeded):
         assert conflict == ("catalog_metadata_conflict" in evidence.warnings), course_id
 
 
-@pytest.mark.parametrize("change", ["none", "blob", "editions_differ", "not_utf8_row"])
+@pytest.mark.parametrize("change", ["none", "blob", "editions_differ", "not_utf8_row", "duplicate_one_valid",
+                                    "duplicates_valid", "empty_clause"])
 def test_fields_and_warnings_are_what_the_chat_path_gives(seeded, change):
     """The report's own reading of snapshots and year documents gives the same gaps and warnings as chat."""
+    if change.startswith("duplicate"):  # Only a copy without keys holds two rows for one course and year.
+        without_keys(seeded, "course_requisite_documents")
     with writing(seeded) as conn:
         conn.execute("PRAGMA ignore_check_constraints=ON")
         if change == "blob":
@@ -1493,6 +1533,12 @@ def test_fields_and_warnings_are_what_the_chat_path_gives(seeded, change):
         elif change == "not_utf8_row":
             conn.execute("INSERT INTO course_requisite_documents(course_id, catalog_year, document, content_hash) "
                          "VALUES('c-cs5200', '2027-2028', CAST(x'7bff7d' AS TEXT), ?)", ("0" * 64,))
+        elif change.startswith("duplicate"):  # A second CS 5800 2026-2027 row; only one_valid's fails its hash.
+            second = requisite("c-cs5800", "CS 5800", "Algorithms", prerequisite="CS 5010")
+            put_requisite(conn, "c-cs5800", "2026-2027", second, digest="0" * 64 if change.endswith("one_valid") else None)
+        elif change == "empty_clause":  # A label with no clause after it.
+            put_requisite(conn, "c-cs5800", "2025-2026", requisite("c-cs5800", "CS 5800", "Algorithms",
+                                                                   year="2025-2026", prerequisite=""))
     report = audit.build_report(seeded)
     courses, served = chat_evidence(seeded)
     fields = section(report, "fields")
@@ -1503,9 +1549,18 @@ def test_fields_and_warnings_are_what_the_chat_path_gives(seeded, change):
         gaps = sum(field in evidence.missing_fields for evidence in served.values())
         assert counts["missing"] + counts["catalog_only"] + counts["catalog_lists_none"] == gaps, field
     assert fields["fields"]["prereqs"]["year_rules"] == sum(bool(item.requisites.editions) for item in served.values())
-    flagged = {"editions_differ": "requisites_differ_by_catalog_year", "not_utf8_row": "structured_requisites_unusable"}
+    flagged = {"editions_differ": ("c-cs5800", "requisites_differ_by_catalog_year"),
+               "not_utf8_row": ("c-cs5200", "structured_requisites_unusable"),
+               "duplicate_one_valid": ("c-cs5800", "structured_requisites_unusable"),
+               "duplicates_valid": ("c-cs5800", "structured_requisites_unusable"),
+               "empty_clause": ("c-cs5800", "requisite_clause_unparsed")}
     if change in flagged:
-        assert flagged[change] in served["c-cs5800" if change == "editions_differ" else "c-cs5200"].warnings
+        course_id, warning = flagged[change]
+        assert warning in served[course_id].warnings
+    if change.startswith("duplicate"):  # Chat uses the year's one row that passes; with two, neither.
+        kept = [edition.catalog_year for edition in served["c-cs5800"].requisites.editions]
+        assert kept == (["2026-2027"] if change.endswith("one_valid") else [])
+        assert section(report, "requisite_documents")["counts"]["duplicate_rows"] == 2  # Still counted per row.
     if change == "not_utf8_row":  # Chat's query for CS 5200 fails, so its year rule is gone and the code is a gap.
         assert served["c-cs5200"].requisites.storage == "schema_unusable"
         assert "prereqs" in served["c-cs5200"].missing_fields
