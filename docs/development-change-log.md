@@ -2655,21 +2655,37 @@
 - 导入了这几个模块的 62 个测试文件：2027 passed（6 个进程）。
 - 全量：3175 passed（main `751c6b1` 上是 3140，加这里的 35 个）。
 - 变异检查：13 个，跑新测试文件和 `tests/test_embedder.py`：零行不再保护、不转 float32、按列归一化、导入时加载 torch；课程代码不去空白、不转大写、报错文字改了、去掉空格；时间只解析不核对写法、时间报错文字改了；三处调用改成不校验。13/13 被杀，第一次就全杀。
+  - 审查更正：「导入时加载 torch」那个（V04）其实是在收集测试时就失败了。这个 venv 里 `import torch` 本来就失败（缺 `libcudnn.so.9`），onnxruntime、OpenVINO 也没装，所以它不是被「不加载模型运行时」那条断言杀死的。审查后换成了替身变异，见「审查」。
 - ruff 0.5.0（F/E9/B）对改动的 .py 文件：干净；没有 CR、没有权限位改动。
 - 只用测试自己建的数据；没有真实模型调用，没有打开真实库，没有在真实的 ONNX／OpenVINO 后端上跑（三个后端现在调用的是同一个函数对象，函数体也和原来一样）；没有改任何模型参数。
 
 ### 审查
 
-还没有审查。按计划要开两路只读审查（一路看行为是否等价，一路看测试和文档），等用户安排。
+2026-10-12，一路只读审查（SIMr1，同时看 SIM-02），看 `751c6b1..9a80be5`，不派生子 agent，不改仓库；主评审也看了一遍。报告在仓库外。
+
+- **结论**：0 CRITICAL、0 HIGH、0 MEDIUM、2 LOW、1 处零碎，行为和 main 一致。
+  - 每份删掉的副本和共用的那份，函数体和报错文字都相同；装饰器和校验模式没动。
+  - 所有别名和导入方都还能解析，包括 CI 会跑的 `scripts/rehearse_recovery.py`；改过的模块里已经没有地方再读 `COURSE_CODE_PATTERN` 或 `datetime`。
+  - 新文件 `rag/vectors.py` 会进 Docker 镜像。
+  - 它重跑了 33 个特征测试（在 main 上）、62 个相关测试文件（2027）、全量（3175）和 13 个变异体，数字都对得上。
+- **都成立，都已处理**：
+  1. 低：测试只把校验函数当普通函数调用，没测它挂在模型字段上。把 `schemas/feedback_candidate.py` 装饰器里的 `'feedback_updated_at'` 删掉，3175 个测试照样通过；这个缺口在本批之前就有。现在 `tests/test_shared_normalizers.py` 对两份导出 schema 的 5 个时间字段各有一个模型层面的用例：用真实导出器写出一行，能通过校验；把其中一个字段换成不规范的写法，就必须报 `Canonical UTC timestamp required`。
+  2. 低：变异体 V04 没证明它看起来证明的东西（见验证记录里的更正）。现在换成替身变异：导入 `rag.vectors` 时往 `sys.modules` 里放一个假的 `torch`，由「不加载模型运行时」那条断言杀死。
+  3. 零碎：`schemas/query_log_export.py` 第 7 行的 import 有 103 个字符，超过 100 列，拆成了多行。同一文件第 72、74 行也是 103 个字符，main 上就有，不是本批带来的，没动。
+- **审查后的验证**：
+  - `tests/test_shared_normalizers.py` 有 40 个用例（原 35 个，加 5 个模型层面的）；相关的 4 个测试文件 272 passed。
+  - 变异 18/18，每个都由明确的失败测试杀死：原来的 13 个（V04 换成替身），加 5 个新的：从装饰器里分别删掉 4 个反馈时间字段，去掉查询日志导出的 `created_at` 校验器。
+  - 全量：3180 passed（3175 加 5）。
+  - ruff 0.5.0（F/E9/B）干净；没有 CR，`git diff --check` 通过。
 
 ### 已知、未处理
 
 1. 看起来相同、但没合并的：`Course._normalize_code`（报错会带出原值）、`RequisiteNode.canonical_code`（允许空值，报错是 `Invalid requisite course code`）、`CatalogSnapshot.normalize_code`（报错是 `Invalid catalog course code`；第 18 批的分支改过这个文件，等它合并后再看）；先修文档和来源的时间校验（只要求带时区并转成 UTC，报错文字也不同）。要合并它们，得先决定报错文字统一成哪一种，这会改行为，不在纯重构里做。
 2. `EMBEDDING_DIM = 1024` 在三个后端各写一次（ONNX、OpenVINO 的注释写明照抄 `rag.embedder`）；计划没列，这次没动。
-3. SIM-02（共享检索决策）和之后的批次还没开始。
+3. SIM-02（共享检索决策）是第 20 节；SIM-03 起还没开始。
 
 ### 发布状态
 
-- 本地分支 `refactor/sim01-shared-helpers`，从 main 的 `751c6b1` 开出；没有 push，没有 PR，等用户要了再开。合并由用户点。
+- 分支 `refactor/sim01-shared-helpers`，从 main 的 `751c6b1` 开出。审查修复后 rebase 到第 18 批的 `637144c` 之上：只有本文件冲突，第 16–19 节按编号排好。rebase 后全量：3613 passed（3573 加这里的 40 个）。随一个 PR 提交，合并由用户点。
 - 纯重构，行为不变，不需要单独部署。本批没有动生产数据。
 

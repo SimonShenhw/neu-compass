@@ -4,7 +4,12 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from schemas.feedback_candidate import RetrievalMode, TrafficKind, canonical_utc_timestamp, text_sha256
+from schemas.feedback_candidate import (
+    RetrievalMode,
+    TrafficKind,
+    canonical_utc_timestamp,
+    text_sha256,
+)
 
 QueryReviewRequirement = Literal[
     'privacy_review_required', 'results_not_ground_truth', 'no_retrieval_snapshot',

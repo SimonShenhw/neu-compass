@@ -8,6 +8,8 @@ expectations hold before and after.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
@@ -95,3 +97,27 @@ def test_both_export_schemas_refuse_the_same_timestamps(value):
         message = "^Canonical UTC timestamp required$" if value in NOT_CANONICAL else None
         with pytest.raises(ValueError, match=message):
             check(value)
+
+
+@pytest.mark.parametrize(("schema", "field"), [
+    ("feedback", "query_created_at"), ("feedback", "answer_created_at"), ("feedback", "feedback_created_at"),
+    ("feedback", "feedback_updated_at"), ("query_log", "created_at"),
+])
+def test_every_timestamp_field_is_checked_on_the_model(empty_db, tmp_path, schema, field):
+    """The shared check is wired to each timestamp field, not only callable on its own: a real exported row
+    validates, and the same row with one field written non-canonically does not.
+    中文：共用的时间校验挂在每个时间字段上，而不只是能单独调用：真实导出的一行能通过，把其中一个字段改成
+    不规范的写法就通不过。"""
+    if schema == "feedback":
+        from tests import test_feedback_candidate_export as export  # noqa: PLC0415
+        model = FeedbackCandidate
+    else:
+        from tests import test_query_log_export as export  # noqa: PLC0415
+        model = QueryLogExportRow
+    export.seed(empty_db)
+    out = tmp_path / "review.jsonl"
+    export.exporter()(export.save_db(empty_db, tmp_path), out=out)
+    [data] = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line.strip()]
+    model.model_validate(data)
+    with pytest.raises(ValueError, match="Canonical UTC timestamp required"):
+        model.model_validate({**data, field: NOT_CANONICAL[0]})
