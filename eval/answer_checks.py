@@ -108,12 +108,15 @@ PROGRAM_CAVEAT = re.compile(
     r"no verified|not (?:an |the )?official|unverified|isn't (?:an |the )?official", re.I)
 PROGRAMS_PAGE = re.compile(r"培养方案|Programs page|\bPrograms\b", re.I)
 SAVED_COPY = re.compile(r"副本|saved copy|stored copy|copy of the catalog|不是实时|非实时|not a live", re.I)
+LIVE_LINK = (r"(?:\blink\b|\burl\b|链接|"
+             r"https?://catalog\.northeastern\.edu/[^\s)\n]{1,200})")
 LIVE_PAGE_NOTE = re.compile(
-    r"(?:link|url)[^。;\n]{0,160}(?:opens?|points? to)[^。;\n]{0,160}(?:current|live|now)|"
-    r"链接[^。；;\n]{0,40}(?:打开|指向|跳转)[^。；;\n]{0,80}(?:现在|当前|实时)", re.I)
+    rf"{LIVE_LINK}[^。；;\n]{{0,160}}(?:opens?|points? to|goes? to|takes? you to|shows?)"
+    r"[^。；;\n]{0,160}\b(?:current|live|now|today)\b|"
+    rf"{LIVE_LINK}[^。；;\n]{{0,40}}(?:打开|指向|跳转|看到|显示)[^。；;\n]{{0,80}}(?:现在|当前|实时|目前|最新)", re.I)
 LIVE_COPY_NEGATION = re.compile(
-    r"(?:not|rather than) (?:the |a |an )?(?:saved copy|stored copy|copy of the catalog)|"
-    r"(?:不是|而非)(?:目录的?|该页的?|保存的?|存档的?)?(?:存档)?副本", re.I)
+    r"(?:not|rather than|instead of|isn['’]t|is not) (?:the |a |an )?(?:saved copy|stored copy|copy of the catalog)|"
+    r"(?:不是|并非|而非|(?<![并而])非)(?:那份|这份|目录的?|该页的?|保存的?|存档的?){0,2}(?:存档)?副本", re.I)
 
 # A sentence ends at 。！？!?, at a line break, or at a period followed by a space or the end; not at
 # the period in 4.0, in dotted initials (U.S.) or after an abbreviation such as e.g., Ph.D. or approx. A

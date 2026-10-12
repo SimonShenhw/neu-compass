@@ -253,8 +253,8 @@ RULES = {
                   "(its year rules decide the category)",
         "by_department": "per department: courses_in_scope; under fields, the same categories per field with zero "
                          "counts omitted (a field that is not_checked above is left out); catalog_description when "
-                         "the catalog was compared, and answer_warnings when the year rules were checked or their "
-                         "table is missing, "
+                         "the catalog was compared, and answer_warnings when the catalog was compared and "
+                         "(the year rules were checked or their table is missing), "
                          "for the department's courses, zero counts omitted",
         "courses_in_scope": "in-scope courses (of the department, under by_department)",
         "catalog_comparison": "whether credits and prereqs were compared with the catalog (that needs a checked "
@@ -294,7 +294,9 @@ RULES = {
                            "usable and unusable rows, which add up to the edition's rows, and statistics over its "
                            "usable documents",
         "unusable": "rows of the edition in any category other than usable",
-        "courses_in_scope_covered": "in-scope courses with a usable document of the edition",
+        "courses_in_scope_covered": "in-scope courses whose rules for this edition can be served: exactly one row "
+                                    "passes checks and evidence projection, and the course's rows are readable; "
+                                    "all recorded editions are checked, not only chat's newest three",
         "prerequisite": "usable documents by prerequisite clause status: parsed, unparsed (kept as text) or "
                         "not_listed (the catalog block lists none, which is not the same as no requirement)",
         "corequisite": "usable documents by corequisite clause status, as for prerequisite",
@@ -311,10 +313,12 @@ RULES = {
         "legacy_prereqs_without_usable_document": "in-scope courses with a stored prereq code list for which "
                                                   "chat's year rules have no usable edition: answers rely on the "
                                                   "code list only (not exclusive)",
-        "by_department": "per department: courses_in_scope and, per edition, with_usable_document and, over those "
-                         "documents, the prerequisite and corequisite clause status and credit_hours_vs_course_credits",
+        "by_department": "per department: courses_in_scope and, per edition, with_usable_document counts courses "
+                         "whose edition rules can be served; prerequisite and corequisite clause status and "
+                         "credit_hours_vs_course_credits remain statistics over usable rows",
         "courses_in_scope": "in-scope courses (of the department, under by_department)",
-        "with_usable_document": "in-scope courses of the department with a usable document of the edition",
+        "with_usable_document": "in-scope courses of the department whose edition rules can be served, using the "
+                                "same all-year course coverage rule as courses_in_scope_covered",
     },
     "program_plans": {
         "text_not_utf8": _NOT_UTF8,
@@ -661,7 +665,6 @@ class _Audit:
         self.known_ids: set = set()  # Every TEXT course_id in courses, decodable or not.
         self.row_codes: dict[str, str | None] = {}  # Readable course_id -> its row's listable code, in scope or not.
         self.snapshots: dict[str, CatalogSnapshot] = {}  # Usable snapshots by course_id.
-        self.documents: dict[str, set[str]] = defaultdict(set)  # course_id -> editions with a usable document.
         self.program_values: list | None = None  # Every program_id value in programs, once read.
         self.duplicate_codes: set[str] = set()  # Codes more than one in-scope course has.
         self.requisites: dict[str, RequisiteEvidence] = {}  # The year rules chat gets, by in-scope course_id.
@@ -990,11 +993,8 @@ class _Audit:
             usable_documents[course_id].append(document)
             stats = editions[edition]
             stats["usable"] += 1
-            stats["courses"].add(course_id)
             stats["captured"].append(document.source.captured_at.date().isoformat())
-            self.documents[course_id].add(edition)
             by_year = departments[_department(course.primary_code)]["by_catalog_year"][edition]
-            by_year["with_usable_document"] += 1
             for name in ("prerequisite", "corequisite"):
                 section = getattr(document.requisites, name)
                 stats[name][section.status] += 1
@@ -1018,6 +1018,16 @@ class _Audit:
             self.requisites[course_id] = (
                 RequisiteEvidence(storage="schema_unusable") if course_id in unreadable
                 else requisite_evidence(course, usable_documents[course_id], unusable_rows[course_id]))
+            # Course coverage uses the same evidence checks, but per year so chat's three-year cap cannot hide older ones.
+            # 中文：课程覆盖重用相同证据核对，但逐年投影，不能让聊天三年上限漏掉更早年度。
+            if course_id not in unreadable:
+                by_edition = defaultdict(list)
+                for document in usable_documents[course_id]:
+                    by_edition[document.catalog_year].append(document)
+                for edition, documents in by_edition.items():
+                    if requisite_evidence(course, documents).editions:
+                        editions[edition]["courses"].add(course_id)
+                        departments[_department(course.primary_code)]["by_catalog_year"][edition]["with_usable_document"] += 1
             if course.prereqs and not self.requisites[course_id].editions:
                 legacy_only += 1
                 self.note("requisite_documents", "legacy_prereqs_without_usable_document", self.item(course))

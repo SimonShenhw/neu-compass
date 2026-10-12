@@ -2456,6 +2456,7 @@
    - `course_answer_evidence(..., requisites=...)`：有可用年度文档时，`prereqs` 不算缺失，也不再有 `prerequisite_logic_unavailable`。新提示码：`requisites_differ_by_catalog_year`（列出的年度规则不同；未解析的一段按整段原文的摘要 `clause_sha256` 比，第 600 字以后才不同也算，审查 A18-F3 改的）、`requisite_clause_unparsed`（有一段没解析）、`structured_requisites_unusable`（有文档不可用，或表读不了）。没有可用年度文档时和 4.3 相同，只是有不可用的文档或表读不了时多一个 `structured_requisites_unusable`（审查 A18-F5 改的说法）。
    - `build_answer_evidence` 用新的 `CourseRequisiteRepository.read_batch`：一次回答的所有课用两次查询读完，核对和课程详情接口相同（课程行的代码和名称、年度、内容 hash、规则树）；读出错时回答照常给出：整批查询失败就逐门课再读，只有自己的行读不了的课是 `schema_unusable`、按旧逻辑，其他课照常（审查 A18-F4 改的）。
 2. 提示词 4.4（`llm/prompts/chat_v4.py`）：
+   - **历史措辞更新说明**：下条保留首次实现的记录；第二轮已改为引用任何年度（包括最新记录）都提醒 live 页面，原文为空或仅有空白均保留。第三轮进一步明确 live 提醒每个回答只说一次、不按课程／规则重复。旧的「最新一份以外」和「原文为空」不是当前契约。
    - 每门课的 `catalog_requisites`：每个年度一项（年度、`catalog_url`、`captured_at`、先修、共修），`editions_not_shown` 是没列出的份数。规则树写成 `all_of`／`any_of`／课程叶，只带原文写明的最低成绩、可并修和 level；不给未解析原因（内部代码）、原文摘要和来源摘要。
    - 有年度规则时去掉 `recorded_metadata.prereqs` 和目录快照的 `prereq_codes`：课程页在年度规则旁边也不显示旧的平铺图。
    - 规则：只有学生在对话里说了 Catalog 年度，才把那一年的规则当成学生的，入学学期不是 Catalog 年度；没说时，各年度相同就说明覆盖哪几年，不同就简短说明并问学生；学生说的年度这里没有时，说明这些记录里没有那一年的规则，不拿别的年度代替（审查 A18-U1 加的）；`all_of`／`any_of`、嵌套、成绩、可并修、level 照原样，共修不是要先修完的课；`not_listed` 不证明没有要求，`unparsed` 照记录给出原文（原文为空表示标签后面没有条款）并说要核对；不说学生有资格、满足了要求或能注册；`structured_requisites_unusable` 时不能把任何年度当成没有要求；引用方式和目录描述相同，存档副本那句每个回答仍只说一次；链接打开的是院系页现在的样子，引用最新一份以外的年度时要说明页面可能已是更新年份的规则（审查 B18-L4 加的）。
@@ -2577,4 +2578,44 @@
 - 改动 Python 文件 ruff 0.5.0 F/E9/B 通过；14 个改动文件无 CR，`git diff --check` 通过。文档实际本地目标存在；行内代码里的 `[标签](URL)` 示例不当作真实链接检查。
 
 **已知、未处理与发布状态**：本节既有七条边界继续保留；纯启发式检查不证明真实回答质量。本轮没有模型调用、生产数据操作、真实账号／浏览器验收或部署；尚未合并，等待用户指定评审。批次 C／D 以及合并和部署不因本轮测试自动完成。
+
+### 第三轮审查收口（2026-10-12）
+
+**范围与原因**：第三轮审查的对象是 `f2ebf2c`，审查员 A18c 加主评审一遍，报告在仓库外（`REVIEW_2026-10-12.md` 的 A 节）。修复由用户按那份清单执行，主评审复核后补本节记录并提交。
+
+**审查**：A18c 的结论是 0 CRITICAL／0 HIGH／0 MEDIUM／5 LOW，另有一条本批之前就存在的问题；主评审另报一条 LOW（按年度的课程覆盖仍按行计）。第二轮的十项确认是在代码里修好的，不只是加了测试。逐条处理如下：
+
+1. 按年度的课程覆盖：`by_catalog_year[年度].courses_in_scope_covered` 和院系的 `with_usable_document` 改为每个年度单独用 `requisite_evidence` 判断。只有这一年恰好一行通过核对和证据投影、这门课的行也都读得出来时，才算覆盖。所有记录过的年度都算，不受聊天最多 3 个年度的限制。逐行质量和条款状态仍按行计。规则文字，以及 `docs/data-coverage-report.md` 里 `year_rules`、`in_scope_courses`、`by_catalog_year`、`by_department` 的说明，同步改了。
+2. `fields.by_department.answer_warnings` 的规则文字补回「目录核对过」这个条件：目录核对完成，且（年度规则已检查或先修文档表不存在）时才输出。文档同步。
+3. 回答检查器认得的实时链接写法扩大了：
+   - 链接可以写成 link、URL、链接，也可以是官方目录的 Markdown 链接或裸 URL；
+   - 动词加了 goes to、takes you to、shows、看到、显示；时间词加了 today、目前、最新；
+   - 否定加了 instead of、isn't、is not、并非、（非…），以及「那份」「这份」这类限定词。
+   - 20 种合规写法各有测试；真正重复两次的说明仍计 2。`docs/answer-grounding.md` 写明这只是有限的表达式识别。
+4. 文字跟上实际行为：
+   - `answer-grounding.md` 和 `schemas/answer_evidence.py` 的注释改成「空或只有空白」；
+   - 本节「已实现」加了一条历史措辞说明；
+   - `structured_requisites_unusable` 的完整标签和卡片上的年份行改成「先修/共修」。
+5. 删掉已经没有地方读的 `self.documents`；提示词改成 "say so once per answer (not once per course or rule)"。
+6. A18c 的 8 个存活变异体各补了测试：
+   - 检查器模式里的 rather than、而非、points to、url 各有独立用例；
+   - 卡片默认显示年份行；
+   - 课程页的来源折叠区保留三条完整警告；
+   - "Never say those years have the same rule…" 这句钉住了。
+7. 本批之前就有的问题：课程详情的身份查询挪进了 `try`。`primary_name` 不是合法 UTF-8 时，`GET /course/{id}` 和 `/requisites` 返回 200，先修列表为空并带 `structured_requisite_schema_unusable`，和聊天给的 `schema_unusable` 一致。
+8. 变异包：第 2 轮的 9 个变异体原来是运行时从审查员的临时文件夹读的，现在直接写进包里。
+
+**修改文件**：`scripts/audit_data_coverage.py`、`db/course_requisite_repository.py`、`llm/prompts/chat_v4.py`、`eval/answer_checks.py`、`app/answer_evidence_view.py`、`schemas/answer_evidence.py`、`tests/test_batch18_review3.py`（新）、`tests/test_batch18_review2.py`、`tests/test_audit_data_coverage.py`、`tests/test_chat_structured_requisites.py`、`docs/answer-grounding.md`、`docs/data-coverage-report.md` 及本文件。
+
+**验证记录**：
+
+- 新回归测试：
+  - 初版 36 个在 `f2ebf2c` 上跑，23 个失败、13 个通过；通过的是第 6 条那些原本行为就对的保护测试，靠对应的撤回变异体证明它们能抓到问题。
+  - 最终 41 个全过。
+- 定向 9 个文件（清单在仓库外的工作记录里）：577 passed，之后又加了 4 个不同写法的用例。
+- 全量离线：3573 passed、5 warnings。用户那次 658.79 秒，是和变异测试一起跑的；主评审在独立快照上又跑了一次，3573 passed，284 秒。
+- 变异：129/129 + 34/34，每个都有明确的失败测试，0 SUSPECT，0 存活。A18c 的 8 个和第 2 轮的 9 个都在包里，全部被杀死。
+- ruff 0.5.0（F/E9/B）通过；13 个改动文件都没有 CR，`git diff --check` 通过。
+
+**已知、未处理与发布状态**：同上一轮。检查器仍然只认有限的写法，别的自然语言写法可能漏判或误判。没有调用模型，没有动生产数据，没有用真实账号或浏览器验收，也没有部署；只在本地提交，未合并。
 

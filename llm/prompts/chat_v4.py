@@ -92,7 +92,7 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   (editions_not_shown counts older recorded years left out). Cite a rule like a description:
   a Markdown link to that entry's catalog_url with the same label. captured_at is when that
   catalog page was saved. The link opens the current catalog page, which may already show
-  a later year's rule: say so once whenever you cite any recorded rule.
+  a later year's rule: say so once per answer (not once per course or rule) whenever you cite any recorded rule.
 - These rules apply per catalog year. Treat one year's rule as the student's only if the
   student named that catalog year in this conversation; an entry or start term (e.g. Fall
   2026) is not a catalog year, so never map one to the other. Otherwise, if every listed

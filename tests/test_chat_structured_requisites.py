@@ -488,7 +488,7 @@ def test_rules_for_year_scoped_requisites():
         "Cite a rule like a description: a Markdown link to that entry's catalog_url with the same label",
         "captured_at is when that catalog page was saved",
         "The link opens the current catalog page, which may already show a later year's rule: "
-        "say so once whenever you cite any recorded rule",
+        "say so once per answer (not once per course or rule) whenever you cite any recorded rule",
         "if every listed year has the same rule and requisites_differ_by_catalog_year is absent, "
         "say which catalog years it covers",
         "older recorded years may be left out",
@@ -572,7 +572,7 @@ def test_new_codes_have_labels_and_are_never_printed_by_answers():
 def test_the_evidence_card_names_the_recorded_years_only_from_a_valid_block(empty_db):
     record = seeded(empty_db, *(document(f"{year}-{year + 1}") for year in range(2022, 2027)))
     evidence = evidence_for(empty_db, record).model_dump(mode="json")
-    line = "先修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 2 个更早年份没有列出（非实时核验，不判断能否注册）"
+    line = "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 2 个更早年份没有列出（非实时核验，不判断能否注册）"
     assert requisite_years_line(evidence) == line
     assert line in evidence_summary(evidence)
     # A block whose only fault is a year that is not YYYY-YYYY: the caption renders Markdown, so it shows nothing.

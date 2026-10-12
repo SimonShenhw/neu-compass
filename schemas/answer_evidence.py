@@ -86,9 +86,9 @@ class RequisiteSectionEvidence(BaseModel):
     @model_validator(mode="after")
     def consistent_state(self) -> RequisiteSectionEvidence:
         # The stored RequisiteSection's own rule: only a parsed section has a tree, never a partial one, and an
-        # unparsed one keeps its text, which is empty for a label with no clause after it.
+        # unparsed one keeps its text, which is empty or whitespace-only for labels without clauses.
         # 中文：沿用已存 RequisiteSection 的规则：只有 parsed 有规则树，不给部分成功的树；unparsed 保留原文，
-        # 标签后面没有条款时原文为空。
+        # 标签后面没有条款时原文为空或只有空白；原文不改写。
         if self.status == "not_listed":
             valid = self.rule is None and self.clause_text is None and not self.clause_truncated and self.unparsed_reason is None
         elif self.status == "unparsed":

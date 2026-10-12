@@ -33,7 +33,7 @@ WARNING_LABELS = {
     "prerequisite_logic_unavailable": "先修代码未保留 AND/OR 语义，不能据此判断所有/任一必需。",
     "requisites_differ_by_catalog_year": "不同 Catalog 年份记录的先修/共修规则不一样，要看你适用哪一年。",
     "requisite_clause_unparsed": "有一段先修/共修原文没能解析成规则，只能照原文核对。",
-    "structured_requisites_unusable": "有已存的年度先修规则读不出来或校验没通过；不能当作那一年没有要求。",
+    "structured_requisites_unusable": "有已存的年度先修/共修规则读不出来或校验没通过；不能当作那一年没有要求。",
     "program_seed_unverified": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。",
     "catalog_metadata_conflict": "目录快照与课程记录的学分不一致，需向官方核实，不能静默合并。",
     "field_evidence_value_conflict": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
@@ -256,7 +256,7 @@ def requisite_years_line(evidence: dict) -> str | None:
         return None
     years = "、".join(f"Catalog {edition.catalog_year}" for edition in requisites.editions)
     older = f"，另有 {requisites.editions_omitted} 个更早年份没有列出" if requisites.editions_omitted else ""
-    return f"先修规则：已存 {years} 的课程块原文{older}（非实时核验，不判断能否注册）"
+    return f"先修/共修规则：已存 {years} 的课程块原文{older}（非实时核验，不判断能否注册）"
 
 
 def evidence_summary(evidence: dict, *, missing_limit: int | None = None,

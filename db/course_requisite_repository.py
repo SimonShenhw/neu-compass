@@ -146,15 +146,15 @@ class CourseRequisiteRepository:
         if not bundle.schema_available:
             bundle.warnings.append("structured_requisite_schema_unavailable")
             return bundle
-        course = self._conn.execute("SELECT primary_code,primary_name FROM courses WHERE course_id=?", (course_id,)).fetchone()
-        if course is None:
-            bundle.warnings.append("structured_requisites_missing")
-            return bundle
         clause, params = "course_id=?", [course_id]
         if catalog_year is not None:
             clause += " AND catalog_year=?"
             params.append(catalog_year)
         try:
+            course = self._conn.execute("SELECT primary_code,primary_name FROM courses WHERE course_id=?", (course_id,)).fetchone()
+            if course is None:
+                bundle.warnings.append("structured_requisites_missing")
+                return bundle
             bundle.has_any_stored_records = self._conn.execute("SELECT 1 FROM course_requisite_documents WHERE course_id=? LIMIT 1", (course_id,)).fetchone() is not None
             rows = self._conn.execute(f"SELECT course_id,catalog_year,document,content_hash FROM course_requisite_documents WHERE {clause} ORDER BY catalog_year DESC", params).fetchall()
         except sqlite3.DatabaseError:

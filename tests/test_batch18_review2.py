@@ -86,7 +86,7 @@ def test_live_link_wording_does_not_erase_a_real_saved_copy_note(text):
 
 @pytest.mark.parametrize("sentinel", [
     "The link opens the current catalog page, which may already show a later year's rule",
-    "say so once whenever you cite any recorded rule",
+    "say so once per answer (not once per course or rule) whenever you cite any recorded rule",
     "captured_at is when that catalog page was saved",
     "older recorded years may be left out",
     "requisites_differ_by_catalog_year means the recorded rules differ even when truncated clause_text looks identical",

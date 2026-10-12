@@ -837,11 +837,12 @@ def assert_adds_up(report):
     assert sum(sizes.values()) == total(documents["in_scope_courses"])
     for item in departments:
         for stats in item["by_catalog_year"].values():
-            for key in ("prerequisite", "corequisite", "credit_hours_vs_course_credits"):
-                assert sum(stats[key].values()) == stats["with_usable_document"]
+            for key in ("corequisite", "credit_hours_vs_course_credits"):
+                assert sum(stats[key].values()) == sum(stats["prerequisite"].values())
     for edition, stats in editions.items():
         per_department = [item["by_catalog_year"].get(edition) for item in departments]
-        assert sum(item["with_usable_document"] for item in per_department if item) == stats["usable"]
+        assert sum(item["with_usable_document"] for item in per_department if item) == stats["courses_in_scope_covered"]
+        assert sum(sum(item["prerequisite"].values()) for item in per_department if item) == stats["usable"]
         for key in ("prerequisite", "corequisite", "credit_hours_vs_course_credits"):
             for value in stats[key]:
                 assert stats[key][value] == sum(item[key][value] for item in per_department if item), (edition, key)
