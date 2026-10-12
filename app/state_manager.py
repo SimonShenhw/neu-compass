@@ -93,11 +93,15 @@ def login(
 
 
 def logout(state: SessionState) -> None:
-    """Clear identity + conversation. Search filters keep — nothing private
-    in them, and the user shouldn't have to retype after logout/login.
+    """Clear identity + conversation + the Co-op teaser fetched for this
+    account (app.view_cache.COOP_TEASER_KEY: the API redacts it by tier; the
+    view cache also never serves it to another scope). Search filters keep —
+    nothing private in them, and the user shouldn't have to retype after
+    logout/login.
 
-    清空身份 + 对话。搜索过滤器保留 —— 里面没有任何隐私信息，用户也
-    不该在登出/登录之后还要重新输入一遍。"""
+    清空身份 + 对话 + 替这个账号获取的 Co-op 预览（app.view_cache.COOP_TEASER_KEY：
+    API 按等级裁剪它；页面缓存本身也绝不会把它给另一个范围用）。搜索过滤器
+    保留 —— 里面没有任何隐私信息，用户也不该在登出/登录之后还要重新输入一遍。"""
     state["user_id"] = None
     state["user_email"] = None
     state["user_display_name"] = None
@@ -106,7 +110,8 @@ def logout(state: SessionState) -> None:
     state["messages"] = []
     state["search_results"] = []
     state["selected_course_id"] = None
-    for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in']:
+    for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in',
+                '_coop_teaser_cache']:
         state.pop(key, None)
 
 

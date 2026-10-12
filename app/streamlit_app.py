@@ -374,6 +374,41 @@ def _clear_filters_callback() -> None:
     st.session_state.pop("filter_credits", None)
 
 
+def _refresh_view_cache_callback() -> None:
+    """on_click callback for the sidebar's refresh button: the read-only page caches (app.view_cache)
+    fetch again on their next read. The callback itself leaves chat history, pending questions and
+    widget choices as they are; the refetch it causes clears a family's plan choice only when that
+    family's plans changed (program_view.get_curriculum_cached).
+    中文：侧边栏刷新按钮的 on_click 回调：只读页面缓存（app.view_cache）下一次读取时重新获取。回调
+    本身不动聊天历史、待发的问题和各组件的选择；它引起的重新获取只在某个项目的方案变了时清除该项目的
+    方案选择（program_view.get_curriculum_cached）。"""
+    import streamlit as st  # noqa: PLC0415
+
+    from app.view_cache import expire_all  # noqa: PLC0415
+
+    expire_all(st.session_state)
+
+
+# Under the sidebar's refresh button when a read of this run showed the content loaded earlier because
+# fetching it again failed (app.view_cache.served_fallback), so a failed refresh is not silent.
+# 中文：本次运行里有读取因为重新获取失败而显示了之前加载的内容时，显示在侧边栏刷新按钮下面
+# （app.view_cache.served_fallback），刷新失败时不再悄无声息。
+FALLBACK_NOTICE = "有些内容这次没能更新，显示的是上次加载的版本；稍后再操作页面时会再试。"
+
+
+def _end_page(st, notice_slot) -> None:
+    """End of every page: FALLBACK_NOTICE in the sidebar slot when it applies, then the footer.
+    Runs after the page's own cached reads, so the notice is about this run.
+    中文：每个页面的结尾：适用时在侧边栏的位置显示 FALLBACK_NOTICE，然后是页脚。它在页面自己的缓存
+    读取之后运行，所以说明针对的是这一次运行。"""
+    from app import view_cache  # noqa: PLC0415
+    from app.ui_theme import footer_html  # noqa: PLC0415
+
+    if view_cache.served_fallback(st.session_state):
+        notice_slot.caption(FALLBACK_NOTICE)
+    st.markdown(footer_html(), unsafe_allow_html=True)
+
+
 def render() -> None:
     """Render the chat UI. Imported lazily so `import app.streamlit_app`
     in tests doesn't trigger Streamlit's session machinery.
@@ -396,7 +431,6 @@ def render() -> None:
     )
     from app.ui_theme import (  # noqa: PLC0415
         empty_detail_html,
-        footer_html,
         guest_banner_html,
         hero_html,
         inject_theme,
@@ -411,6 +445,9 @@ def render() -> None:
     )
     inject_theme(st)
     init_state(st.session_state)
+    from app import view_cache  # noqa: PLC0415
+
+    view_cache.begin_run(st.session_state)  # Before any cached read of this run.
 
     # Process ?code= callback BEFORE rendering anything else (it may rerun).
     # 先处理 ?code= 回调再渲染其他内容（回调可能触发 rerun）。
@@ -434,18 +471,22 @@ def render() -> None:
     render_auth_sidebar()
     active_filters = _render_filters_sidebar(st, st.session_state)
 
-    # Corpus size for the hero pill — one /ready call per browser tab,
-    # cached in session_state. Failure (API warming) degrades to the
-    # number-free wording inside hero_html.
-    # hero 徽标里的课程总数 —— 每个浏览器标签页只调一次 /ready，缓存在
-    # session_state。失败（API 预热中）时降级为 hero_html 里不带数字的文案。
-    if "_ready_info" not in st.session_state:
-        try:
-            with ApiClient(timeout=5.0) as api:
-                st.session_state["_ready_info"] = api.ready()
-        except ApiError:
-            st.session_state["_ready_info"] = {}
-    ready_info = st.session_state.get("_ready_info") or {}
+    # Corpus size for the hero pill, from /ready through the tab's view cache (app.view_cache): a
+    # failure (503 while the API warms up) shows the number-free wording in hero_html and is tried
+    # again 30 s later instead of for the rest of the tab, and a success is fetched again after 5 min.
+    # 中文：hero 徽标里的课程总数，经标签页的页面缓存（app.view_cache）取 /ready：失败（API 预热时的
+    # 503）显示 hero_html 里不带数字的文案，30 秒后重试，而不是整个标签页都不再取；成功的结果 5 分钟后
+    # 重新获取。
+    def _fetch_ready() -> object:
+        with ApiClient(timeout=5.0) as api:
+            return api.ready()
+
+    try:
+        ready_info = view_cache.cached(st.session_state, view_cache.READY_KEY, _fetch_ready)
+    except ApiError:
+        ready_info = {}
+    if not isinstance(ready_info, dict):
+        ready_info = {}
 
     logged_in = is_logged_in(st.session_state)
     st.markdown(
@@ -488,6 +529,17 @@ def render() -> None:
     apply_deep_link(st, pages=pages)
 
     nav = st.sidebar.radio("页面 / Pages", pages, key="nav_page")
+    # The callback runs before the next script run, so every cached read of that run fetches again
+    # (the hero above included). Reruns never repeat a question, a Co-op submission or a vote.
+    # 中文：回调在下一次脚本运行之前执行，所以那一次运行里每个缓存读取都会重新获取（包括上面的
+    # hero）。rerun 不会重发提问、Co-op 投稿或评价。
+    st.sidebar.button(
+        view_cache.REFRESH_LABEL, key="view_cache_refresh", on_click=_refresh_view_cache_callback,
+        use_container_width=True,
+        help="重新获取课程总数、培养方案和 Co-op 预览；不会重新发送提问、投稿或评价。",
+    )
+    # Filled by _end_page once the page's cached reads have run. 中文：页面的缓存读取都跑完后由 _end_page 填写。
+    fallback_slot = st.sidebar.empty()
     # Guests see the Co-op tier summary under the hero on every page except Co-op itself, whose
     # own notice says the same thing. 中文：游客在除 Co-op 页以外的每个页面都会在 hero 下面看到
     # Co-op 分级说明；Co-op 页自己的提示内容相同，不再重复。
@@ -497,13 +549,13 @@ def render() -> None:
         from app.program_view import render_program_browser  # noqa: PLC0415
 
         render_program_browser(st)
-        st.markdown(footer_html(), unsafe_allow_html=True)
+        _end_page(st, fallback_slot)
         return
     if nav.startswith("💼"):
         from app.coop_view import render_coop_panel  # noqa: PLC0415
 
         render_coop_panel(st)
-        st.markdown(footer_html(), unsafe_allow_html=True)
+        _end_page(st, fallback_slot)
         return
 
     # 5:3 (was 3:2): the chat stream is the primary surface — review
@@ -745,7 +797,7 @@ def render() -> None:
 
             render_course_detail(st, course, cid=cid)
 
-    st.markdown(footer_html(), unsafe_allow_html=True)
+    _end_page(st, fallback_slot)
 
 
 # Streamlit entry point: render() at module top when running via streamlit

@@ -13,7 +13,7 @@
 ## API、提示词和界面共用的契约
 
 - `/chat` 首个 NDJSON meta 带 `prompt_version`（当前 `"4.3"`：在 4.2 的基础上，存档副本那句每个回答只说一次，数值冲突时两个数都要写出来；4.2 从未部署），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
-- `answer_evidence` 包含 `catalog`、`field_evidence`、`source_review_ids`、`missing_fields`、`warnings`。缺失包括官方描述及常用选课字段；`None`/空列表表示记录未提供，数值 0 不当成缺失。这不是完整 syllabus 字段的覆盖率报告。
+- `answer_evidence` 包含 `catalog`、`field_evidence`、`source_review_ids`、`missing_fields`、`warnings`。缺失包括官方描述及常用选课字段；`None`/空列表表示记录未提供，数值 0 不当成缺失。这不是完整 syllabus 字段的覆盖率报告；全库按院系／字段的统计见 [数据覆盖、冲突与来源报告](data-coverage-report.md)（OPT-03：每个字段的 `missing`、`catalog_only`、`catalog_lists_none` 三类合起来，就是这里 `missing_fields` 里的这个字段，学分的 `catalog_conflict` 就是这里的 `catalog_metadata_conflict`；另外比较先修代码集合，这一项回答路径没有对应警告）。
 - v4 提示词与 SSE meta 使用同一份读取结果，避免模型拿到一套依据、界面显示另一套。课程详情涉及培养方案时另外标记未核验 seed；chat 的培养方案捷径也标记该限制。不同查询语境的警告不必逐字相同。
 - 目录与课程学分冲突、数值估计与支持值冲突时保留两边并警告，不静默改写课程或选择一个值。先修代码列表不保留 AND/OR；培养方案 seed 不等于正式 Plan of Study 或选课资格保证。
 - v4 把查询、历史、来源块作为引用/JSON 数据，并要求忽略其中嵌入的指令；历史只能帮助解析所指，不能补造课程事实。移除按 5xxx/6xxx/7xxx 判断难度或首学期适合度的捷径。合成记录不应成为真实课程推荐。

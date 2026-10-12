@@ -21,6 +21,7 @@ class FakeSurface:
     def __init__(self, choice=None):
         self.choice = choice
         self.captions, self.texts, self.markdowns, self.selectors, self.helps = [], [], [], [], []
+        self.placeholders = []
         self.session_state = {}
 
     def caption(self, text):
@@ -32,9 +33,10 @@ class FakeSurface:
     def markdown(self, text):
         self.markdowns.append(text)
 
-    def selectbox(self, label, values, *, format_func, key, help=None):
+    def selectbox(self, label, values, *, format_func, key, help=None, placeholder=None):
         self.selectors.append((label, values, [format_func(value) for value in values], key))
         self.helps.append(help)
+        self.placeholders.append(placeholder)
         return self.choice
 
     def expander(self, label):

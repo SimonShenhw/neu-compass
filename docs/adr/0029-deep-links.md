@@ -51,8 +51,11 @@ A **transient API failure does not burn the flag.** The dominant failure
 mode is a student clicking a shared link while the API is still warming
 (bge-m3 cold start is ~70s), and settling there would kill the link
 permanently for exactly the user the feature exists to serve. Cost: with
-a hard-down API, each rerun retries. Mirrors `program_view`'s "failures
-are not cached so a warming API recovers".
+a hard-down API, each rerun retries. (Update 2026-10-08, OPT-02: a
+`?program=` ref now reads the program list through `app.view_cache`,
+which remembers a failure for 30 s and then fetches again, so a warming
+API still recovers without a reload; a `?course=` ref and a plan link
+still GET on every rerun until they settle. See `docs/view-cache.md`.)
 
 ### Resolve — `GET /resolve/course?ref=...` (new route)
 

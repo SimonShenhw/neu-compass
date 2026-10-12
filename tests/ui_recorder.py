@@ -45,6 +45,15 @@ class Recorder:
     def warning(self, value):
         self._add("warning", value)
 
+    def info(self, value):
+        self._add("info", value)
+
+    def error(self, value):
+        self._add("error", value)
+
+    def subheader(self, value):
+        self._add("subheader", value)
+
     def selectbox(self, label, options, **kwargs):
         self._add("selectbox", label)
         assert self.shared["choice"] in options

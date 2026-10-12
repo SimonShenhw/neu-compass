@@ -69,9 +69,9 @@ COURSE_PARAM = "course"
 PROGRAM_PARAM = "program"
 
 # One-shot guard. Underscore prefix = transient session bookkeeping, not
-# user state (same convention as _programs_cache / _curriculum_cache).
+# user state (same convention as the app.view_cache keys).
 # 中文：一次性守卫。下划线前缀 = 临时会话记账，而非用户状态（与
-# _programs_cache / _curriculum_cache 同一套约定）。
+# app.view_cache 的那些键同一套约定）。
 APPLIED_FLAG = "_deep_link_applied"
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -177,17 +177,20 @@ def apply_deep_link(st, *, pages: list[str]) -> None:
     the Programs page and the (more specific) course wins the landing page.
 
     Transient API failures do NOT burn the one-shot flag — the ref is
-    retried on the next rerun, mirroring the "failures are not cached so a
-    warming API recovers" rule in program_view's fetch helpers.
+    tried again on a later rerun. A `?program=` ref goes through
+    program_view's cached program list, which remembers a failure for 30 s;
+    a `?course=` ref and a plan link GET on every rerun until they settle
+    (docs/view-cache.md lists this as not covered by the view cache).
 
     中文：每个会话消费一次 `?course=` / `?program=`，然后路由过去。
 
     两个参数都不存在、或本会话已经应用过时，什么也不做。两个参数同时出现是
     合法的：培养方案会在 Programs 页面里备好，而更具体的课程赢得落地页。
 
-    临时性的 API 失败不会烧掉这个一次性标志 —— 下一次 rerun 会重试该 ref，
-    与 program_view 抓取辅助函数里「失败不缓存，好让预热中的 API 能恢复」
-    这条规则保持一致。
+    临时性的 API 失败不会烧掉这个一次性标志 —— 之后的 rerun 会重试该 ref。
+    `?program=` 走 program_view 缓存的项目列表，失败记 30 秒；`?course=`
+    和方案链接在确定结果之前每次 rerun 都会请求一次（docs/view-cache.md
+    把这一点列为页面缓存没有覆盖的部分）。
     """
     from app.program_plan_links import has_plan_link
     if has_plan_link(st.query_params):
@@ -242,7 +245,8 @@ def _apply_plan_ref(st, *, pages: list[str]) -> None:
         with ApiClient(session_token=st.session_state.get('session_token'), timeout=8.0) as api:
             body = api.get_program_curriculum(target.program_id)
     except ApiError as exc:
-        if exc.status_code in {408, 429} or exc.status_code >= 500:
+        from app import view_cache
+        if view_cache.transient(exc):
             # Transient: retried on a later rerun WITHOUT touching navigation
             # or the current program selection — doing that on every rerun of
             # an outage pinned the student to the Programs page. Only the
@@ -251,7 +255,8 @@ def _apply_plan_ref(st, *, pages: list[str]) -> None:
             # —— 以前每次 rerun 都这么做，故障期间学生会被钉在培养方案页。
             # 只在每条链接第一次时清掉该项目旧的方案选择。
             if st.session_state.get(RETRY_KEY) != token:
-                st.session_state.pop(f'program-plan-{target.program_id}', None)
+                # Set, not popped, so the browser's selectbox is reset too.
+                st.session_state[f'program-plan-{target.program_id}'] = None
                 st.session_state[RETRY_KEY] = token
                 st.warning('🔗 方案链接暂时无法核对，稍后会自动重试；在此之前不会改动你当前的页面。')
             return
@@ -266,19 +271,20 @@ def _apply_plan_ref(st, *, pages: list[str]) -> None:
     settle(None if plan is not None else MESSAGES[status])
     cache = _evict_family(st, target.program_id)
     if plan is not None:
-        cache[target.program_id] = body
+        from app import view_cache
+        view_cache.store(cache, target.program_id, body)
         st.session_state['selected_program_id'] = target.program_id
         st.session_state[PENDING_KEY] = target.model_dump(mode='json')
 
 
 def _evict_family(st, program_id: str) -> dict:
-    """Drop the family's plan widget choice and cached curriculum; return the cache.
-    中文：丢弃该项目的方案组件选择和缓存的课程表；返回缓存字典。"""
-    st.session_state.pop(f'program-plan-{program_id}', None)
-    cache = st.session_state.get('_curriculum_cache')
-    if not isinstance(cache, dict):
-        cache = {}
-        st.session_state['_curriculum_cache'] = cache
+    """Clear the family's plan widget choice (set to None, so the browser resets it too) and drop its
+    cached curriculum; return the cache.
+    中文：清掉该项目的方案组件选择（设成 None，浏览器里的选择框也会复位），丢弃缓存的课程表；返回
+    缓存字典。"""
+    from app import view_cache
+    st.session_state[f'program-plan-{program_id}'] = None
+    cache = view_cache.curricula(st.session_state)
     cache.pop(program_id, None)
     return cache
 

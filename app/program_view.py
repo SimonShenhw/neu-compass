@@ -22,8 +22,11 @@ State contract (the main app owns navigation; this module only sets flags):
     (writing a widget-bound key after the widget rendered raises
     StreamlitAPIException; see the filter-clear comment in streamlit_app).
   - _programs_cache / _curriculum_cache: per-tab response caches
-    (underscore prefix = transient cache, not user state). Failures are
-    NOT cached so a warming API recovers on the next rerun.
+    (underscore prefix = transient cache, not user state), kept by
+    app.view_cache: a success is fetched again after 5 min, a failure is
+    remembered for 30 s (so an outage does not make every rerun wait on the
+    timeout) and then tried again. A refetch that changes a family's plans
+    drops that family's plan choice (_PLAN_REVISED_KEY tells the page).
 
 状态约定（导航由主 app 掌管；本模块只负责置标志位）：
   - selected_program_id：当前展开的是哪个培养方案的课程表（None = 网格）。
@@ -32,8 +35,10 @@ State contract (the main app owns navigation; this module only sets flags):
     面板。这里绝不直接改 nav_page（组件渲染后再写其绑定的 key 会抛
     StreamlitAPIException；见 streamlit_app 中 filter-clear 处的说明）。
   - _programs_cache / _curriculum_cache：按标签页缓存的响应
-    （下划线前缀 = 临时缓存，非用户状态）。失败不缓存，这样一个正在
-    预热的 API 能在下一次 rerun 时恢复。
+    （下划线前缀 = 临时缓存，非用户状态），由 app.view_cache 维护：成功
+    的结果 5 分钟后重新获取，失败记 30 秒（故障期间不会每次 rerun 都等
+    超时），之后重试。重新获取后某个项目的方案变了，就清掉这个项目的
+    方案选择（_PLAN_REVISED_KEY 告诉页面）。
 
 The fetch helpers (get_programs_cached / get_curriculum_cached) are shared
 with app.discover_view so the landing teasers and this page hit the same
@@ -60,51 +65,83 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 # 中文:共享的抓取辅助函数（app.discover_view 也会导入它们）
 
 
+# Set to the program_id whose plan choice a refetch dropped; the curriculum view says so once.
+# 中文：重新获取后清掉了哪个项目的方案选择，就记下它的 program_id；课程表页面提示一次。
+_PLAN_REVISED_KEY = "_program_plan_revised"
+PLAN_REVISED_NOTICE = "这个项目的版本化方案有更新，之前选的目录版本与路径已清除，请重新选择。"
+
+
 def get_programs_cached(st) -> list[dict]:
-    """GET /programs once per browser tab, cached in _programs_cache.
+    """GET /programs through the tab's view cache (_programs_cache; the list
+    is public, the same for every viewer).
 
-    Raises ApiError on an uncached failure — the program page renders
-    st.error, the landing discovery block silently drops its section.
+    Raises ApiError while a failure is fresh and nothing was loaded before —
+    the program page renders st.error, the landing discovery block drops its
+    section.
 
-    每个浏览器标签页只调一次 GET /programs，缓存进 _programs_cache。
+    经标签页的页面缓存（_programs_cache；列表是公开的，对每位访客都一样）
+    取 GET /programs。
 
-    未缓存的失败会抛出 ApiError —— 培养方案页面据此渲染 st.error，
-    落地页的发现区块则悄悄丢弃对应的展示区块。"""
+    失败仍有效、之前又没加载成功过时抛出 ApiError —— 培养方案页面据此
+    渲染 st.error，落地页的发现区块则丢弃对应的展示区块。"""
+    from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiClient  # noqa: PLC0415
 
-    cached = st.session_state.get("_programs_cache")
-    if cached is not None:
-        return cached
-    with ApiClient(
-        session_token=st.session_state.get("session_token"), timeout=8.0,
-    ) as api:
-        programs = api.list_programs()
-    st.session_state["_programs_cache"] = programs
-    return programs
+    def fetch() -> object:
+        with ApiClient(
+            session_token=st.session_state.get("session_token"), timeout=8.0,
+        ) as api:
+            return api.list_programs()
+
+    return view_cache.cached(st.session_state, view_cache.PROGRAMS_KEY, fetch)
 
 
 def get_curriculum_cached(st, program_id: str) -> dict:
-    """GET /programs/{id} once per (tab, program), cached in
-    _curriculum_cache[program_id]. Raises ApiError on uncached failure
-    (including 404 for unseeded ids) — callers decide how loud to be.
+    """GET /programs/{id} through the tab's view cache
+    (_curriculum_cache[program_id]; public). Raises ApiError while a failure
+    is fresh and no earlier success may be served: a definite answer such as
+    404 (an unseeded id) always, a transient failure only when nothing was
+    loaded before (view_cache.transient) — callers decide how loud to be.
 
-    每个 (标签页, 培养方案) 组合只调一次 GET /programs/{id}，缓存进
-    _curriculum_cache[program_id]。未缓存的失败会抛出 ApiError（包括
-    未 seed 的 id 导致的 404）—— 具体报错多响亮由调用方决定。"""
+    A refetch whose plans differ from the last ones loaded clears the family's
+    plan choice, as the family refresh button below does: a changed revision
+    must be chosen again, never silently kept. The choice is set to None, not popped:
+    a popped key sends nothing to the browser, which keeps showing the old
+    option and sends it back with the next rerun. Callers run this before the
+    plan selectbox exists in the run (setting it afterwards would raise).
+
+    经标签页的页面缓存（_curriculum_cache[program_id]；公开内容）取
+    GET /programs/{id}。失败仍有效、又不能给出之前的成功结果时抛出 ApiError：
+    明确的答复（例如未 seed 的 id 导致的 404）总是抛出，暂时性失败只在之前
+    没加载成功过时抛出（view_cache.transient）—— 具体报错多响亮由调用方决定。
+
+    重新获取到的方案和上次加载的不同时，清掉这个项目的方案选择，和下面的
+    项目刷新按钮一样：版本变了就要重新选择，绝不悄悄沿用。选择是设成 None，而不是
+    删掉：删掉的键不会通知浏览器，浏览器会继续显示旧选项，并在下一次 rerun
+    时把它送回来。调用方都在这一轮的方案选择框创建之前调用（之后再设会报错）。"""
+    from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiClient  # noqa: PLC0415
 
-    cache = st.session_state.get("_curriculum_cache")
-    if cache is None:
-        cache = {}
-        st.session_state["_curriculum_cache"] = cache
-    if program_id in cache:
-        return cache[program_id]
-    with ApiClient(
-        session_token=st.session_state.get("session_token"), timeout=8.0,
-    ) as api:
-        curriculum = api.get_program_curriculum(program_id)
-    cache[program_id] = curriculum
-    return curriculum
+    def fetch() -> object:
+        with ApiClient(
+            session_token=st.session_state.get("session_token"), timeout=8.0,
+        ) as api:
+            return api.get_program_curriculum(program_id)
+
+    def drop_changed_choice(previous: object, current: object) -> None:
+        key = f"program-plan-{program_id}"
+        if st.session_state.get(key) is None:
+            return  # Nothing chosen: Streamlit registers the selectbox's key with None.
+        same = (isinstance(previous, dict) and isinstance(current, dict)
+                and previous.get("plans") == current.get("plans"))
+        if not same:
+            st.session_state[key] = None
+            st.session_state[_PLAN_REVISED_KEY] = program_id
+
+    return view_cache.cached(
+        view_cache.curricula(st.session_state), program_id, fetch, on_success=drop_changed_choice,
+        state=st.session_state,
+    )
 
 
 # === Pure HTML builders (escaped and on one line — catalog names can contain & < ", and a blank
@@ -256,16 +293,21 @@ def _render_curriculum(st, program_id: str) -> None:
     # Refresh before rendering the bound scope widget. A changed revision
     # must be selected explicitly again; never silently reapply the old choice.
     # 中文：仅清除当前家族缓存与方案选择，不保存或复用政策响应。
+    from app import view_cache  # noqa: PLC0415
+
     if st.button("刷新方案及政策证据", key=f"prog-refresh-{program_id}"):
         st.session_state.pop('_program_plan_link_pending', None)
-        cache = st.session_state.get("_curriculum_cache", {})
-        cache.pop(program_id, None)
-        st.session_state.pop(f"program-plan-{program_id}", None)
+        view_cache.curricula(st.session_state).pop(program_id, None)
+        # Set, not popped, so the browser's selectbox is reset too (see get_curriculum_cached).
+        st.session_state[f"program-plan-{program_id}"] = None
     try:
         cur = get_curriculum_cached(st, program_id)
     except ApiError as e:
         st.error(f"无法加载课程表: {e.detail}")
         return
+    revised = st.session_state.get(_PLAN_REVISED_KEY) == program_id
+    if revised:
+        st.session_state.pop(_PLAN_REVISED_KEY, None)
 
     st.markdown(
         _program_header_html(
@@ -279,6 +321,8 @@ def _render_curriculum(st, program_id: str) -> None:
 
         st.caption(literal_markdown(cur["notes"]))  # Database text: shown as written, not Markdown.
     from app.program_plan_view import render_program_plans  # noqa: PLC0415
+    if revised:
+        st.info(PLAN_REVISED_NOTICE)
     plan = render_program_plans(st, cur.get("plans", []), key=f"program-plan-{program_id}", program_id=program_id)
     if plan is not None:
         from app.program_policy_view import load_selected_program_policy_evidence  # noqa: PLC0415
