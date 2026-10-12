@@ -243,3 +243,13 @@ def test_folding_keeps_every_caveat_of_the_sources():
     for needle in ("不判断个人注册、减免、成绩、开课或完整政策", "院系页面未声明校区或个人路径", "旧详情若有整数",
                    "此证据不重写 Course 的整数 credits", "来源捕获 UTC", "批准/资格证据和项目片段不是完整学校政策"):
         assert any(needle in value for value in folded), needle
+
+
+def test_the_chat_caption_claims_only_the_years_chat_gets():
+    """Chat gets the newest MAX_REQUISITE_EDITIONS usable years; an older chosen year is not cited by answers."""
+    from schemas.answer_evidence import MAX_REQUISITE_EDITIONS  # noqa: PLC0415
+
+    st = FakeSt("2022-2023")
+    render(st, bundle(*(document(f"{year}-{year + 1}") for year in range(2022, 2027))))
+    assert any(f"最多引用最近 {MAX_REQUISITE_EDITIONS} 个已记录年份" in caption for caption in st.captions)
+    assert not any("对话回答会按年份引用这些规则" in caption for caption in st.captions)

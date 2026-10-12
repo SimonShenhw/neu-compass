@@ -60,17 +60,14 @@ from api.dependencies import (
 )
 from api.models import ChatRequest
 from api.routes.common import (
-    attempt_hyde_rescue,
-    build_hard_filters,
-    error_frames,
-    fetch_texts,
-    filter_courses,
-    log_query,
-)
-from api.routes.search import (
     BLEND_ALPHA,
     RERANK_POOL_SIZE,
     RERANKER_REJECT_THRESHOLD,
+    build_hard_filters,
+    error_frames,
+    filter_courses,
+    log_query,
+    rerank_with_gate_and_rescue,
 )
 from db.alias_repository import AliasRepository
 from db.program_repository import ProgramAmbiguous, ProgramNotFound, ProgramRepository
@@ -85,7 +82,7 @@ from rag.answer_evidence import build_answer_evidence
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import asks_for_alternatives, normalize_query_to_course_ids
 from rag.rejection import build_gate_fn
-from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
+from rag.reranker import CrossEncoderReranker
 from rag.retriever import SearchHit
 from schemas.course import DeliveryMode
 
@@ -244,53 +241,21 @@ def chat(
     rejection_reason: str | None = None
     was_rescued = False
     if matched_via == "hybrid" and reranker is not None and hits:
-        # One batched SELECT for all candidate texts (was ≤20 per-row queries).
-        texts = fetch_texts(conn, [h.course.course_id for h in hits])
-
-        gate_fn = None
-        if settings.rejection_mode == "calibrated":
-            diag = hybrid.last_diagnostics or {}
-            gate_fn = build_gate_fn(
-                query=req.query,
-                bm25_top=diag.get("bm25_top", 0.0),
-                vec_top=diag.get("vec_top", 0.0),
-            )
-        blended_hits, rerank_meta = rerank_blend_with_rejection(
-            req.query, hits, reranker,
-            fetch_text=texts.get,
-            blend_alpha=BLEND_ALPHA,
-            reject_threshold=RERANKER_REJECT_THRESHOLD,
-            top_k=req.k,
-            gate_fn=gate_fn,
+        decision = rerank_with_gate_and_rescue(
+            query=req.query, hits=hits, conn=conn, hybrid=hybrid,
+            reranker=reranker, diagnostics=getattr(hybrid, "last_diagnostics", None),
+            hard_filters=hard_filters or None, rescue_fn=rescue_fn,
+            pool_size=max(req.k, RERANK_POOL_SIZE), blend_alpha=BLEND_ALPHA,
+            reject_threshold=RERANKER_REJECT_THRESHOLD, top_k=req.k,
+            gate_builder=build_gate_fn,
         )
-        if rerank_meta["rejected"]:
-            # ADR-0019 rescue — same semantics as /search (incl. the
-            # borderline-only scope: high-confidence rejections skip the LLM).
-            # 中文（ADR-0019）：救援逻辑，与 /search 语义一致（含仅临界情形
-            # 生效的范围限定：高置信度拒答会跳过 LLM）。
-            rescued = None
-            if rescue_fn is not None and (
-                gate_fn is None
-                or getattr(gate_fn, "last_p", 1.0)
-                >= settings.rescue_min_probability
-            ):
-                rescued = attempt_hyde_rescue(
-                    query=req.query, conn=conn, hybrid=hybrid,
-                    reranker=reranker, rescue_fn=rescue_fn,
-                    hard_filters=hard_filters or None,
-                    pool_size=max(req.k, RERANK_POOL_SIZE),
-                    blend_alpha=BLEND_ALPHA, top_k=req.k,
-                )
-            if rescued is not None:
-                log.info("chat.hyde_rescued", query=req.query, count=len(rescued))
-                hits = rescued
-                was_rescued = True
-            else:
-                hits = []
-                matched_via = "rejected"
-                rejection_reason = str(rerank_meta["reason"])
-        else:
-            hits = blended_hits
+        hits = decision.hits
+        was_rescued = decision.rescued
+        rejection_reason = decision.rejection_reason
+        if was_rescued:
+            log.info("chat.hyde_rescued", query=req.query, count=len(hits))
+        if decision.rejected:
+            matched_via = "rejected"
 
     log.info(
         "chat.retrieved",

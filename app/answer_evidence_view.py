@@ -13,7 +13,7 @@ import time
 from pydantic import ValidationError
 
 from rag.answer_evidence import source_kind
-from schemas.answer_evidence import OFFICIAL_CATALOG_URL, CatalogSnapshot
+from schemas.answer_evidence import OFFICIAL_CATALOG_URL, CatalogSnapshot, RequisiteEvidence
 
 SOURCE_KIND_LABELS = {
     "rmp_review": "RateMyProfessors 教师评价", "reddit": "Reddit 讨论", "syllabus": "课程大纲",
@@ -31,6 +31,9 @@ WARNING_LABELS = {
     "extracted_evidence_not_official_facts": "软字段是来源支持的抽取/评价，不是官方事实；抽取置信度不等于事实概率。",
     "topics_source_unavailable": "结构化主题未附来源，需核实。",
     "prerequisite_logic_unavailable": "先修代码未保留 AND/OR 语义，不能据此判断所有/任一必需。",
+    "requisites_differ_by_catalog_year": "不同 Catalog 年份记录的先修/共修规则不一样，要看你适用哪一年。",
+    "requisite_clause_unparsed": "有一段先修/共修原文没能解析成规则，只能照原文核对。",
+    "structured_requisites_unusable": "有已存的年度先修/共修规则读不出来或校验没通过；不能当作那一年没有要求。",
     "program_seed_unverified": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。",
     "catalog_metadata_conflict": "目录快照与课程记录的学分不一致，需向官方核实，不能静默合并。",
     "field_evidence_value_conflict": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
@@ -46,6 +49,9 @@ SHORT_WARNING_LABELS = {
     "extracted_evidence_not_official_facts": "工作量、难度等是根据评价的估计，不是官方信息",
     "topics_source_unavailable": "主题列表没有来源",
     "prerequisite_logic_unavailable": "先修课之间是「都要」还是「任选」不清楚",
+    "requisites_differ_by_catalog_year": "先修/共修规则各年份不一样，要看你的 Catalog 年份",
+    "requisite_clause_unparsed": "有一段先修/共修原文没能解析，请照原文核对",
+    "structured_requisites_unusable": "有年度先修/共修规则读不出来，不是没有要求",
     "program_seed_unverified": "培养方案关系没有核实，不是正式的 Plan of Study",
     "catalog_metadata_conflict": "目录学分和课程记录不一致，请向学校核实",
     "field_evidence_value_conflict": "有估计值和评价原文对不上，需要核实",
@@ -74,7 +80,8 @@ def render_retrieval_notices(st, notices) -> None:
 COMPACT_WARNINGS = {
     "catalog_metadata_conflict", "field_evidence_value_conflict", "program_seed_unverified",
     "synthetic_record_not_real_course", "prerequisite_logic_unavailable",
-    "extracted_evidence_not_official_facts",
+    "extracted_evidence_not_official_facts", "requisites_differ_by_catalog_year",
+    "requisite_clause_unparsed", "structured_requisites_unusable",
 }
 
 
@@ -235,13 +242,34 @@ def render_streamed_answer(st, chunks, *, min_interval: float = 0.1, clock=time.
     return text
 
 
-def evidence_summary(evidence: dict, *, missing_limit: int | None = None) -> list[str]:
+def requisite_years_line(evidence: dict) -> str | None:
+    """Which catalog years' prerequisite rules the answer had, e.g. '先修规则：已存 Catalog 2026-2027
+    的课程块原文…'. Only a block that passes RequisiteEvidence's checks is read (its years are then
+    plain YYYY-YYYY), so stored history or a bad payload shows nothing instead of raw text.
+    中文：回答用到了哪些 Catalog 年份的先修规则。只读通过 RequisiteEvidence 校验的数据块（年份因此只能
+    是 YYYY-YYYY），已存历史或坏数据不显示，也不会原样显示其中的文字。"""
+    try:
+        requisites = RequisiteEvidence.model_validate(evidence.get("requisites"))
+    except ValidationError:
+        return None
+    if not requisites.editions:
+        return None
+    years = "、".join(f"Catalog {edition.catalog_year}" for edition in requisites.editions)
+    older = f"，另有 {requisites.editions_omitted} 个更早年份没有列出" if requisites.editions_omitted else ""
+    return f"先修/共修规则：已存 {years} 的课程块原文{older}（非实时核验，不判断能否注册）"
+
+
+def evidence_summary(evidence: dict, *, missing_limit: int | None = None,
+                     show_requisite_years: bool = True) -> list[str]:
     lines = []
     catalog = _catalog_snapshot(evidence)
     if catalog:
         lines.append("来源：已存目录快照（非实时核验）")
     else:
         lines.append("来源：未附可追溯目录快照")
+    years = requisite_years_line(evidence) if show_requisite_years else None
+    if years:
+        lines.append(years)
     missing = [_label(FIELD_LABELS, field) for field in evidence.get("missing_fields", [])]
     if missing:
         visible = missing if missing_limit is None else missing[:missing_limit]
@@ -279,22 +307,27 @@ def render_course_overview(st, evidence: dict | None) -> None:
     else:
         st.caption("没有官方目录描述的存档。")
     # The caption above already says when there is no catalog record.
-    line = notice_line([code for code in evidence.get("warnings", []) if code != "catalog_source_unavailable"])
+    # The full course-year selector is separate: these three short warnings describe chat's capped year block.
+    # 中文：完整课程年度在规则面板里显示；这三条短提示只描述聊天限量的年度块，不在课程概览重复。
+    line = notice_line([code for code in evidence.get("warnings", []) if code not in {
+        "catalog_source_unavailable", "requisites_differ_by_catalog_year", "requisite_clause_unparsed",
+        "structured_requisites_unusable"}])
     if line:
         st.caption(line)
 
 
 def render_answer_evidence(st, evidence: dict | None, *, detailed: bool = False,
-                           show_description: bool = True) -> None:
+                           show_description: bool = True, show_requisite_years: bool = True) -> None:
     """Compact (cards under an answer): source line, missing fields, one caveat line.
     Detailed (course detail, inside 来源与说明): every field, every warning in full, snapshot and
     recorded sources. show_description=False when render_course_overview already showed it.
     中文：紧凑模式（回答下方的卡片）：来源、缺失字段、一行提示。详细模式（课程详情的「来源与说明」
     里）：全部字段、每条提示的完整说明、快照和记录来源。若 render_course_overview 已显示描述，
-    传 show_description=False。"""
+    传 show_description=False；课程页同时传 show_requisite_years=False，避免把聊天最近三年的摘要当作完整年份。"""
     if evidence is None:
         return  # Backward-compatible history entries may predate this contract.
-    for line in evidence_summary(evidence, missing_limit=None if detailed else 5):
+    for line in evidence_summary(evidence, missing_limit=None if detailed else 5,
+                                 show_requisite_years=show_requisite_years):
         st.caption(line)
     if not detailed:
         line = notice_line(evidence.get("warnings", []), only=COMPACT_WARNINGS)

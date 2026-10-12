@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from schemas.course import COURSE_CODE_PATTERN
+from schemas.course import canonical_course_code
 from schemas.course_requisites import CatalogRequisites
 from schemas.course_requisite_source import CourseRequisiteSource
 from schemas.course_description_evidence import CourseDescriptionEvidence
@@ -34,10 +34,7 @@ class CourseRequisiteDocument(BaseModel):
     @field_validator("course_code")
     @classmethod
     def canonical_code(cls, value):
-        match = COURSE_CODE_PATTERN.fullmatch(value.strip().upper())
-        if not match:
-            raise ValueError("Invalid course code")
-        return f"{match.group(1)} {match.group(2)}"
+        return canonical_course_code(value)
 
     @field_validator("imported_at")
     @classmethod

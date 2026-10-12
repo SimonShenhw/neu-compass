@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
+from schemas.answer_evidence import MAX_REQUISITE_EDITIONS
 from schemas.course_requisite_document import CourseRequisiteDocument, CourseRequisiteListing
 from schemas.course_requisites import RequisiteNode
 from schemas.course_program_context import CourseProgramContext
@@ -242,7 +243,9 @@ def render_course_requisites(st, data: dict | None, *, course_id: str, course_co
         st.markdown(f"[官方院系来源]({document.source.url})")
         st.caption(f"来源捕获 UTC {document.source.captured_at.isoformat()} · 导入 UTC {document.imported_at.isoformat()}；不是实时查询")
         st.text(f"来源 HTML 字节摘要：{document.source.sha256}（不证明不可篡改真实性或个人适用性）")
-        st.caption("批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。此规则未用于对话回答或生成学期安排。")
+        st.caption("批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。"
+                   f"对话回答最多引用最近 {MAX_REQUISITE_EDITIONS} 个已记录年份的这些规则（更早的只计数），"
+                   "但不判断你能否注册，也不用于生成学期安排。")
     context = next((item for item in bundle.program_contexts if item.catalog_year == chosen and item.course_code == course_code), None)
     with st.expander("🎓 同一年份培养方案里的相关要求"):
         # Edition-specific widget keys prevent a previous path silently carrying over.

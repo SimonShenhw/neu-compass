@@ -23,7 +23,7 @@ def course(**updates):
 
 
 def test_version_and_empty_candidates():
-    assert PROMPT_VERSION == "4.3"
+    assert PROMPT_VERSION == "4.4"
     assert "no matches found in catalog" in build_prompt("unknown", [])
 
 
@@ -52,7 +52,9 @@ def test_internal_ids_never_reach_the_prompt_but_their_meaning_does(description)
         assert identifier not in prompt
     projected = json.loads(format_courses_block([SearchHit(course=record, score=1)], {record.course_id: evidence}))[0]
     # Exact keys at every level, so no new ID-like field can slip into the projection unnoticed.
-    assert set(projected) == {"course_id", "primary_code", "primary_name", "recorded_metadata", "answer_evidence"}
+    assert set(projected) == {"course_id", "primary_code", "primary_name", "recorded_metadata",
+                              "catalog_requisites", "answer_evidence"}
+    assert projected["catalog_requisites"] is None  # Not looked up: nothing about prerequisites changes.
     used = projected["answer_evidence"]
     assert set(used) == {"catalog", "field_evidence", "field_evidence_omitted_count", "recorded_sources",
                          "missing_fields", "warnings"}
@@ -82,8 +84,9 @@ def test_citation_rules_ask_for_plain_words_and_catalog_links_only():
                      # Live runs: first no answer said the catalog text is a stored copy, then
                      # multi-course answers said it once per course, then "once per answer" made
                      # answers about a course with no catalog say it too.
-                     "If you used any catalog description, say once per answer (not once per course), in one "
-                     "short plain sentence, that it comes from a saved copy of the catalog, not a live check",
+                     "If you used any catalog description or catalog_requisites rule, say once per answer (not "
+                     "once per course), in one short plain sentence, that it comes from a saved copy of the "
+                     "catalog, not a live check",
                      "For a course whose catalog is null, say the available record has no official catalog "
                      "description for it",
                      # Two answers gave only the estimate when it disagreed with its quote.

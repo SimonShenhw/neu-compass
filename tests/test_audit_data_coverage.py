@@ -13,6 +13,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,8 +27,8 @@ from db.course_requisite_repository import content_hash as requisite_hash
 from db.program_plan_repository import ProgramPlanRepository
 from db.program_plan_repository import content_hash as plan_hash
 from db.repository import CourseRepository
-from rag.answer_evidence import AVAILABILITY_FIELDS, course_answer_evidence
-from schemas.answer_evidence import CatalogSnapshot
+from rag.answer_evidence import AVAILABILITY_FIELDS, build_answer_evidence, course_answer_evidence, requisite_evidence
+from schemas.answer_evidence import CatalogSnapshot, RequisiteEvidence
 from schemas.catalog_credit_hours import CatalogCreditHours
 from schemas.course import Course, EvidenceSnippet
 from schemas.course_description_evidence import CourseDescriptionEvidence
@@ -312,11 +313,12 @@ def test_field_categories_cover_every_in_scope_course(seeded):
     assert set(table) == set(AVAILABILITY_FIELDS)
     for counts in table.values():
         assert list(counts) == list(audit.FIELD_CATEGORIES) and sum(counts.values()) == 8
-    assert table["credits"] == {"catalog_only": 0, "catalog_lists_none": 0, "catalog_conflict": 1,
+    assert table["credits"] == {"year_rules": 0, "catalog_only": 0, "catalog_lists_none": 0, "catalog_conflict": 1,
                                 "catalog_consistent": 2, "missing": 3, "extracted_estimate": 0,
                                 "course_sources_only": 1, "no_recorded_source": 1}
-    assert table["prereqs"] == {"catalog_only": 1, "catalog_lists_none": 0, "catalog_conflict": 1,
-                                "catalog_consistent": 1, "missing": 4, "extracted_estimate": 0,
+    # CS 5800, CS 5200 and AAI 6600 have a usable year document: chat gives its rules, not the stored list.
+    assert table["prereqs"] == {"year_rules": 3, "catalog_only": 0, "catalog_lists_none": 0, "catalog_conflict": 1,
+                                "catalog_consistent": 0, "missing": 3, "extracted_estimate": 0,
                                 "course_sources_only": 0, "no_recorded_source": 1}
     assert table["workload_hours_per_week"]["extracted_estimate"] == 1
     assert table["difficulty_score"]["extracted_estimate"] == 1
@@ -330,13 +332,19 @@ def test_field_categories_cover_every_in_scope_course(seeded):
     assert warnings["catalog_metadata_conflict"] == 1 and warnings["field_evidence_value_conflict"] == 1
     assert warnings["catalog_retrieval_date_unknown"] == 2 and warnings["catalog_source_unavailable"] == 5
     assert "synthetic_record_not_real_course" not in warnings
+    # Year rules: CS 6140 and DS 5220 (a) have a code list and no usable document; CS 5200's clause is kept as text;
+    # five courses have documents that cannot be used.
+    assert (warnings["prerequisite_logic_unavailable"], warnings["requisite_clause_unparsed"],
+            warnings["structured_requisites_unusable"]) == (2, 1, 5)
     cs = fields["by_department"]["CS"]
     assert cs["courses_in_scope"] == 3 and set(cs["fields"]) == set(AVAILABILITY_FIELDS)
     assert cs["fields"]["credits"] == {"catalog_conflict": 1, "catalog_consistent": 1, "missing": 1}
+    assert cs["fields"]["prereqs"] == {"year_rules": 2, "no_recorded_source": 1}
     # CS 5800 has a usable snapshot with a description, CS 5200 one without, CS 6140 none (bad JSON).
     assert cs["catalog_description"] == {"empty_in_usable_snapshot": 1, "no_usable_snapshot": 1, "present": 1}
     assert cs["answer_warnings"] == {"catalog_metadata_conflict": 1, "catalog_retrieval_date_unknown": 1,
-                                     "catalog_source_unavailable": 1, "prerequisite_logic_unavailable": 3}
+                                     "catalog_source_unavailable": 1, "prerequisite_logic_unavailable": 1,
+                                     "requisite_clause_unparsed": 1, "structured_requisites_unusable": 1}
     # Zero counts are left out here too: no DS course has a usable snapshot without a description.
     assert fields["by_department"]["DS"]["catalog_description"] == {"no_usable_snapshot": 2, "present": 1}
     assert "categories" not in fields
@@ -829,11 +837,12 @@ def assert_adds_up(report):
     assert sum(sizes.values()) == total(documents["in_scope_courses"])
     for item in departments:
         for stats in item["by_catalog_year"].values():
-            for key in ("prerequisite", "corequisite", "credit_hours_vs_course_credits"):
-                assert sum(stats[key].values()) == stats["with_usable_document"]
+            for key in ("corequisite", "credit_hours_vs_course_credits"):
+                assert sum(stats[key].values()) == sum(stats["prerequisite"].values())
     for edition, stats in editions.items():
         per_department = [item["by_catalog_year"].get(edition) for item in departments]
-        assert sum(item["with_usable_document"] for item in per_department if item) == stats["usable"]
+        assert sum(item["with_usable_document"] for item in per_department if item) == stats["courses_in_scope_covered"]
+        assert sum(sum(item["prerequisite"].values()) for item in per_department if item) == stats["usable"]
         for key in ("prerequisite", "corequisite", "credit_hours_vs_course_credits"):
             for value in stats[key]:
                 assert stats[key][value] == sum(item[key][value] for item in per_department if item), (edition, key)
@@ -930,6 +939,21 @@ def test_any_missing_table_makes_the_report_incomplete(seeded, table):
     elif table == "courses":
         assert section(report, "courses") == marker
         assert section(report, "fields") == {"status": "not_checked", "code": "courses_not_checked"}
+    elif table == "course_requisite_documents":
+        # Without the table chat has no year rules (schema_missing, as in 4.3): prereqs and the warnings still count,
+        # and agree with chat (the runtime database has no such table yet).
+        fields = section(report, "fields")
+        assert section(report, "requisite_documents") == marker
+        _, served = chat_evidence(seeded)
+        assert {item.requisites.storage for item in served.values()} == {"schema_missing"}
+        expected = Counter(warning for evidence in served.values() for warning in set(evidence.warnings))
+        assert fields["answer_warnings"] == dict(sorted(expected.items()))
+        counts = fields["fields"]["prereqs"]
+        assert counts["year_rules"] == 0
+        assert (counts["missing"] + counts["catalog_only"] + counts["catalog_lists_none"]
+                == sum("prereqs" in evidence.missing_fields for evidence in served.values()))
+        assert fields["fields"]["credits"]["catalog_consistent"] == 2 and fields["catalog_description"]["present"] == 2
+        assert all("prereqs" in item["fields"] and "answer_warnings" in item for item in fields["by_department"].values())
 
 
 def test_schema_versions_are_counted_against_the_release_migrations(seeded):
@@ -1017,6 +1041,36 @@ def test_a_missing_read_column_is_not_checked(seeded):
     assert section(report, "catalog_snapshots") == {"status": "not_checked", "code": "column_missing"}
 
 
+@pytest.mark.parametrize("change", [
+    ("DROP TABLE course_requisite_documents", "CREATE VIEW course_requisite_documents AS SELECT * FROM courses"),
+    ("ALTER TABLE course_requisite_documents RENAME COLUMN document TO payload",),
+])
+def test_a_requisite_table_that_cannot_be_read_leaves_prereqs_unchecked(seeded, change):
+    """The report conservatively leaves these fields unchecked. Chat has no year rules: a view is
+    schema_missing, a missing column is schema_unusable; catalog comparison is still counted."""
+    modify(seeded, *change)
+    fields = section(audit.build_report(seeded), "fields")
+    no_rules = {"status": "not_checked", "code": "requisite_documents_not_checked"}
+    assert fields["fields"]["prereqs"] == fields["answer_warnings"] == no_rules
+    assert all("prereqs" not in item["fields"] and "answer_warnings" not in item
+               for item in fields["by_department"].values())
+    assert fields["catalog_comparison"] == {"status": "checked"} and fields["catalog_description"]["present"] == 2
+    assert fields["fields"]["credits"]["catalog_consistent"] == 2
+    assert all("catalog_description" in item for item in fields["by_department"].values())
+
+
+def test_without_snapshots_the_catalog_marker_comes_first(seeded):
+    """No snapshots and an unreadable requisite table: prereqs and the warnings name the catalog snapshots, the first
+    input they lack."""
+    modify(seeded, "DROP TABLE course_catalog_sources",
+           "ALTER TABLE course_requisite_documents RENAME COLUMN document TO payload")
+    report = audit.build_report(seeded)
+    assert section(report, "requisite_documents") == {"status": "not_checked", "code": "column_missing"}
+    fields = section(report, "fields")
+    not_compared = {"status": "not_checked", "code": "catalog_snapshots_not_checked"}
+    assert fields["fields"]["prereqs"] == fields["answer_warnings"] == not_compared
+
+
 def test_courses_failure_leaves_dependent_sections_not_checked(seeded, monkeypatch):
     def failing(self):
         raise audit._Failed("row_budget")
@@ -1038,6 +1092,8 @@ def test_an_unexpected_error_fails_only_its_section(seeded, monkeypatch):
     report = audit.build_report(seeded)
     assert section(report, "requisite_documents") == {"status": "failed", "code": "section_failed"}
     assert section(report, "program_plans")["status"] == "checked" and report["complete"] is False
+    fields = section(report, "fields")
+    assert fields["fields"]["prereqs"] == fields["answer_warnings"] == audit.NO_YEAR_RULES
     assert SENTINEL not in json.dumps(report)
 
 
@@ -1305,7 +1361,8 @@ def test_an_excluded_course_with_a_free_text_code_names_nothing(seeded):
 
 def test_blank_catalog_codes_list_nothing(seeded):
     modify(seeded, "UPDATE course_catalog_sources SET snapshot=json_set(snapshot, '$.prereq_codes', "
-                   "json_array('   ', '')) WHERE course_id='c-cs5200'")
+                   "json_array('   ', '')) WHERE course_id='c-cs5200'",
+           "DELETE FROM course_requisite_documents WHERE course_id='c-cs5200'")  # Else its year rules decide prereqs.
     report = audit.build_report(seeded, details=True)
     assert section(report, "catalog_snapshots")["usable_snapshots"]["prereq_codes_listed"] == 1  # CS 5800 only.
     prereqs = section(report, "fields")["fields"]["prereqs"]
@@ -1439,20 +1496,89 @@ def test_an_orphan_plan_is_unusable_here_although_the_course_page_shows_it(seede
     assert "course_context does not check programs" in audit.RULES["program_plans"]["orphan_rows"]
 
 
-def test_missing_categories_agree_with_answer_evidence(seeded):
-    conn, courses = served_courses(seeded)
+def chat_evidence(path):
+    """What the chat path gives each in-scope course, one course per batch (the report's per-course model)."""
+    conn, courses = served_courses(path)
     try:
-        attached = CatalogSourceRepository(conn).get_batch(list(courses.values()))
+        return courses, {course_id: build_answer_evidence(conn, [course])[course_id]
+                         for course_id, course in courses.items()}
     finally:
         conn.close()
+
+
+def test_missing_categories_agree_with_answer_evidence(seeded):
+    courses, served = chat_evidence(seeded)
+    assert any(evidence.requisites.editions for evidence in served.values())  # Year rules are part of the check.
     for course_id, course in courses.items():
-        snapshot_ = attached.get(course_id)
-        evidence = course_answer_evidence(course, snapshot_)
-        gaps = {field for field in AVAILABILITY_FIELDS if audit.field_category(course, field, snapshot_)
+        evidence = served[course_id]
+        gaps = {field for field in AVAILABILITY_FIELDS
+                if audit.field_category(course, field, evidence.catalog, evidence.requisites)
                 in ("missing", "catalog_only", "catalog_lists_none")}
         assert gaps == set(evidence.missing_fields) - {"catalog_description"}, course_id
-        conflict = audit.field_category(course, "credits", snapshot_) == "catalog_conflict"
+        conflict = audit.field_category(course, "credits", evidence.catalog) == "catalog_conflict"
         assert conflict == ("catalog_metadata_conflict" in evidence.warnings), course_id
+
+
+@pytest.mark.parametrize("change", ["none", "blob", "editions_differ", "not_utf8_row", "duplicate_one_valid",
+                                    "duplicates_valid", "empty_clause"])
+def test_fields_and_warnings_are_what_the_chat_path_gives(seeded, change):
+    """The report's own reading of snapshots and year documents gives the same gaps and warnings as chat."""
+    if change.startswith("duplicate"):  # Only a copy without keys holds two rows for one course and year.
+        without_keys(seeded, "course_requisite_documents")
+    with writing(seeded) as conn:
+        conn.execute("PRAGMA ignore_check_constraints=ON")
+        if change == "blob":
+            for statement in BLOB_ROWS:
+                conn.execute(statement)
+        elif change == "editions_differ":
+            put_requisite(conn, "c-cs5800", "2025-2026", requisite("c-cs5800", "CS 5800", "Algorithms",
+                                                                   year="2025-2026", prerequisite="CS 5010"))
+        elif change == "not_utf8_row":
+            conn.execute("INSERT INTO course_requisite_documents(course_id, catalog_year, document, content_hash) "
+                         "VALUES('c-cs5200', '2027-2028', CAST(x'7bff7d' AS TEXT), ?)", ("0" * 64,))
+        elif change.startswith("duplicate"):  # A second CS 5800 2026-2027 row; only one_valid's fails its hash.
+            second = requisite("c-cs5800", "CS 5800", "Algorithms", prerequisite="CS 5010")
+            put_requisite(conn, "c-cs5800", "2026-2027", second, digest="0" * 64 if change.endswith("one_valid") else None)
+        elif change == "empty_clause":  # A label with no clause after it.
+            put_requisite(conn, "c-cs5800", "2025-2026", requisite("c-cs5800", "CS 5800", "Algorithms",
+                                                                   year="2025-2026", prerequisite=""))
+    report = audit.build_report(seeded)
+    courses, served = chat_evidence(seeded)
+    fields = section(report, "fields")
+    expected = Counter(warning for evidence in served.values() for warning in set(evidence.warnings))
+    assert fields["answer_warnings"] == dict(sorted(expected.items()))
+    for field in AVAILABILITY_FIELDS:
+        counts = fields["fields"][field]
+        gaps = sum(field in evidence.missing_fields for evidence in served.values())
+        assert counts["missing"] + counts["catalog_only"] + counts["catalog_lists_none"] == gaps, field
+    assert fields["fields"]["prereqs"]["year_rules"] == sum(bool(item.requisites.editions) for item in served.values())
+    flagged = {"editions_differ": ("c-cs5800", "requisites_differ_by_catalog_year"),
+               "not_utf8_row": ("c-cs5200", "structured_requisites_unusable"),
+               "duplicate_one_valid": ("c-cs5800", "structured_requisites_unusable"),
+               "duplicates_valid": ("c-cs5800", "structured_requisites_unusable"),
+               "empty_clause": ("c-cs5800", "requisite_clause_unparsed")}
+    if change in flagged:
+        course_id, warning = flagged[change]
+        assert warning in served[course_id].warnings
+    if change.startswith("duplicate"):  # Chat uses the year's one row that passes; with two, neither.
+        kept = [edition.catalog_year for edition in served["c-cs5800"].requisites.editions]
+        assert kept == (["2026-2027"] if change.endswith("one_valid") else [])
+        assert section(report, "requisite_documents")["counts"]["duplicate_rows"] == 2  # Still counted per row.
+    if change == "not_utf8_row":  # Chat's query for CS 5200 fails, so its year rule is gone and the code is a gap.
+        assert served["c-cs5200"].requisites.storage == "schema_unusable"
+        assert "prereqs" in served["c-cs5200"].missing_fields
+
+
+def test_a_year_rule_decides_prereqs_first():
+    course = Course(course_id="c-cs5800", primary_code="CS 5800", primary_name="Algorithms", prereqs=["CS 5004"])
+    with_rules = requisite_evidence(course, [requisite("c-cs5800", "CS 5800", "Algorithms", prerequisite="CS 5004")])
+    listed_snapshot = snapshot("CS 5800", "Algorithms", prereqs=["CS 5010"])
+    assert audit.field_category(course, "prereqs", listed_snapshot, with_rules) == "year_rules"
+    for without in (None, requisite_evidence(course, []), RequisiteEvidence(storage="schema_unusable")):
+        assert audit.field_category(course, "prereqs", listed_snapshot, without) == "catalog_conflict"
+    assert audit.field_category(course, "credits", None, with_rules) == "missing"  # Only prereqs has year rules.
+    evidence = course_answer_evidence(course, listed_snapshot, requisites=with_rules)
+    assert "prereqs" not in evidence.missing_fields and "prerequisite_logic_unavailable" not in evidence.warnings
 
 
 @pytest.mark.parametrize("stored, listed, expected", [
@@ -1689,7 +1815,8 @@ def test_details_are_off_by_default_and_bounded(seeded):
     assert listed(details, "catalog_snapshots", "identity_mismatch", "AAI") == ["AAI 6600"]
     assert listed(details, "catalog_snapshots", "absent", "DS") == ["DS 5110"]
     assert listed(details, "fields", "credits.catalog_conflict", "CS") == ["CS 5200"]
-    assert listed(details, "fields", "prereqs.catalog_only", "CS") == ["CS 5200"]
+    # CS 5200's catalog lists a code, but its year document gives the rule, so nothing is left to fill.
+    assert "prereqs.catalog_only" not in details["fields"] and "prereqs.year_rules" not in details["fields"]
     assert listed(details, "fields", "field_evidence_value_conflict", "DS") == ["DS 5110"]
     assert listed(details, "fields", "catalog_description.empty_in_usable_snapshot", "CS") == ["CS 5200"]
     item = [{"catalog_year": "2026-2027", "code": "CS 5200"}]
@@ -1716,8 +1843,7 @@ def test_details_are_off_by_default_and_bounded(seeded):
     assert [item["coverage"] for item in scopes if item["program_id"] == "ds-ms"] == ["partial"]
     bounded = audit.build_report(seeded, details=True, max_codes=1)["details"]
     assert bounded["fields"]["prereqs.missing"]["by_department"] == {
-        "AAI": {"items": ["AAI 6600"], "omitted": 0}, "DS": {"items": ["DS 5110"], "omitted": 1},
-        "INFO": {"items": ["INFO 6105"], "omitted": 0}}
+        "DS": {"items": ["DS 5110"], "omitted": 1}, "INFO": {"items": ["INFO 6105"], "omitted": 0}}
 
 
 def test_every_list_names_the_record_of_a_shared_code(seeded):

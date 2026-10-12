@@ -25,6 +25,9 @@ from typing import Protocol
 
 import numpy as np
 
+# Kept under its old name here: scripts and tests import it from this module.
+from rag.vectors import l2_normalize as _l2_normalize
+
 EMBEDDING_DIM = 1024  # bge-m3 dense vector dimension
 # 中文:bge-m3 稠密向量维度。
 
@@ -134,16 +137,6 @@ class BGEM3Embedder:
         if normalize:
             vecs = _l2_normalize(vecs)
         return vecs
-
-
-def _l2_normalize(vectors: np.ndarray) -> np.ndarray:
-    """Normalize each row to unit L2 norm. Returns float32. Zero rows stay zero.
-
-    中文:把每一行归一化为单位 L2 范数。返回 float32。全零行保持为零。
-    """
-    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1.0, norms)
-    return (vectors / norms).astype(np.float32)
 
 
 def _try_compile_inner_backbone(flag_model: object, *, mode: str) -> None:

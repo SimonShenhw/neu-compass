@@ -32,6 +32,8 @@ from typing import Any
 
 import numpy as np
 
+from rag.vectors import l2_normalize as _l2_normalize
+
 EMBEDDING_DIM = 1024  # bge-m3 dense vector dimension (mirrors rag.embedder)
 
 
@@ -99,12 +101,6 @@ def _build_session(onnx_path: str, providers: list[str]) -> Any:
         sess_options=sess_options,
         providers=_expand_provider_options(providers),
     )
-
-
-def _l2_normalize(vectors: np.ndarray) -> np.ndarray:
-    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1.0, norms)
-    return (vectors / norms).astype(np.float32)
 
 
 class OnnxEmbedder:

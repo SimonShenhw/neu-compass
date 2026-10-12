@@ -61,56 +61,26 @@ from api.dependencies import (
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
 from api.routes.common import (
-    attempt_hyde_rescue,
+    BLEND_ALPHA,
+    RERANK_POOL_SIZE,
+    RERANKER_REJECT_THRESHOLD,
     build_hard_filters,
-    fetch_texts,
     filter_courses,
     log_query,
+    rerank_with_gate_and_rescue,
 )
-from config import settings
 from db.alias_repository import AliasRepository
 from db.repository import CourseRepository
 from llm.query_filter_extractor import extract_filters_adaptive
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import asks_for_alternatives, normalize_query_to_course_ids
 from rag.rejection import build_gate_fn
-from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
+from rag.reranker import CrossEncoderReranker
 from schemas.course import DeliveryMode
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 log = structlog.get_logger("neu_compass.search")
-
-# PLAN v2.2 §3.4 + ADR-0015. Tunable; ADR-supplement if changed.
-# 中文：出自 PLAN v2.2 §3.4 + ADR-0015；可调参数，改动需补充 ADR。
-RERANK_POOL_SIZE = settings.rerank_pool_size
-"""Candidates HybridRetriever returns before rerank+blend narrows to req.k.
-Env-overridable (RERANK_POOL_SIZE, default 20) so the NAS can A/B pool sizes
-without a redeploy — the cross-encoder pass over this pool is the /search
-p50 bottleneck there.
-
-HybridRetriever 返回的候选数量，之后由 rerank+blend 收窄到 req.k。可通过
-环境变量覆盖（RERANK_POOL_SIZE，默认 20），这样 NAS 端无需重新部署即可
-A/B 测试候选池大小 —— 对该候选池做交叉编码器前向计算正是 /search 在那台
-机器上的 p50 延迟瓶颈。"""
-
-RERANKER_REJECT_THRESHOLD = 0.05
-"""Raw bge-reranker sigmoid below which the query has no good match.
-Calibrated by ADR-0016 ROC sweep (was 0.4 in PLAN v2.2 §3.4 spec);
-empirical data on test_set v0.2 showed 0.4 false-rejected ~26% of real
-queries. T=0.05 catches all 4 adversarial AND keeps real R@5 baseline.
-
-低于此 bge-reranker 原始 sigmoid 值即判定查询无良好匹配。由 ADR-0016 的
-ROC 扫描校准得出（PLAN v2.2 §3.4 规格原为 0.4）；test_set v0.2 的实测数据
-显示 0.4 会误拒约 26% 的真实查询。T=0.05 既能拦下全部 4 条对抗查询，又能
-保住真实查询的 R@5 基线。"""
-
-BLEND_ALPHA = 0.4
-"""Z-score blend weight on RRF leg. 0.0 = pure reranker, 1.0 = pure RRF.
-Locked by ADR-0015 sweep on test_set v0.2 (n=42); re-sweep on v0.3 mandatory.
-
-RRF 一路在 Z-score 融合中的权重。0.0 = 纯 reranker，1.0 = 纯 RRF。由
-ADR-0015 在 test_set v0.2（n=42）上的扫描锁定；换到 v0.3 后必须重新扫描。"""
 
 
 def _elapsed_ms(started: float) -> float:
@@ -313,81 +283,36 @@ def search(
         final_hits = hybrid_hits[: req.k]
         rejection_reason: str | None = None
     else:
-        # One batched SELECT for all candidate texts (was ≤20 per-row queries).
-        # 中文：对所有候选文本做一次批量 SELECT（此前是最多 20 条逐行查询）。
-        texts = fetch_texts(conn, [h.course.course_id for h in hybrid_hits])
-        # ADR-0018: calibrated gate fuses leg evidence the cross-encoder
-        # can't see; opt-in via REJECTION_MODE=calibrated. Falls back to
-        # the ADR-0016 threshold gate otherwise (gate_fn=None).
-        # 中文（ADR-0018）：校准拒答门融合了交叉编码器看不到的两路证据；
-        # 通过 REJECTION_MODE=calibrated 开启，否则退回 ADR-0016 的阈值门
-        # （gate_fn=None）。
-        gate_fn = None
-        if settings.rejection_mode == "calibrated":
-            diag = hybrid.last_diagnostics or {}
-            gate_fn = build_gate_fn(
-                query=req.query,
-                bm25_top=diag.get("bm25_top", 0.0),
-                vec_top=diag.get("vec_top", 0.0),
-            )
-        blended_hits, meta = rerank_blend_with_rejection(
-            req.query, hybrid_hits, reranker,
-            fetch_text=texts.get,
-            blend_alpha=BLEND_ALPHA,
-            reject_threshold=RERANKER_REJECT_THRESHOLD,
-            top_k=req.k,
-            gate_fn=gate_fn,
+        decision = rerank_with_gate_and_rescue(
+            query=req.query, hits=hybrid_hits, conn=conn, hybrid=hybrid,
+            reranker=reranker, diagnostics=getattr(hybrid, "last_diagnostics", None),
+            hard_filters=hard_filters or None, rescue_fn=rescue_fn,
+            pool_size=pool_size, blend_alpha=BLEND_ALPHA,
+            reject_threshold=RERANKER_REJECT_THRESHOLD, top_k=req.k,
+            gate_builder=build_gate_fn,
         )
-        if meta["rejected"]:
-            # ADR-0019: one LLM second-opinion + HyDE retrieval retry for
-            # would-be-rejected queries. Garbage stays rejected (REJECT
-            # verdict); evidence-poor real queries get a second chance.
-            # Borderline-only: a high-confidence gate rejection skips the
-            # LLM entirely (its verdict is flaky exactly on gibberish).
-            # 中文（ADR-0019）：对本会被拒答的查询，追加一次 LLM 复核意见 +
-            # HyDE 检索重试。真正的乱码仍维持拒答（REJECT 判决）；证据不足
-            # 的真实查询则获得第二次机会。仅对临界情形生效：高置信度的门控
-            # 拒答会完全跳过 LLM（LLM 恰恰在乱码上判断最不稳定）。
-            rescued = None
-            if rescue_fn is not None and (
-                gate_fn is None
-                or getattr(gate_fn, "last_p", 1.0)
-                >= settings.rescue_min_probability
-            ):
-                rescued = attempt_hyde_rescue(
-                    query=req.query, conn=conn, hybrid=hybrid,
-                    reranker=reranker, rescue_fn=rescue_fn,
-                    hard_filters=hard_filters or None,
-                    pool_size=pool_size, blend_alpha=BLEND_ALPHA,
-                    top_k=req.k,
-                )
-            if rescued is None:
-                elapsed_ms = _elapsed_ms(started)
-                log.info(
-                    "search.rejected",
-                    query=req.query,
-                    max_sigmoid=meta["max_sigmoid"],
-                    n_candidates=meta["n_candidates"],
-                    duration_ms=elapsed_ms,
-                )
-                log_query(
-                    conn, route="search", query=req.query,
-                    matched_via="rejected", k=req.k, latency_ms=elapsed_ms,
-                    rejection_reason=str(meta["reason"]),
-                    user_id=telemetry_user,
-                )
-                return SearchResponse(
-                    query=req.query, k=req.k, matched_via="rejected",
-                    results=[], latency_ms=round(elapsed_ms, 2),
-                    rejection_reason=str(meta["reason"]),
-                )
-            log.info("search.hyde_rescued", query=req.query, count=len(rescued))
-            final_hits = rescued
-            rejection_reason = None
-            was_rescued = True
-        else:
-            final_hits = blended_hits
-            rejection_reason = None
+        if decision.rejected:
+            elapsed_ms = _elapsed_ms(started)
+            log.info(
+                "search.rejected", query=req.query,
+                max_sigmoid=decision.meta["max_sigmoid"],
+                n_candidates=decision.meta["n_candidates"], duration_ms=elapsed_ms,
+            )
+            log_query(
+                conn, route="search", query=req.query,
+                matched_via="rejected", k=req.k, latency_ms=elapsed_ms,
+                rejection_reason=decision.rejection_reason, user_id=telemetry_user,
+            )
+            return SearchResponse(
+                query=req.query, k=req.k, matched_via="rejected",
+                results=[], latency_ms=round(elapsed_ms, 2),
+                rejection_reason=decision.rejection_reason,
+            )
+        final_hits = decision.hits
+        rejection_reason = decision.rejection_reason
+        was_rescued = decision.rescued
+        if was_rescued:
+            log.info("search.hyde_rescued", query=req.query, count=len(final_hits))
 
     results = [
         SearchHitOut(

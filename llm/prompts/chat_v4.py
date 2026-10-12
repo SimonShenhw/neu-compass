@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from llm.prompts.chat_v3 import format_history_block
 from rag.answer_evidence import course_answer_evidence, source_kind
@@ -27,7 +27,13 @@ from schemas.answer_evidence import CourseAnswerEvidence
 # 4.3 存档副本那句每个回答只说一次、且只在用到目录描述时说（4.2 会对每门课各说一次）；没有
 # 目录的课要说明没有；抽取的数字旁边写「估计」；数值冲突时两个数都要写出来。来自 2026-10-05/06
 # 的真实模型复核（scripts/eval_answers_live.py）；4.2 从未部署。
-PROMPT_VERSION = "4.3"
+# 4.4: catalog_requisites, the year-scoped prerequisite/corequisite rules of the course detail
+#      panel (AND/OR trees, minimum grades, concurrency, unparsed clauses), per catalog year; the
+#      flat prereq code lists are left out when a year rule exists. Not checked against a real
+#      model yet.
+# 中文：4.4 新增 catalog_requisites：课程详情面板里按 Catalog 年度记录的先修/共修规则（AND/OR
+# 树、最低成绩、可并修、未解析条款）；有年度规则时不再给平铺的先修代码列表。还没有用真实模型复核。
+PROMPT_VERSION = "4.4"
 DESCRIPTION_LIMIT = 1200
 QUOTE_LIMIT = 300
 QUOTES_PER_COURSE = 3
@@ -55,10 +61,10 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   For claims derived from its description, cite it as a Markdown link to its supplied
   catalog_url, labelled in the student's language: [NEU 官方课程目录](catalog_url) in a
   Chinese answer, [NEU course catalog](catalog_url) in an English one. Never use that
-  link for any other page. If you used any catalog description, say once per answer (not
-  once per course), in one short plain sentence, that it comes from a saved copy of the
-  catalog, not a live check. For a course whose catalog is null, say the available record
-  has no official catalog description for it.
+  link for any other page. If you used any catalog description or catalog_requisites rule,
+  say once per answer (not once per course), in one short plain sentence, that it comes from
+  a saved copy of the catalog, not a live check. For a course whose catalog is null, say the
+  available record has no official catalog description for it.
   imported_at is an IMPORT time, NOT a retrieval date. Unknown retrieved_at means
   the catalog fetch date is unknown; do not call this a current semester offering.
 - field_evidence quotes support extracted estimates/opinions, NOT official catalog facts.
@@ -81,8 +87,39 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   If asked about a missing field, say the available record lacks it; never guess.
 - Never infer difficulty, level, content, workload, or first-semester suitability
   from the course NUMBER. Do not use a 5xxx/6xxx/7xxx heuristic.
-- Prerequisite codes do NOT encode AND/OR logic. Do not turn a list into
-  'all are required' or 'any one is sufficient'. Official eligibility needs verification.
+- catalog_requisites lists prerequisite and corequisite rules recorded from saved copies of
+  the official catalog's course blocks, one entry per catalog year, newest first
+  (editions_not_shown counts older recorded years left out). Cite a rule like a description:
+  a Markdown link to that entry's catalog_url with the same label. captured_at is when that
+  catalog page was saved. The link opens the current catalog page, which may already show
+  a later year's rule: say so once per answer (not once per course or rule) whenever you cite any recorded rule.
+- These rules apply per catalog year. Treat one year's rule as the student's only if the
+  student named that catalog year in this conversation; an entry or start term (e.g. Fall
+  2026) is not a catalog year, so never map one to the other. Otherwise, if every listed
+  year has the same rule and requisites_differ_by_catalog_year is absent, say which catalog
+  years it covers; if they differ, say so briefly
+  and ask which catalog year applies to the student. If the student names a catalog year
+  that has no entry here, say these records give no rule for that year (older recorded
+  years may be left out, see editions_not_shown) and never give another year's rule as
+  theirs.
+- requisites_differ_by_catalog_year means the recorded rules differ even when truncated
+  clause_text looks identical. Never say those years have the same rule when this warning
+  is present; the comparison used the full recorded clauses, not just the shown text.
+- In a rule, all_of means every branch is required and any_of means any one branch is
+  enough; keep the nesting, minimum_grade, may_be_taken_concurrently and the level mark
+  (Graduate/Undergraduate, as written in the clause) exactly as given. A corequisite is a
+  separate requirement, not a course to finish first. status not_listed: that year's course
+  block lists none, which does not prove there is no requirement. status unparsed: the
+  clause could not be turned into a rule; give its clause_text as recorded (say so when
+  clause_truncated is true; an empty or whitespace-only clause_text means the label has no text after it) and
+  say it needs checking.
+- These rules come from course blocks only. Never say the student is eligible, meets or
+  has met a requirement, or can register; approvals, placement, transfer credit and
+  program rules are not covered. structured_requisites_unusable means some recorded rules
+  for this course could not be read: do not treat any year as having no requirement.
+- Without catalog_requisites entries, prerequisite codes do NOT encode AND/OR logic. Do not
+  turn a list into 'all are required' or 'any one is sufficient'. Official eligibility needs
+  verification.
 - program_seed_unverified means these are UNVERIFIED seeded program suggestions,
   not an official Plan of Study or guaranteed graduation/registration eligibility.
   Program candidates may include declared cross-department members: membership
@@ -125,6 +162,46 @@ Answer:
 """
 
 
+def _rule(node: dict) -> dict:
+    """A rule tree in the words the prompt explains: {"all_of": [...]}, {"any_of": [...]} or a course
+    leaf with only the marks the clause states. 中文：用提示词解释过的词表示规则树。"""
+    if node["kind"] != "course":
+        return {node["kind"]: [_rule(child) for child in node["children"]]}
+    leaf = {"course": node["course_code"]}
+    if node["minimum_grade"]:
+        leaf["minimum_grade"] = node["minimum_grade"]
+    if node["concurrent_allowed"]:
+        leaf["may_be_taken_concurrently"] = True
+    if node["academic_level"]:
+        leaf["level"] = node["academic_level"]
+    return leaf
+
+
+def _clause(section: dict) -> dict:
+    # The unparsed reason is an internal code; the model gets the status and the recorded text.
+    # 中文：未解析的原因是内部代码；模型只拿到状态和记录的原文。
+    projected: dict[str, Any] = {"status": section["status"]}
+    if section["rule"]:
+        projected["rule"] = _rule(section["rule"])
+    if section["clause_text"] is not None:
+        projected["clause_text"] = section["clause_text"]
+        projected["clause_truncated"] = section["clause_truncated"]
+    return projected
+
+
+def format_requisites(requisites: dict | None) -> dict | None:
+    if requisites is None:
+        return None
+    return {
+        "editions": [{
+            "catalog_year": edition["catalog_year"], "catalog_url": edition["catalog_url"],
+            "captured_at": edition["captured_at"], "prerequisite": _clause(edition["prerequisite"]),
+            "corequisite": _clause(edition["corequisite"]),
+        } for edition in requisites["editions"]],
+        "editions_not_shown": requisites["editions_omitted"],
+    }
+
+
 def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAnswerEvidence] | None = None) -> str:
     if not hits:
         return "(no matches found in catalog)"
@@ -133,7 +210,14 @@ def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAns
         course = hit.course
         provenance = (evidence or {}).get(course.course_id) or course_answer_evidence(course)
         data = provenance.model_dump(mode="json")
+        requisites = format_requisites(data.pop("requisites"))
+        # 4.4: next to a year rule, a flat code list would contradict its AND/OR (the course page
+        # hides the flat graph for the same reason). 中文：有年度规则时，平铺的代码列表会和它的 AND/OR
+        # 矛盾（课程页出于同样原因隐藏平铺图）。
+        year_rules = bool(requisites and requisites["editions"])
         catalog = data["catalog"]
+        if catalog and year_rules:
+            del catalog["prereq_codes"]
         if catalog:
             del catalog["snapshot_id"]  # 4.2: an audit ID, not something to print in an answer.
             if catalog["description"]:
@@ -168,20 +252,22 @@ def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAns
         # 给出总数容易让模型写成「50 位学生说」，而这些评价可能是别的课的。
         data["recorded_sources"] = sorted({
             SOURCE_KIND_LABELS[source_kind(source)] for source in data.pop("source_review_ids")})
+        metadata = {
+            "credits": course.credits, "term": course.term,
+            "delivery_mode": course.delivery_mode.value if course.delivery_mode else None,
+            "professor": course.professor[:4], "prereqs": course.prereqs[:8],
+            "topics_covered": course.topics_covered[:8], "skill_tags": course.skill_tags[:6],
+            "workload_hours_per_week": course.workload_hours_per_week,
+            "difficulty_score": course.difficulty_score,
+            "grading_components": [item.model_dump() for item in course.grading_components[:6]],
+            "career_relevance": course.career_relevance[:6],
+        }
+        if year_rules:
+            del metadata["prereqs"]
         records.append({
             "course_id": course.course_id, "primary_code": course.primary_code,
-            "primary_name": course.primary_name,
-            "recorded_metadata": {
-                "credits": course.credits, "term": course.term,
-                "delivery_mode": course.delivery_mode.value if course.delivery_mode else None,
-                "professor": course.professor[:4], "prereqs": course.prereqs[:8],
-                "topics_covered": course.topics_covered[:8], "skill_tags": course.skill_tags[:6],
-                "workload_hours_per_week": course.workload_hours_per_week,
-                "difficulty_score": course.difficulty_score,
-                "grading_components": [item.model_dump() for item in course.grading_components[:6]],
-                "career_relevance": course.career_relevance[:6],
-            },
-            "answer_evidence": data,
+            "primary_name": course.primary_name, "recorded_metadata": metadata,
+            "catalog_requisites": requisites, "answer_evidence": data,
         })
     return json.dumps(records, ensure_ascii=False, indent=2)
 

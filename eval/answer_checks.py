@@ -24,7 +24,8 @@ FIELD_NAMES = ("snapshot_id", "source_kind", "recorded_sources", "field_evidence
 CODES = ("catalog_source_unavailable", "catalog_retrieval_date_unknown", "catalog_metadata_conflict",
          "extracted_evidence_not_official_facts", "field_evidence_value_conflict", "topics_source_unavailable",
          "prerequisite_logic_unavailable", "program_seed_unverified", "synthetic_record_not_real_course",
-         "program_schedule_unverified")
+         "program_schedule_unverified", "requisites_differ_by_catalog_year", "requisite_clause_unparsed",
+         "structured_requisites_unusable")
 
 CATALOG_HEX = re.compile(r"catalog:[0-9a-fA-F]+")
 HEX_RUN = re.compile(r"[0-9a-fA-F]{12,}")
@@ -107,6 +108,15 @@ PROGRAM_CAVEAT = re.compile(
     r"no verified|not (?:an |the )?official|unverified|isn't (?:an |the )?official", re.I)
 PROGRAMS_PAGE = re.compile(r"培养方案|Programs page|\bPrograms\b", re.I)
 SAVED_COPY = re.compile(r"副本|saved copy|stored copy|copy of the catalog|不是实时|非实时|not a live", re.I)
+LIVE_LINK = (r"(?:\blink\b|\burl\b|链接|"
+             r"https?://catalog\.northeastern\.edu/[^\s)\n]{1,200})")
+LIVE_PAGE_NOTE = re.compile(
+    rf"{LIVE_LINK}[^。；;\n]{{0,160}}(?:opens?|points? to|goes? to|takes? you to|shows?)"
+    r"[^。；;\n]{0,160}\b(?:current|live|now|today)\b|"
+    rf"{LIVE_LINK}[^。；;\n]{{0,40}}(?:打开|指向|跳转|看到|显示)[^。；;\n]{{0,80}}(?:现在|当前|实时|目前|最新)", re.I)
+LIVE_COPY_NEGATION = re.compile(
+    r"(?:not|rather than|instead of|isn['’]t|is not) (?:the |a |an )?(?:saved copy|stored copy|copy of the catalog)|"
+    r"(?:不是|并非|而非|(?<![并而])非)(?:那份|这份|目录的?|该页的?|保存的?|存档的?){0,2}(?:存档)?副本", re.I)
 
 # A sentence ends at 。！？!?, at a line break, or at a period followed by a space or the end; not at
 # the period in 4.0, in dotted initials (U.S.) or after an abbreviation such as e.g., Ph.D. or approx. A
@@ -168,6 +178,19 @@ def _outside_no_catalog(sentence: str, pattern: re.Pattern) -> bool:
     """pattern in a clause (split at ；/;) of the sentence that is not the no-catalog note.
     中文：pattern 出现在这句里不是「没有目录」说明的分句（按 ；/; 分）中。"""
     return any(pattern.search(clause) and not NO_CATALOG.search(clause) for clause in CLAUSE_END.split(sentence))
+
+
+def _saved_copy_note(sentence: str) -> bool:
+    """Count the archived-source note, not a separate warning about where the live link opens.
+    中文：实时链接提醒不是第二条存档说明；同句分号前真正的存档说明仍保留。"""
+    for clause in CLAUSE_END.split(sentence):
+        if NO_CATALOG.search(clause):
+            continue
+        if LIVE_PAGE_NOTE.search(clause):
+            clause = LIVE_COPY_NEGATION.sub(" ", clause)
+        if SAVED_COPY.search(clause):
+            return True
+    return False
 
 
 def review_attribution(parts: list[str], has_rmp_data: bool) -> str:
@@ -283,7 +306,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
         # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.
-        "saved_copy_mentions": sum(1 for part in parts if _outside_no_catalog(part, SAVED_COPY)),
+        "saved_copy_mentions": sum(1 for part in parts if _saved_copy_note(part)),
         "chars": len(text),
     }
 

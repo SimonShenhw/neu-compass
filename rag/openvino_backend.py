@@ -74,6 +74,8 @@ from typing import Any
 import numpy as np
 import structlog
 
+from rag.vectors import l2_normalize as _l2_normalize
+
 _log = structlog.get_logger("neu_compass.openvino")
 
 EMBEDDING_DIM = 1024  # bge-m3 dense vector dimension (mirrors rag.embedder)
@@ -106,14 +108,6 @@ def _build_ov_config(*, cache_dir: str | None) -> dict[str, str]:
     if cache_dir:
         cfg["CACHE_DIR"] = cache_dir
     return cfg
-
-
-def _l2_normalize(vectors: np.ndarray) -> np.ndarray:
-    # Guard against div-by-zero for an all-zero row (stays zero, not NaN).
-    # 中文:防止全零行导致除零(全零行结果保持为零,而不是变成 NaN)。
-    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1.0, norms)
-    return (vectors / norms).astype(np.float32)
 
 
 class OvEmbedder:

@@ -18,6 +18,16 @@ ReviewRequirement = Literal[
 ]
 
 
+def canonical_utc_timestamp(value: str) -> str:
+    """The value itself when it is exactly YYYY-MM-DDTHH:MM:SSZ, a real UTC time written that way; ValueError
+    otherwise. The query-log export rows use it too. 中文：恰好是 YYYY-MM-DDTHH:MM:SSZ（真实存在的 UTC 时间、而且
+    就这样写）时原样返回，否则 ValueError。查询日志导出行也用它。"""
+    parsed = datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
+    if parsed.strftime('%Y-%m-%dT%H:%M:%SZ') != value:
+        raise ValueError('Canonical UTC timestamp required')
+    return value
+
+
 def text_sha256(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
@@ -108,10 +118,7 @@ class FeedbackCandidate(BaseModel):
     @field_validator('query_created_at', 'answer_created_at', 'feedback_created_at', 'feedback_updated_at')
     @classmethod
     def utc_timestamp(cls, value):
-        parsed = datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
-        if parsed.strftime('%Y-%m-%dT%H:%M:%SZ') != value:
-            raise ValueError('Canonical UTC timestamp required')
-        return value
+        return canonical_utc_timestamp(value)
 
     @model_validator(mode='after')
     def provenance_consistency(self):
