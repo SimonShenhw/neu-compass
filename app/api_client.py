@@ -42,11 +42,11 @@ def _retry_seconds(value):
 
 
 class ApiError(RuntimeError):
-    """Non-2xx response from the API. .status_code + .detail are exposed
-    for the UI to render a useful message.
+    """API failure, including malformed success JSON. .status_code + .detail
+    expose a safe UI message (5xx and non-JSON errors use fixed text).
 
-    API 返回的非 2xx 响应。暴露 .status_code + .detail，供 UI 渲染出
-    有意义的提示信息。"""
+    API 失败（含畸形成功 JSON）。暴露 .status_code + .detail，供 UI 渲染
+    安全提示；5xx／非 JSON 错误使用固定文字。"""
 
     def __init__(self, status_code: int, detail: str, *, error_type: str | None = None,
                  retry_after_seconds: int | None = None) -> None:
@@ -64,6 +64,10 @@ class ApiError(RuntimeError):
             detail = f'服务正忙，请{later}手动重试。' if self.error_type == 'service_busy' else f'服务暂不可用，请{later}手动重试。'
         elif status_code in {408, 504}:
             detail = '请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。'
+        elif status_code == 502 and self.error_type == 'invalid_response':
+            detail = '服务返回了无法识别的内容，请稍后手动重试。'
+        elif status_code >= 500:
+            detail = '服务暂时出错，请稍后手动重试。'
         self.detail = detail
         super().__init__(f"API {status_code}: {detail}")
 
@@ -310,15 +314,21 @@ class ApiClient:
             error_type = None
             try:
                 body = r.json()
-                detail = body.get('detail', r.text)
+            except ValueError:
+                body = None
+            detail = '请求未完成，请稍后手动重试。'
+            if isinstance(body, dict):
+                if isinstance(body.get('detail'), str):
+                    detail = body['detail']
                 error_type = body.get('error_type')
-            except Exception:
-                detail = r.text
-            raise ApiError(r.status_code, str(detail), error_type=error_type,
+            raise ApiError(r.status_code, detail, error_type=error_type,
                            retry_after_seconds=_retry_seconds(r.headers.get('retry-after')))
         if r.status_code == 204:
             return None
-        return r.json()
+        try:
+            return r.json()
+        except ValueError:
+            raise ApiError(502, 'invalid_response', error_type='invalid_response') from None
 
 
 __all__ = ["ApiClient", "ApiError"]

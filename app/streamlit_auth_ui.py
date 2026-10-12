@@ -107,8 +107,22 @@ def handle_oauth_callback() -> None:
     try:
         with ApiClient() as api:
             identity = api.oauth_callback(code)
-    except ApiError as e:
-        st.error(f"Login failed: {e.detail}")
+    except ApiError:
+        st.error("Login failed. Please try signing in again.")
+        st.query_params.clear()
+        return
+
+    # Validate before changing any session or cookie state. Malformed success responses
+    # are failures too; do not turn them into KeyError/TypeError or a partial login.
+    # 中文：更新身份／cookie 前先校验；畸形的成功响应也应安全失败，不留下半登录状态。
+    if (not isinstance(identity, dict)
+        or not isinstance(identity.get("user_id"), str) or not identity["user_id"]
+        or not isinstance(identity.get("email"), str) or not identity["email"]
+        or type(identity.get("contribution_count", 0)) is not int
+        or identity.get("contribution_count", 0) < 0
+        or (identity.get("session_token") is not None and not isinstance(identity["session_token"], str))
+        or (identity.get("display_name") is not None and not isinstance(identity["display_name"], str))):
+        st.error("Login failed. Please try signing in again.")
         st.query_params.clear()
         return
 

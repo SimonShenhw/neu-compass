@@ -188,7 +188,7 @@ def get_program_curriculum(
     except ProgramNotFound as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Program {program_id!r} not found",
+            detail="program_id not found",
         ) from e
 
     edges = program_repo.list_required_courses(program_id)

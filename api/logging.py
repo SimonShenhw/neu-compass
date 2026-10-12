@@ -22,6 +22,7 @@ PLAN §7.5 / v2.0 §4.1：structlog 是本项目唯一的日志库。生产环�
 from __future__ import annotations
 
 import logging
+import re
 import sys
 import time
 import uuid
@@ -33,8 +34,51 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from config import settings
+from api.error_fields import safe_error_fields
+from api.exceptions import internal_error_response
 
 _CONFIGURED = False
+_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+
+def _safe_exception(_logger: Any, _name: str, event: dict[str, Any]) -> dict[str, Any]:
+    """Consume exc_info before either renderer can print traceback text or Rich locals."""
+    info = event.pop("exc_info", None)
+    event.pop("exception", None)
+    event.pop("stack_info", None)
+    if info:
+        exc = info if isinstance(info, BaseException) else (
+            info[1] if isinstance(info, tuple) and len(info) == 3 else sys.exc_info()[1])
+        if isinstance(exc, BaseException):
+            event.update(safe_error_fields(exc))
+    return event
+
+
+class _SafeForeignLogs(logging.Filter):
+    """Sanitize the shared record BEFORE all downstream handlers (including caplog).
+
+    Project structlog output is already processed. Foreign library messages are untrusted;
+    keep level and safe exception location, not URLs, bodies or exception text.
+    """
+
+    def __init__(self, renderer: Any) -> None:
+        super().__init__()
+        self.renderer = renderer
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not getattr(record, "_safe_structlog", False):
+            fields: dict[str, object] = {"event": "stdlib.error" if record.levelno >= logging.ERROR else "stdlib.log",
+                                         "level": record.levelname.lower()}
+            context = structlog.contextvars.get_contextvars()
+            fields.update({key: context[key] for key in ("request_id", "method", "path") if key in context})
+            if record.exc_info and record.exc_info[1] is not None:
+                fields.update(safe_error_fields(record.exc_info[1]))
+            record.msg = self.renderer(None, record.levelname.lower(), fields)
+            record.args = ()
+        record.exc_info = None
+        record.exc_text = None
+        record.stack_info = None
+        return True
 
 
 def configure_logging() -> structlog.stdlib.BoundLogger:
@@ -60,28 +104,29 @@ def configure_logging() -> structlog.stdlib.BoundLogger:
         else:
             renderer = structlog.dev.ConsoleRenderer(colors=False)
 
+        def render_safe(logger: Any, name: str, event: dict[str, Any]) -> Any:
+            return (renderer(logger, name, event),), {"extra": {"_safe_structlog": True}}
+
         structlog.configure(
             processors=[
                 structlog.contextvars.merge_contextvars,
                 structlog.stdlib.add_log_level,
                 structlog.processors.TimeStamper(fmt="iso", utc=True),
-                structlog.processors.StackInfoRenderer(),
-                structlog.processors.format_exc_info,
-                renderer,
+                _safe_exception,
+                render_safe,
             ],
             logger_factory=structlog.stdlib.LoggerFactory(),
             wrapper_class=structlog.stdlib.BoundLogger,
             cache_logger_on_first_use=True,
         )
-        # stdlib logging routes through structlog's renderer above. We just need
-        # a stream handler on the root that doesn't mangle the already-formatted
-        # message (structlog hands us the final string).
-        # 中文：标准库 logging 会经过上面 structlog 的渲染器。这里只需要给
-        # root logger 挂一个不会破坏已格式化消息的 stream handler
-        # （structlog 已经把最终字符串交给我们了）。
+        # Structlog passes marked, rendered strings; foreign records are sanitized
+        # and rendered by the first root handler's filter before any other handler sees them.
+        # 中文：structlog 传入带标记的成品字符串；第三方记录先在首个 root handler
+        # 的 filter 中安全化和渲染，后面的 handler 不再看到原始消息。
         root = logging.getLogger()
         root.handlers.clear()
         handler = logging.StreamHandler(stream=sys.stderr)
+        handler.addFilter(_SafeForeignLogs(renderer))
         handler.setFormatter(logging.Formatter("%(message)s"))
         root.addHandler(handler)
         root.setLevel(log_level)
@@ -104,7 +149,8 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
-        request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if _REQUEST_ID.fullmatch(incoming) else str(uuid.uuid4())
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(
             request_id=request_id,
@@ -116,10 +162,13 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception as exc:
             elapsed_ms = (time.perf_counter() - start) * 1000
-            log.exception("request.unhandled", duration_ms=round(elapsed_ms, 2))
-            raise
+            log.error("request.unhandled", status=500, error_type="internal_error",
+                      duration_ms=round(elapsed_ms, 2), **safe_error_fields(exc))
+            response = internal_error_response()
+            response.headers["x-request-id"] = request_id
+            return response
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         log.info(

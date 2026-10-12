@@ -161,7 +161,7 @@ def test_4xx_raises_apierror_with_detail() -> None:
     assert "uniquely identifying" in ei.value.detail
 
 
-def test_5xx_raises_apierror_with_text_when_no_json() -> None:
+def test_5xx_raises_apierror_with_fixed_text_when_no_json() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text="internal boom")
 
@@ -169,7 +169,7 @@ def test_5xx_raises_apierror_with_text_when_no_json() -> None:
         with pytest.raises(ApiError) as ei:
             api.health()
     assert ei.value.status_code == 500
-    assert "internal boom" in ei.value.detail
+    assert ei.value.detail == "服务暂时出错，请稍后手动重试。"
 
 
 # === oauth_callback ===

@@ -2770,3 +2770,70 @@
 - 分支 `refactor/sim02-retrieval-decision`，从 main 的 `751c6b1` 开出；审查和修复都已完成。之后 rebase 到 SIM-01 之上（第 18 批 → SIM-01 → 本批）：只有本文件冲突，第 16–20 节按编号排好；冻结的特征测试文件哈希不变。rebase 后全量：3685 passed（3613 加这里的 72 个）。随一个 PR 提交，合并由用户点。
 - 纯重构，行为不变，不需要单独部署；没有生产数据修改或付费模型调用。
 
+## 21 — SAFE-02：安全错误出口（2026-10-12）
+
+### 上线记录（main `9dff227`，2026-10-12 22:42 UTC 起）
+
+以下引用仓库外 `release_2026-10-12/DEPLOY_RECORD.md`，**不是本批重新执行的线上验证**：PR #6–#11 已上线，#8 包含 OPT-02／03，#9 为 OPT-04 第一步，#10／#11 为 SIM-01／02。新镜像 `442834b18ae0`；回退标签 `neu-compass:rollback-20261012` 指向原镜像 `d8f97df9d1a4`；预发布备份 `runtime-data/backups/prerelease-20261012-224114.db`。备份不能用来直接覆盖仍在写入的生产库。
+
+- ready 6469/6469、Co-op 30 条；培养方案 cs-ms 2／ds-ms 4／info-ms 2／aai-ms 0；政策 12 条。
+- test_set_v04 116 条加预热：R@5 0.8628、MRR 0.9341，服务端 p50 822.8 ms／p95 1131.9 ms；和 10-07 的差异记作运行波动，不宣称性能提升。
+- `/chat` 检查：CS 第一学期问题为 hybrid 5 条、正常结束，有 `program_schedule_unverified`；CS 5004 先修引用 2026-2027 记录，CS 5001 C- AND CS 5002 C-，CS 5005 单列共修。第一条终端结果曾被脚本吞掉，以 API 日志为依据；另一次乱码重跑是 PowerShell 编码问题，不算产品结果。
+- AAI 6600 改为 `Applied Artificial Intelligence` 并补目录快照；命名修复和快照各 1 条，复跑快照新增 0。CS 5200 名称未变。
+- 公网只读页面显示 6,469 门课、游客、四个项目、推荐和 Co-op 预览／刷新入口；**用户本人浏览器验收见 D4：仍需真实账号登录／刷新／登出、CS 5004 聊天与详情、AAI 6600 名称核对**。
+
+### 范围与原因
+
+这是有意改变错误响应文字与日志字段的修复，不是纯重构。从 main `9dff227` 独立开 `fix/safe02-error-exits`。合成标记经真实 OAuth exchange、TestClient、ApiClient、AppTest 与 JSON／console 日志证明原有出口缺口。成功请求、检索／门控、状态码和聊天流协议保持；不改主页面编排或 `llm/gemini_client.py` 的日志契约。
+
+### 已实现
+
+| 边界 | 有意的行为变化 |
+|---|---|
+| 未捕获异常 | middleware 消化、单个安全错误事件和固定 500，共用响应构造函数；兜底不渲染 traceback |
+| 日志管道 | 消耗 exc_info，转成类型／原因类型／最多六帧；第三方 stdlib 任意消息改固定事件，保留级别、请求关联和安全定位；项目成功事件不删字段 |
+| OAuth | 七种 reason、固定公开消息、安全上游状态／错误码与有界小写域名；不展示 Google 描述或完整邮箱；Google 网络故障仍 401 |
+| 回显 | 课程／项目 404、delivery_mode 422 不带输入；歧义 409 保留选择，不附异常文字；422 字段名仅接受安全字符且最多 64 字符 |
+| 关联 | x-request-id 仅接受安全字符且最多 64 字符，其他换 UUID4；只进头，不增加响应体字段 |
+| 遥测／反馈 | query_log 写失败不记录异常原文；反馈存储 503 新增安全诊断 |
+| 客户端／登录页 | 5xx／非 JSON 错误文字固定，畸形 2xx JSON 转 502 invalid_response；登录失败固定文字，畸形身份响应不抛异常或写入半登录状态 |
+| 发布配置 | Streamlit 默认只显示类型；完整详情仅可本地显式开启 |
+
+`error_frames` 抽到小模块 `api/error_fields.py`，避免日志导入路由造成循环；common 保留同名导入，原调用路径和 `file.py:LINE function` 格式保留。新 safe_error_fields 独立处理隐式 context，不改变 Gemini 辅助函数。taxonomy 值不改，只补正确说明。
+
+### 修改文件
+
+- 生产：`api/error_fields.py`（新）、`api/logging.py`、`api/exceptions.py`；auth／chat／common／course／feedback／program／search 路由；`app/auth.py`、`app/api_client.py`、`app/streamlit_auth_ui.py`；`.streamlit/config.toml`。
+- 测试：`tests/test_safe_error_exits.py`（新）；`test_api_auth_route.py`、`test_api_errors.py`、`test_app_auth.py`、`test_app_api_client.py`。
+- 文档：本文件、`api_contract.md`、`pii_redaction.md`。两份尚未入库的路线／精简计划只在 main 本地刷新状态，没有混入公开提交。
+
+### 验证记录
+
+- 仅内存 SQLite、占位 key、MockTransport、模型替身及 AppTest，没有读取真实凭证／生产库或付费模型调用。
+- 首版 41 项新增测试在未改产品的基线上为 **39 failed／2 passed**；原本正确的是安全 extra 字段名与有效 request ID。另补六项兜底／字段白名单／域名边界测试，合计 47 项。
+- 最终 47 项在独立 git archive 的未修改 main 上 **45 failed／2 passed，6 warnings，40.21 秒**；强化后的兜底测试真正覆盖隐式 context，不依赖 Starlette 的 cause 改写。
+- 初次十文件定向回归 **157 passed，21 warnings，50.53 秒**（六 worker，包含首版 41 项）；补齐 47 项后的同十文件串行 **163 passed，6 warnings，42.47 秒**。随后 context 测试补强与提示兼容修复见下文，最终产品树另跑全量。
+- 有意更新的旧期望：OAuth 拒绝夹具改显式 reason；API OAuth／CourseNotFound detail 改固定文字；Google 400 不再显示 Code expired；ApiClient 500 不再显示服务端纯文本。普通安全 extra 字段名、taxonomy、既有 Gemini／聊天错误、URL OAuth warning 和 verifier 类型诊断保持。
+- 首轮全量 **1 failed／3731 passed，7 warnings，534.62 秒**：通用 5xx 提示覆盖了已有 invalid_response 安全固定提示。保留 `502 + invalid_response` 原固定文字后再跑全量，没有放宽缓存测试或改变缓存行为。
+- 具名变异最终 **29/29**：25 项首轮有效杀死、三项串行复核、一个新增提示兼容变异，每项都有明确 FAILED 身份。原轮 S18 存活、S21／S23 SUSPECT 均保留记录；S18 补强真正的 context 测试，后两项是框架匹配源码 timeout 参数造成误判，串行复核为 AssertionError／KeyError。本包分类器只匹配实际 pytest E 行，真实超时仍为 SUSPECT。共享框架未改，不混称一次完整 29 项重跑。
+- 最后一次变异运行的未变异基线（新增测试／API errors／auth／缓存四文件）**162 passed，5 warnings，35.86 秒**；三项串行复核的基线为 87 passed。
+- 最终产品树全量离线 **3732 passed，7 warnings，551.13 秒**（main 原 3685 加新增 47）；警告为三项 SWIG 类型及四次 HTTP 422 名称弃用。没有实时浏览器／账号／NAS 或模型性能验证。
+- 改动 18 个 Python 文件 Ruff 0.5.0 F/E9/B 通过；22 个改动文件 CR=0、`git diff --check` 通过，7 个真实本地 Markdown 目标有效。main 两份未跟踪计划文档 CR=0、49 个目标有效，未纳入本批提交。
+
+### 审查
+
+作者自检：逐项对照 O1–O11、真实日志处理顺序及 middleware 边界；没有独立评审结论。后续交用户原审查流程复核。
+
+### 已知、未处理
+
+1. 成功查询原文／query_log 留存、auth.callback.success 的 Google sub 不改；路径／uvicorn access query string 仍可能含个人信息，不宣称所有日志匿名或无 PII。
+2. 已发流头以后的异常不能改成此 500；聊天已有自己的安全流错误出口。启动脚本其他打印不在本批治理范围。
+3. OPT-02 只读核对：真实空结果有一次页面覆盖，但跨 rerun／TTL 的强度仍可补；同 token 贡献权限变化不立即过期 Co-op teaser，须另批行为修改。
+4. SIM-03 未开始，SIM-04 等其合并；OPT-04 第二步、OPT-06、学生端拓展不做。
+5. 未做真人账号、NAS、公网、负载或生产效果验收；部署记录与本批离线结果分开。
+
+### 发布状态
+
+- 分支 `fix/safe02-error-exits`，起点 main `9dff227`；实现与验证完成，仅做本地提交（准确 hash 另记仓库外 WORKLOG）。尚未推送、PR、合并或部署，仍待独立审查。
+- 本批有 API／UI／发布配置行为变化，审查合并后需重新发布镜像才能线上生效。
+

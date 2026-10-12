@@ -160,7 +160,7 @@ def test_auth_me_valid_token_unknown_user_401(
 
 def test_callback_oauth_error_returns_401(api_client: TestClient) -> None:
     def boom(code: str, **kw) -> dict:
-        raise OAuthError("Email domain not allowed: bad@gmail.com")
+        raise OAuthError(reason="domain_not_allowed")
 
     _override_exchange(api_client, boom)
     r = api_client.post("/auth/callback", json={"code": "x"})

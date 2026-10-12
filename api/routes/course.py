@@ -93,7 +93,7 @@ def get_course(
     except CourseNotFound as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Course {course_id!r} not found",
+            detail="Course not found",
         ) from e
 
     program_context = [

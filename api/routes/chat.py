@@ -213,7 +213,7 @@ def chat(
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid delivery_mode: {req.delivery_mode!r}",
+                detail="Invalid delivery_mode",
             ) from e
 
     started = time.perf_counter()
@@ -232,7 +232,6 @@ def chat(
         choices = ", ".join(p.program_id for p in exc.programs)
         raise HTTPException(status_code=409, detail=(
             f"这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：{choices}。"
-            f" ({exc})"
         )) from exc
     retrieval_ms = (time.perf_counter() - started) * 1000
 

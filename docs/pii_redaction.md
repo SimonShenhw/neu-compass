@@ -265,3 +265,13 @@ def auto_redact_pre(text: str) -> str:
 ## 9. 查询日志导出（OPT-01，2026-10-07）
 
 `scripts/export_query_log.py` 改成与 06B-2 相同的契约，见 [查询日志导出](query-log-export.md)：只读已有库、默认只统计；元数据文件不含查询原文和原始 user_id；原文需要成对开关和新文件；仓库内限定已忽略的 data/raw/query_log_review。旧版默认写的 `eval/query_log_export.jsonl` 已加入 Git 忽略，但忽略不替代访问控制、脱敏或留存。query_log 本身仍没有自动清理，保留期仍由运维负责。本批只在合成临时库上验证，没有导出或清理真实数据。
+
+## 10. 安全错误出口（SAFE-02，2026-10-12）
+
+错误响应不展示异常 str/repr、Google error_description、完整邮箱或请求／响应原文。OAuth 保持 401，按固定 reason 选择提示；404／delivery_mode 422 不带输入值；chat 项目歧义保留库内项目选择，不附异常文字。422 多余字段名仅回显有界安全名称，详见 [API 契约](api_contract.md#safe-error-exits-safe-02)。
+
+错误日志只留固定事件名、级别、请求关联和白名单诊断：异常／原因类型、上游状态／安全错误码、最多六个 `file.py:LINE function` 栈帧。不读源码、局部变量，不渲染 traceback。OAuth 拒绝可记录小写、有界域名，不记录地址。经过配置 root handler 的第三方 stdlib 日志任意消息被固定事件替代，保留安全定位；JSON／console 都适用。request ID 有字符和长度限制，非法输入被新的 UUID4 替代，只在头中返回。
+
+尚未发送响应的未捕获异常在请求中间件消化，只有一条安全错误事件，不再向 ServerErrorMiddleware／uvicorn 传播。流头发送后无法换成固定 500；聊天流自己的固定错误处理保持不变。Streamlit 发布配置默认仅显示错误类型；完整详情仅供本地显式开启。
+
+这不是「所有日志没有 PII」：成功查询原文及 query_log 留存、本来的 Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串仍需单独治理。本批不改留存／删除／备份、不改 Docker 启动参数，不执行真实账号或线上验收。
