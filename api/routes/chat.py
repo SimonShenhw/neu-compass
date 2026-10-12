@@ -243,7 +243,7 @@ def chat(
     if matched_via == "hybrid" and reranker is not None and hits:
         decision = rerank_with_gate_and_rescue(
             query=req.query, hits=hits, conn=conn, hybrid=hybrid,
-            reranker=reranker, diagnostics=hybrid.last_diagnostics,
+            reranker=reranker, diagnostics=getattr(hybrid, "last_diagnostics", None),
             hard_filters=hard_filters or None, rescue_fn=rescue_fn,
             pool_size=max(req.k, RERANK_POOL_SIZE), blend_alpha=BLEND_ALPHA,
             reject_threshold=RERANKER_REJECT_THRESHOLD, top_k=req.k,

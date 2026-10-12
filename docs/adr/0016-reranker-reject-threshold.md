@@ -63,7 +63,7 @@ T=0.05 的取值理由:
 
 **RERANKER_REJECT_THRESHOLD = 0.05**
 
-写在 `api/routes/search.py` 模块常量,跟 ADR-0015 锁定的 `BLEND_ALPHA = 0.4`
+写在 `api/routes/common.py` 模块常量(SIM-02 从 `api/routes/search.py` 移来,search 仍可导入),跟 ADR-0015 锁定的 `BLEND_ALPHA = 0.4`
 并列。两者都是 §3.4 + §3.5 rerank+blend+reject 层的 hyperparameter,但各自
 回答不同问题 —— 阈值是绝对置信度的截断,α 是排序信号的权重。
 

@@ -2714,6 +2714,8 @@
 | `api/routes/chat.py` | 从 common 导入；保留入口 guard／流式／遥测 |
 | `tests/test_retrieval_decision_parity.py`（新） | 抽取前先通过、抽取后保持不变的 46 项路由特征测试 |
 | `tests/test_retrieval_decision_helper.py`（新） | 显式诊断、首次 meta、None-only 救援、guard、兼容与请求实例隔离 |
+| `tests/test_retrieval_decision_rescue_rules.py`（新，审查后加） | 救援规则、日志字段和耗时；阈值门不需要检索器诊断 |
+| `docs/adr/0016-reranker-reject-threshold.md` | 常量所在的模块（审查后改） |
 | 本文件 | 范围、验证与未完成边界 |
 
 ### 验证记录
@@ -2728,7 +2730,34 @@
 
 ### 审查
 
-已自行逐段对照路由与依赖生命周期，保留行为对照表与冻结测试。尚未经过用户指定的独立评审；没有新开评审 agent，不将自查当作评审通过。
+作者先自行逐段对照了路由和依赖的生命周期，保留了行为对照表和冻结测试。2026-10-12 做了一轮只读审查（审查员 SIMr1，和 SIM-01 一起审；主评审另外核对过），报告在仓库外。
+
+**结论**：没有 CRITICAL 或 HIGH。在 9,904 个场景下和 main 对照了响应、NDJSON、`query_log`、替身调用和去掉耗时以后的全部日志事件，0 处差异；记录里的数字都复现了。问题出在测试强度上，还有一处很小的行为差异：
+
+1. **MEDIUM**：共享函数现在替两条路由管着几条救援规则，测试没有钉住。审查员写的 23 个变异体里有 13 个在作者的 6 个测试文件下存活，其中 6 个连全量都抓不到：
+   - 去掉 `rescue_fn is not None` 判断，或者改了它的运算优先级；
+   - 救援候选池从 `max(k, RERANK_POOL_SIZE)` 变成 `RERANK_POOL_SIZE`；
+   - 救回结果的顺序被打乱；
+   - 门槛写死成 0.25。
+
+   处理：新增 `tests/test_retrieval_decision_rescue_rules.py`，覆盖：
+   - HyDE 关闭时不尝试救援；
+   - 门槛从 settings 读取；
+   - k 大于候选池时，救回的结果保持第二轮的完整顺序和分数；
+   - `search.rejected` 的字段和耗时、两条 `hyde_rescued` 事件的 `count`，以及 chat 的 `retrieval_ms` 在重排前取值。
+
+   冻结的特征测试文件一行没改。
+2. **LOW**：日志和耗时字段以前没有测试，上面的新文件用假时钟覆盖了。
+3. **LOW**：两条路由原来在阈值模式下也会读 `hybrid.last_diagnostics`；抽取前只有 calibrated 模式读。换成没有这个属性的检索器，抽取前返回 200，抽取后返回 500。生产不受影响，因为 `HybridRetriever` 在 `__init__` 里把它设成了 `None`。
+   - 处理：两条路由改成 `getattr(hybrid, "last_diagnostics", None)`。阈值模式下和抽取前完全一样；calibrated 模式下，这种检索器现在拿到 0 而不是抛异常。没有哪个真实的检索器缺这个属性。
+   - 新测试在 `989ae58` 上失败 4 个，在 main 和修复后都通过。
+4. **LOW，零碎**：`search.py` 的 `_elapsed_ms` 前面补了一个空行；ADR-0016 改成常量在 `api/routes/common.py`；去掉了本节前面多出来的 `---` 分隔线。
+
+**修复后的验证**：
+- 新文件 18 passed（在 main 上也是 18 passed）；连同既有测试文件共 253 passed；冻结测试的哈希不变。
+- 全量离线：3212 passed、5 warnings（原来的 3194 加新增的 18 个），342 秒，在独立快照上跑。
+- 变异 30/30，每个都有明确的失败测试，0 SUSPECT，0 存活。原来的 15 个之外，新加了审查员的 13 个存活变异体，以及两个"读诊断信息不加 getattr"的变异体。
+- ruff 0.5.0（F/E9/B）通过；没有 CR，`git diff --check` 通过。
 
 ### 已知、未处理
 
@@ -2738,6 +2767,6 @@
 
 ### 发布状态
 
-- 本地独立分支，本轮离线验收完成，单独本地提交；尚待用户指定的独立评审，审完以前不合并。
-- 没有 push／PR／merge／deploy，没有生产数据修改或付费模型调用。
+- 分支 `refactor/sim02-retrieval-decision`，从 main 的 `751c6b1` 开出；审查和修复都已完成。之后 rebase 到 SIM-01 之上（第 18 批 → SIM-01 → 本批）：只有本文件冲突，第 16–20 节按编号排好；冻结的特征测试文件哈希不变。rebase 后全量：3685 passed（3613 加这里的 72 个）。随一个 PR 提交，合并由用户点。
+- 纯重构，行为不变，不需要单独部署；没有生产数据修改或付费模型调用。
 

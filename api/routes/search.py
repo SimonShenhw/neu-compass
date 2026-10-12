@@ -82,6 +82,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 log = structlog.get_logger("neu_compass.search")
 
+
 def _elapsed_ms(started: float) -> float:
     """Elapsed time since `started` (perf_counter) in milliseconds, rounded.
     自 `started`（perf_counter）以来的耗时（毫秒），已四舍五入。"""
@@ -284,7 +285,7 @@ def search(
     else:
         decision = rerank_with_gate_and_rescue(
             query=req.query, hits=hybrid_hits, conn=conn, hybrid=hybrid,
-            reranker=reranker, diagnostics=hybrid.last_diagnostics,
+            reranker=reranker, diagnostics=getattr(hybrid, "last_diagnostics", None),
             hard_filters=hard_filters or None, rescue_fn=rescue_fn,
             pool_size=pool_size, blend_alpha=BLEND_ALPHA,
             reject_threshold=RERANKER_REJECT_THRESHOLD, top_k=req.k,
