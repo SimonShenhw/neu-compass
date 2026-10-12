@@ -482,13 +482,17 @@ def test_rules_for_year_scoped_requisites():
         "A corequisite is a separate requirement, not a course to finish first",
         "status not_listed: that year's course block lists none, which does not prove there is no requirement",
         "give its clause_text as recorded (say so when clause_truncated is true;",
-        "an empty clause_text means the label has no text after it) and say it needs checking",
+        "an empty or whitespace-only clause_text means the label has no text after it) and say it needs checking",
         "Never say the student is eligible, meets or has met a requirement, or can register",
         "structured_requisites_unusable means some recorded rules for this course could not be read",
         "Cite a rule like a description: a Markdown link to that entry's catalog_url with the same label",
-        "The link opens that page as it is now, not the saved copy, so it may show a later year's rule: "
-        "say so when you cite a rule from any entry but the newest",
-        "if every listed year has the same rule, say which catalog years it covers",
+        "captured_at is when that catalog page was saved",
+        "The link opens the current catalog page, which may already show a later year's rule: "
+        "say so once whenever you cite any recorded rule",
+        "if every listed year has the same rule and requisites_differ_by_catalog_year is absent, "
+        "say which catalog years it covers",
+        "older recorded years may be left out",
+        "requisites_differ_by_catalog_year means the recorded rules differ even when truncated clause_text looks identical",
         "keep the nesting, minimum_grade, may_be_taken_concurrently and the level mark "
         "(Graduate/Undergraduate, as written in the clause) exactly as given",
         "approvals, placement, transfer credit and program rules are not covered",

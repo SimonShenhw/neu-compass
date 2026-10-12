@@ -107,7 +107,7 @@ def render_course_detail(st: Any, course: dict, *, cid: str) -> None:
 
     snippets = course.get("evidence_snippets") or []
     with st.expander("📎 来源与说明（数据从哪来、缺了什么）"):
-        render_answer_evidence(st, evidence, detailed=True, show_description=False)
+        render_answer_evidence(st, evidence, detailed=True, show_description=False, show_requisite_years=False)
         if snippets:
             st.markdown(f"**评价和大纲原文摘录（{len(snippets)} 条）**")
             render_field_evidence(st, snippets)

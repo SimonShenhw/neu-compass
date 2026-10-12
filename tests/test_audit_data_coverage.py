@@ -1045,8 +1045,8 @@ def test_a_missing_read_column_is_not_checked(seeded):
     ("ALTER TABLE course_requisite_documents RENAME COLUMN document TO payload",),
 ])
 def test_a_requisite_table_that_cannot_be_read_leaves_prereqs_unchecked(seeded, change):
-    """A table that exists but is not read (a view, a missing column): a prereq gap cannot be told from a year rule.
-    The catalog comparison does not need the year documents, so it is counted as usual."""
+    """The report conservatively leaves these fields unchecked. Chat has no year rules: a view is
+    schema_missing, a missing column is schema_unusable; catalog comparison is still counted."""
     modify(seeded, *change)
     fields = section(audit.build_report(seeded), "fields")
     no_rules = {"status": "not_checked", "code": "requisite_documents_not_checked"}
@@ -1091,6 +1091,8 @@ def test_an_unexpected_error_fails_only_its_section(seeded, monkeypatch):
     report = audit.build_report(seeded)
     assert section(report, "requisite_documents") == {"status": "failed", "code": "section_failed"}
     assert section(report, "program_plans")["status"] == "checked" and report["complete"] is False
+    fields = section(report, "fields")
+    assert fields["fields"]["prereqs"] == fields["answer_warnings"] == audit.NO_YEAR_RULES
     assert SENTINEL not in json.dumps(report)
 
 

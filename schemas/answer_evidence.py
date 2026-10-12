@@ -132,12 +132,12 @@ class RequisiteEvidence(BaseModel):
     storage: available, schema_missing (no table) or schema_unusable (the table cannot be read).
     editions: usable documents, newest catalog year first, at most MAX_REQUISITE_EDITIONS;
     editions_omitted counts the other usable ones. unusable_records: stored documents that failed
-    the identity, hash or tree checks, or that share a catalog year with another one (only a copy
-    without keys can hold two; neither is used).
+    the identity, hash or tree checks, or belong to a year with two passing documents (possible
+    only in a copy without keys; neither is used). A year's one passing row is kept if its twins fail.
     中文：一门课的回答可用的年度先修文档。storage：可用、没有表、表读不了。editions：可用文档，按
     Catalog 年度从新到旧，最多 MAX_REQUISITE_EDITIONS 份，editions_omitted 是其余可用的份数。
-    unusable_records：身份、hash 或规则树核对不过的已存文档，以及和另一份同年度的（只有缺键的副本里
-    才会有两份，两份都不用）。"""
+    unusable_records：身份、hash 或规则树核对不过的已存文档，以及同年度有两份都通过核对的文档（只有
+    缺键的副本里才会有，两份都不用）；同年度只有一份通过核对则保留它，其余计入不可用。"""
 
     model_config = ConfigDict(extra="forbid")
 

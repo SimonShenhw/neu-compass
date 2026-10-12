@@ -167,6 +167,11 @@ class CourseRequisiteRepository:
             except (ValueError, TypeError):
                 bundle.unusable_records += 1
                 log.warning("course.requisite_document_unusable", course_id=course_id, catalog_year=row["catalog_year"])
+        # Match chat: one passing row wins over invalid twins; two passing rows make that year unusable.
+        # 中文：与聊天一致：只有一行核对通过就用它；同年两行都通过则该年全部不用。
+        years = Counter(item.catalog_year for item in bundle.documents)
+        bundle.unusable_records += sum(count for count in years.values() if count > 1)
+        bundle.documents = [item for item in bundle.documents if years[item.catalog_year] == 1]
         if bundle.unusable_records:
             bundle.warnings.append("structured_requisites_unusable")
         if not rows:
