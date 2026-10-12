@@ -2689,3 +2689,55 @@
 - 分支 `refactor/sim01-shared-helpers`，从 main 的 `751c6b1` 开出。审查修复后 rebase 到第 18 批的 `637144c` 之上：只有本文件冲突，第 16–19 节按编号排好。rebase 后全量：3613 passed（3573 加这里的 40 个）。随一个 PR 提交，合并由用户点。
 - 纯重构，行为不变，不需要单独部署。本批没有动生产数据。
 
+## 20 — 共享检索决策（SIM-02，2026-10-12）
+
+### 范围与原因
+
+从 main `751c6b1` 单独开 `refactor/sim02-retrieval-decision`。第 16–19 节在各自待合并分支上，本节按本轮安排保留编号 20，不代表那些批次已经合并或部署。
+
+`/search` 与 `/chat` 重复维护候选文本读取、calibrated gate、重排融合和临界拒答的 HyDE 救援。抽出共同决策，保持两条接口原有行为；不改变阈值、候选池、融合参数或请求级状态的生命周期。
+
+### 已实现
+
+1. 三个常量移到 `api/routes/common.py`，原值与说明不变。search 保留同名导入；chat 直接从 common 导入，不再依赖 search 模块导出。
+2. `RetrievalDecision`：最终 hits、rejected、rejection_reason、rescued 和首次重排 meta。救回后清除最终拒答状态，首次门控元数据仍保留，不把第一次拒答伪装成门控接受。
+3. `rerank_with_gate_and_rescue`：一批候选文本、显式传入的初次 diagnostics、原始 query 重排、原有门控概率判断、原有 `attempt_hyde_rescue`。每 pass 只评分一次，救援失败维持初次拒答原因；有效 hard_filters、pool_size 与 top_k 不丢失、不互换。
+4. 两条路由的差异不抽走：search 无 reranker 时截断、拒答时早退并记录 max_sigmoid／n_candidates；chat 仅在非空 hybrid 且有 reranker 时进入共享决策，拒答后继续输出 meta／token／done。context／alias／program 入口、空候选与筛选排除仍走原路径；两个 hyde_rescued 事件名各自保留，响应 hybrid 与遥测 hyde_rescued 仍分开。
+5. `HybridRetriever` 依赖仍每请求新建，不改成全局单例。共享决策不从 hybrid 读取可被重试覆盖的 last_diagnostics；门构造函数传参，保留既有测试在路由替换 build_gate_fn 的边界。
+
+### 修改文件
+
+| 文件 | 修改 |
+|---|---|
+| `api/routes/common.py` | 三常量、结果对象与共享决策 |
+| `api/routes/search.py` | 调用共享决策；保留拒答日志／早退／遥测／降级 |
+| `api/routes/chat.py` | 从 common 导入；保留入口 guard／流式／遥测 |
+| `tests/test_retrieval_decision_parity.py`（新） | 抽取前先通过、抽取后保持不变的 46 项路由特征测试 |
+| `tests/test_retrieval_decision_helper.py`（新） | 显式诊断、首次 meta、None-only 救援、guard、兼容与请求实例隔离 |
+| 本文件 | 范围、验证与未完成边界 |
+
+### 验证记录
+
+- 只用合成内存 SQLite、模型替身和 TestClient。初版特征测试的计时字段／预期排序错误先修正为现有契约，不改产品实现，不把夹具错误当作产品缺陷。
+- 抽取前 46 passed、3 warnings；冻结 SHA-256 为 `189f94067cd3b939e8e27999a6a044657b4c7b7a7988a03290948b25b7bd6f54`。抽取后哈希核对通过、测试未改一行；连同既有六文件为 227 passed、5 warnings。helper 单测另有 8 passed、3 warnings。
+- 覆盖 alias／context／program、普通 hybrid、无 reranker、空候选、阈值／校准拒答、救援成功／拒绝／异常／空检索／高置信度跳过／无概率属性／code guard、筛选排除／替代课程锚点、k 大于配置池、原 query 与缩写／HyDE 扩写、文本回退；核对 HTTP／NDJSON、query_log、事件名与调用次数。
+- 全量离线：3194 passed、5 warnings，285.32 秒；三条 SWIG 与两条 HTTP 422 名称弃用提示。此分支从 main 开，不包含 16–18／SIM-01，测试总数不能与 A 的 3532 直接比较。
+- 具名变异：15/15，全部记录明确的 FAILED 测试身份，0 survivor／0 SUSPECT／0 ERROR；门控、高置信度跳过、概率默认值、显式诊断、原 query、救援筛选／pool／top_k、None-only 契约、拒答状态／原因、两条遥测与 chat 入口 guard 均有对应变异。逐条表与完整输出在仓库外保留。
+- 改动的 5 个 Python 文件 ruff 0.5.0 F/E9/B 通过；6 个文件无 CR，`git diff --check` 和实际本地文档目标检查通过。
+- 10 次预热、75 次测量的替身端点：search median 4.103→3.530ms、p95 4.675→4.085ms；chat median 5.419→4.579ms、p95 6.368→5.164ms。after 在全量／变异结束后执行，没有明显变慢；单轮 sanity check，不宣称统计显著改善或生产性能提升。
+
+### 审查
+
+已自行逐段对照路由与依赖生命周期，保留行为对照表与冻结测试。尚未经过用户指定的独立评审；没有新开评审 agent，不将自查当作评审通过。
+
+### 已知、未处理
+
+1. 不处理 SAFE-02 的错误文字／日志字段，也不处理 SIM-03/04、OPT-04 第二步或 OPT-06。
+2. chat 的 retrieval_ms 原来在重排前计时，本批保留；统一计时语义会是行为修改，应另批处理。
+3. 真模型、真实库、真实浏览器／账号、NAS 负载与生产流量未核验。
+
+### 发布状态
+
+- 本地独立分支，本轮离线验收完成，单独本地提交；尚待用户指定的独立评审，审完以前不合并。
+- 没有 push／PR／merge／deploy，没有生产数据修改或付费模型调用。
+

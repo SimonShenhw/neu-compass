@@ -25,16 +25,66 @@ from __future__ import annotations
 import os
 import sqlite3
 import traceback
+from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
 import structlog
 
+from config import settings
 from llm.gemini_client import GeminiError, error_log_fields
 from rag.filters import filter_course_ids
+from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
 from rag.retriever import SearchHit
 from schemas.course import Course
 
 log = structlog.get_logger("neu_compass.routes.common")
+
+
+# PLAN v2.2 §3.4 + ADR-0015. Tunable; ADR-supplement if changed.
+# 中文：出自 PLAN v2.2 §3.4 + ADR-0015；可调参数，改动需补充 ADR。
+RERANK_POOL_SIZE = settings.rerank_pool_size
+"""Candidates HybridRetriever returns before rerank+blend narrows to req.k.
+Env-overridable (RERANK_POOL_SIZE, default 20) so the NAS can A/B pool sizes
+without a redeploy — the cross-encoder pass over this pool is the /search
+p50 bottleneck there.
+
+HybridRetriever 返回的候选数量，之后由 rerank+blend 收窄到 req.k。可通过
+环境变量覆盖（RERANK_POOL_SIZE，默认 20），这样 NAS 端无需重新部署即可
+A/B 测试候选池大小 —— 对该候选池做交叉编码器前向计算正是 /search 在那台
+机器上的 p50 延迟瓶颈。"""
+
+RERANKER_REJECT_THRESHOLD = 0.05
+"""Raw bge-reranker sigmoid below which the query has no good match.
+Calibrated by ADR-0016 ROC sweep (was 0.4 in PLAN v2.2 §3.4 spec);
+empirical data on test_set v0.2 showed 0.4 false-rejected ~26% of real
+queries. T=0.05 catches all 4 adversarial AND keeps real R@5 baseline.
+
+低于此 bge-reranker 原始 sigmoid 值即判定查询无良好匹配。由 ADR-0016 的
+ROC 扫描校准得出（PLAN v2.2 §3.4 规格原为 0.4）；test_set v0.2 的实测数据
+显示 0.4 会误拒约 26% 的真实查询。T=0.05 既能拦下全部 4 条对抗查询，又能
+保住真实查询的 R@5 基线。"""
+
+BLEND_ALPHA = 0.4
+"""Z-score blend weight on RRF leg. 0.0 = pure reranker, 1.0 = pure RRF.
+Locked by ADR-0015 sweep on test_set v0.2 (n=42); re-sweep on v0.3 mandatory.
+
+RRF 一路在 Z-score 融合中的权重。0.0 = 纯 reranker，1.0 = 纯 RRF。由
+ADR-0015 在 test_set v0.2（n=42）上的扫描锁定；换到 v0.3 后必须重新扫描。"""
+
+
+@dataclass(frozen=True)
+class RetrievalDecision:
+    """Final outcome, plus initial rerank metadata for route-owned rejection logs.
+
+    A successful rescue clears rejected/reason, not meta's original gate verdict.
+    中文：最终结果与首次重排元数据；救回后清除拒答状态／原因，原门控元数据仍供路由使用。
+    """
+
+    hits: list[SearchHit]
+    rejected: bool
+    rejection_reason: str | None
+    rescued: bool
+    meta: dict[str, object]
 
 
 def error_frames(exc: BaseException, limit: int = 6) -> list[str]:
@@ -125,6 +175,56 @@ def fetch_texts(
         list(course_ids),
     ).fetchall()
     return {r["course_id"]: r["raw_text"] for r in rows}
+
+
+def rerank_with_gate_and_rescue(
+    *,
+    query: str,
+    hits: list[SearchHit],
+    conn: sqlite3.Connection,
+    hybrid: Any,
+    reranker: CrossEncoderReranker,
+    diagnostics: dict[str, float] | None,
+    hard_filters: dict[str, object] | None,
+    rescue_fn: Callable[[str], str | None] | None,
+    pool_size: int,
+    blend_alpha: float,
+    reject_threshold: float,
+    top_k: int,
+    gate_builder: Callable[..., Callable[[list[float]], tuple[bool, str]]],
+) -> RetrievalDecision:
+    """Shared hybrid decision; shortcuts, degraded paths and response assembly stay in routes.
+
+    diagnostics is the initial request-local evidence, never read from hybrid here:
+    an optional retry overwrites hybrid.last_diagnostics. Each pass scores once,
+    using the original query. Rescue scope and policy are unchanged (ADR-0018/19).
+    中文：共享混合检索决策；精确／降级入口与响应组装留在路由。显式接收首次诊断，
+    不在此读取会被救援重试覆盖的实例状态；每轮只按原始查询重排一次，门控／救援策略不变。
+    """
+    texts = fetch_texts(conn, [hit.course.course_id for hit in hits])
+    gate_fn = None
+    if settings.rejection_mode == "calibrated":
+        diag = diagnostics or {}
+        gate_fn = gate_builder(query=query, bm25_top=diag.get("bm25_top", 0.0), vec_top=diag.get("vec_top", 0.0))
+    blended_hits, meta = rerank_blend_with_rejection(
+        query, hits, reranker, fetch_text=texts.get,
+        blend_alpha=blend_alpha, reject_threshold=reject_threshold,
+        top_k=top_k, gate_fn=gate_fn,
+    )
+    if not meta["rejected"]:
+        return RetrievalDecision(blended_hits, False, None, False, meta)
+    rescued = None
+    if rescue_fn is not None and (
+        gate_fn is None or getattr(gate_fn, "last_p", 1.0) >= settings.rescue_min_probability
+    ):
+        rescued = attempt_hyde_rescue(
+            query=query, conn=conn, hybrid=hybrid, reranker=reranker,
+            rescue_fn=rescue_fn, hard_filters=hard_filters,
+            pool_size=pool_size, blend_alpha=blend_alpha, top_k=top_k,
+        )
+    if rescued is not None:
+        return RetrievalDecision(rescued, False, None, True, meta)
+    return RetrievalDecision([], True, str(meta["reason"]), False, meta)
 
 
 def attempt_hyde_rescue(
@@ -259,4 +359,6 @@ def log_query(
         return None
 
 
-__all__ = ["attempt_hyde_rescue", "build_hard_filters", "fetch_texts", "filter_courses", "log_query"]
+__all__ = ["BLEND_ALPHA", "RERANK_POOL_SIZE", "RERANKER_REJECT_THRESHOLD", "RetrievalDecision",
+           "attempt_hyde_rescue", "build_hard_filters", "fetch_texts", "filter_courses", "log_query",
+           "rerank_with_gate_and_rescue"]
