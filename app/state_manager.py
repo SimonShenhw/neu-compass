@@ -78,6 +78,23 @@ def is_logged_in(state: SessionState) -> bool:
     return bool(state.get("user_id"))
 
 
+def valid_identity(identity: object) -> bool:
+    """True when an /auth success body has the shape login() needs.
+
+    Check before changing any session or cookie state: a malformed success is a failure, not a
+    KeyError/TypeError or a partial login. Used by the OAuth callback and the cookie restore.
+    中文：/auth 成功响应是否具备 login() 需要的形状。更新会话或 cookie 前先校验：畸形的成功响应
+    算失败，不能变成 KeyError／TypeError 或半登录状态。OAuth 回调和 cookie 恢复共用。
+    """
+    return (isinstance(identity, dict)
+        and isinstance(identity.get("user_id"), str) and bool(identity["user_id"])
+        and isinstance(identity.get("email"), str) and bool(identity["email"])
+        and type(identity.get("contribution_count", 0)) is int
+        and identity.get("contribution_count", 0) >= 0
+        and (identity.get("session_token") is None or isinstance(identity["session_token"], str))
+        and (identity.get("display_name") is None or isinstance(identity["display_name"], str)))
+
+
 def login(
     state: SessionState,
     *,

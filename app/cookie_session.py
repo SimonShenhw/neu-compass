@@ -243,7 +243,8 @@ def restore_login(
 
     fetch_me raising ApiError(401) means the cookie is stale/invalid → a
     clear is queued so the browser drops it. Any other failure (API down,
-    timeout) leaves the cookie alone; a later full page reload retries.
+    timeout, a malformed success body) leaves the cookie alone; a later full
+    page reload retries.
 
     尝试"cookie → 恢复登录"。每个浏览器标签页最多执行一次。
 
@@ -253,11 +254,11 @@ def restore_login(
     悄悄把用户重新登录回去。
 
     fetch_me 抛出 ApiError(401) 意味着 cookie 已过期/无效 → 排队一次
-    清除操作，让浏览器丢弃它。其他任何失败（API 挂了、超时）都不动
-    这个 cookie；之后一次完整的页面刷新会重试。
+    清除操作，让浏览器丢弃它。其他任何失败（API 挂了、超时、成功响应
+    形状不对）都不动这个 cookie；之后一次完整的页面刷新会重试。
     """
     from app.api_client import ApiError  # noqa: PLC0415
-    from app.state_manager import is_logged_in, login  # noqa: PLC0415
+    from app.state_manager import is_logged_in, login, valid_identity  # noqa: PLC0415
 
     if state.get(_RESTORE_DONE_KEY):
         return False
@@ -270,6 +271,10 @@ def restore_login(
     except ApiError as e:
         if e.status_code == 401:
             queue_cookie_clear(state)
+        return False
+    # A malformed success is not proof the cookie is stale: like an outage, keep it for a reload.
+    # 中文：畸形的成功响应不能说明 cookie 失效：和 API 故障一样保留 cookie，等之后刷新重试。
+    if not valid_identity(me):
         return False
 
     login(

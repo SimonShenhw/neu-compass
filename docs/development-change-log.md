@@ -2784,26 +2784,27 @@
 
 ### 范围与原因
 
-这是有意改变错误响应文字与日志字段的修复，不是纯重构。从 main `9dff227` 独立开 `fix/safe02-error-exits`。合成标记经真实 OAuth exchange、TestClient、ApiClient、AppTest 与 JSON／console 日志证明原有出口缺口。成功请求、检索／门控、状态码和聊天流协议保持；不改主页面编排或 `llm/gemini_client.py` 的日志契约。
+这是有意改变错误响应文字与日志字段的修复，不是纯重构。从 main `9dff227` 独立开 `fix/safe02-error-exits`。合成标记经真实 OAuth exchange、TestClient、ApiClient、AppTest 与 JSON／console 日志证明原有出口缺口。成功请求、检索／门控和聊天流协议保持；状态码只有一处有意变化：Google 返回 200 但内容不是 JSON 时，原来是未捕获的 500，现在是 401 `missing_id_token`。不改主页面编排或 `llm/gemini_client.py` 的日志契约。
 
 ### 已实现
 
 | 边界 | 有意的行为变化 |
 |---|---|
 | 未捕获异常 | middleware 消化、单个安全错误事件和固定 500，共用响应构造函数；兜底不渲染 traceback |
-| 日志管道 | 消耗 exc_info，转成类型／原因类型／最多六帧；第三方 stdlib 任意消息改固定事件，保留级别、请求关联和安全定位；项目成功事件不删字段 |
+| 日志管道 | 消耗 exc_info，转成类型／原因类型／最多六帧，原因类型不把 Starlette 重抛留下的包装当成原因；第三方 stdlib 任意消息改固定事件，保留级别、logger 名、时间戳、请求关联和安全定位；项目成功事件不删字段 |
 | OAuth | 七种 reason、固定公开消息、安全上游状态／错误码与有界小写域名；不展示 Google 描述或完整邮箱；Google 网络故障仍 401 |
 | 回显 | 课程／项目 404、delivery_mode 422 不带输入；歧义 409 保留选择，不附异常文字；422 字段名仅接受安全字符且最多 64 字符 |
 | 关联 | x-request-id 仅接受安全字符且最多 64 字符，其他换 UUID4；只进头，不增加响应体字段 |
 | 遥测／反馈 | query_log 写失败不记录异常原文；反馈存储 503 新增安全诊断 |
-| 客户端／登录页 | 5xx／非 JSON 错误文字固定，畸形 2xx JSON 转 502 invalid_response；登录失败固定文字，畸形身份响应不抛异常或写入半登录状态 |
+| 客户端／登录页 | 5xx／非 JSON 错误文字固定，畸形 2xx JSON 转 502 invalid_response；登录失败固定文字，畸形身份响应（OAuth 回调和 cookie 恢复共用 `valid_identity`）不抛异常或写入半登录状态 |
+| 聊天流 | meta 行在响应开始前构造，出错时走 middleware 的安全 500，不在流头之后抛出 |
 | 发布配置 | Streamlit 默认只显示类型；完整详情仅可本地显式开启 |
 
 `error_frames` 抽到小模块 `api/error_fields.py`，避免日志导入路由造成循环；common 保留同名导入，原调用路径和 `file.py:LINE function` 格式保留。新 safe_error_fields 独立处理隐式 context，不改变 Gemini 辅助函数。taxonomy 值不改，只补正确说明。
 
 ### 修改文件
 
-- 生产：`api/error_fields.py`（新）、`api/logging.py`、`api/exceptions.py`；auth／chat／common／course／feedback／program／search 路由；`app/auth.py`、`app/api_client.py`、`app/streamlit_auth_ui.py`；`.streamlit/config.toml`。
+- 生产：`api/error_fields.py`（新）、`api/logging.py`、`api/exceptions.py`；auth／chat／common／course／feedback／program／search 路由；`app/auth.py`、`app/api_client.py`、`app/streamlit_auth_ui.py`、`app/state_manager.py`、`app/cookie_session.py`（后两个是审查后的修复）；`.streamlit/config.toml`。
 - 测试：`tests/test_safe_error_exits.py`（新）；`test_api_auth_route.py`、`test_api_errors.py`、`test_app_auth.py`、`test_app_api_client.py`。
 - 文档：本文件、`api_contract.md`、`pii_redaction.md`。两份尚未入库的路线／精简计划只在 main 本地刷新状态，没有混入公开提交。
 
@@ -2822,18 +2823,38 @@
 
 ### 审查
 
-作者自检：逐项对照 O1–O11、真实日志处理顺序及 middleware 边界；没有独立评审结论。后续交用户原审查流程复核。
+作者先自检：逐项对照 O1–O11、真实日志处理顺序及 middleware 边界。2026-10-13 做了一轮独立只读审查（审查员 A21；主评审另外核对过），报告在仓库外。
+
+**结论**：没有 CRITICAL 或 HIGH。调查列出的泄漏路径都已关闭，并在按 Dockerfile `CMD` 启动的真实 uvicorn 上实测确认：39 个探针在 `9dff227` 上有 9 个响应体带出标记，本批只剩文档允许的 2 处回显；没有数据库记录带标记；成功请求的日志事件两边一致。处理如下：
+
+1. **MEDIUM**：`cause_type` 把框架包装当成了原因。经过真实 middleware 时，没有 cause 的错误记成 `EndOfStream`（Starlette 在 `except anyio.EndOfStream` 里 `from None` 重抛）；流头之后的错误记成 `ExceptionGroup`（`collapse_excgroups()` 在 `except` 里重抛）。
+   - 处理：`api/error_fields.py` 跳过这两种包装，显式和隐式原因不变，S18 的 `from None` 期望也保留。只尊重 `__suppress_context__` 的方案修不好流头之后的情况，还会让 S18 失败，所以没有采用。
+   - 新测试：仓库错误经 middleware 不再有 `cause_type`；流头之后的错误，有 cause 时报 `ValueError`，没有时不报。
+2. **LOW**：`/chat` 的 meta 行在生成器里、`try` 之前构造。出错时 200 头已经发出，uvicorn 会打印带原文的完整 traceback。处理：meta 在返回 `StreamingResponse` 之前构造并序列化，出错走 middleware 的安全 500。新测试覆盖分数转换失败和序列化失败两种情况。文档写明流头之后的异常仍会有 uvicorn traceback。
+3. **LOW**：审查员的 14 个额外变异体里有 7 个在相关测试下存活。放到全量下仍有 6 个存活：显式 `exception=` 参数、`log.exception` 的定位、第三方事件的请求关联和定位、Google 非对象错误体、`request.unhandled` 的 status／error_type。非法 request ID 换成常量的那个，只被长度检查顺带抓到。处理：新增对应测试。
+4. **LOW**：cookie 恢复在 `/auth/me` 返回畸形 200 时会 `KeyError` 或写入半登录状态（main 上本来就有，与回调同类）。处理：抽出 `state_manager.valid_identity()`，回调和 cookie 恢复共用；畸形响应不登录，保留 cookie，和 API 故障时一样（新测试）。
+5. **LOW**：第三方 `stdlib.*` 事件没有 logger 名和时间戳。处理：加上；logger 名是代码里写死的。
+6. **LOW，文档**：Google 200 但内容不是 JSON 从 500 变成 401 没有记录，已补到上面「范围与原因」和 API 契约。Streamlit 进程日志和 Python `warnings` 仍会打印原文，已写进「已知、未处理」。`app/auth.py` 一处注释没写完，已修。
+
+**修复后的验证**：
+- `tests/test_safe_error_exits.py` 现为 62 项（原 47 项加 15 项）。整个文件放到 `2871822` 上是 **12 failed／50 passed**：失败的是 F1 两项、meta 两项、第三方事件来源一项、cookie 恢复七项；补的旧行为测试在修复前就通过。
+- 十二文件定向 **384 passed**（六 worker）。
+- 全量离线 **3747 passed，7 warnings，301 秒**（原来的 3732 加新增 15 项），在独立快照上跑。
+- 变异 **55/55**，每个都有明确的 FAILED 测试：作者的 29 个（S18、S23 改锚到修复后的代码），审查员的 14 个，以及新增的 12 个。
+  - 用 12 个 worker 跑时，登录回调的 AppTest 冷启动超过 30 秒，35 个记为 SUSPECT。换成 6 个 worker、再换成 2 个 worker 复核后全部杀死，没有存活。
+  - 新增变异体里，「接受负数 contribution_count」首轮存活（回调测试原来也没有这一项），补了一个参数后杀死。
+- ruff 0.5.0（F/E9/B）通过；没有 CR，`git diff --check` 通过。
 
 ### 已知、未处理
 
 1. 成功查询原文／query_log 留存、auth.callback.success 的 Google sub 不改；路径／uvicorn access query string 仍可能含个人信息，不宣称所有日志匿名或无 PII。
-2. 已发流头以后的异常不能改成此 500；聊天已有自己的安全流错误出口。启动脚本其他打印不在本批治理范围。
+2. 已发流头以后的异常不能改成此 500：只记一条安全的 `unhandled_exception`，但 uvicorn 自己的 handler 不经过 root 过滤器，仍会打印带原文的 traceback。聊天的 meta 已挪到响应开始前，模型流错误转成流内事件，目前没有已知的生产路径会走到这里。Python `warnings` 和 Streamlit 进程日志（UI 未捕获异常）也仍打印原文，浏览器只显示类型。启动脚本其他打印不在本批治理范围。
 3. OPT-02 只读核对：真实空结果有一次页面覆盖，但跨 rerun／TTL 的强度仍可补；同 token 贡献权限变化不立即过期 Co-op teaser，须另批行为修改。
-4. SIM-03 未开始，SIM-04 等其合并；OPT-04 第二步、OPT-06、学生端拓展不做。
+4. SIM-03 叠在本批之后（第 22 节），SIM-04 等其合并；OPT-04 第二步、OPT-06、学生端拓展不做。
 5. 未做真人账号、NAS、公网、负载或生产效果验收；部署记录与本批离线结果分开。
 
 ### 发布状态
 
-- 分支 `fix/safe02-error-exits`，起点 main `9dff227`；实现与验证完成，仅做本地提交（准确 hash 另记仓库外 WORKLOG）。尚未推送、PR、合并或部署，仍待独立审查。
+- 分支 `fix/safe02-error-exits`，起点 main `9dff227`；实现、独立审查和审查后的修复都已完成，均为本地提交（准确 hash 另记仓库外）。尚未推送、PR、合并或部署。
 - 本批有 API／UI／发布配置行为变化，审查合并后需重新发布镜像才能线上生效。
 

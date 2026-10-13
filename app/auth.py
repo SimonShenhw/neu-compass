@@ -352,11 +352,10 @@ def exchange_code_for_token(
     except OAuthError:
         raise
     except Exception as e:
-        # Type only: google-auth's messages can quote the token or its audience values, and this
-        # Keep the existing type-only exception diagnostic; the route uses safe_detail
-        # and structured fields, not this exception's text.
-        # 中文：只给类型：google-auth 的消息里可能引用 token 本身或 audience 的值，而这段文字会进
-        # 旧类型诊断继续保留；路由只使用 safe_detail 和结构化字段。
+        # Type only: google-auth's messages can quote the token or its audience values. The route
+        # uses safe_detail and structured fields, never this exception's text.
+        # 中文：只给类型：google-auth 的消息里可能引用 token 本身或 audience 的值；路由只使用
+        # safe_detail 和结构化字段，不使用这段异常文字。
         raise OAuthError(
             f"ID token verification failed: {type(e).__name__}", reason="id_token_invalid",
         ) from e

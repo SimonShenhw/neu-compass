@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import io
+import json
 import logging
 import re
 import sqlite3
 import tomllib
+import types
 from pathlib import Path
 
 import httpx
@@ -145,6 +148,7 @@ def test_repository_failure_uses_safe_uncaught_exit(api_client, monkeypatch, rea
     _secret_free(caplog, response)
     line = _event(caplog, "request.unhandled")
     assert "OperationalError" in line and "frames" in line
+    assert "cause_type" not in line  # Starlette's EndOfStream re-raise is not a cause.
 
 
 def test_query_log_failure_does_not_break_search_or_leak(api_client, monkeypatch, real_logging, caplog):
@@ -290,6 +294,8 @@ def test_uncaught_event_fields_are_whitelisted_before_rendering(api_client, midd
     assert set(errors[0]) <= {"event", "log_level", "request_id", "method", "path", "status",
         "duration_ms", "error_type", "exc_type", "cause_type", "frames"}
     assert "frames" in errors[0] and "exc_info" not in errors[0]
+    if middleware:
+        assert errors[0]["status"] == 500 and errors[0]["error_type"] == "internal_error"
 
 
 @pytest.mark.parametrize("email", ["marker-email@EXAMPLE.INVALID", "marker-email@a b", "marker-email@" + "a" * 254])
@@ -337,3 +343,151 @@ def test_stdlib_and_structlog_exception_rendering_is_safe(monkeypatch, caplog, l
         root.setLevel(level)
         structlog.configure(**previous)
         pipeline._CONFIGURED = configured
+
+
+# --- Review follow-ups (2026-10-13): wrapper causes, pre-header meta, pins, cookie restore ---
+
+
+@contextlib.contextmanager
+def _json_logs(monkeypatch):
+    """Real pipeline rendering JSON into a StringIO, inside the test call (caplog's phase)."""
+    import api.logging as pipeline
+    from config import settings
+    root = logging.getLogger()
+    handlers, level = root.handlers[:], root.level
+    previous = structlog.get_config().copy()
+    configured = pipeline._CONFIGURED
+    stream = io.StringIO()
+    monkeypatch.setattr(settings, "log_format", "json")
+    monkeypatch.setattr(pipeline, "_CONFIGURED", False)
+    try:
+        configure_logging()
+        root.handlers[0].setStream(stream)
+        yield stream
+    finally:
+        structlog.contextvars.clear_contextvars()
+        root.handlers[:] = handlers
+        root.setLevel(level)
+        structlog.configure(**previous)
+        pipeline._CONFIGURED = configured
+
+
+def _rendered_events(stream):
+    return [json.loads(line) for line in stream.getvalue().splitlines() if line.startswith("{")]
+
+
+@pytest.mark.parametrize("chained", [False, True])
+def test_error_after_headers_names_no_framework_cause(empty_db, chained):
+    from fastapi.responses import StreamingResponse
+    from fastapi.testclient import TestClient
+    from structlog.testing import capture_logs
+    from tests.conftest import build_test_app
+    app = build_test_app(empty_db)
+    def stream():
+        def chunks():
+            yield b"{}\n"
+            if chained:
+                raise RuntimeError(MARKER) from ValueError(EMAIL)
+            raise RuntimeError(MARKER)
+        return StreamingResponse(chunks(), media_type="application/x-ndjson")
+    app.add_api_route("/synthetic-stream", stream, methods=["GET"])
+    with capture_logs() as entries, TestClient(app, raise_server_exceptions=False) as client:
+        client.get("/synthetic-stream")
+    [event] = [entry for entry in entries if entry["event"] == "unhandled_exception"]
+    assert event["exc_type"] == "RuntimeError"
+    # collapse_excgroups() re-raises inside `except` for its group; the group is not the cause.
+    assert event.get("cause_type") == ("ValueError" if chained else None)
+    assert MARKER not in repr(entries) and EMAIL not in repr(entries)
+
+
+@pytest.mark.parametrize("failure", ["score", "serialise"])
+def test_chat_meta_failure_is_a_safe_pre_header_500(api_client, monkeypatch, real_logging, caplog, failure):
+    import api.routes.chat as chat
+    from api.dependencies import get_chat_stream_fn
+    original = chat._retrieve
+    class BadScore:
+        def __float__(self):
+            raise ValueError(MARKER)
+    class MetaJson:
+        @staticmethod
+        def dumps(payload, *args, **kwargs):
+            if isinstance(payload, dict) and payload.get("type") == "meta":
+                raise ValueError(MARKER)
+            return json.dumps(payload, *args, **kwargs)
+    def retrieve(req, alias_repo, course_repo, *args):
+        _, _, hard_filters, notices = original(req, alias_repo, course_repo, *args)
+        score = BadScore() if failure == "score" else 0.5
+        hit = types.SimpleNamespace(course=course_repo.get("c-cs-5800"), score=score)
+        return [hit], "alias", hard_filters, notices
+    monkeypatch.setattr(chat, "_retrieve", retrieve)
+    if failure == "serialise":
+        monkeypatch.setattr(chat, "json", MetaJson)
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: (lambda prompt: iter(["unused"]))
+    with caplog.at_level(logging.INFO):
+        response = api_client.post("/chat", json={"query": "Algo"})  # Default raise_server_exceptions=True.
+    assert response.status_code == 500 and response.json()["error_type"] == "internal_error"
+    assert response.headers["x-request-id"]
+    _secret_free(caplog, response)
+    line = _event(caplog, "request.unhandled")
+    assert "ValueError" in line and "chat.py:" in line
+
+
+def test_structlog_exception_paths_keep_only_safe_location(monkeypatch):
+    with _json_logs(monkeypatch) as stream:
+        structlog.get_logger("synthetic").error("synthetic.kwarg", exception=MARKER)
+        try:
+            raise RuntimeError(MARKER)
+        except RuntimeError:
+            structlog.get_logger("synthetic").exception("synthetic.only_structlog")
+        events = {event["event"]: event for event in _rendered_events(stream)}
+        assert MARKER not in stream.getvalue()
+    assert "exception" not in events["synthetic.kwarg"]
+    only = events["synthetic.only_structlog"]
+    assert only["exc_type"] == "RuntimeError"
+    assert any(frame.startswith("test_safe_error_exits.py:") for frame in only["frames"])
+
+
+def test_foreign_error_keeps_origin_request_context_and_location(monkeypatch):
+    with _json_logs(monkeypatch) as stream:
+        structlog.contextvars.bind_contextvars(request_id="synthetic-rid", method="GET", path="/synthetic")
+        try:
+            raise RuntimeError(MARKER)
+        except RuntimeError:
+            logging.getLogger("thirdparty.synthetic").exception("ignored %s", EMAIL)
+        [event] = [e for e in _rendered_events(stream) if e["event"] == "stdlib.error"]
+        assert MARKER not in stream.getvalue() and EMAIL not in stream.getvalue()
+    assert event["logger"] == "thirdparty.synthetic" and event["timestamp"].endswith("Z")
+    assert (event["request_id"], event["method"], event["path"]) == ("synthetic-rid", "GET", "/synthetic")
+    assert event["exc_type"] == "RuntimeError" and event["frames"]
+
+
+def test_invalid_request_ids_get_fresh_replacements(api_client):
+    returned = {api_client.get("/health", headers={"x-request-id": "bad id"}).headers["x-request-id"]
+                for _ in range(2)}
+    assert len(returned) == 2
+
+
+def test_google_non_object_error_body_is_a_401(api_client, real_logging, caplog):
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(400, json=[MARKER]))) as http:
+        fn = functools.partial(exchange_code_for_token, http_client=http)
+        api_client.app.dependency_overrides[get_oauth_exchange_fn] = lambda: fn
+        with caplog.at_level(logging.INFO):
+            response = api_client.post("/auth/callback", json={"code": "synthetic"})
+    assert response.status_code == 401
+    _secret_free(caplog, response)
+    assert "token_exchange_rejected" in _event(caplog, "auth.callback.rejected")
+
+
+@pytest.mark.parametrize("me", [{}, [], {"user_id": ["x"], "email": 5},
+    {"user_id": "u", "email": EMAIL, "contribution_count": "3"},
+    {"user_id": "u", "email": EMAIL, "contribution_count": True},
+    {"user_id": "u", "email": EMAIL, "display_name": 5},
+    {"user_id": "u", "email": EMAIL, "contribution_count": -1}])
+def test_cookie_restore_rejects_malformed_identity(me):
+    from app.cookie_session import restore_login
+    from app.state_manager import init_state, is_logged_in
+    state: dict = {}
+    init_state(state)
+    assert restore_login(state, "synthetic-token", lambda token: me) is False
+    assert not is_logged_in(state) and state["session_token"] is None
+    assert not state.get("_pending_cookie")  # Not a 401: the cookie stays for a later reload.

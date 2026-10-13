@@ -20,10 +20,30 @@ def error_frames(exc: BaseException, limit: int = 6) -> list[str]:
         return []
 
 
+def _framework_context(exc: BaseException) -> bool:
+    """Starlette re-raise artefacts are contexts, not causes.
+
+    `BaseHTTPMiddleware` re-raises a cause-less app error `from None` inside `except anyio.EndOfStream`;
+    after headers, `collapse_excgroups()` re-raises the error inside `except` for its own group.
+    中文：Starlette 重抛留下的包装异常不是原因：无原因的错误在 `except anyio.EndOfStream` 中被
+    `from None` 重抛；流头发出后，`collapse_excgroups()` 在处理自身异常组时重抛。
+    """
+    context = exc.__context__
+    if isinstance(context, BaseExceptionGroup):
+        return any(inner is exc for inner in context.exceptions)
+    return (exc.__suppress_context__ and type(context).__name__ == "EndOfStream"
+            and type(context).__module__.startswith("anyio"))
+
+
 def safe_error_fields(exc: BaseException) -> dict[str, object]:
     """Type, chained type and at most six frames; context is useful even with `from None`."""
     fields: dict[str, object] = {"exc_type": type(exc).__name__, "frames": error_frames(exc)}
-    cause = exc.__cause__ if exc.__cause__ is not None else exc.__context__
+    if exc.__cause__ is not None:
+        cause = exc.__cause__
+    elif exc.__context__ is not None and not _framework_context(exc):
+        cause = exc.__context__
+    else:
+        cause = None
     if cause is not None:
         fields["cause_type"] = type(cause).__name__
     return fields

@@ -270,8 +270,8 @@ def auto_redact_pre(text: str) -> str:
 
 错误响应不展示异常 str/repr、Google error_description、完整邮箱或请求／响应原文。OAuth 保持 401，按固定 reason 选择提示；404／delivery_mode 422 不带输入值；chat 项目歧义保留库内项目选择，不附异常文字。422 多余字段名仅回显有界安全名称，详见 [API 契约](api_contract.md#safe-error-exits-safe-02)。
 
-错误日志只留固定事件名、级别、请求关联和白名单诊断：异常／原因类型、上游状态／安全错误码、最多六个 `file.py:LINE function` 栈帧。不读源码、局部变量，不渲染 traceback。OAuth 拒绝可记录小写、有界域名，不记录地址。经过配置 root handler 的第三方 stdlib 日志任意消息被固定事件替代，保留安全定位；JSON／console 都适用。request ID 有字符和长度限制，非法输入被新的 UUID4 替代，只在头中返回。
+错误日志只留固定事件名、级别、请求关联和白名单诊断：异常／原因类型、上游状态／安全错误码、最多六个 `file.py:LINE function` 栈帧。不读源码、局部变量，不渲染 traceback。原因类型不把 Starlette 重抛留下的 `anyio.EndOfStream` 或流头后的异常组当成原因。OAuth 拒绝可记录小写、有界域名，不记录地址。经过配置 root handler 的第三方 stdlib 日志任意消息被固定事件替代，保留代码里写死的 logger 名、时间戳和安全定位；JSON／console 都适用。request ID 有字符和长度限制，非法输入被新的 UUID4 替代，只在头中返回。OAuth 回调和 cookie 恢复都先校验身份形状，畸形的成功响应不登录、不抛异常。
 
-尚未发送响应的未捕获异常在请求中间件消化，只有一条安全错误事件，不再向 ServerErrorMiddleware／uvicorn 传播。流头发送后无法换成固定 500；聊天流自己的固定错误处理保持不变。Streamlit 发布配置默认仅显示错误类型；完整详情仅供本地显式开启。
+尚未发送响应的未捕获异常在请求中间件消化，只有一条安全错误事件，不再向 ServerErrorMiddleware／uvicorn 传播。流头发送后无法换成固定 500：会记一条安全的 `unhandled_exception`，但 uvicorn 自己的 handler 不经过 root 过滤器，仍会打印带异常原文的 traceback。聊天流的 meta 行在响应开始前就构造好，模型流的错误转成流内错误事件，所以目前没有已知的生产路径会走到这里。Python `warnings` 和 Streamlit 进程日志（UI 未捕获异常）也仍打印原文；浏览器里只显示错误类型。Streamlit 发布配置默认仅显示错误类型；完整详情仅供本地显式开启。
 
 这不是「所有日志没有 PII」：成功查询原文及 query_log 留存、本来的 Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串仍需单独治理。本批不改留存／删除／备份、不改 Docker 启动参数，不执行真实账号或线上验收。

@@ -511,6 +511,8 @@ and request log context.
   from seven reasons: `token_exchange_rejected`, `token_endpoint_unreachable`,
   `missing_id_token`, `id_token_invalid`, `claims_invalid`, `email_unverified`,
   `domain_not_allowed`. Google descriptions, tokens and email addresses are not returned.
+  The one status change: a Google 200 whose body is not JSON was an uncaught 500 and is
+  now this 401 (`missing_id_token`).
 - Chat 409 still offers database-backed program IDs and selection guidance, but no
   appended exception text. The existing Gemini 502 and chat stream error contracts remain.
 
@@ -518,24 +520,33 @@ Safe error diagnostics allow request_id, method, path, status, duration_ms; erro
 exc_type, cause_type, error_kind, upstream_status, upstream_reason; frames, tokens_sent,
 oauth_reason, google_error, email_domain; and existing database coop_id/program_id/course_id.
 Frames are at most six `file.py:LINE function` entries (basenames, no source or locals).
-Cause type falls back to implicit exception context. Google error codes match
+Cause type falls back to implicit exception context, except Starlette's re-raise
+artefacts: the `anyio.EndOfStream` that `BaseHTTPMiddleware` leaves on a cause-less
+error, and the exception group around the error after headers are sent. Google error codes match
 `[a-z_]{1,64}`; refused domains are lowercase and match `[a-z0-9.-]{1,253}`.
 No exception str/repr, traceback text, error_description, email, OAuth code, session/
 feedback token, headers or body content is logged in these diagnostics. Foreign stdlib
 messages routed through the configured root handler are replaced by fixed `stdlib.log` /
-`stdlib.error` events with safe diagnostics;
-level and request context remain. Successful project events retain their existing fields.
+`stdlib.error` events with safe diagnostics; level, the code-defined logger name, a
+timestamp and request context remain. Successful project events retain their existing fields.
 
 The UI client uses fixed text for 5xx and non-JSON error bodies, retaining status and safe
 error_type; malformed 2xx JSON becomes `ApiError(502, error_type="invalid_response")`.
 The existing fixed invalid-response notice is preserved, as are rate/busy/timeout notices.
-Malformed OAuth identity shapes fail without modifying login state. Streamlit defaults to
+Malformed identity shapes (OAuth callback and cookie restore) fail without modifying
+login state; a malformed restore keeps the cookie, like an outage. Streamlit defaults to
 `client.showErrorDetails="type"`; full details are opt-in for local development only.
 
 Boundaries: this does not remove successful query text logs or query_log contents, the
 Google sub in `auth.callback.success`, or potential sensitive data in request paths/access
 query strings. Exceptions after response headers are sent cannot be converted to this
-500 body (chat handles its own stream errors). No general PII-free logging claim is made.
+500 body: they are logged once as a safe `unhandled_exception`, but uvicorn's own
+`Exception in ASGI application` traceback (its handler bypasses the root filter) still
+prints the message. `/chat` builds its first (meta) line before the response starts and
+turns model-stream errors into stream error events, so no production path is known to
+reach this. Python `warnings` and the Streamlit process log (uncaught UI exceptions) also
+print full text; the browser shows the exception type only. No general PII-free logging
+claim is made.
 
 ## Frontend touch-points (for Andy)
 

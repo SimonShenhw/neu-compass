@@ -58,21 +58,24 @@ class _SafeForeignLogs(logging.Filter):
     """Sanitize the shared record BEFORE all downstream handlers (including caplog).
 
     Project structlog output is already processed. Foreign library messages are untrusted;
-    keep level and safe exception location, not URLs, bodies or exception text.
+    keep level, the code-defined logger name, a timestamp and safe exception location, not URLs,
+    bodies or exception text.
     """
 
     def __init__(self, renderer: Any) -> None:
         super().__init__()
         self.renderer = renderer
+        self.stamp = structlog.processors.TimeStamper(fmt="iso", utc=True)
 
     def filter(self, record: logging.LogRecord) -> bool:
         if not getattr(record, "_safe_structlog", False):
             fields: dict[str, object] = {"event": "stdlib.error" if record.levelno >= logging.ERROR else "stdlib.log",
-                                         "level": record.levelname.lower()}
+                                         "level": record.levelname.lower(), "logger": record.name}
             context = structlog.contextvars.get_contextvars()
             fields.update({key: context[key] for key in ("request_id", "method", "path") if key in context})
             if record.exc_info and record.exc_info[1] is not None:
                 fields.update(safe_error_fields(record.exc_info[1]))
+            fields = self.stamp(None, record.levelname.lower(), fields)
             record.msg = self.renderer(None, record.levelname.lower(), fields)
             record.args = ()
         record.exc_info = None
