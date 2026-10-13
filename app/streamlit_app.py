@@ -190,34 +190,7 @@ def _render_message_text(st: Any, msg: dict) -> None:
     st.markdown(answer_markdown(content) if msg["role"] == "assistant" else content)
 
 
-def _recent_history(messages: list[dict], limit: int = 6) -> list[dict]:
-    """Last `limit` turns as the {role, content} shape ChatRequest.history
-    expects. Content capped at 4000 chars (the API's ChatTurn bound);
-    assistant answers can exceed it with long evidence-rich replies.
-
-    取最近 `limit` 轮对话，整理成 ChatRequest.history 期望的
-    {role, content} 形状。内容截断到 4000 字符（API 的 ChatTurn 上限）；
-    带大量证据的助手长回答可能超限，所以必须截断。"""
-    return [
-        {"role": m["role"], "content": str(m["content"])[:4000]}
-        for m in messages[-limit:]
-        if m.get("content")
-    ]
-
-
-def _context_course_ids(messages: list[dict], limit: int = 10) -> list[str]:
-    """Course ids from the most recent assistant turn that carried
-    evidence — the referent set for follow-ups ("这门课..."). The API
-    only uses these when its follow-up detector fires, so sending them
-    on every request is harmless.
-
-    取最近一条带证据的助手回复里的课程 id —— 即追问（"这门课..."）的
-    指代集合。API 只在其追问检测器命中时才使用它们，因此每次请求都带上
-    也无副作用。"""
-    for m in reversed(messages):
-        if m.get("role") == "assistant" and m.get("evidence"):
-            return [ev["course_id"] for ev in m["evidence"]][:limit]
-    return []
+from app.chat_view import _context_course_ids, _recent_history  # Compatibility exports.
 
 
 FOLLOWUP_CHIPS_SINGLE: list[str] = [
@@ -430,7 +403,6 @@ def render() -> None:
         render_auth_sidebar,
     )
     from app.ui_theme import (  # noqa: PLC0415
-        empty_detail_html,
         guest_banner_html,
         hero_html,
         inject_theme,
@@ -600,87 +572,22 @@ def render() -> None:
         # 回答会出现在这些内容下面）。第三轮针对冷启动白屏的修复：落地页提供可浏览的真实内容
         # （培养方案 / 入门课程 / Co-op 预览），而不只是示例查询。
         if not get_messages(st.session_state) and not prompt:
-            from app.discover_view import render_discover  # noqa: PLC0415
+            from app.discover_view import render_landing  # noqa: PLC0415
 
-            render_discover(st)
-            st.divider()
-            st.markdown("**🔍 试试这样问**")
-            sample_cols = st.columns(2)
-            for i, (label, query) in enumerate(SAMPLE_QUERIES):
-                col = sample_cols[i % 2]
-                if col.button(
-                    label, use_container_width=True, key=f"sample-{i}",
-                ):
-                    st.session_state["pending_query"] = query
-                    st.rerun()
-            st.caption(
-                "💡 也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
-            )
-            st.divider()
+            render_landing(st, SAMPLE_QUERIES)
 
-        # Render existing conversation history. enumerate(messages) so the
-        # "Open" button keys can include the message index — without that,
-        # the same course appearing in two different message evidence
-        # blocks (common when user asks repeatedly about a topic) collides
-        # on f"open-{role}-{course_id}" and Streamlit raises
-        # DuplicateWidgetID, blowing up the entire chat history.
-        # 渲染已有的对话历史。用 enumerate(messages) 是为了让「查看」按钮的
-        # key 带上消息序号 —— 否则同一门课出现在两条消息的证据块里（用户
-        # 反复追问同一主题时很常见）会在 f"open-{role}-{course_id}" 上撞
-        # key，Streamlit 抛 DuplicateWidgetID，整个聊天历史直接崩掉。
-        messages = get_messages(st.session_state)
-        for msg_idx, msg in enumerate(messages):
-            with st.chat_message(
-                msg["role"],
-                avatar="🎓" if msg["role"] == "user" else "🧭",
-            ):
-                from app.answer_evidence_view import render_retrieval_notices  # noqa: PLC0415
+        # Resolve legacy hooks here, inside the chat column, at each script run.
+        # 中文：聊天列内查找主入口原有 renderer，替换点和位置不变。
+        from app.chat_view import render_chat_history  # noqa: PLC0415
 
-                _render_message_text(st, msg)
-                render_retrieval_notices(st, msg.get("notices"))
-                if msg.get("evidence"):
-                    n_ev = len(msg["evidence"])
-                    with st.expander(
-                        f"📎 相关课程（{n_ev} 门）",
-                        expanded=(n_ev <= 3),
-                    ):
-                        if msg.get("matched_via"):
-                            st.markdown(
-                                matched_via_badge(msg["matched_via"]),
-                                unsafe_allow_html=True,
-                            )
-                        _render_evidence_block(
-                            st, msg["evidence"],
-                            key_prefix=f"open-{msg_idx}-{msg['role']}",
-                        )
-            if msg['role'] == 'assistant':
-                from app.answer_feedback_view import render_answer_feedback
-                render_answer_feedback(st, msg, key_prefix=f'answer-feedback-{msg_idx}')
-            # Follow-up suggestion chips under the LATEST answer only —
-            # they ride the conversation-continuity path (context tier),
-            # so a click answers about the course(s) just discussed.
-            # 追问建议 chips 只挂在最新一条回答下面 —— 它们走对话连续性
-            # 路径（context 档），点击即是在追问刚讨论过的那（几）门课。
-            is_last = msg_idx == len(messages) - 1
-            if (
-                is_last
-                and msg["role"] == "assistant"
-                and msg.get("evidence")
-                and msg.get("matched_via") not in ("rejected", "empty")
-            ):
-                chips = (
-                    FOLLOWUP_CHIPS_SINGLE
-                    if len(msg["evidence"]) == 1
-                    else FOLLOWUP_CHIPS_MULTI
-                )
-                chip_cols = st.columns(len(chips))
-                for i, chip in enumerate(chips):
-                    if chip_cols[i].button(
-                        f"↳ {chip}", key=f"chip-{msg_idx}-{i}",
-                        use_container_width=True,
-                    ):
-                        st.session_state["pending_query"] = chip
-                        st.rerun()
+        render_chat_history(
+            st, get_messages(st.session_state),
+            render_message_text=_render_message_text,
+            render_evidence_block=_render_evidence_block,
+            matched_via_badge=matched_via_badge,
+            single_chips=FOLLOWUP_CHIPS_SINGLE,
+            multi_chips=FOLLOWUP_CHIPS_MULTI,
+        )
 
         # New input → stream assistant response. Two paths: the pinned chat_input box OR a
         # pending_query injected by a sample / follow-up chip (both read above).
@@ -778,24 +685,9 @@ def render() -> None:
             st.rerun()
 
     with detail_col:
-        st.subheader("📘 课程详情")
-        cid = st.session_state.get("selected_course_id")
-        course: dict | None = None
-        if not cid:
-            st.markdown(empty_detail_html(), unsafe_allow_html=True)
-        else:
-            with ApiClient(
-                session_token=st.session_state.get("session_token")
-            ) as api:
-                try:
-                    course = api.get_course(cid)
-                except ApiError as e:
-                    st.error(f"课程详情加载失败：{e.detail}")
+        from app.course_detail_view import render_selected_course  # noqa: PLC0415
 
-        if course:
-            from app.course_detail_view import render_course_detail  # noqa: PLC0415
-
-            render_course_detail(st, course, cid=cid)
+        render_selected_course(st)
 
     _end_page(st, fallback_slot)
 

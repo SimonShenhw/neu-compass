@@ -281,4 +281,26 @@ def render_discover(st) -> None:
         st.caption(PARTIAL_NOTICE)
 
 
-__all__ = ["render_discover"]
+def render_landing(st, sample_queries: list[tuple[str, str]]) -> None:
+    """Discovery plus samples; caller owns the no-history/no-prompt guard.
+
+    中文：发现区＋示例按钮的外层；原 render_discover 的替换仍生效。
+    """
+    render_discover(st)
+    st.divider()
+    st.markdown("**🔍 试试这样问**")
+    sample_cols = st.columns(2)
+    for i, (label, query) in enumerate(sample_queries):
+        col = sample_cols[i % 2]
+        if col.button(
+            label, use_container_width=True, key=f"sample-{i}",
+        ):
+            st.session_state["pending_query"] = query
+            st.rerun()
+    st.caption(
+        "💡 也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
+    )
+    st.divider()
+
+
+__all__ = ["render_discover", "render_landing"]

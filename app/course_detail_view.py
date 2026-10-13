@@ -119,4 +119,30 @@ def render_course_detail(st: Any, course: dict, *, cid: str) -> None:
         st.caption("把链接发给同学，他们打开就直接看到这门课。")
 
 
-__all__ = ["grading_text", "render_course_detail", "soft_estimates"]
+def render_selected_course(st: Any) -> None:
+    """Load the selected course on each rerun; imports keep client replacement lazy.
+
+    中文：详情列的加载编排；不新增缓存，客户端在调用时才导入。
+    """
+    from app.api_client import ApiClient, ApiError  # noqa: PLC0415
+    from app.ui_theme import empty_detail_html  # noqa: PLC0415
+
+    st.subheader("📘 课程详情")
+    cid = st.session_state.get("selected_course_id")
+    course: dict | None = None
+    if not cid:
+        st.markdown(empty_detail_html(), unsafe_allow_html=True)
+    else:
+        with ApiClient(
+            session_token=st.session_state.get("session_token")
+        ) as api:
+            try:
+                course = api.get_course(cid)
+            except ApiError as e:
+                st.error(f"课程详情加载失败：{e.detail}")
+
+    if course:
+        render_course_detail(st, course, cid=cid)
+
+
+__all__ = ["grading_text", "render_course_detail", "render_selected_course", "soft_estimates"]

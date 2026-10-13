@@ -2869,3 +2869,63 @@
 - 分支 `fix/safe02-error-exits`，起点 main `9dff227`；实现、独立审查和审查后的修复都已完成，均为本地提交（准确 hash 另记仓库外）。尚未推送、PR、合并或部署。
 - 本批有 API／UI／发布配置行为变化，审查合并后需重新发布镜像才能线上生效。
 
+## 22 — 前端主入口职责拆分（SIM-03，2026-10-13）
+
+### 范围与原因
+
+按本轮方案第 0–3 步，从 main `9dff227` 独立开分支。目标是主入口负责页面编排，不改现有功能、状态、文案、widget key、请求或 rerun 语义。没有把 SAFE-02 的错误行为变化带进本分支，也不做 SIM-04 转义工具整理或第 4 步流式抽取。
+
+### 已实现
+
+| 块 | 去向／保留边界 |
+|---|---|
+| 两个历史纯函数 | `app/chat_view.py`；main 保留 `_recent_history`／`_context_course_ids` 同名导入。保留原 slice、4000 字符截断、最新带证据助手、顺序／重复／畸形输入行为 |
+| R17 详情栏 | `course_detail_view.render_selected_course`；客户端调用时导入，原正文 renderer 仍在原模块，不新增缓存 |
+| R14 落地页 | `discover_view.render_landing`；通过模块全局调用原 render_discover，示例列表由 main 传入，显示条件留 main，不把按钮塞进原发现函数 |
+| R15 历史展示 | `chat_view.render_chat_history`；仍在聊天列，接收 main 当前的两个 renderer、badge 和 chip 列表，保持旧替换点和所有 key |
+| R0–R13／R16／R18 | 启动／认证／cookie／缓存／导航／筛选／固定输入／隐私许可／项目 selector／整个提交块／三处收尾保留原处 |
+
+main 的 `_format_evidence`、`_render_evidence_block`、`_render_message_text`、`stream_assistant`、`_summarize_results`、`FALLBACK_NOTICE` 保留为原定义／常量；`_render_filters_sidebar` 仍在 main，通过 main 全局名、两个位置参数调用。没有新造不必要的兼容包装。运行时的认证、cookie、program cache、stream renderer 查找保持。
+
+main 809→701 行，render 389→308 行；这是减少主入口内联职责，不宣称整个项目总行数下降。迁出代码在原页面列／container 中运行，反馈仍在对应 chat_message 外，privacy／selector 仍在输入前。不存在「清空对话」控件，本批也不新增。
+
+### 修改文件
+
+- `app/chat_view.py`（新）：纯 helper 和历史展示。
+- `app/streamlit_app.py`：保留编排／兼容名称／时序，委托三块。
+- `app/course_detail_view.py`、`app/discover_view.py`：各追加一个小 wrapper，旧正文／发现函数不改。
+- `tests/test_page_orchestration.py`（新）：先通过、后冻结的行为特征测试；`tests/test_page_feedback_keys.py`（新）：变异后补强完整反馈 key，另在 archive main 上通过。
+- 本文件：验证与发布边界。仓库外另有中文 WORKLOG、AST 对照、替身测量和具名变异日志。
+
+### 验证记录
+
+- 占位 key、合成状态、MockTransport／AppTest；新测试有 send guard，替身失效会失败，不会真正联网。没有读真实凭证或生产库。
+- 初版新测试有四处搭法／预期错误（landing click pass、AppTest 中断片段、CSS 类名），在未改产品的 main 上修正，仅改测试，不把它们算产品缺陷。
+- main 原产品上新测试 **22 passed，3 warnings，18.18 秒**；冻结 SHA-256 `5fa6bfb2ce72c5401e226289646d184d698909839d0ca7376a8d8817f831cbd2`。抽取后未改一行，hash 一致。
+- 覆盖纯 helper 的窗口／截断／原 slice 语义、冷 landing 四示例、空详情、历史课程切换／错误前缀／带 token／每次重取、单／多课追问／pending、history-before-query／context、重复课程 key、chip guard、项目 ID、主入口替换点和文本过滤。
+- 13 文件定向 **559 passed，18 warnings，51.47 秒**（六 worker）；全量 **3707 passed，5 warnings，305.13 秒**，为 main 3685 + 新增 22。分支未包含 SAFE-02，不能直接与其测试数比较。
+- 既有三处 AST 钉子和旧测试不改。额外 AST 对照 **15/15**：迁出的纯函数、历史（仅依赖名替换）、landing（仅 import／参数名）、详情（仅 import 位置）一致；整个 R16 和九个未迁出函数完全相同。
+- 首轮具名变异 16/17，反馈 prefix 存活：旧页面用例只查 key 后缀。另补 1 项精确 key／改票／rerun 用例，在 archive main 上 1 passed；两新增文件为 23 passed。原冻结 22 项不改，不把测试余项当产品缺陷。
+- 最终具名变异 **17/17**（首轮有效 16 + P15 串行复核），均有真实 FAILED 身份，0 存活／SUSPECT／ERROR，不混称一次完整重跑。结构顺序、提交 rerun、证据／chip／反馈 key、context、assistant filter、late client／stream lookup、filters patch、截断／顺序／重复等各有对应负例。模块级绑定变异也有禁止联网的保护。
+- 每场景预热 15、测 100 次的 Python／Recorder 替身：landing median 0.010250→0.010970ms、p95 0.012010→0.012490ms；history 0.021550→0.021536／0.047411→0.025290ms；detail 0.030026→0.030760／0.055841→0.058762ms。未明显变慢；量级小、单轮噪声大，不宣称统计或生产性能改善。
+- 补强后的最终全量 **3708 passed，5 warnings，368.52 秒**，main 3685 + 两新增文件 23 项；警告为三项 SWIG 类型与两次 HTTP 422 名称弃用。
+- 6 个改动 Python 文件 Ruff 0.5.0 F/E9/B 通过；7 个改动文件 CR=0、diff 检查通过，1 个真实本地 Markdown 目标有效。原冻结文件 hash 不变。
+
+### 审查
+
+作者逐项对照块表、九条顺序、六个 patch seam、三个 AST 钉子；目前只有作者验证，尚无独立审查结论。冻结测试是有限的等价性证据，不宣称覆盖所有浏览器／并发／真实账号场景。
+
+### 已知、未处理
+
+1. 不搬第 4 步流式编排、不做 SIM-04/05、OPT-04 第二步、OPT-06 或学生端拓展。
+2. SAFE-02 在独立分支；本分支的 5xx 文案仍是原实现，新增课程错误测试只钉中文前缀，允许以后叠加该安全修复。
+3. 登录／cookie／deep-link／pending-nav 的更多真实页面验收、筛选清除、真实清对话控件等原余项不在本批实现。
+4. 本批只有 AppTest、源码对照和 Python 替身测量，没有真实浏览器／账号／NAS／生产模型或性能验收。
+5. 两份本地未跟踪计划文档仍未决定公开入库，本批不加入。
+
+### 发布状态
+
+- 分支 `refactor/sim03-page-orchestration`，起点 main `9dff227`；实现与验证完成，仅做本地提交（准确 hash 在仓库外 WORKLOG）。尚未推送、PR、合并或部署，仍待独立审查。
+- 第 21 节在独立 SAFE-02 分支；本分支从第 20 节后追加第 22 节。将来按实际合并顺序 rebase、排序并重新全量，不假装当前 main 已包含两批。
+- 纯重构，不需要独立数据迁移；部署与合并仍由用户另行决定，SIM-04 必须等本批合并后再开。
+
