@@ -13,11 +13,13 @@ import tomllib
 import types
 from pathlib import Path
 
+import anyio
 import httpx
 import pytest
 import structlog
 
 from api.dependencies import get_oauth_exchange_fn
+from api.error_fields import safe_error_fields
 from api.logging import configure_logging
 from app.api_client import ApiClient, ApiError
 from app.auth import exchange_code_for_token
@@ -491,3 +493,78 @@ def test_cookie_restore_rejects_malformed_identity(me):
     assert restore_login(state, "synthetic-token", lambda token: me) is False
     assert not is_logged_in(state) and state["session_token"] is None
     assert not state.get("_pending_cookie")  # Not a 401: the cookie stays for a later reload.
+
+
+# --- Second review (2026-10-13): only framework wrappers are skipped; identity branches ---
+
+
+def _group_context():
+    try:
+        raise ExceptionGroup("synthetic", [ValueError(MARKER)])
+    except ExceptionGroup:
+        raise RuntimeError(MARKER)  # noqa: B904 - implicit context on purpose
+
+
+def _end_of_stream_context():
+    try:
+        raise anyio.EndOfStream
+    except anyio.EndOfStream:
+        raise RuntimeError(MARKER)  # noqa: B904 - implicit, not suppressed
+
+
+def _end_of_stream_cause():
+    raise RuntimeError(MARKER) from anyio.EndOfStream()
+
+
+def _from_none_over_value_error():
+    try:
+        raise ValueError(MARKER)
+    except ValueError:
+        raise RuntimeError(MARKER) from None
+
+
+def _from_none_over_other_anyio():
+    try:
+        raise anyio.ClosedResourceError
+    except anyio.ClosedResourceError:
+        raise RuntimeError(MARKER) from None
+
+
+def _collapsed(depth):
+    """What starlette's collapse_excgroups() does: unwrap single-member groups, re-raise in the handler."""
+    group: BaseException = RuntimeError(MARKER)
+    for _ in range(depth):
+        group = ExceptionGroup("synthetic", [group])
+    try:
+        raise group
+    except BaseException as caught:
+        exc = caught
+        while isinstance(exc, BaseExceptionGroup) and len(exc.exceptions) == 1:
+            exc = exc.exceptions[0]
+        raise exc  # noqa: B904 - the implicit context is exactly what collapse_excgroups() leaves
+
+
+@pytest.mark.parametrize(("scenario", "expected"), [
+    (_group_context, "ExceptionGroup"), (_end_of_stream_context, "EndOfStream"),
+    (_end_of_stream_cause, "EndOfStream"), (_from_none_over_value_error, "ValueError"),
+    (_from_none_over_other_anyio, "ClosedResourceError"),
+    (functools.partial(_collapsed, 1), None), (functools.partial(_collapsed, 2), None),
+], ids=["group", "end_of_stream", "explicit_end_of_stream", "from_none", "other_anyio", "collapsed", "nested"])
+def test_only_framework_wrappers_are_skipped_as_causes(scenario, expected):
+    with pytest.raises(RuntimeError) as info:
+        scenario()
+    assert safe_error_fields(info.value).get("cause_type") == expected
+
+
+@pytest.mark.parametrize(("identity", "valid"), [
+    ({"user_id": "", "email": EMAIL}, False), ({"user_id": "u", "email": ""}, False),
+    ({"user_id": "u", "email": EMAIL, "session_token": 5}, False),
+    ({"user_id": "u", "email": EMAIL, "session_token": ["t"]}, False),
+    ({"user_id": ["x"], "email": EMAIL}, False), ({"user_id": "u", "email": 5}, False),
+    ({"user_id": "u", "email": EMAIL}, True),
+    ({"user_id": "u", "email": EMAIL, "contribution_count": 0, "session_token": None, "display_name": None}, True),
+    ({"user_id": "u", "email": EMAIL, "contribution_count": 3, "session_token": "t", "display_name": "Name"}, True),
+])
+def test_valid_identity_branches(identity, valid):
+    from app.state_manager import valid_identity
+    assert valid_identity(identity) is valid

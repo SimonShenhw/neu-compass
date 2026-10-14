@@ -511,8 +511,9 @@ and request log context.
   from seven reasons: `token_exchange_rejected`, `token_endpoint_unreachable`,
   `missing_id_token`, `id_token_invalid`, `claims_invalid`, `email_unverified`,
   `domain_not_allowed`. Google descriptions, tokens and email addresses are not returned.
-  The one status change: a Google 200 whose body is not JSON was an uncaught 500 and is
-  now this 401 (`missing_id_token`).
+  Status changes: malformed Google responses that used to raise an uncaught 500 are now
+  this 401 — a 200 body that is not JSON or not a JSON object, a 4xx JSON body that is not
+  an object, and a non-string email claim.
 - Chat 409 still offers database-backed program IDs and selection guidance, but no
   appended exception text. The existing Gemini 502 and chat stream error contracts remain.
 
