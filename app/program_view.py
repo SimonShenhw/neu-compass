@@ -317,7 +317,7 @@ def _render_curriculum(st, program_id: str) -> None:
         unsafe_allow_html=True,
     )
     if cur.get("notes"):
-        from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+        from app.text_render import literal_markdown  # noqa: PLC0415
 
         st.caption(literal_markdown(cur["notes"]))  # Database text: shown as written, not Markdown.
     from app.program_plan_view import render_program_plans  # noqa: PLC0415

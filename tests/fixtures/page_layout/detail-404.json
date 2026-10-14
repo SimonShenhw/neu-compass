@@ -1,0 +1,12 @@
+[
+  {"path":[0,3],"type":"flex_container","proto":{"flex_container":{"gap_config":{"gap_size":"SMALL"},"scale":1,"direction":"HORIZONTAL","wrap":true,"align":"STRETCH"},"width_config":{"use_stretch":true}}},
+  {"path":[0,3,0],"type":"column","proto":{"weight":0.625,"gap_config":{"gap_size":"SMALL"}}},
+  {"path":[0,3,0,0],"type":"subheader","proto":{"tag":"h3","body":"💬 提问"},"width":{"use_stretch":true}},
+  {"path":[0,3,0,1],"type":"caption","proto":{"body":"你的提问原文会记进不公开的查询日志。请不要输入个人信息或密码之类的秘密。","element_type":"CAPTION"},"width":{"use_stretch":true}},
+  {"path":[0,3,0,2],"type":"caption","proto":{"body":"回答内容不会保存（回答反馈功能目前关闭）。","element_type":"CAPTION"},"width":{"use_stretch":true}},
+  {"path":[0,3,0,3],"type":"chat_message","proto":{"name":"user","avatar":"🎓","avatar_type":"EMOJI"}},
+  {"path":[0,3,0,3,0],"type":"markdown","proto":{"body":"fixed question","element_type":"NATIVE"}},
+  {"path":[0,3,1],"type":"column","proto":{"weight":0.375,"gap_config":{"gap_size":"SMALL"}}},
+  {"path":[0,3,1,0],"type":"subheader","proto":{"tag":"h3","body":"📘 课程详情"},"width":{"use_stretch":true}},
+  {"path":[0,3,1,1],"type":"error","proto":{"body":"课程详情加载失败：Course not found","format":"ERROR","width_config":{"use_stretch":true}}}
+]
