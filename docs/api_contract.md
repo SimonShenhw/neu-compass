@@ -483,15 +483,71 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 ## Conventions
 
 - **All inputs**: `extra='forbid'` Pydantic config. Typo'd fields → 422 with
-  a detail message naming the field. Don't try to "be helpful" by accepting
+  a detail message naming only fields matching `[A-Za-z_][A-Za-z0-9_.]{0,63}`;
+  other locations become `<field>`. Unknown keys are still rejected. Don't try to "be helpful" by accepting
   unknown keys.
 - **Latency**: `latency_ms` is wall-clock from request entry to response
   encode. Doesn't include Cloudflare edge overhead.
-- **Logging**: every request emits a `structlog` JSON line on stdout with
-  `request.handled` event + duration. `grep request.handled api.log | jq`
-  for traffic auditing.
+- **Logging**: completed requests emit a `structlog` JSON line on stderr with
+  `request.handled` + duration. Uncaught errors before response headers are sent emit
+  one `request.unhandled` event and return the fixed 500 below, not a second traceback.
+  Console mode also consumes exception information before rendering: no Rich locals.
 - **Versioning**: this is v0.1. Breaking changes go in v0.2 with a
   parallel `/v2/*` prefix; never silent breaks.
+
+### Safe error exits (SAFE-02)
+
+The `{detail, error_type, status_code}` shape and existing HTTP status codes remain.
+Uncaught 500 uses `internal_error`; other HTTP 5xx use `server_error` unless explicitly
+mapped (502 `upstream_error`, 503 `service_unavailable`); 429 is `rate_limited`.
+No request ID is added to the body. An inbound `x-request-id` is retained only if it
+matches `[A-Za-z0-9._-]{1,64}`, otherwise a UUID4 replaces it in the response header
+and request log context.
+
+- Uncaught 500 detail: `Internal server error. Check API logs by x-request-id.`
+- Course/program missing: `Course not found` / `program_id not found`, without the
+  supplied path ID. Invalid delivery mode: `Invalid delivery_mode`, without the value.
+- OAuth refusal remains 401, including Google network errors. Fixed text is selected
+  from seven reasons: `token_exchange_rejected`, `token_endpoint_unreachable`,
+  `missing_id_token`, `id_token_invalid`, `claims_invalid`, `email_unverified`,
+  `domain_not_allowed`. Google descriptions, tokens and email addresses are not returned.
+  Status changes: malformed Google responses that used to raise an uncaught 500 are now
+  this 401 — a 200 body that is not JSON or not a JSON object, a 4xx JSON body that is not
+  an object, and a non-string email claim.
+- Chat 409 still offers database-backed program IDs and selection guidance, but no
+  appended exception text. The existing Gemini 502 and chat stream error contracts remain.
+
+Safe error diagnostics allow request_id, method, path, status, duration_ms; error_type,
+exc_type, cause_type, error_kind, upstream_status, upstream_reason; frames, tokens_sent,
+oauth_reason, google_error, email_domain; and existing database coop_id/program_id/course_id.
+Frames are at most six `file.py:LINE function` entries (basenames, no source or locals).
+Cause type falls back to implicit exception context, except Starlette's re-raise
+artefacts: the `anyio.EndOfStream` that `BaseHTTPMiddleware` leaves on a cause-less
+error, and the exception group around the error after headers are sent. Google error codes match
+`[a-z_]{1,64}`; refused domains are lowercase and match `[a-z0-9.-]{1,253}`.
+No exception str/repr, traceback text, error_description, email, OAuth code, session/
+feedback token, headers or body content is logged in these diagnostics. Foreign stdlib
+messages routed through the configured root handler are replaced by fixed `stdlib.log` /
+`stdlib.error` events with safe diagnostics; level, the code-defined logger name, a
+timestamp and request context remain. Successful project events retain their existing fields.
+
+The UI client uses fixed text for 5xx and non-JSON error bodies, retaining status and safe
+error_type; malformed 2xx JSON becomes `ApiError(502, error_type="invalid_response")`.
+The existing fixed invalid-response notice is preserved, as are rate/busy/timeout notices.
+Malformed identity shapes (OAuth callback and cookie restore) fail without modifying
+login state; a malformed restore keeps the cookie, like an outage. Streamlit defaults to
+`client.showErrorDetails="type"`; full details are opt-in for local development only.
+
+Boundaries: this does not remove successful query text logs or query_log contents, the
+Google sub in `auth.callback.success`, or potential sensitive data in request paths/access
+query strings. Exceptions after response headers are sent cannot be converted to this
+500 body: they are logged once as a safe `unhandled_exception`, but uvicorn's own
+`Exception in ASGI application` traceback (its handler bypasses the root filter) still
+prints the message. `/chat` builds its first (meta) line before the response starts and
+turns model-stream errors into stream error events, so no production path is known to
+reach this. Python `warnings` and the Streamlit process log (uncaught UI exceptions) also
+print full text; the browser shows the exception type only. No general PII-free logging
+claim is made.
 
 ## Frontend touch-points (for Andy)
 

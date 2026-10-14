@@ -50,6 +50,7 @@ from api.models import (
     OAuthCallbackResponse,
 )
 from app.auth import OAuthError
+from api.error_fields import safe_error_fields
 from db.user_repository import UserRepository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -104,10 +105,10 @@ def oauth_callback(
             redirect_uri=req.redirect_uri,
         )
     except OAuthError as e:
-        log.info("auth.callback.rejected", reason=str(e))
+        log.info("auth.callback.rejected", **e.log_fields(), **safe_error_fields(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
+            detail=e.safe_detail,
         ) from e
 
     email = identity["email"]

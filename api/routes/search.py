@@ -169,7 +169,7 @@ def search(
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid delivery_mode: {req.delivery_mode!r}",
+                detail="Invalid delivery_mode",
             ) from e
 
     # Exact references remain cheap but must obey the same metadata filters.

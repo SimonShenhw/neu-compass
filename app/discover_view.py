@@ -25,11 +25,13 @@ The main app owns navigation; this module only sets flags + st.rerun():
   - pending_nav_to_programs (+ selected_program_id) — program chip click
   - pending_nav_to_coop — Co-op "去看看" click
   - selected_course_id — 入门推荐 查看 click (stays on the search page)
+  - pending_query — sample-question click in render_landing (main submits it on the next run)
 
 导航由主 app 掌管；本模块只负责置标志位 + st.rerun()：
   - pending_nav_to_programs（+ selected_program_id）—— 点击培养方案 chip
   - pending_nav_to_coop —— 点击 Co-op 的"去看看"
   - selected_course_id —— 点击入门推荐的查看（停留在搜索页）
+  - pending_query —— render_landing 里点击示例问题（主入口在下一次运行时提交）
 
 Defensive by contract: every fetch is wrapped in try/except ApiError and a
 failed endpoint drops its section — the landing must render even when half
@@ -266,13 +268,13 @@ PARTIAL_NOTICE = ("部分内容暂时没加载出来：稍后再操作页面时�
 
 
 def render_discover(st) -> None:
-    """The discovery block. Caller (streamlit_app) shows it only when
+    """The discovery block. Its caller (render_landing, from streamlit_app.render) runs only when
     get_messages(...) is empty — once a conversation exists the chat
     history owns that space. Sections render independently; a dead
     endpoint drops its section without touching the others, and one
     caption says that something is missing and how to fetch it again.
 
-    发现区块本体。调用方（streamlit_app）只在 get_messages(...) 为空时
+    发现区块本体。调用方（render_landing，由 streamlit_app.render 调用）只在 get_messages(...) 为空时
     展示它 —— 一旦对话存在，那块空间就归聊天历史所有。各区块独立渲染；
     某个端点挂了只会丢弃自己的区块，不影响其他区块，并用一行说明告诉
     用户少了内容、怎样重新获取。"""
@@ -281,4 +283,26 @@ def render_discover(st) -> None:
         st.caption(PARTIAL_NOTICE)
 
 
-__all__ = ["render_discover"]
+def render_landing(st, sample_queries: list[tuple[str, str]]) -> None:
+    """Discovery plus samples; caller owns the no-history/no-prompt guard.
+
+    中文：发现区＋示例按钮的外层；原 render_discover 的替换仍生效。
+    """
+    render_discover(st)
+    st.divider()
+    st.markdown("**🔍 试试这样问**")
+    sample_cols = st.columns(2)
+    for i, (label, query) in enumerate(sample_queries):
+        col = sample_cols[i % 2]
+        if col.button(
+            label, use_container_width=True, key=f"sample-{i}",
+        ):
+            st.session_state["pending_query"] = query
+            st.rerun()
+    st.caption(
+        "💡 也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
+    )
+    st.divider()
+
+
+__all__ = ["render_discover", "render_landing"]

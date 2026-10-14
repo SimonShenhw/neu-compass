@@ -194,14 +194,17 @@ def test_exchange_code_posts_correct_grant() -> None:
     assert captured["body"]["grant_type"] == "authorization_code"
 
 
-def test_exchange_code_4xx_raises_with_detail() -> None:
+def test_exchange_code_4xx_raises_with_safe_reason() -> None:
     http = _mock_token_endpoint(
         {"error": "invalid_grant", "error_description": "Code expired"},
         status_code=400,
     )
     with http:
-        with pytest.raises(OAuthError, match="Code expired"):
+        with pytest.raises(OAuthError, match="Google token exchange failed") as info:
             exchange_code_for_token("bad-code", http_client=http)
+    assert info.value.reason == "token_exchange_rejected"
+    assert info.value.google_error == "invalid_grant" and info.value.upstream_status == 400
+    assert "Code expired" not in str(info.value)
 
 
 def test_exchange_code_missing_id_token_raises() -> None:

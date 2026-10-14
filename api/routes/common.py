@@ -22,15 +22,14 @@ the same rejection block and must share the same rescue semantics.
 
 from __future__ import annotations
 
-import os
 import sqlite3
-import traceback
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
 import structlog
 
 from config import settings
+from api.error_fields import error_frames, safe_error_fields
 from llm.gemini_client import GeminiError, error_log_fields
 from rag.filters import filter_course_ids
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
@@ -85,22 +84,6 @@ class RetrievalDecision:
     rejection_reason: str | None
     rescued: bool
     meta: dict[str, object]
-
-
-def error_frames(exc: BaseException, limit: int = 6) -> list[str]:
-    """Where an error was raised: the innermost `limit` frames as "file:line function", innermost
-    last. No message, no locals, no source lines read. Never raises: it runs inside except blocks.
-
-    中文：错误发生的位置：最内层的 `limit` 帧，写成「文件:行号 函数名」，最内层在最后。不含消息、
-    不含局部变量、不读源码行。从不抛异常：它在 except 块里运行。
-    """
-    if limit <= 0:
-        return []
-    try:
-        summary = traceback.StackSummary.extract(traceback.walk_tb(exc.__traceback__), lookup_lines=False)
-        return [f"{os.path.basename(frame.filename)}:{frame.lineno} {frame.name}" for frame in summary[-limit:]]
-    except Exception:  # noqa: BLE001
-        return []
 
 
 class _FilterableRequest(Protocol):
@@ -355,7 +338,7 @@ def log_query(
         conn.commit()
         return log_id
     except Exception as e:  # noqa: BLE001 — telemetry is best-effort / 遥测是尽力而为
-        log.warning("query_log.write_failed", error=str(e)[:120])
+        log.warning("query_log.write_failed", **safe_error_fields(e))
         return None
 
 

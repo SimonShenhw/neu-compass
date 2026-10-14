@@ -38,7 +38,9 @@ strings, not as a closed enum):
   - service_unavailable  — 503, warmup or degraded mode
   - upstream_error       — 502, LLM / RMP / Reddit failure
   - client_error         — other 4xx
-  - internal_error       — 5xx not otherwise classified
+  - rate_limited         — 429, request rate limit
+  - server_error         — other classified HTTP 5xx
+  - internal_error       — uncaught 500
 
 `error_type` 分类体系（稳定；客户端应把未知类型当作不透明字符串处理，
 而不是当作封闭枚举）：
@@ -51,7 +53,9 @@ strings, not as a closed enum):
   - service_unavailable  —— 503，预热中或降级模式
   - upstream_error       —— 502，LLM / RMP / Reddit 调用失败
   - client_error         —— 其他 4xx
-  - internal_error       —— 未归类的 5xx
+  - rate_limited         —— 429，请求限流
+  - server_error         —— 其他 HTTP 5xx
+  - internal_error       —— 未捕获的 500
 
 Tests: tests/test_api_errors.py — TestClient + a tiny throwaway app
 exercising each handler in isolation.
@@ -62,6 +66,8 @@ exercising each handler in isolation.
 
 from __future__ import annotations
 
+import re
+
 import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -70,6 +76,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth import OAuthError
+from api.error_fields import safe_error_fields
 from db.repository import CourseNotFound
 from llm.gemini_client import GeminiError, error_log_fields
 
@@ -86,6 +93,7 @@ class ErrorResponse(BaseModel):
 
 
 _log = structlog.get_logger("neu_compass.error")
+_FIELD_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.]{0,63}")
 
 
 _STATUS_TO_TYPE: dict[int, str] = {
@@ -125,6 +133,12 @@ def _error_response(
     return JSONResponse(status_code=status_code, content=body, headers=headers)
 
 
+def internal_error_response() -> JSONResponse:
+    """Identical fixed 500 body for middleware and the last-resort handler."""
+    return _error_response(status_code=500, error_type="internal_error",
+        detail="Internal server error. Check API logs by x-request-id.")
+
+
 async def http_exception_handler(
     request: Request, exc: HTTPException,
 ) -> JSONResponse:
@@ -156,6 +170,8 @@ async def validation_error_handler(
         loc = ".".join(
             str(part) for part in err.get("loc", ()) if part != "body"
         )
+        if loc and not _FIELD_NAME.fullmatch(loc):
+            loc = "<field>"
         msg = err.get("msg", "invalid")
         msgs.append(f"{loc}: {msg}" if loc else str(msg))
     return _error_response(
@@ -171,7 +187,7 @@ async def oauth_error_handler(
     return _error_response(
         status_code=401,
         error_type="unauthorized",
-        detail=str(exc),
+        detail=exc.safe_detail,
     )
 
 
@@ -181,7 +197,7 @@ async def course_not_found_handler(
     return _error_response(
         status_code=404,
         error_type="not_found",
-        detail=f"Course {str(exc)!r} not found",
+        detail="Course not found",
     )
 
 
@@ -216,10 +232,10 @@ async def unhandled_exception_handler(
     request: Request, exc: Exception,
 ) -> JSONResponse:
     """Last-resort handler. Anything not caught above becomes a structured
-    500. Logs full traceback for debugging.
+    500. Logs safe types and limited frame locations only.
 
-    最后一道处理器。前面没兜住的任何异常都会变成结构化的 500。记录完整
-    traceback 供调试使用。
+    最后一道处理器。前面没兜住的任何异常都会变成结构化的 500。只记录
+    安全类型和有限栈帧供定位，不记录 traceback 文字。
 
     Crucial: do NOT leak the exception message to clients — it could
     expose internals (file paths, stack frames, dependency versions). Use
@@ -231,26 +247,16 @@ async def unhandled_exception_handler(
     `x-request-id`（由 RequestLogMiddleware 设置）把客户端这次失败的
     请求和服务端日志行关联起来。
     """
-    _log.exception(
+    _log.error(
         "unhandled_exception",
         path=request.url.path,
         method=request.method,
-        exc_type=type(exc).__name__,
+        **safe_error_fields(exc),
     )
-    response = _error_response(
-        status_code=500,
-        error_type="internal_error",
-        detail="Internal server error. Check API logs by x-request-id.",
-    )
-    # RequestLogMiddleware sets x-request-id on SUCCESS responses, but this
-    # handler runs in the outermost ServerErrorMiddleware — outside it — so
-    # the one response whose body says "correlate by x-request-id" was the
-    # one without the header. Recover it from the structlog contextvars the
-    # middleware bound before the exception.
-    # 中文：RequestLogMiddleware 只在成功响应上设置 x-request-id，但这个
-    # 处理器运行在最外层的 ServerErrorMiddleware 之外 —— 于是恰恰是那个
-    # body 里写着"请按 x-request-id 关联"的响应，自己反而没带这个请求头。
-    # 从 middleware 在异常发生前绑定的 structlog contextvars 里把它找回来。
+    response = internal_error_response()
+    # Normal uncaught errors are now consumed by RequestLogMiddleware. If this
+    # outer fallback runs, preserve any request ID already bound by that middleware.
+    # 中文：普通未捕获错误已在中间件消化；兜底仍保留已绑定的 request ID。
     request_id = structlog.contextvars.get_contextvars().get("request_id")
     if request_id:
         response.headers["x-request-id"] = str(request_id)

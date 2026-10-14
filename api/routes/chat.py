@@ -213,7 +213,7 @@ def chat(
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid delivery_mode: {req.delivery_mode!r}",
+                detail="Invalid delivery_mode",
             ) from e
 
     started = time.perf_counter()
@@ -232,7 +232,6 @@ def chat(
         choices = ", ".join(p.program_id for p in exc.programs)
         raise HTTPException(status_code=409, detail=(
             f"这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：{choices}。"
-            f" ({exc})"
         )) from exc
     retrieval_ms = (time.perf_counter() - started) * 1000
 
@@ -289,33 +288,37 @@ def chat(
         evidence=answer_evidence, retrieval_mode=matched_via, notices=notices,
     )
 
+    # Meta first so the client can render evidence bubbles before LLM tokens land. It is built
+    # before the response starts, so a failure here is still the middleware's safe 500 rather than
+    # an exception after the headers (which uvicorn would print as a full traceback).
+    # 中文：先发 meta，让客户端能在 LLM token 到达前先渲染证据气泡。它在响应开始前就构造好，
+    # 出错时仍走 middleware 的安全 500，而不是在流头之后抛出（uvicorn 会打印完整 traceback）。
+    meta_payload: dict[str, Any] = {
+        "type": "meta",
+        "matched_via": matched_via,
+        "retrieval_ms": round(retrieval_ms, 2),
+        "prompt_version": PROMPT_VERSION,
+        "results": [
+            {
+                "course_id": h.course.course_id,
+                "primary_code": h.course.primary_code,
+                "primary_name": h.course.primary_name,
+                "score": float(h.score),
+                "answer_evidence": answer_evidence[h.course.course_id].model_dump(mode="json"),
+            }
+            for h in hits
+        ],
+    }
+    if rejection_reason is not None:
+        meta_payload["rejection_reason"] = rejection_reason
+    # Only present when non-empty, so the legacy meta shape is unchanged.
+    # 中文：仅在非空时出现，旧的 meta 形状保持不变。
+    if notices:
+        meta_payload["notices"] = list(notices)
+    meta_line = (json.dumps(meta_payload) + "\n").encode("utf-8")
+
     def event_stream() -> Iterator[bytes]:
-        # Meta first so the client can render evidence bubbles before LLM
-        # tokens land.
-        # 中文：先发 meta，让客户端能在 LLM token 到达前先渲染证据气泡。
-        meta_payload: dict[str, Any] = {
-            "type": "meta",
-            "matched_via": matched_via,
-            "retrieval_ms": round(retrieval_ms, 2),
-            "prompt_version": PROMPT_VERSION,
-            "results": [
-                {
-                    "course_id": h.course.course_id,
-                    "primary_code": h.course.primary_code,
-                    "primary_name": h.course.primary_name,
-                    "score": float(h.score),
-                    "answer_evidence": answer_evidence[h.course.course_id].model_dump(mode="json"),
-                }
-                for h in hits
-            ],
-        }
-        if rejection_reason is not None:
-            meta_payload["rejection_reason"] = rejection_reason
-        # Only present when non-empty, so the legacy meta shape is unchanged.
-        # 中文：仅在非空时出现，旧的 meta 形状保持不变。
-        if notices:
-            meta_payload["notices"] = list(notices)
-        yield (json.dumps(meta_payload) + "\n").encode("utf-8")
+        yield meta_line
 
         # Bound memory and issue a receipt only after normal upstream completion.
         from schemas.answer_feedback import MAX_ANSWER_CHARS

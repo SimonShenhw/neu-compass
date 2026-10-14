@@ -106,7 +106,7 @@ def test_oauth_error_maps_to_401_unauthorized(client: TestClient) -> None:
     assert r.status_code == 401
     body = r.json()
     assert body["error_type"] == "unauthorized"
-    assert "invalid grant" in body["detail"]
+    assert body["detail"] == OAuthError.MESSAGES["claims_invalid"]
 
 
 def test_course_not_found_maps_to_404(client: TestClient) -> None:
@@ -114,7 +114,7 @@ def test_course_not_found_maps_to_404(client: TestClient) -> None:
     assert r.status_code == 404
     body = r.json()
     assert body["error_type"] == "not_found"
-    assert "neu-cs-9999" in body["detail"]
+    assert body["detail"] == "Course not found"
 
 
 def test_gemini_error_maps_to_502_upstream(client: TestClient) -> None:

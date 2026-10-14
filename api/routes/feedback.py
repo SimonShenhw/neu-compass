@@ -2,14 +2,18 @@
 
 import sqlite3
 
+import structlog
+
 from fastapi import APIRouter, HTTPException, Response
 
 from api.dependencies import DbConn
+from api.error_fields import safe_error_fields
 from config import settings
 from db.answer_feedback_repository import AnswerFeedbackRepository
 from schemas.answer_feedback import AnswerFeedbackRequest, AnswerFeedbackResponse
 
 router = APIRouter(prefix='/feedback', tags=['feedback'])
+log = structlog.get_logger("neu_compass.feedback")
 
 
 @router.post('', response_model=AnswerFeedbackResponse,
@@ -28,6 +32,7 @@ def submit_feedback(req: AnswerFeedbackRequest, conn: DbConn, response: Response
         raise HTTPException(404, 'Feedback target unavailable') from exc
     except sqlite3.Error as exc:
         conn.rollback()
+        log.warning("feedback.storage_failed", **safe_error_fields(exc))
         raise HTTPException(503, 'Feedback storage temporarily unavailable') from exc
     response.headers['Cache-Control'] = 'no-store'
     return AnswerFeedbackResponse(answer_id=req.answer_id, rating=req.rating)

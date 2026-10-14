@@ -61,7 +61,7 @@ def handle_oauth_callback() -> None:
         queue_cookie_write,
         queue_oauth_state_clear,
     )
-    from app.state_manager import login  # noqa: PLC0415
+    from app.state_manager import login, valid_identity  # noqa: PLC0415
 
     # Google's deny path redirects back with ?error=access_denied (no code).
     # Without this branch the params silently stuck around and the page
@@ -107,8 +107,16 @@ def handle_oauth_callback() -> None:
     try:
         with ApiClient() as api:
             identity = api.oauth_callback(code)
-    except ApiError as e:
-        st.error(f"Login failed: {e.detail}")
+    except ApiError:
+        st.error("Login failed. Please try signing in again.")
+        st.query_params.clear()
+        return
+
+    # Validate before changing any session or cookie state. Malformed success responses
+    # are failures too; do not turn them into KeyError/TypeError or a partial login.
+    # 中文：更新身份／cookie 前先校验；畸形的成功响应也应安全失败，不留下半登录状态。
+    if not valid_identity(identity):
+        st.error("Login failed. Please try signing in again.")
         st.query_params.clear()
         return
 

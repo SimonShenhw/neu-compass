@@ -14,6 +14,10 @@ font = "sans serif"
 [browser]
 gatherUsageStats = false
 
+[client]
+# Deployment default; full tracebacks are opt-in only for local development.
+showErrorDetails = "type"
+
 [runner]
 # Streamlit "magic" renders bare module-level strings — it was painting the
 # SAMPLE_QUERIES docstring in app/streamlit_app.py onto the page. Off.

@@ -46,6 +46,7 @@ Authlib 客户端本身不在这里构造；我们只是把 authorize URL 递回
 from __future__ import annotations
 
 import functools
+import re
 from typing import Any, Callable
 from urllib.parse import urlencode
 
@@ -61,8 +62,41 @@ GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 
 
 class OAuthError(RuntimeError):
-    """Login refused. Message is safe to surface to the user.
-    登录被拒绝。这条消息可以安全地展示给用户。"""
+    """Seven stable reasons; public text never includes provider text or identity.
+
+    中文：七种稳定原因；对外文字不包含上游原文或身份信息。
+    """
+
+    MESSAGES = {
+        "token_exchange_rejected": "Google token exchange failed. Please sign in again.",
+        "token_endpoint_unreachable": "Could not reach Google token endpoint. Please try again.",
+        "missing_id_token": "Google token response did not include a valid id_token.",
+        "id_token_invalid": "ID token verification failed. Please sign in again.",
+        "claims_invalid": "ID token email/sub claims are invalid.",
+        "email_unverified": "Google reports email is not verified.",
+        "domain_not_allowed": "Email domain not allowed. Restricted to husky.neu.edu / northeastern.edu.",
+    }
+
+    def __init__(self, message: str | None = None, *, reason: str = "claims_invalid",
+                 upstream_status: int | None = None, google_error: object = None,
+                 email_domain: object = None) -> None:
+        self.reason = reason if reason in self.MESSAGES else "claims_invalid"
+        self.safe_detail = self.MESSAGES[self.reason]
+        self.upstream_status = upstream_status if type(upstream_status) is int and 100 <= upstream_status <= 599 else None
+        self.google_error = google_error if isinstance(google_error, str) and re.fullmatch(r"[a-z_]{1,64}", google_error) else None
+        self.email_domain = email_domain if isinstance(email_domain, str) and re.fullmatch(r"[a-z0-9.-]{1,253}", email_domain) else None
+        # Preserve the existing type-only verifier diagnostic, never arbitrary legacy messages.
+        # 中文：兼容既有的 verifier 类型诊断，但不保留调用方任意传入的消息。
+        diagnostic = message if (self.reason == "id_token_invalid" and isinstance(message, str)
+            and re.fullmatch(r"ID token verification failed: [A-Za-z_][A-Za-z0-9_]{0,63}", message)) else self.safe_detail
+        super().__init__(diagnostic)
+
+    def log_fields(self) -> dict[str, object]:
+        fields: dict[str, object] = {"oauth_reason": self.reason}
+        for name in ("upstream_status", "google_error", "email_domain"):
+            if (value := getattr(self, name)) is not None:
+                fields[name] = value
+        return fields
 
 
 def is_email_allowed(email: str | None) -> bool:
@@ -145,15 +179,13 @@ def validate_id_token_claims(claims: dict[str, Any]) -> dict[str, Any]:
         raise OAuthError("Claims payload must be an object")
 
     email = claims.get("email")
-    if not email:
+    if not isinstance(email, str) or not email:
         raise OAuthError("ID token missing 'email' claim")
     if not claims.get("email_verified", False):
-        raise OAuthError("Google reports email is not verified")
+        raise OAuthError(reason="email_unverified")
     if not is_email_allowed(email):
-        raise OAuthError(
-            f"Email domain not allowed: {email}. "
-            f"NEU-Compass is open to {', '.join(settings.allowed_email_domains)} only."
-        )
+        domain = email.partition("@")[2].lower() if email.count("@") == 1 else None
+        raise OAuthError(reason="domain_not_allowed", email_domain=domain)
 
     sub = claims.get("sub")
     if not sub:
@@ -290,32 +322,29 @@ def exchange_code_for_token(
                 },
             )
         except httpx.RequestError as e:
-            raise OAuthError(
-                f"Could not reach Google token endpoint: {type(e).__name__}"
-            ) from e
+            raise OAuthError(reason="token_endpoint_unreachable") from e
     finally:
         if own_client:
             client.close()
 
     if resp.status_code != 200:
-        # Google returns JSON {error, error_description} on 4xx; surface the
-        # description if present (safe — it's their text, not user input).
-        # 中文:Google 在 4xx 时会返回 JSON {error, error_description}；
-        # 若存在就把 description 展示出来（安全 —— 这是他们的文本，
-        # 不是用户输入）。
+        # Only the bounded OAuth error code is diagnostic; descriptions are untrusted.
+        # 中文：只保留有界错误码；Google 的描述也可能包含输入，不展示或记录。
         try:
             payload = resp.json()
-        except Exception:
+        except ValueError:
             payload = {}
-        detail = payload.get("error_description") or payload.get("error") or "(no detail)"
-        raise OAuthError(
-            f"Google token exchange failed (HTTP {resp.status_code}): {detail}"
-        )
+        google_error = payload.get("error") if isinstance(payload, dict) else None
+        raise OAuthError(reason="token_exchange_rejected", upstream_status=resp.status_code,
+                         google_error=google_error)
 
-    body = resp.json()
-    id_token = body.get("id_token")
-    if not id_token:
-        raise OAuthError("Google token response did not include id_token")
+    try:
+        body = resp.json()
+    except ValueError as exc:
+        raise OAuthError(reason="missing_id_token") from exc
+    id_token = body.get("id_token") if isinstance(body, dict) else None
+    if not isinstance(id_token, str) or not id_token:
+        raise OAuthError(reason="missing_id_token")
 
     verifier = id_token_verifier or _verify_google_id_token
     try:
@@ -323,12 +352,12 @@ def exchange_code_for_token(
     except OAuthError:
         raise
     except Exception as e:
-        # Type only: google-auth's messages can quote the token or its audience values, and this
-        # text reaches both the 401 detail and the auth.callback.rejected log.
-        # 中文：只给类型：google-auth 的消息里可能引用 token 本身或 audience 的值，而这段文字会进
-        # 401 的 detail，也会进 auth.callback.rejected 日志。
+        # Type only: google-auth's messages can quote the token or its audience values. The route
+        # uses safe_detail and structured fields, never this exception's text.
+        # 中文：只给类型：google-auth 的消息里可能引用 token 本身或 audience 的值；路由只使用
+        # safe_detail 和结构化字段，不使用这段异常文字。
         raise OAuthError(
-            f"ID token verification failed: {type(e).__name__}"
+            f"ID token verification failed: {type(e).__name__}", reason="id_token_invalid",
         ) from e
 
     return validate_id_token_claims(claims)

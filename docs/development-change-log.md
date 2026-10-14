@@ -2770,3 +2770,178 @@
 - 分支 `refactor/sim02-retrieval-decision`，从 main 的 `751c6b1` 开出；审查和修复都已完成。之后 rebase 到 SIM-01 之上（第 18 批 → SIM-01 → 本批）：只有本文件冲突，第 16–20 节按编号排好；冻结的特征测试文件哈希不变。rebase 后全量：3685 passed（3613 加这里的 72 个）。随一个 PR 提交，合并由用户点。
 - 纯重构，行为不变，不需要单独部署；没有生产数据修改或付费模型调用。
 
+## 21 — SAFE-02：安全错误出口（2026-10-12）
+
+### 上线记录（main `9dff227`，2026-10-12 22:42 UTC 起）
+
+以下引用仓库外 `release_2026-10-12/DEPLOY_RECORD.md`，**不是本批重新执行的线上验证**：PR #6–#11 已上线，#8 包含 OPT-02／03，#9 为 OPT-04 第一步，#10／#11 为 SIM-01／02。新镜像 `442834b18ae0`；回退标签 `neu-compass:rollback-20261012` 指向原镜像 `d8f97df9d1a4`；预发布备份 `runtime-data/backups/prerelease-20261012-224114.db`。备份不能用来直接覆盖仍在写入的生产库。
+
+- ready 6469/6469、Co-op 30 条；培养方案 cs-ms 2／ds-ms 4／info-ms 2／aai-ms 0；政策 12 条。
+- test_set_v04 116 条加预热：R@5 0.8628、MRR 0.9341，服务端 p50 822.8 ms／p95 1131.9 ms；和 10-07 的差异记作运行波动，不宣称性能提升。
+- `/chat` 检查：CS 第一学期问题为 hybrid 5 条、正常结束，有 `program_schedule_unverified`；CS 5004 先修引用 2026-2027 记录，CS 5001 C- AND CS 5002 C-，CS 5005 单列共修。第一条终端结果曾被脚本吞掉，以 API 日志为依据；另一次乱码重跑是 PowerShell 编码问题，不算产品结果。
+- AAI 6600 改为 `Applied Artificial Intelligence` 并补目录快照；命名修复和快照各 1 条，复跑快照新增 0。CS 5200 名称未变。
+- 公网只读页面显示 6,469 门课、游客、四个项目、推荐和 Co-op 预览／刷新入口；**用户本人浏览器验收见 D4：仍需真实账号登录／刷新／登出、CS 5004 聊天与详情、AAI 6600 名称核对**。
+
+### 范围与原因
+
+这是有意改变错误响应文字与日志字段的修复，不是纯重构。从 main `9dff227` 独立开 `fix/safe02-error-exits`。合成标记经真实 OAuth exchange、TestClient、ApiClient、AppTest 与 JSON／console 日志证明原有出口缺口。成功请求、检索／门控和聊天流协议保持；状态码的有意变化只有一类：Google 的畸形响应原来会变成未捕获的 500，现在是 401。具体是四种：200 但内容不是 JSON；200 但 JSON 不是对象；4xx 的 JSON 错误体不是对象；email claim 不是字符串。不改主页面编排或 `llm/gemini_client.py` 的日志契约。
+
+### 已实现
+
+| 边界 | 有意的行为变化 |
+|---|---|
+| 未捕获异常 | middleware 消化、单个安全错误事件和固定 500，共用响应构造函数；兜底不渲染 traceback |
+| 日志管道 | 消耗 exc_info，转成类型／原因类型／最多六帧，原因类型不把 Starlette 重抛留下的包装当成原因；第三方 stdlib 任意消息改固定事件，保留级别、logger 名、时间戳、请求关联和安全定位；项目成功事件不删字段 |
+| OAuth | 七种 reason、固定公开消息、安全上游状态／错误码与有界小写域名；不展示 Google 描述或完整邮箱；Google 网络故障仍 401 |
+| 回显 | 课程／项目 404、delivery_mode 422 不带输入；歧义 409 保留选择，不附异常文字；422 字段名仅接受安全字符且最多 64 字符 |
+| 关联 | x-request-id 仅接受安全字符且最多 64 字符，其他换 UUID4；只进头，不增加响应体字段 |
+| 遥测／反馈 | query_log 写失败不记录异常原文；反馈存储 503 新增安全诊断 |
+| 客户端／登录页 | 5xx／非 JSON 错误文字固定，畸形 2xx JSON 转 502 invalid_response；登录失败固定文字，畸形身份响应（OAuth 回调和 cookie 恢复共用 `valid_identity`）不抛异常或写入半登录状态 |
+| 聊天流 | meta 行在响应开始前构造，出错时走 middleware 的安全 500，不在流头之后抛出 |
+| 发布配置 | Streamlit 默认只显示类型；完整详情仅可本地显式开启 |
+
+`error_frames` 抽到小模块 `api/error_fields.py`，避免日志导入路由造成循环；common 保留同名导入，原调用路径和 `file.py:LINE function` 格式保留。新 safe_error_fields 独立处理隐式 context，不改变 Gemini 辅助函数。taxonomy 值不改，只补正确说明。
+
+### 修改文件
+
+- 生产：`api/error_fields.py`（新）、`api/logging.py`、`api/exceptions.py`；auth／chat／common／course／feedback／program／search 路由；`app/auth.py`、`app/api_client.py`、`app/streamlit_auth_ui.py`、`app/state_manager.py`、`app/cookie_session.py`（后两个是审查后的修复）；`.streamlit/config.toml`。
+- 测试：`tests/test_safe_error_exits.py`（新）；`test_api_auth_route.py`、`test_api_errors.py`、`test_app_auth.py`、`test_app_api_client.py`。
+- 文档：本文件、`api_contract.md`、`pii_redaction.md`。两份尚未入库的路线／精简计划只在 main 本地刷新状态，没有混入公开提交。
+
+### 验证记录
+
+- 仅内存 SQLite、占位 key、MockTransport、模型替身及 AppTest，没有读取真实凭证／生产库或付费模型调用。
+- 首版 41 项新增测试在未改产品的基线上为 **39 failed／2 passed**；原本正确的是安全 extra 字段名与有效 request ID。另补六项兜底／字段白名单／域名边界测试，合计 47 项。
+- 最终 47 项在独立 git archive 的未修改 main 上 **45 failed／2 passed，6 warnings，40.21 秒**；强化后的兜底测试真正覆盖隐式 context，不依赖 Starlette 的 cause 改写。
+- 初次十文件定向回归 **157 passed，21 warnings，50.53 秒**（六 worker，包含首版 41 项）；补齐 47 项后的同十文件串行 **163 passed，6 warnings，42.47 秒**。随后 context 测试补强与提示兼容修复见下文，最终产品树另跑全量。
+- 有意更新的旧期望：OAuth 拒绝夹具改显式 reason；API OAuth／CourseNotFound detail 改固定文字；Google 400 不再显示 Code expired；ApiClient 500 不再显示服务端纯文本。普通安全 extra 字段名、taxonomy、既有 Gemini／聊天错误、URL OAuth warning 和 verifier 类型诊断保持。
+- 首轮全量 **1 failed／3731 passed，7 warnings，534.62 秒**：通用 5xx 提示覆盖了已有 invalid_response 安全固定提示。保留 `502 + invalid_response` 原固定文字后再跑全量，没有放宽缓存测试或改变缓存行为。
+- 具名变异最终 **29/29**：25 项首轮有效杀死、三项串行复核、一个新增提示兼容变异，每项都有明确 FAILED 身份。原轮 S18 存活、S21／S23 SUSPECT 均保留记录；S18 补强真正的 context 测试，后两项是框架匹配源码 timeout 参数造成误判，串行复核为 AssertionError／KeyError。本包分类器只匹配实际 pytest E 行，真实超时仍为 SUSPECT。共享框架未改，不混称一次完整 29 项重跑。
+- 最后一次变异运行的未变异基线（新增测试／API errors／auth／缓存四文件）**162 passed，5 warnings，35.86 秒**；三项串行复核的基线为 87 passed。
+- 最终产品树全量离线 **3732 passed，7 warnings，551.13 秒**（main 原 3685 加新增 47）；警告为三项 SWIG 类型及四次 HTTP 422 名称弃用。没有实时浏览器／账号／NAS 或模型性能验证。
+- 改动 18 个 Python 文件 Ruff 0.5.0 F/E9/B 通过；22 个改动文件 CR=0、`git diff --check` 通过，7 个真实本地 Markdown 目标有效。main 两份未跟踪计划文档 CR=0、49 个目标有效，未纳入本批提交。
+
+### 审查
+
+作者先自检：逐项对照 O1–O11、真实日志处理顺序及 middleware 边界。2026-10-13 做了一轮独立只读审查（审查员 A21；主评审另外核对过），报告在仓库外。
+
+**结论**：没有 CRITICAL 或 HIGH。调查列出的泄漏路径都已关闭，并在按 Dockerfile `CMD` 启动的真实 uvicorn 上实测确认：39 个探针在 `9dff227` 上有 9 个响应体带出标记，本批只剩文档允许的 2 处回显；没有数据库记录带标记；成功请求的日志事件两边一致。处理如下：
+
+1. **MEDIUM**：`cause_type` 把框架包装当成了原因。经过真实 middleware 时，没有 cause 的错误记成 `EndOfStream`（Starlette 在 `except anyio.EndOfStream` 里 `from None` 重抛）；流头之后的错误记成 `ExceptionGroup`（`collapse_excgroups()` 在 `except` 里重抛）。
+   - 处理：`api/error_fields.py` 跳过这两种包装，显式和隐式原因不变，S18 的 `from None` 期望也保留。只尊重 `__suppress_context__` 的方案修不好流头之后的情况，还会让 S18 失败，所以没有采用。
+   - 新测试：仓库错误经 middleware 不再有 `cause_type`；流头之后的错误，有 cause 时报 `ValueError`，没有时不报。
+2. **LOW**：`/chat` 的 meta 行在生成器里、`try` 之前构造。出错时 200 头已经发出，uvicorn 会打印带原文的完整 traceback。处理：meta 在返回 `StreamingResponse` 之前构造并序列化，出错走 middleware 的安全 500。新测试覆盖分数转换失败和序列化失败两种情况。文档写明流头之后的异常仍会有 uvicorn traceback。
+3. **LOW**：审查员的 14 个额外变异体里有 7 个在相关测试下存活。放到全量下仍有 6 个存活：显式 `exception=` 参数、`log.exception` 的定位、第三方事件的请求关联和定位、Google 非对象错误体、`request.unhandled` 的 status／error_type。非法 request ID 换成常量的那个，只被长度检查顺带抓到。处理：新增对应测试。
+4. **LOW**：cookie 恢复在 `/auth/me` 返回畸形 200 时会 `KeyError` 或写入半登录状态（main 上本来就有，与回调同类）。处理：抽出 `state_manager.valid_identity()`，回调和 cookie 恢复共用；畸形响应不登录，保留 cookie，和 API 故障时一样（新测试）。
+5. **LOW**：第三方 `stdlib.*` 事件没有 logger 名和时间戳。处理：加上；logger 名是代码里写死的。
+6. **LOW，文档**：Google 200 但内容不是 JSON 从 500 变成 401 没有记录，已补到上面「范围与原因」和 API 契约。Streamlit 进程日志和 Python `warnings` 仍会打印原文，已写进「已知、未处理」。`app/auth.py` 一处注释没写完，已修。
+
+**修复后的验证**：
+- `tests/test_safe_error_exits.py` 现为 62 项（原 47 项加 15 项）。整个文件放到 `2871822` 上是 **12 failed／50 passed**：失败的是 F1 两项、meta 两项、第三方事件来源一项、cookie 恢复七项；补的旧行为测试在修复前就通过。
+- 十二文件定向 **384 passed**（六 worker）。
+- 全量离线 **3747 passed，7 warnings，301 秒**（原来的 3732 加新增 15 项），在独立快照上跑。
+- 变异 **55/55**，每个都有明确的 FAILED 测试：作者的 29 个（S18、S23 改锚到修复后的代码），审查员的 14 个，以及新增的 12 个。
+  - 用 12 个 worker 跑时，登录回调的 AppTest 冷启动超过 30 秒，35 个记为 SUSPECT。换成 6 个 worker、再换成 2 个 worker 复核后全部杀死，没有存活。
+  - 新增变异体里，「接受负数 contribution_count」首轮存活（回调测试原来也没有这一项），补了一个参数后杀死。
+- ruff 0.5.0（F/E9/B）通过；没有 CR，`git diff --check` 通过。
+
+**第二轮复查**（2026-10-13 晚，审查员 A21 复审修复提交）：修复都解决了对应的问题，没有回归。修复前后，成功请求的日志事件、10 个成功响应体（包括两个聊天流）、query_log 和状态码都一致。剩下 3 个 LOW，已处理：
+1. 异常组嵌套时（collapse 拆开多层单成员组），外层的组仍被当成原因。处理：递归检查成员。
+2. 新代码有 8 个分支没有测试管，例如把所有异常组都当包装、`session_token` 不检查类型、接受空的 user_id／email。处理：补 16 项测试，其中 7 个原因场景、9 个身份形状。
+3. 状态码变化少算了：其实有四种 Google 畸形响应从 500 变成 401。处理：改了上面「范围与原因」和 API 契约的说法。
+
+**第二轮复查后的验证**：
+- 本文件现为 78 项（又加 16 项）；放到 `88d0ef4` 上只有嵌套那一项失败（1 failed／77 passed）。
+- 全量离线 **3763 passed，7 warnings，340 秒**，在独立快照上跑。
+- 受影响的变异体 **20/20**，每个都有明确的 FAILED 测试，0 SUSPECT（4 个 worker）。包括：作者的 S18、S23、S28；审查员第一轮的 E09；N01–N03 和 N09–N12；审查员第二轮的 X01–X08；以及新增的「不递归」。
+- ruff 0.5.0（F/E9/B）通过；没有 CR，`git diff --check` 通过。
+
+### 已知、未处理
+
+1. 成功查询原文／query_log 留存、auth.callback.success 的 Google sub 不改；路径／uvicorn access query string 仍可能含个人信息，不宣称所有日志匿名或无 PII。
+2. 已发流头以后的异常不能改成此 500：只记一条安全的 `unhandled_exception`，但 uvicorn 自己的 handler 不经过 root 过滤器，仍会打印带原文的 traceback。聊天的 meta 已挪到响应开始前，模型流错误转成流内事件，目前没有已知的生产路径会走到这里。Python `warnings` 和 Streamlit 进程日志（UI 未捕获异常）也仍打印原文，浏览器只显示类型。启动脚本其他打印不在本批治理范围。
+3. OPT-02 只读核对：真实空结果有一次页面覆盖，但跨 rerun／TTL 的强度仍可补；同 token 贡献权限变化不立即过期 Co-op teaser，须另批行为修改。
+4. SIM-03 叠在本批之后（第 22 节），SIM-04 等其合并；OPT-04 第二步、OPT-06、学生端拓展不做。
+5. 未做真人账号、NAS、公网、负载或生产效果验收；部署记录与本批离线结果分开。
+
+### 发布状态
+
+- 分支 `fix/safe02-error-exits`，起点 main `9dff227`；实现、独立审查和审查后的修复都已完成，均为本地提交（准确 hash 另记仓库外）。尚未推送、PR、合并或部署。
+- 本批有 API／UI／发布配置行为变化，审查合并后需重新发布镜像才能线上生效。
+
+## 22 — 前端主入口职责拆分（SIM-03，2026-10-13）
+
+### 范围与原因
+
+按本轮方案第 0–3 步，从 main `9dff227` 独立开分支。目标是主入口负责页面编排，不改现有功能、状态、文案、widget key、请求或 rerun 语义。本批自身的改动不含 SAFE-02 的错误行为变化（rebase 后叠在 SAFE-02 之上），也不做 SIM-04 转义工具整理或第 4 步流式抽取。
+
+### 已实现
+
+| 块 | 去向／保留边界 |
+|---|---|
+| 两个历史纯函数 | `app/chat_view.py`；main 保留 `_recent_history`／`_context_course_ids` 同名导入。保留原 slice、4000 字符截断、最新带证据助手、顺序／重复／畸形输入行为 |
+| R17 详情栏 | `course_detail_view.render_selected_course`；客户端调用时导入，原正文 renderer 仍在原模块，不新增缓存 |
+| R14 落地页 | `discover_view.render_landing`；通过模块全局调用原 render_discover，示例列表由 main 传入，显示条件留 main，不把按钮塞进原发现函数 |
+| R15 历史展示 | `chat_view.render_chat_history`；仍在聊天列，接收 main 当前的两个 renderer、badge 和 chip 列表，保持旧替换点和所有 key |
+| R0–R13／R16／R18 | 启动／认证／cookie／缓存／导航／筛选／固定输入／隐私许可／项目 selector／整个提交块／三处收尾保留原处 |
+
+main 的 `_format_evidence`、`_render_evidence_block`、`_render_message_text`、`stream_assistant`、`_summarize_results`、`FALLBACK_NOTICE` 保留为原定义／常量；`_render_filters_sidebar` 仍在 main，通过 main 全局名、两个位置参数调用。没有新造不必要的兼容包装。运行时的认证、cookie、program cache、stream renderer 查找保持。
+
+main 809→701 行，render 389→308 行；这是减少主入口内联职责，不宣称整个项目总行数下降。迁出代码在原页面列／container 中运行，反馈仍在对应 chat_message 外，privacy／selector 仍在输入前。不存在「清空对话」控件，本批也不新增。
+
+### 修改文件
+
+- `app/chat_view.py`（新）：纯 helper 和历史展示。
+- `app/streamlit_app.py`：保留编排／兼容名称／时序，委托三块。
+- `app/course_detail_view.py`、`app/discover_view.py`：各追加一个小 wrapper，旧正文／发现函数不改。
+- `tests/test_page_orchestration.py`（新）：先通过、后冻结的行为特征测试；`tests/test_page_feedback_keys.py`（新）：变异后补强完整反馈 key，另在 archive main 上通过。
+- 本文件：验证与发布边界。仓库外另有中文 WORKLOG、AST 对照、替身测量和具名变异日志。
+
+### 验证记录
+
+- 占位 key、合成状态、MockTransport／AppTest；新测试有 send guard，替身失效会失败，不会真正联网。没有读真实凭证或生产库。
+- 初版新测试有四处搭法／预期错误（landing click pass、AppTest 中断片段、CSS 类名），在未改产品的 main 上修正，仅改测试，不把它们算产品缺陷。
+- main 原产品上新测试 **22 passed，3 warnings，18.18 秒**；冻结 SHA-256 `5fa6bfb2ce72c5401e226289646d184d698909839d0ca7376a8d8817f831cbd2`。抽取后未改一行，hash 一致。
+- 覆盖纯 helper 的窗口／截断／原 slice 语义、冷 landing 四示例、空详情、历史课程切换／错误前缀／带 token／每次重取、单／多课追问／pending、history-before-query／context、重复课程 key、chip guard、项目 ID、主入口替换点和文本过滤。
+- 13 文件定向 **559 passed，18 warnings，51.47 秒**（六 worker）；rebase 前（基于 `9dff227`）全量 **3707 passed，5 warnings，305.13 秒**，为 main 3685 + 新增 22。rebase 后的数字见「审查」一节。
+- 既有三处 AST 钉子和旧测试不改。额外 AST 对照 **15/15**：迁出的纯函数、历史（仅依赖名替换）、landing（仅 import／参数名）、详情（仅 import 位置）一致；整个 R16 和九个未迁出函数完全相同。
+- 首轮具名变异 16/17，反馈 prefix 存活：旧页面用例只查 key 后缀。另补 1 项精确 key／改票／rerun 用例，在 archive main 上 1 passed；两新增文件为 23 passed。原冻结 22 项不改，不把测试余项当产品缺陷。
+- 最终具名变异 **17/17**（首轮有效 16 + P15 串行复核），均有真实 FAILED 身份，0 存活／SUSPECT／ERROR，不混称一次完整重跑。结构顺序、提交 rerun、证据／chip／反馈 key、context、assistant filter、late client／stream lookup、filters patch、截断／顺序／重复等各有对应负例。模块级绑定变异也有禁止联网的保护。
+- 每场景预热 15、测 100 次的 Python／Recorder 替身：landing median 0.010250→0.010970ms、p95 0.012010→0.012490ms；history 0.021550→0.021536／0.047411→0.025290ms；detail 0.030026→0.030760／0.055841→0.058762ms。未明显变慢；量级小、单轮噪声大，不宣称统计或生产性能改善。
+- rebase 前（基于 `9dff227`）补强后的最终全量 **3708 passed，5 warnings，368.52 秒**，main 3685 + 两新增文件 23 项；警告为三项 SWIG 类型与两次 HTTP 422 名称弃用。
+- 6 个改动 Python 文件 Ruff 0.5.0 F/E9/B 通过；7 个改动文件 CR=0、diff 检查通过，1 个真实本地 Markdown 目标有效。原冻结文件 hash 不变。
+
+### 审查
+
+作者逐项对照块表、九条顺序、六个 patch seam、三个 AST 钉子。2026-10-13 做了一轮独立只读审查（审查员 B22；主评审另外核对过），报告在仓库外。冻结测试和差分对比都是有限的等价性证据，不宣称覆盖所有浏览器／并发／真实账号场景。
+
+**结论**：纯重构成立，没有 CRITICAL 或 HIGH。差分对比在两棵树上跑了 98 个 AppTest 场景、439 步，逐步比较原始 ForwardMsg 流、元素树、每个 API 调用和请求体、`session_state`、脚本运行和 rerun 次数。96 个场景逐字节一致，另 2 个只在异常栈里多一层新模块的帧；同一棵树自己对比 0 处差异；17 个「运行前替换名字」的场景也一致。计划 B3 的规则全部满足。处理如下：
+
+1. **MEDIUM，测试缺口（不拦合并）**：新测试管住了 key、请求、chip 条件、替换点和只过滤助手文本，但没管搬出去的块渲染在哪个容器、一轮里的顺序、展开和 HTML 开关、历史里的提示和卡片数、空状态和首页布局。审查员的 58 个变异体里，有 29 个明显改变页面，却在 rebase 前的全量（3708 项）下全部存活（主评审复跑）；rebase 后 SAFE-02 新增和修改的测试也杀不掉（审查员在 rebase 后复核，58 个的结果与之前完全相同）。处理：放到 SIM-04 第 0 步，补布局快照，AST 检查改成看最近一层 `with`。
+2. **LOW**：异常栈里会出现新模块的帧（`chat_view.py`、`course_detail_view.py`），这是差分对比里唯一的差别。叠在 SAFE-02 之后，浏览器只显示错误类型。
+3. **LOW**：原有三条 AST 检查只读 `render()`，现在管的代码少了；例如在 `render_chat_history` 里加 `st.chat_input` 不会被发现。处理：和第 1 条一起放到 SIM-04 第 0 步。
+4. **LOW**：四个在调用时才查找的名字（`render_retrieval_notices`、`render_answer_feedback`、`empty_detail_html`、`render_course_detail`）实现正确，但没有测试固定，记在这里。
+5. **LOW，文档**：搬走的 docstring 丢了理由，`discover_view` 两处说明过时。处理：恢复理由（4000 字符截断的原因、上下文 id 每次都带也无副作用、「查看」key 带序号的原因、追问走 context 档），补上 `pending_query`，改了调用方说明；只改注释和 docstring，代码不变。
+6. **INFO**：按项目自己的 ruff 配置，兼容导出那行有 E402。这行必须在 `sys.path` 插入之后，所以加 `noqa` 说明，不挪位置。
+7. **main 上本来就有**：GET /course 返回 200 但内容不是 JSON 时整页报错；叠上 SAFE-02 后变成固定提示。
+
+**rebase 后的验证**：
+- 用 `rebase_stack.sh` rebase 到 SAFE-02（含两轮审查修复）之后。只有本文件冲突；本批改动的文件和 rebase 前逐字节相同；本文件等于 SAFE-02 的版本加第 22 节；冻结测试的哈希不变。
+- 差分对比在 SAFE-02 之上重跑：基线是 SAFE-02 第一轮修复，对照是本批加文档修复，98 个场景、439 步，0 处差异；同一棵树自己对比也是 0。原来只在异常栈上不同的 2 个场景也一致了：浏览器只显示错误类型；详情接口返回 200 但内容不是 JSON 时，显示固定提示，不再报错。之后 SAFE-02 的第二轮修复只改原因判断和测试，不碰页面。
+- 改动的三个 Python 文件去掉 docstring 后 AST 与修复前相同；ruff 0.5.0（F/E9/B）通过，没有 CR，`git diff --check` 通过。
+- 全量离线 **3786 passed，7 warnings，262 秒**（SAFE-02 的 3763 加本批 23 项），在独立快照上跑。
+
+### 已知、未处理
+
+1. 不搬第 4 步流式编排、不做 SIM-04/05、OPT-04 第二步、OPT-06 或学生端拓展。
+2. 本批叠在 SAFE-02 之后。SAFE-02 改了 5xx 和 404 的文字，所以新增的课程错误测试只钉中文前缀。
+3. 登录／cookie／deep-link／pending-nav 的更多真实页面验收、筛选清除、真实清对话控件等原余项不在本批实现。
+4. 本批只有 AppTest、源码对照和 Python 替身测量，没有真实浏览器／账号／NAS／生产模型或性能验收。
+5. 两份本地未跟踪计划文档仍未决定公开入库，本批不加入。
+
+### 发布状态
+
+- 分支 `refactor/sim03-page-orchestration`，起点 main `9dff227`，已 rebase 到 SAFE-02 两轮审查修复之后（第 21 节在前，本节在后）。实现、独立审查和文档修复都已完成，均为本地提交（准确 hash 在仓库外）。尚未推送、PR、合并或部署。
+- 合并顺序：先 SAFE-02，再本批。
+- 纯重构，不需要独立数据迁移；部署与合并仍由用户另行决定，SIM-04 必须等本批合并后再开。
+
