@@ -190,7 +190,7 @@ def _render_message_text(st: Any, msg: dict) -> None:
     st.markdown(answer_markdown(content) if msg["role"] == "assistant" else content)
 
 
-from app.chat_view import _context_course_ids, _recent_history  # Compatibility exports.
+from app.chat_view import _context_course_ids, _recent_history  # noqa: E402 - compat exports; needs sys.path above
 
 
 FOLLOWUP_CHIPS_SINGLE: list[str] = [
