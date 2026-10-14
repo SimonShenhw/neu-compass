@@ -52,10 +52,10 @@ def render_chat_history(
     Hooks and chip lists come from the main entry at call time, without importing
     that entry here. 中文：显式依赖保留主入口替换点，不反向导入主入口。
     """
-    # Index + role in the 查看 keys: the same course in two answers (common when a student asks about a
-    # topic repeatedly) would otherwise collide on f"open-{role}-{course_id}", and Streamlit's
+    # The message index in the 查看 keys: the same course in two answers (common when a student asks about
+    # a topic repeatedly) would otherwise collide on f"open-{role}-{course_id}", and Streamlit's
     # DuplicateWidgetID would take down the whole chat history.
-    # 中文：「查看」按钮的 key 带上消息序号＋角色：同一门课出现在两条回答的证据里（反复追问同一主题时
+    # 中文：「查看」按钮的 key 带上消息序号：同一门课出现在两条回答的证据里（反复追问同一主题时
     # 很常见）会在 f"open-{role}-{course_id}" 上撞 key，DuplicateWidgetID 会让整个聊天历史崩掉。
     for msg_idx, msg in enumerate(messages):
         with st.chat_message(
