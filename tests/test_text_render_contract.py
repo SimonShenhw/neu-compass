@@ -27,6 +27,18 @@ def test_literal_markdown_escapes_every_ascii_punctuation(character):
     assert literal_markdown(character) == "\\" + character + ("\u2060" if character == ":" else "")
 
 
+@pytest.mark.parametrize("value,expected", [
+    ("HTTPS://X.example", "H\u2060TTPS\\:\u2060\\/\\/X\\.example"),
+    ("Http://x.example", "H\u2060ttp\\:\u2060\\/\\/x\\.example"),
+    ("http://x.example", "h\u2060ttp\\:\u2060\\/\\/x\\.example"),
+    ("WWW.X.example", "W\u2060WW\\.X\\.example"),
+    ("wwwx", "wwwx"), ("awwwards", "awwwards"),
+    ("https:/x", "https\\:\u2060\\/x"), ("httpx", "httpx"),
+])
+def test_url_start_boundaries_keep_exact_joiner_placement(value, expected):
+    assert literal_markdown(value) == expected
+
+
 @pytest.mark.parametrize("value,single_line,block", [
     ("a\rb", "a b", "ab"),
     ("a\n", "a", "a<br>"),
