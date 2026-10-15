@@ -12,6 +12,12 @@ import time
 
 from pydantic import ValidationError
 
+from app.text_render import (
+    WORD_JOINER as WORD_JOINER,
+    _URL_START,
+    literal_markdown as literal_markdown,
+)
+
 from rag.answer_evidence import source_kind
 from schemas.answer_evidence import OFFICIAL_CATALOG_URL, CatalogSnapshot, RequisiteEvidence
 
@@ -157,13 +163,11 @@ def _when(value: datetime) -> str:
 # 不可见的 word joiner；代码里能看到插入的转义，目录网址会带尖括号显示；表格的 "\|" 会变成分列。
 # Streamlit 的排版替换仍然生效（"->"、"<-"、"<->"、"--"、">="、"<="、"~="），以标点开头的少数
 # emoji 短代码（":+1:"）仍会变成 emoji。邮箱地址仍可能变成邮件链接。
-WORD_JOINER = "\u2060"
 _CATALOG_URL = OFFICIAL_CATALOG_URL.pattern + r"(?:#[A-Za-z0-9_-]{1,64})?"  # An in-page anchor is harmless.
 _CATALOG_LINK = re.compile(
     r"\[([^\[\]\n]{1,200})\]\(\s{0,20}<?(" + _CATALOG_URL + r")>?(?:\s{1,20}\"[^\"\n]{0,200}\")?\s{0,20}\)")
 _CATALOG_AUTOLINK = re.compile(r"<(" + _CATALOG_URL + r")>")
 _CATALOG_BARE = re.compile(_CATALOG_URL)
-_URL_START = re.compile(r"(?i)(?:h(?=ttps?://)|w(?=ww\.))")
 _MATH_FENCE = re.compile(r"(?i)(?<=```|~~~)([ \t]*m)(?=ath)")
 # ":" before a directive or shortcode name comes first, so "]:name" also gets its word joiner.
 # A name may start with anything but ASCII whitespace or punctuation: the renderer's notion of
@@ -173,7 +177,6 @@ _OPENER = re.compile(
     r"(?P<name>:(?=[^ \t\r\n!-/:-@\[-`{-~]))|&(?=[#A-Za-z])|<(?=[A-Za-z/!?])|(?<=\])[(:]|!(?=[\[\ue000])|\$")
 _MARKS = re.compile("[\ue000\ue001]")
 _PLACEHOLDER = re.compile("\ue000(\\d+)\ue001")
-_ASCII_PUNCTUATION = re.compile(r"[!-/:-@\[-`{-~]")
 
 
 def _literal(text: str) -> str:
@@ -182,19 +185,6 @@ def _literal(text: str) -> str:
     text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, text)
     text = _MATH_FENCE.sub(lambda match: match.group(1) + WORD_JOINER, text)
     return _OPENER.sub(lambda match: "\\" + match.group(0) + (WORD_JOINER if match.lastgroup else ""), text)
-
-
-def literal_markdown(value: object) -> str:
-    """One line of plain text for a Markdown context, e.g. a course name from the database in a
-    label: whitespace runs (line breaks included) become one space, every ASCII punctuation
-    character is escaped, and URL starts and ":" get the same word joiner as answer_markdown().
-    An e-mail address may still become a mail link.
-    中文：放进 Markdown 的一行纯文字，例如标签里来自数据库的课程名：连续空白（含换行）变成一个
-    空格，每个 ASCII 标点都转义，网址开头和 ":" 后面插入和 answer_markdown() 一样的 word joiner。
-    邮箱地址仍可能变成邮件链接。"""
-    text = _URL_START.sub(lambda match: match.group(0) + WORD_JOINER, " ".join(str(value).split()))
-    return _ASCII_PUNCTUATION.sub(
-        lambda match: "\\" + match.group(0) + (WORD_JOINER if match.group(0) == ":" else ""), text)
 
 
 def _label(labels: dict[str, str], code: object) -> str:

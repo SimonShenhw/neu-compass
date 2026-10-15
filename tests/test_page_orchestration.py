@@ -4,24 +4,14 @@ from __future__ import annotations
 
 import ast
 import copy
-import json
 from pathlib import Path
 
-import httpx
 import pytest
-from streamlit.testing.v1 import AppTest
 
 from app.streamlit_app import _context_course_ids, _recent_history
+from tests.page_layout_support import ANSWER, COURSES, MULTI, SINGLE, install_backend, page, run
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = "from app.streamlit_app import render\nrender()"
-COURSES = [
-    {"course_id": "c-algo", "primary_code": "CS 5800", "primary_name": "Synthetic Algorithms", "score": 0.9},
-    {"course_id": "c-ml", "primary_code": "DS 5220", "primary_name": "Synthetic ML", "score": 0.7},
-]
-SINGLE = ["↳ 这门课讲什么内容？", "↳ 这门课作业量大吗？", "↳ 先修要求是什么？"]
-MULTI = ["↳ 这几门课怎么选？", "↳ 哪门最适合零基础？", "↳ 第一门的先修要求？"]
-ANSWER = "Synthetic [untrusted](https://elsewhere.example) answer."
 
 
 @pytest.mark.parametrize("limit", [6, 2, 0, -2])
@@ -67,88 +57,9 @@ def test_context_default_cap_and_existing_malformed_behavior():
         _context_course_ids([{"role": "assistant", "evidence": [{}]}])
 
 
-class Backend:
-    def __init__(self):
-        self.results = copy.deepcopy(COURSES[:1])
-        self.programs = []
-        self.course_status = 200
-        self.requests = []
-        self.posts = []
-        self.queued = []
-        self.trace = []
-
-    def __call__(self, request):
-        self.requests.append((request.method, request.url.path, request.headers.get("authorization")))
-        if request.method == "POST":
-            assert request.url.path == "/chat"
-            self.posts.append(json.loads(request.content))
-            self.trace.append("post")
-            events = [{"type": "meta", "results": self.results, "matched_via": "hybrid",
-                       "notices": ["program_schedule_unverified"]},
-                {"type": "token", "text": ANSWER}, {"type": "done"}]
-            return httpx.Response(200, content="".join(json.dumps(event) + "\n" for event in events).encode())
-        if request.url.path == "/ready":
-            return httpx.Response(200, json={"status": "ready", "courses_indexed": 3, "bm25_corpus": 3})
-        if request.url.path.startswith("/course/"):
-            if self.course_status != 200:
-                return httpx.Response(self.course_status, json={"detail": "synthetic detail failure"})
-            course = next(item for item in COURSES if request.url.path.endswith(item["course_id"]))
-            return httpx.Response(200, json={**course, "credits": 4, "term": "Fall 2026"})
-        raise AssertionError(f"Unexpected synthetic request: {request.method} {request.url.path}")
-
-
 @pytest.fixture
 def backend(monkeypatch):
-    import streamlit as st
-    import app.api_client as clients
-    import app.cookie_session as cookies
-    import app.discover_view as discover
-    import app.program_view as programs
-    import app.streamlit_app as main
-    import app.streamlit_auth_ui as auth
-    from config import settings
-
-    backend = Backend()
-    original_client, original_send, original_rerun = clients.ApiClient, httpx.Client.send, st.rerun
-    def guarded_send(client, request, **kwargs):
-        assert isinstance(client._transport, httpx.MockTransport), "Live network prohibited in characterization tests"
-        return original_send(client, request, **kwargs)
-    monkeypatch.setattr(httpx.Client, "send", guarded_send)
-    monkeypatch.setattr(clients, "ApiClient", lambda **kwargs: original_client(
-        base_url="http://synthetic-orchestration", transport=httpx.MockTransport(backend), **kwargs))
-    monkeypatch.setattr(settings, "answer_feedback_enabled", False)
-    monkeypatch.setattr(auth, "handle_oauth_callback", lambda: None)
-    monkeypatch.setattr(auth, "render_auth_sidebar", lambda: None)
-    monkeypatch.setattr(cookies, "restore_login_from_cookie", lambda: False)
-    monkeypatch.setattr(cookies, "flush_pending_cookie", lambda: None)
-    def filters(st, state):
-        backend.trace.append("filters")
-        return {"credits": 0, "professor": "Synthetic Prof", "delivery_mode": ""}
-    monkeypatch.setattr(main, "_render_filters_sidebar", filters)
-    monkeypatch.setattr(discover, "render_discover", lambda st: backend.trace.append("landing"))
-    monkeypatch.setattr(programs, "get_programs_cached", lambda st: backend.programs)
-    def rerun(*args, **kwargs):
-        if st.session_state.get("pending_query") is not None:
-            backend.queued.append(st.session_state["pending_query"])
-        return original_rerun(*args, **kwargs)
-    monkeypatch.setattr(st, "rerun", rerun)
-    return backend
-
-
-def run(app):
-    app.run(timeout=45)
-    assert not app.exception
-    return app
-
-
-def page(*, messages=None, token=None):
-    app = AppTest.from_string(SCRIPT)
-    if messages is not None:
-        app.session_state["messages"] = copy.deepcopy(messages)
-    if token:
-        app.session_state["session_token"] = token
-        app.session_state["user_id"] = "synthetic-user"
-    return run(app)
+    return install_backend(monkeypatch)
 
 
 def test_cold_landing_has_four_samples_then_hides_on_submit(backend):

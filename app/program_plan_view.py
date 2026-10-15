@@ -43,7 +43,7 @@ def scope_label(plan: ProgramPlan, *, markdown: bool = False) -> str:
     路径都是校验过的固定格式）。"""
     concentration = plan.concentration or "共同部分／未限定 concentration"
     if markdown and plan.concentration:
-        from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+        from app.text_render import literal_markdown  # noqa: PLC0415
 
         concentration = literal_markdown(plan.concentration)
     return f"{plan.campus} · Catalog {plan.catalog_year} · {PATH_LABELS[plan.pathway]} · {concentration}"

@@ -36,6 +36,12 @@ from __future__ import annotations
 
 import html
 
+from app.text_render import (
+    _one_line as _one_line,
+    labelled_line_html as labelled_line_html,
+    plain_text_html as plain_text_html,
+)
+
 ALIPAY_BLUE = "#1677FF"
 
 # matched_via → (label, background, foreground). Mirrors the API's
@@ -409,14 +415,6 @@ def matched_via_badge(matched_via: str) -> str:
     )
 
 
-def _one_line(value: object) -> str:
-    """Escaped data for the one-block HTML these helpers build: line breaks become spaces, because
-    a blank line would end the HTML block and the rest would be read as Markdown (links included).
-    中文：这些函数拼出的单块 HTML 里的数据：转义，换行变成空格；空行会结束 HTML 块，后面的内容
-    就会被当成 Markdown（包括链接）。"""
-    return html.escape(" ".join(str(value).splitlines()))
-
-
 def course_header_html(
     *,
     code: str,
@@ -571,7 +569,7 @@ def prereq_label_md(
     一行先修课程的 markdown 文本（它旁边的 Open 按钮是 Streamlit 组件，
     所以这里保持 markdown 形式而不是 HTML）。代码和名称来自数据库（名称曾由
     模型写入），所以按纯文字放进去；只有 ID 时放进代码片段，去掉反引号和换行。"""
-    from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+    from app.text_render import literal_markdown  # noqa: PLC0415
 
     shown = (f"**{literal_markdown(code)}** — {literal_markdown(name)}" if code and name
              else f"`{' '.join(str(course_id).replace('`', '').split())}`")
@@ -587,30 +585,6 @@ def empty_detail_html() -> str:
         '<div class="nc-empty-icon">📘</div>'
         "点回答下方课程旁的「查看」<br>这里会显示课程详情、先修要求和培养方案定位"
         "</div>"
-    )
-
-
-def plain_text_html(text: object) -> str:
-    """Escaped text for a block-level HTML tag that STARTS the st.markdown string (see
-    labelled_line_html). Newlines become <br>, so the value stays inside one HTML block,
-    which the Markdown parser never reads as Markdown (no links, emphasis, math or
-    directives from the data). Next to Markdown text, inside a paragraph, it would still be
-    parsed, so never use it there.
-
-    中文：用于放在 st.markdown 字符串开头的块级 HTML 标签里（见 labelled_line_html）。
-    换行改成 <br>，值留在同一个 HTML 块里，Markdown 解析器不会把它当 Markdown 解析
-    （数据里的链接、强调、公式、指令都不会生效）。如果和 Markdown 文字放在同一段落里，
-    仍会被解析，所以不要那样用。"""
-    return html.escape(str(text)).replace("\r", "").replace("\n", "<br>")
-
-
-def labelled_line_html(label: str, value: object) -> str:
-    """'<label>：value' as a single escaped HTML line (the value is data, e.g. extracted
-    fields; the label is ours). 中文：「标签：值」的单行转义 HTML；值是数据（例如抽取字段），
-    标签是我们自己的文字。"""
-    return (
-        f'<div class="nc-line"><span class="nc-line-label">{html.escape(label)}：</span>'
-        f"{plain_text_html(value)}</div>"
     )
 
 

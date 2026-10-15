@@ -373,7 +373,7 @@ def _apply_course_ref(st, ref: str, *, pages: list[str]) -> bool:
     st.session_state["selected_course_id"] = matches[0]["course_id"]
     st.session_state["nav_page"] = pages[0]
     if len(matches) > 1:
-        from app.answer_evidence_view import literal_markdown  # noqa: PLC0415
+        from app.text_render import literal_markdown  # noqa: PLC0415
 
         # The codes come from the database: plain text, like the prerequisite rows.
         # 中文：课程代码来自数据库，按纯文字放进去，和先修行一样。
