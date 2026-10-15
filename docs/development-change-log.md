@@ -2969,7 +2969,9 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 - `app/text_render.py`（新）：四个纯函数；URL 开头正则与 WORD_JOINER 两项供原过滤器共享，ASCII 标点正则只用于 literal helper。
 - `app/answer_evidence_view.py`、`app/ui_theme.py`：兼容别名；未迁出 renderer 原样保留。
 - `app/deep_links.py`、`app/program_plan_view.py`、`app/program_view.py`：各只改一个 import。
-- `tests/test_aaa_page_layout.py`、`tests/test_text_render_contract.py`、`tests/test_text_render_imports.py`（新）与 `tests/fixtures/page_layout/` 六个快照。
+- `tests/test_aaa_page_layout.py`、`tests/test_text_render_contract.py`、`tests/test_text_render_imports.py`（新）与 `tests/fixtures/page_layout/` 九个快照。
+- `scripts/regenerate_page_layout.py`、`tests/page_layout_support.py`（新）：显式快照核对／生成入口及共用合成 backend。
+- `tests/test_page_orchestration.py`：backend 移入共用 helper；原编排断言保留。
 - 本文件。中文 WORKLOG、完整输出、变异及结构对照在仓库外，不随公开提交。
 
 ### 验证记录
@@ -3007,6 +3009,52 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 ### 发布状态
 
-- 分支 `refactor/sim04-text-render`，起点 main `9771b05`。实现已独立审查，评审后测试／文档修复和上述离线验收已完成，待轻量复核；推送、PR、合并尚未进行。计划随 B 一起部署，仍需另行授权。本地提交与准确 hash 另记仓库外工作记录。最终文档提交不改已验收的 15 个非文档文件，哈希另核对。
+- 分支 `refactor/sim04-text-render`，起点 main `9771b05`。实现、评审后修复及轻量复核已完成；PR #14 已于 2026-10-15 合入 main（合并提交 `6e1a01d`）。轻量复核的 LOW-1 文件清单遗漏由第 24 节同批补正。部署计划随 B 一起进行，仍需另行授权，不把合并视为已部署。本地提交与准确 hash 另记仓库外工作记录。
 - 无数据迁移；新模块须随代码发布后才会在线上生效。本批离线结果不是当前线上采用结果。
+
+## 24 — 空结果验收与贡献数变化后的预览缓存（OPT-02，2026-10-15）
+
+### 范围与原因
+
+从已合并 SIM-04 的 origin/main `6e1a01d` 开独立分支，补齐 OPT-02 的空成功、同 token 下贡献数变化两项。空成功原本就按成功处理，本次补特征测试；贡献数变化是有意的行为修复，不混入文本工具重构、API 等级规则或其他缓存策略。
+
+### 已实现
+
+1. 游客范围仍固定；登录范围改为 token 摘要＋完整贡献数。缺失计数按 0；畸形计数独立为 c?，不和真实计数共用。预览在同一处捕获 token 和计数用于该次请求／缓存范围。
+2. 保留 300 秒成功／30 秒失败 TTL，不改投稿结果处理、登录、登出或 API；空列表／空字典成功不算故障、不算回退，也不显示缺内容提示。
+3. 补缓存层、视图层与 AppTest；覆盖计数升降、同 token 登录更新、投稿响应中的服务端计数、不变计数不重取、变范围后的失败不回退旧内容，以及 rerun 不重复 POST。
+4. 按 SIM-04 轻量复核 LOW-1 补齐第 23 节文件清单与合并状态；不改该批产品代码、测试或快照。
+
+### 有意的行为变化
+
+只有一项：同一个 token 下，本地已知贡献数变化后，Co-op 预览下一次读取重新 GET /coop；旧范围的列表不再显示，也不作为失败时的回退。按完整计数分范围，因此 2→3 也会重取，不在客户端复制服务端等级规则。
+
+### 修改文件
+
+- `app/view_cache.py`、`app/discover_view.py`：范围及调用方读值，未改 API／TTL。
+- `tests/test_view_cache.py`、`tests/test_home_cache_page.py`：空成功和贡献数边界。
+- `docs/view-cache.md`、本文件：契约、验收及发布边界。
+
+### 验证记录
+
+- 在未改产品的起点上先复现：**23 failed／108 passed／6 warnings／34.11 秒，退出码 1**。空成功、计数不变、游客等特征测试原本就对；23 项失败属于待修复的贡献数范围与预览刷新路径，不当作产品回归。新增 38 项，未删原测试。
+- 修复后 8 文件定向 **211 passed／6 warnings／37.84 秒**；串行全量 **3905 passed／7 warnings／374.82 秒**，均退出码 0。7 个全量警告仍为 3 个 SWIG 与 4 处 HTTP 422 弃用。
+- 两份测试从失败复现起冻结，修复后未调整断言；4 个非文档代码文件在全量前后、变异后哈希一致。除目标两函数外的函数／类 AST、模块导入与常量均保持原样。
+- A 的 9 份布局快照默认核对全部 match，没有 --write；其测试、helper、生成器与快照均没有差异。API、DB、配置、RAG／LLM、登录、投稿处理与 sidebar 实现不改。
+- 11 个具名变异以两文件定向范围、2 worker 运行，先跑完整串行定向基线 **131 passed／3 warnings／22.64 秒**；随后 **11/11 killed**，逐项核对真实 FAILED 身份，0 存活／实际超时／ERROR。不混称本批变异在完整 tests/ 上运行。
+- 4 Python 文件 Ruff 0.5.0 F/E9/B 通过；6 文件 UTF-8／LF、whitespace、边界和新增内容扫描通过，新增邮箱仅已知合成测试地址。私有 WORKLOG、完整输出、冻结哈希与逐项变异报告不随公开提交。
+
+### 审查
+
+作者按方案 B2–B7 核对特征测试与失败复现、scope／调用方配对、失败回退隔离和不重复 POST，并对 API 字段裁剪与模拟数据语义作源码对照。独立审查待安排；以上是本地离线验证，不是生产或真实账号验收。
+
+### 已知、未处理
+
+1. 客户端不知道审核变动前不能立即切换范围；重新登录、刷新触发 cookie 恢复的 /auth/me 或下一次投稿响应才更新计数，此前预览最多保持 5 分钟，可手动刷新重取。不轮询，不逐次 rerun 请求 /auth/me；sidebar 显示仍沿用登录／投稿更新路径。
+2. pending 投稿本身不增加贡献；测试响应的新计数模拟服务端此前审核发布的旧贡献，不能解释成发帖立即获奖。
+3. 不做 OPT-06、学生端新功能或生产／真实浏览器／账号验收；main 两份未跟踪计划文档不加入本批。
+
+### 发布状态
+
+分支 `fix/opt02-empty-and-contribution`，起点 `6e1a01d`。本地实现及离线验收完成，待独立审查；尚未推送／开 PR／合并／部署。仅 UI 需要部署，计划与 A 一起，须另行授权。没有数据迁移；会话中的旧 token-only 缓存首次读取时因范围不同自然重取。没有真实数据／NAS／模型调用，不把本地测试称为已经上线。
 
