@@ -107,7 +107,9 @@ def test_sentences_end_at_english_periods_but_not_in_numbers_or_abbreviations():
 
 
 def test_an_estimate_in_one_sentence_does_not_cover_a_number_in_the_next():
-    context = AnswerContext(lang="en", unstated_values=(4.0, 12.0))
+    context = AnswerContext(lang="en", course_codes=("CS 9001",),
+                            unstated=(("CS 9001", "difficulty_score", 4.0),
+                                      ("CS 9001", "workload_hours_per_week", 12.0)))
     checks = check_answer("The workload is estimated at 12 hours a week. Reviews report a difficulty of 4.0/5.", context)
     assert {item["value"]: item["kind"] for item in checks["estimates"]} == {
         12.0: "qualified as estimate", 4.0: "AS REVIEWER-REPORTED"}

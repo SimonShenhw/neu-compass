@@ -3088,3 +3088,49 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 分支 `fix/opt02-empty-and-contribution`，起点 `6e1a01d`。实现、独立审查和评审后修复已完成；推送、开 PR 随后进行，合并由用户操作。仅 UI 需要部署，计划与 A 一起，须另行授权。没有数据迁移；会话中的旧 token-only 缓存首次读取时因范围不同自然重取。没有真实数据／NAS／模型调用，不把本地测试称为已经上线。
 
+## 25 — 离线完整链路评测与检查器身份（OPT-06，2026-10-16）
+
+### 范围与原因
+
+从 origin/main `6e1a01d` 独立推进 C，不混入 B 的缓存修复。分 C-1、C-2 两个提交；本节预计编号 25，合并前按最终合并顺序调整。只改评测工具、测试和记录，线上运行路径不变。
+
+### 已实现
+
+1. C-1 的未陈述数值保留课程＋字段身份，只做 workload／difficulty；同句归属，单课可直接归属，不跨句继承。课程或字段判不出时保留未解析信号。
+2. 汇总和 Markdown 表列出 unattributed；新增课号超出证据、来源数值分歧未完整说明两个信号，不加入 HARD_FAILURES。
+3. 记录 CHECKER_VERSION 和检查器／关键源文件 SHA-256，固定证据结果标明 live_api 或 live_model；旧结果缺层级时重评标 legacy_unknown，不臆测原始来源。
+4. --rescore 必须给 --out 新目录，原 results.json／summary.md 永不覆盖；记录 rescore_of 路径、原文件哈希、前后检查器版本。旧上下文仍能读取，估计项身份标 unavailable，错误记录和原运行分母保留。
+5. C-2 离线完整路由评测尚未实现，不把检查器测试当成整批完成。
+
+### 有意的行为变化
+
+- `test_case_is_built_like_chat_and_the_context_reflects_the_evidence` 和 `test_an_estimate_in_one_sentence_does_not_cover_a_number_in_the_next` 从合并数值升级到课程／字段三元组；保留原有语义断言。
+- 旧的重评调用方测试改为提供新目录，并从新目录核对结果；未删错误保留、无需联网和检查器 bug 保留 traceback 的断言。
+- summarize 新增按 kind 和身份未解析计数；新结果增加身份字段；原地 --rescore 改为新目录输出。
+
+### 修改文件
+
+- `eval/answer_checks.py`、`scripts/eval_answers_live.py`：检查器和固定证据工具。
+- `tests/test_opt06_answer_identity.py`、`tests/test_eval_answers_live.py`、`tests/test_answer_checks.py`：复现、兼容和不可覆盖契约。
+- 本文件；完整日志、测试冻结哈希和 WORKLOG 在仓库外保留。
+
+### 验证记录
+
+- C-1 正式红色基线：六文件 15 failed／184 passed／3 warnings；实现后相同冻结测试 199 passed／3 warnings。
+- 显式六文件构成的 C-1 隔离副本串行全量 3883 passed／7 warnings／257.73 秒，退出码 0；五个 Python 文件前后哈希与工作区一致。提前预写的 C-2 测试不在 C-1 副本或本提交中。
+- M01–M05、M14 六个具名变异在六文件定向范围全部 killed，逐项有真实 FAILED 身份，不称为全量变异。Ruff F/E9/B、UTF-8／LF、差异检查和运行代码边界检查通过。
+
+### 审查
+
+本地开发中，尚未独立审查；不把单元测试通过写成真实模型或生产验收。
+
+### 已知、未处理
+
+- 真实 API、真实模型和本机真实索引层不在本批，不读取真实数据。
+- 同句课程／字段归属、冲突数值和课号检查只是有限文本信号，不证明答案正确，不自动跨句推断。
+- C-2 合成完整链路评测尚待实现；最终离线层将固定 production_quality_verified=false。
+
+### 发布状态
+
+分支 `feat/opt06-offline-route-eval`，起点 `6e1a01d`；不推送、不建 PR、不合并、不部署。本批只改评测工具和测试，不需要部署；文件虽随以后镜像打包，运行时不导入 eval。
+

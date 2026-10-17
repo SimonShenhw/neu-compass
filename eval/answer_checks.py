@@ -18,6 +18,13 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+CHECKER_VERSION = "2.0-course-field"
+NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
+ANSWER_COURSE_CODE = re.compile(r"\b([A-Z]{2,4})\s*(\d{4}[A-Z]?)\b")
+WORKLOAD_UNIT = re.compile(r"小时|\bhours?\b|\bhrs?\b|每周|per week", re.I)
+DIFFICULTY_UNIT = re.compile(r"难度|difficulty|/\s*5\b", re.I)
+COURSE_COUNT_UNIT = re.compile(r"\s*(?:门|courses?\b|classes?\b|prerequisites?\b)", re.I)
+
 # JSON field names and warning/notice codes the prompt contains; an answer must not print them.
 FIELD_NAMES = ("snapshot_id", "source_kind", "recorded_sources", "field_evidence", "catalog_url",
                "source_review_ids", "missing_fields", "supported_value", "recorded_metadata")
@@ -150,6 +157,9 @@ class AnswerContext:
     program_notice: bool = False  # program_schedule_unverified was passed
     unstated_values: tuple[float, ...] = ()  # numeric estimates that no supplied quote states
     prompt_keys: frozenset[str] = field(default_factory=frozenset)  # JSON keys in the prompt's course block
+    course_codes: tuple[str, ...] = ()
+    unstated: tuple[tuple[str, str, float], ...] = ()  # (course code, field, value); old contexts keep unstated_values.
+    conflicts: tuple[tuple[str, str, tuple[float, ...]], ...] = ()  # Numeric source disagreements; signals only.
 
 
 def _context(text: str, match: re.Match, width: int = 40) -> str:
@@ -235,6 +245,74 @@ def find_links(text: str) -> list[dict]:
     return links
 
 
+def _course_codes(text: str) -> set[str]:
+    return {f"{match[1]} {match[2]}" for match in ANSWER_COURSE_CODE.finditer(text)}
+
+
+def _number_field(sentence: str, number: re.Match, candidates: set[str]) -> str | None:
+    """Prefer the number's adjacent unit, then the nearest preceding field cue.
+    中文：先看紧邻单位，再看最近的字段提示；不把课程门数当成难度。"""
+    tail = sentence[number.end():number.end() + 20]
+    if re.match(r"\s*(?:小时|hours?\b|hrs?\b)", tail, re.I):
+        return "workload_hours_per_week"
+    if re.match(r"\s*/\s*5\b", tail):
+        return "difficulty_score"
+    before = sentence[max(0, number.start() - 30):number.start()]
+    cues = [(match.end(), name) for pattern, name in ((WORKLOAD_UNIT, NUMERIC_FIELDS[0]),
+                                                    (DIFFICULTY_UNIT, NUMERIC_FIELDS[1]))
+            for match in pattern.finditer(before)]
+    if cues:
+        return max(cues)[1]
+    return next(iter(candidates)) if len(candidates) == 1 else None
+
+
+def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
+    estimates = []
+    identified = bool(context.course_codes or context.unstated)
+    values = {item[2] for item in context.unstated} if identified else set(context.unstated_values)
+    for sentence in parts:
+        mentioned = _course_codes(sentence)
+        course = (next(iter(mentioned)) if len(mentioned) == 1 else
+                  context.course_codes[0] if not mentioned and len(context.course_codes) == 1 else None)
+        for value in sorted(values):
+            for number in number_pattern(value).finditer(sentence):
+                field_name, identity = None, "unavailable"
+                if identified:
+                    if COURSE_COUNT_UNIT.match(sentence[number.end():]):
+                        continue
+                    candidates = [(code, name) for code, name, candidate in context.unstated
+                                  if candidate == value and (course is None or code == course)]
+                    if not candidates:
+                        continue
+                    field_name = _number_field(sentence, number, {name for _, name in candidates})
+                    if field_name is not None and not any(name == field_name for _, name in candidates):
+                        continue
+                    identity = "course_unresolved" if course is None else "field_unresolved" if field_name is None else "resolved"
+                before = sentence[max(0, number.start() - 20):number.start()]
+                if RECORD_CUE.search(before):
+                    kind = "attributed to the record"
+                elif ESTIMATE_CUE.search(sentence):
+                    kind = "qualified as estimate"
+                elif REPORT_CUE.search(sentence):
+                    kind = "AS REVIEWER-REPORTED"
+                else:
+                    kind = "unattributed"
+                estimates.append({"value": value, "kind": kind, "sentence": sentence.strip()[:220],
+                                  "course": course if identified else None, "field": field_name, "identity": identity})
+    return estimates
+
+
+def _conflict_signals(parts: list[str], context: AnswerContext) -> list[dict]:
+    missing = []
+    for code, field_name, values in context.conflicts:
+        relevant = " ".join(part for part in parts if _course_codes(part) == {code}
+                            or (not _course_codes(part) and context.course_codes == (code,)))
+        absent = [value for value in values if not re.search(rf"(?<![\d.]){value:g}(?:\.0+)?(?![\d.]|\s*/)", relevant)]
+        if absent:
+            missing.append({"course": code, "field": field_name, "missing_values": absent})
+    return missing
+
+
 def check_answer(text: str, context: AnswerContext) -> dict:
     """Every check for one answer. Hard failures: ids_fail, links_fail, counts_fail, rmp_fail.
     The rest are signals for a person to read. 中文：一个回答的全部检查。硬失败：ids_fail、links_fail、
@@ -279,20 +357,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
     if context.program_notice and not PROGRAMS_PAGE.search(text):
         missing.append("programs_page_pointer")
 
-    estimates = []
-    for sentence in parts:
-        for value in sorted(set(context.unstated_values)):
-            for number in number_pattern(value).finditer(sentence):
-                before = sentence[max(0, number.start() - 20):number.start()]
-                if RECORD_CUE.search(before):
-                    kind = "attributed to the record"
-                elif ESTIMATE_CUE.search(sentence):
-                    kind = "qualified as estimate"
-                elif REPORT_CUE.search(sentence):
-                    kind = "AS REVIEWER-REPORTED"
-                else:
-                    kind = "unattributed"
-                estimates.append({"value": value, "kind": kind, "sentence": sentence.strip()[:220]})
+    estimates = _estimates(parts, context)
 
     return {
         "ids": ids, "ids_fail": any(ids.values()),
@@ -304,6 +369,8 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "caveats_missing": missing,
         "estimates": estimates,
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
+        "course_codes_outside_evidence": sorted(_course_codes(text) - set(context.course_codes)),
+        "conflicts_missing_values": _conflict_signals(parts, context),
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
         # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.
         "saved_copy_mentions": sum(1 for part in parts if _saved_copy_note(part)),
@@ -323,10 +390,15 @@ def summarize(checks: list[dict]) -> dict:
         "label_language_bad": sum(1 for item in checks if item["label_language_ok"] is False),
         "caveats_missing": dict(Counter(name for item in checks for name in item["caveats_missing"])),
         "estimates_as_reported": sum(len(item["estimates_as_reported"]) for item in checks),
+        "estimates_by_kind": dict(Counter(estimate["kind"] for item in checks for estimate in item["estimates"])),
+        "estimates_identity_unresolved": sum(estimate.get("identity") in {"course_unresolved", "field_unresolved"}
+                                             for item in checks for estimate in item["estimates"]),
+        "course_codes_outside_evidence": sum(bool(item.get("course_codes_outside_evidence")) for item in checks),
+        "conflicts_missing_values": sum(bool(item.get("conflicts_missing_values")) for item in checks),
         "repeated_saved_copy": sum(1 for item in checks if item["saved_copy_mentions"] > 1),
         "rmp": dict(rmp),
     }
 
 
-__all__ = ["AnswerContext", "HARD_FAILURES", "check_answer", "find_links", "number_pattern", "review_attribution",
+__all__ = ["AnswerContext", "CHECKER_VERSION", "HARD_FAILURES", "check_answer", "find_links", "number_pattern", "review_attribution",
            "sentences", "summarize"]

@@ -64,9 +64,11 @@ def test_case_is_built_like_chat_and_the_context_reflects_the_evidence():
     assert context.no_catalog_relevant and context.fetch_date_relevant and context.prereq_relevant
     assert context.has_rmp_data and not context.program_notice
     # No quote states 4.0 (difficulty); 12 is stated for CS 5800 but not for CS 5200.
-    assert context.unstated_values == (4.0, 12.0)
+    assert context.unstated == (("CS 5200", "difficulty_score", 4.0),
+                                ("CS 5200", "workload_hours_per_week", 12.0),
+                                ("CS 5800", "difficulty_score", 4.0))
     _, only_5800 = build_case({**QUESTION, "course_ids": ["neu-cs-5800"]}, PAYLOADS)
-    assert only_5800.unstated_values == (4.0,)  # Its quote states the 12 hours.
+    assert only_5800.unstated == (("CS 5800", "difficulty_score", 4.0),)  # Its quote states the 12 hours.
     assert not only_5800.no_catalog_relevant
     assert {"field_evidence", "recorded_sources", "primary_code"} <= context.prompt_keys
 
@@ -180,8 +182,8 @@ def test_rescore_keeps_the_original_runs_errors(tmp_path):
         yield answer
 
     run([QUESTION], PAYLOADS, out=tmp_path, runs=2, max_calls=5, stream_fn=stream)
-    assert main(["--rescore", str(tmp_path / "results.json")]) == 3
-    rescored = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    assert main(["--rescore", str(tmp_path / "results.json"), "--out", str(tmp_path / "rescored")]) == 3
+    rescored = json.loads((tmp_path / "rescored/results.json").read_text(encoding="utf-8"))
     assert rescored["errors"] == 1 and rescored["status"] == "incomplete"
 
 
@@ -273,7 +275,7 @@ def test_a_bad_rescore_file_is_a_setup_error(tmp_path):
         odd.write_text(json.dumps(report), encoding="utf-8")
         assert main(["--rescore", str(odd)]) == 2
     odd.write_text(json.dumps(good), encoding="utf-8")
-    assert main(["--rescore", str(odd)]) == 0  # The untouched report still rescores cleanly.
+    assert main(["--rescore", str(odd), "--out", str(tmp_path / "rescored")]) == 0
 
 
 def test_a_bug_in_the_checks_is_not_reported_as_a_setup_error(tmp_path, monkeypatch):
@@ -286,7 +288,7 @@ def test_a_bug_in_the_checks_is_not_reported_as_a_setup_error(tmp_path, monkeypa
 
     monkeypatch.setattr(checks, "check_answer", broken)
     with pytest.raises(TypeError, match="a bug in a check"):
-        main(["--rescore", str(tmp_path / "results.json")])
+        main(["--rescore", str(tmp_path / "results.json"), "--out", str(tmp_path / "rescored")])
 
 
 def test_main_redacts_the_configured_key_from_recorded_errors(tmp_path, monkeypatch):
@@ -352,9 +354,9 @@ def test_rescore_rechecks_saved_answers_without_any_call(tmp_path, monkeypatch):
     saved["records"][0]["answer"] = "Leaked neu-cs-5800."  # As if the stored answer had been this.
     (tmp_path / "results.json").write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(httpx, "Client", lambda **kwargs: pytest.fail("rescore must not open HTTP"))
-    assert main(["--rescore", str(tmp_path / "results.json")]) == 1
-    rescored = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    assert main(["--rescore", str(tmp_path / "results.json"), "--out", str(tmp_path / "rescored")]) == 1
+    rescored = json.loads((tmp_path / "rescored/results.json").read_text(encoding="utf-8"))
     assert rescored["summary"]["ids_fail"] == 1 and rescored["model_calls"] == 1 and "rescored_utc" in rescored
-    assert "| Q1 run 1 | ids_fail |" in (tmp_path / "summary.md").read_text(encoding="utf-8")
+    assert "| Q1 run 1 | ids_fail |" in (tmp_path / "rescored/summary.md").read_text(encoding="utf-8")
     with pytest.raises(SystemExit):
         main(["--out", str(tmp_path)])  # --api-base is required unless --rescore is given.

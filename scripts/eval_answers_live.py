@@ -9,13 +9,13 @@ Never prints the API key.
 Run from the repo root in the project venv (config.settings reads GEMINI_API_KEY from .env):
     python scripts/eval_answers_live.py --api-base http://<api-host>:8000 --out /tmp/answer-eval
     python scripts/eval_answers_live.py --api-base http://<api-host>:8000 --out /tmp/x --dry-run
-    python scripts/eval_answers_live.py --rescore /tmp/answer-eval/results.json   # after tuning checks
+    python scripts/eval_answers_live.py --rescore /tmp/answer-eval/results.json --out /tmp/answer-recheck
 Exit code: 0 every planned answer was checked and none failed a hard check (or a dry run), 1 some
 answer failed a hard check, 2 setup, argument or input error (an unreachable API or a non-200 GET,
 a missing or malformed --questions or --rescore file, a payload that does not fit, an --out folder
 that cannot be created or written), 3 incomplete (a model call failed, the call cap stopped the run
 early, or no answer was checked). Every prompt and context is built and saved before the first
-model call. --rescore keeps the original run's errors.
+model call. --rescore keeps the original run's errors and requires a new --out directory; originals stay unchanged.
 
 中文：按 /chat 的方式问真实模型，并检查回答（eval/answer_checks.py）。证据只来自线上 API 的
 GET /course/{id}（只读，并带 X-Eval-Run 标记，不会被当成学生查询）；提示词用本地的
@@ -25,15 +25,18 @@ llm.gemini_client.generate_text_stream，参数与 /chat 一样。结果写到 -
 （或空跑），1 有回答没过硬检查，2 准备阶段、参数或输入出错（API 连不上或 GET 不是 200、--questions
 或 --rescore 文件缺失或格式不对、数据对不上、--out 目录建不了或写不进），3 不完整（有模型调用失败、
 调用上限提前停止，或没有任何回答可检查）。第一次调用模型之前会先构造并保存好全部提示词和上下文。
---rescore 保留原来那次运行的错误。
+--rescore 保留原来那次运行的错误，必须给 --out 新目录，原文件永不覆盖。
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
+import math
 import re
+import subprocess
 import sys
 from collections.abc import Callable, Iterable
 from datetime import datetime, timezone
@@ -91,21 +94,32 @@ def course_parts(payload: dict):
     return course, catalog, requisites
 
 
-def unstated_values(courses_block: str) -> tuple[float, ...]:
-    """Numeric estimates in the prompt that no supplied quote states (supported values and the
-    recorded workload/difficulty), so an answer giving them must call them estimates."""
-    from eval.answer_checks import number_pattern  # noqa: PLC0415
+def course_records(courses_block: str) -> list[dict]:
+    """The prompt's JSON course block, or its explicit no-match sentinel.
+    中文：只接受课程 JSON 列表或明确的无结果标记。"""
+    if courses_block.strip() == "(no matches found in catalog)":
+        return []
+    records = json.loads(courses_block)
+    if not isinstance(records, list):
+        raise ValueError("course block must be a list")
+    return records
+
+
+def unstated_values(courses_block: str) -> tuple[tuple[str, str, float], ...]:
+    """Unstated numeric estimates, retaining their course and field identity.
+    中文：未被同一课程、同一字段引文直接陈述的值，保留三元组身份。"""
+    from eval.answer_checks import NUMERIC_FIELDS, number_pattern  # noqa: PLC0415
 
     values = set()
-    for record in json.loads(courses_block):
+    for record in course_records(courses_block):
         quotes = record["answer_evidence"]["field_evidence"]
         candidates = [(item["field"], item["supported_value"]) for item in quotes]
         metadata = record["recorded_metadata"]
-        candidates += [(name, metadata.get(name)) for name in ("workload_hours_per_week", "difficulty_score")]
+        candidates += [(name, metadata.get(name)) for name in NUMERIC_FIELDS]
         for name, value in candidates:
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if name in NUMERIC_FIELDS and isinstance(value, (int, float)) and not isinstance(value, bool):
                 if not any(number_pattern(value).search(item["quote"]) for item in quotes if item["field"] == name):
-                    values.add(float(value))
+                    values.add((record["primary_code"], name, float(value)))
     return tuple(sorted(values))
 
 
@@ -120,9 +134,73 @@ def _keys(node, found: set[str]) -> set[str]:
     return found
 
 
+def conflict_values(records: list[dict]) -> tuple:
+    """Numeric disagreements visible in the prompt, not a claim that either source is correct.
+    中文：只记提示词里可见的数值分歧，不裁定哪一来源正确。"""
+    conflicts = []
+    for record in records:
+        evidence, metadata = record["answer_evidence"], record["recorded_metadata"]
+        catalog = evidence.get("catalog") or {}
+        pairs = {"credits": [metadata.get("credits"), catalog.get("credits")]}
+        for item in evidence["field_evidence"]:
+            pattern = (r"(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|小时)" if item["field"] == "workload_hours_per_week"
+                       else r"(?:difficulty|难度)\D{0,12}(\d+(?:\.\d+)?)" if item["field"] == "difficulty_score" else None)
+            if pattern:
+                pairs.setdefault(item["field"], [metadata.get(item["field"]), item["supported_value"]]).extend(
+                    float(match[1]) for match in re.finditer(pattern, item["quote"], re.I))
+        for name, candidates in pairs.items():
+            values = tuple(sorted({float(value) for value in candidates if type(value) in (int, float)}))
+            if len(values) > 1:
+                conflicts.append((record["primary_code"], name, values))
+    return tuple(conflicts)
+
+
+def context_from_records(block: str, evidence: list[dict], *, lang: str, notices=()):
+    """Shared fixed-evidence/actual-route context projection; no API/model work.
+    中文：固定证据与实际路由共用上下文投影，不请求 API 或模型。"""
+    from eval.answer_checks import AnswerContext  # noqa: PLC0415
+
+    records = course_records(block)
+    catalogs = [item.get("catalog") for item in evidence]
+    urls = {catalog["catalog_url"] for catalog in catalogs if catalog is not None}
+    urls.update(edition["catalog_url"] for item in evidence for edition in (item.get("requisites") or {}).get("editions", []))
+    unstated = unstated_values(block)
+    return AnswerContext(
+        lang=lang, allowed_urls=frozenset(urls),
+        has_rmp_data=any(source.startswith("rmp_review_") for item in evidence for source in item["source_review_ids"])
+        or any(quote["source_id"].startswith("rmp_review_") for item in evidence for quote in item["field_evidence"]),
+        fetch_date_relevant=any(catalog is not None and catalog["retrieved_at"] is None for catalog in catalogs),
+        no_catalog_relevant=any(catalog is None for catalog in catalogs),
+        prereq_relevant=any("prerequisite_logic_unavailable" in item["warnings"] for item in evidence),
+        program_notice="program_schedule_unverified" in notices,
+        unstated_values=tuple(sorted({value for _, _, value in unstated})),
+        course_codes=tuple(record["primary_code"] for record in records), unstated=unstated,
+        conflicts=conflict_values(records), prompt_keys=frozenset(_keys(records, set())),
+    )
+
+
+def checker_identity() -> dict:
+    from eval.answer_checks import CHECKER_VERSION  # noqa: PLC0415
+
+    return {"checker_version": CHECKER_VERSION,
+            "answer_checks_sha256": hashlib.sha256((PROJECT_ROOT / "eval/answer_checks.py").read_bytes()).hexdigest()}
+
+
+def code_identity() -> dict:
+    files = ("api/routes/chat.py", "api/routes/common.py", "api/routes/search.py", "llm/prompts/chat_v4.py",
+             "llm/prompts/chat_v3.py", "rag/answer_evidence.py", "eval/answer_checks.py")
+    try:
+        result = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
+                                capture_output=True, text=True, timeout=5, check=True)
+        commit = result.stdout.strip()
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        commit = None
+    return {"git_commit": commit, "code_files_sha256": {
+        name: hashlib.sha256((PROJECT_ROOT / name).read_bytes()).hexdigest() for name in files}}
+
+
 def build_case(question: dict, payloads: dict[str, dict]):
     """(prompt, AnswerContext) for one question, mirroring api/routes/chat.py."""
-    from eval.answer_checks import AnswerContext  # noqa: PLC0415
     from llm.prompts.chat_v4 import build_prompt, format_courses_block  # noqa: PLC0415
     from rag.answer_evidence import course_answer_evidence  # noqa: PLC0415
     from rag.retriever import SearchHit  # noqa: PLC0415
@@ -135,23 +213,8 @@ def build_case(question: dict, payloads: dict[str, dict]):
     prompt = build_prompt(question["query"], hits, history=None, evidence=evidence,
                           retrieval_mode=question["route"], notices=question["notices"])
     block = format_courses_block(hits, evidence)
-    catalogs = [catalog for _, catalog, _ in parts.values()]
-    edition_urls = {edition.catalog_url for _, _, requisites in parts.values() if requisites is not None
-                    for edition in requisites.editions}
-    context = AnswerContext(
-        lang=question["lang"],
-        allowed_urls=frozenset({catalog.catalog_url for catalog in catalogs if catalog is not None} | edition_urls),
-        has_rmp_data=any(any(source.startswith("rmp_review_") for source in course.source_review_ids)
-                         or any(item.source_id.startswith("rmp_review_") for item in course.evidence_snippets)
-                         for course, _, _ in parts.values()),
-        fetch_date_relevant=any(catalog is not None and catalog.retrieved_at is None for catalog in catalogs),
-        no_catalog_relevant=any(catalog is None for catalog in catalogs),
-        # Only where the answer gets flat code lists without a year rule (4.4).
-        prereq_relevant=any("prerequisite_logic_unavailable" in item.warnings for item in evidence.values()),
-        program_notice="program_schedule_unverified" in question["notices"],
-        unstated_values=unstated_values(block),
-        prompt_keys=frozenset(_keys(json.loads(block), set())),
-    )
+    context = context_from_records(block, [item.model_dump(mode="json") for item in evidence.values()],
+                                   lang=question["lang"], notices=question["notices"])
     return prompt, context
 
 
@@ -165,9 +228,14 @@ def context_to_json(context) -> dict:
 def context_from_json(data: dict):
     from eval.answer_checks import AnswerContext  # noqa: PLC0415
 
-    return AnswerContext(**{**data, "allowed_urls": frozenset(data["allowed_urls"]),
-                            "prompt_keys": frozenset(data["prompt_keys"]),
-                            "unstated_values": tuple(data["unstated_values"])})
+    values = {**data, "allowed_urls": frozenset(data["allowed_urls"]), "prompt_keys": frozenset(data["prompt_keys"]),
+              "unstated_values": tuple(data["unstated_values"])}
+    for name in ("course_codes", "unstated", "conflicts"):
+        if name in values:
+            values[name] = (tuple(values[name]) if name == "course_codes" else
+                            tuple(tuple(item) if name == "unstated" else (item[0], item[1], tuple(item[2]))
+                                  for item in values[name]))
+    return AnswerContext(**values)
 
 
 def run_status(report: dict) -> str:
@@ -203,8 +271,8 @@ def write_report(out: Path, report: dict) -> None:
     lines = [f"# Answer check · prompt {report['prompt_version']} · {report['status']}", "",
              f"chat_v4.py {report['chat_v4_sha256'][:12]} · {planned} planned · {report['model_calls']} model calls · "
              f"{report['errors']} errors · {report['summary']['answers']} answers checked", "",
-             "| answer | hard failures | caveats missing | as reviewer-reported | saved-copy sentences |",
-             "|---|---|---|---|---|"]
+             "| answer | hard failures | caveats missing | as reviewer-reported | unattributed | saved-copy sentences |",
+             "|---|---|---|---|---|---|"]
     for record in report["records"]:
         if "checks" not in record:
             lines.append(f"| {record['qid']} run {record['run']} | error | | | |")
@@ -212,7 +280,8 @@ def write_report(out: Path, report: dict) -> None:
         checks = record["checks"]
         failed = ", ".join(name for name in HARD_FAILURES if checks[name]) or "none"
         lines.append(f"| {record['qid']} run {record['run']} | {failed} | {', '.join(checks['caveats_missing']) or '—'} | "
-                     f"{len(checks['estimates_as_reported'])} | {checks['saved_copy_mentions']} |")
+                     f"{len(checks['estimates_as_reported'])} | "
+                     f"{sum(item['kind'] == 'unattributed' for item in checks['estimates'])} | {checks['saved_copy_mentions']} |")
     lines += ["", "```json", json.dumps(report["summary"], ensure_ascii=False, indent=2), "```", ""]
     (out / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -235,11 +304,20 @@ def _context_ok(context: object) -> bool:
 
     if not isinstance(context, dict) or not set(CONTEXT_KEYS) <= set(context) <= {item.name for item in fields(AnswerContext)}:
         return False
+    numeric = lambda value: type(value) in (int, float) and math.isfinite(value)
     return (context["lang"] in ("zh", "en")
             and all(_is(context[name], list) and all(_is(item, str) for item in context[name])
                     for name in ("allowed_urls", "prompt_keys"))
             and _is(context["unstated_values"], list)
-            and all(_is(value, int) or _is(value, float) for value in context["unstated_values"])
+            and all(numeric(value) for value in context["unstated_values"])
+            and ("course_codes" not in context or isinstance(context["course_codes"], list)
+                 and all(isinstance(code, str) and bool(code.strip()) for code in context["course_codes"]))
+            and all(name not in context or isinstance(context[name], list) and all(
+                isinstance(item, list) and len(item) == 3 and isinstance(item[0], str)
+                and item[1] in (("workload_hours_per_week", "difficulty_score") if name == "unstated"
+                                else ("credits", "workload_hours_per_week", "difficulty_score"))
+                and (numeric(item[2]) if name == "unstated" else isinstance(item[2], list) and all(map(numeric, item[2])))
+                for item in context[name]) for name in ("unstated", "conflicts"))
             and all(_is(context[flag], bool) for flag in CONTEXT_FLAGS if flag in context))
 
 
@@ -263,17 +341,23 @@ def load_report(results: Path) -> dict:
     return report
 
 
-def rescore(results: Path, report: dict | None = None) -> dict:
+def rescore(results: Path, report: dict | None = None, *, out: Path) -> dict:
     """Re-run the current checks on saved answers (no API or model calls), e.g. after tuning a
     detector. 中文：用当前的检查重新评一遍已保存的回答（不调 API、不调模型），比如调整检测规则之后。"""
     from eval.answer_checks import check_answer  # noqa: PLC0415
 
-    report = load_report(results) if report is None else report
+    report = copy.deepcopy(load_report(results) if report is None else report)
+    report["rescore_of"] = {"path": str(results), "sha256": hashlib.sha256(results.read_bytes()).hexdigest(),
+                            "checker_version_before": report.get("checker_version")}
+    report.update(checker_identity())
+    report["checker_version_after"] = report["checker_version"]
+    report.setdefault("evidence_layer", "legacy_unknown")
     for record in report["records"]:
         if "answer" in record:
             record["checks"] = check_answer(record["answer"], context_from_json(record["context"]))
     report["rescored_utc"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    write_report(results.parent, report)
+    out.mkdir(parents=True, exist_ok=False)
+    write_report(out, report)
     return report
 
 
@@ -364,6 +448,8 @@ def run(questions: list[dict], payloads: dict[str, dict], *, out: Path, runs: in
             records.append(record)
     chat_v4 = PROJECT_ROOT / "llm/prompts/chat_v4.py"
     report = {
+        **checker_identity(), **code_identity(),
+        "evidence_layer": "live_model" if stream_fn else "live_api",
         "prompt_version": PROMPT_VERSION,
         "chat_v4_sha256": hashlib.sha256(chat_v4.read_bytes()).hexdigest(),
         "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -399,10 +485,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.rescore:
         try:
             saved = load_report(args.rescore)
+            if args.out is None:
+                raise ValueError("--rescore requires --out with a new directory")
+            if args.out.exists():
+                raise FileExistsError("--out must be a new directory")
         except setup_errors as exc:
             print(f"setup error: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
-        report = rescore(args.rescore, saved)  # Outside the try: a bug in the checks keeps its traceback.
+        try:
+            report = rescore(args.rescore, saved, out=args.out)
+        except OSError as exc:
+            print(f"setup error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
         print(json.dumps({"rescored": str(args.rescore), "status": report["status"], "summary": report["summary"]},
                          ensure_ascii=False))
         return exit_code(report)
