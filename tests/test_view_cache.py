@@ -1,19 +1,22 @@
 """OPT-02: the per-tab caches of read-only page content (app.view_cache) and the views that use them.
 
 A failure is remembered for FAILURE_TTL_SECONDS and then tried again; a success is fetched again after
-SUCCESS_TTL_SECONDS; a failed refetch serves the last success of the same viewer scope; an entry is
-never served to another scope; expire_all() (the refresh button) makes the next read fetch again. The
-clock is replaced, so nothing sleeps. The real page (AppTest) is in test_home_cache_page.py.
+SUCCESS_TTL_SECONDS, and a new success, even an empty one, replaces the last; a failed refetch serves the
+last success of the same viewer scope; an entry is never served to another scope; expire_all() (the
+refresh button) makes the next read fetch again. The clock is replaced, so nothing sleeps. The real page
+(AppTest) is in test_home_cache_page.py.
 
 中文：OPT-02：页面只读内容的按标签页缓存（app.view_cache）以及用到它的视图。失败记
-FAILURE_TTL_SECONDS 秒后重试；成功的结果 SUCCESS_TTL_SECONDS 秒后重新获取；重新获取失败时给出同一访客
-范围上次的成功结果；记录绝不给另一个范围用；expire_all()（刷新按钮）让下一次读取重新获取。时钟是替换的，
-不用真的等待。真实页面（AppTest）在 test_home_cache_page.py。
+FAILURE_TTL_SECONDS 秒后重试；成功的结果 SUCCESS_TTL_SECONDS 秒后重新获取，新的成功结果（空的也算）
+替换上一次的；重新获取失败时给出同一访客范围上次的成功结果；记录绝不给另一个范围用；expire_all()
+（刷新按钮）让下一次读取重新获取。时钟是替换的，不用真的等待。真实页面（AppTest）在
+test_home_cache_page.py。
 """
 
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -322,7 +325,7 @@ def test_expire_all_and_curricula_replace_a_malformed_container(clock, container
     assert view_cache.curricula(state) == {} and state[view_cache.CURRICULUM_KEY] == {}
 
 
-def test_viewer_scope_is_one_per_token_and_does_not_hold_the_token():
+def test_viewer_scope_separates_tokens_and_does_not_hold_the_token():
     assert {view_cache.viewer_scope(state) for state in ({}, {"session_token": None}, {"session_token": ""},
                                                           {"session_token": 7})} == {view_cache.GUEST_SCOPE}
     first = view_cache.viewer_scope({"session_token": "synthetic-session-a"})
@@ -723,3 +726,155 @@ def test_logout_drops_the_teaser_key_the_view_cache_uses():
     logout(state)
     assert view_cache.COOP_TEASER_KEY not in state
     assert state[view_cache.PROGRAMS_KEY] == "public" and state["filters"] == {"credits": 4}
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_empty_success_uses_success_ttl_and_is_never_a_fallback(clock, value):
+    state, source = {}, Source(value)
+    for now, calls in ((START, 1), (START + FAIL_TTL, 1),
+                       (START + OK_TTL - 1, 1), (START + OK_TTL, 2)):
+        clock.now = now
+        view_cache.begin_run(state)
+        assert view_cache.cached(state, "k", source) == value
+        assert source.calls == calls
+        assert not view_cache.served_fallback(state)
+
+
+@pytest.mark.parametrize("renderer,method", [("_render_coop_teaser", "list_coop"),
+                                          ("_render_program_row", "list_programs")])
+def test_empty_rows_are_successful_and_hide_no_missing_section(api, clock, renderer, method):
+    import app.discover_view as discover
+
+    api.routes = {"list_coop": [[]], "list_programs": [[]]}
+    state = {}
+    for now in (START, START + FAIL_TTL, START + OK_TTL - 1):
+        clock.now = now
+        st = page(state)
+        assert getattr(discover, renderer)(st) is False
+        assert not st.log
+        assert [name for name, _, _ in api.calls].count(method) == 1
+        st = page(state)
+        discover.render_discover(st)
+        assert discover.PARTIAL_NOTICE not in shown(st, "caption")
+        assert not view_cache.served_fallback(state)
+
+
+def test_an_empty_refetch_replaces_the_last_success(clock):
+    # Rows withdrawn on the server: the empty answer is the new success, not a fallback to the old rows.
+    # 中文：服务端撤下了内容：空的结果就是新的成功，不回退到旧的内容。
+    state, source = {}, Source(["v1"], [])
+    assert view_cache.cached(state, "k", source) == ["v1"]
+    for now in (START + OK_TTL, START + OK_TTL + FAIL_TTL, START + 2 * OK_TTL - 1):
+        clock.now = now
+        view_cache.begin_run(state)
+        assert view_cache.cached(state, "k", source) == []
+        assert source.calls == 2 and not view_cache.served_fallback(state)
+    assert "v1" not in repr(state)
+
+
+def test_an_empty_teaser_refetch_hides_the_old_rows(api, clock):
+    from app.discover_view import _render_coop_teaser
+
+    api.routes = {"list_coop": [[GUEST_ROW], []]}
+    state = {}
+    st = page(state)
+    assert _render_coop_teaser(st) is False and any("Guest Visible Co" in text for text in shown(st))
+    clock.now = START + OK_TTL
+    view_cache.begin_run(state)
+    st = page(state)
+    assert _render_coop_teaser(st) is False
+    assert not st.log and len(api.calls) == 2
+    assert "Guest Visible Co" not in repr(state) and not view_cache.served_fallback(state)
+
+
+@pytest.mark.parametrize("before,after", [(0, 1), (1, 2), (2, 3), (2, 0)])
+@pytest.mark.parametrize("update", ["upload", "login"])
+def test_same_token_contribution_change_refetches_the_teaser(api, clock, before, after, update):
+    from app.coop_view import apply_upload_result
+    from app.discover_view import _render_coop_teaser
+    from app.state_manager import login
+
+    token = "synthetic-session-a"
+    state = {}
+    identity = {"user_id": "u-synthetic", "user_email": "synthetic@northeastern.edu", "session_token": token}
+    login(state, **identity, contribution_count=before)
+    api.routes = {"list_coop": [[{"company": "Old scoped content", "role": "SWE"}],
+                                [{"company": "New scoped content", "role": "SWE"}]]}
+    assert _render_coop_teaser(page(state)) is False
+    if update == "upload":
+        apply_upload_result(state, {"coop_id": "synthetic", "status": "pending", "duplicate": False,
+                                    "contribution_count": after})
+    else:
+        login(state, **identity, contribution_count=after)
+    st = page(state)
+    assert _render_coop_teaser(st) is False
+    assert api.calls == [("list_coop", token, ()), ("list_coop", token, ())]
+    assert "New scoped content" in "\n".join(shown(st))
+    assert "Old scoped content" not in "\n".join(shown(st))
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_unchanged_contribution_upload_keeps_the_fresh_teaser(api, clock, duplicate):
+    from app.coop_view import apply_upload_result
+    from app.discover_view import _render_coop_teaser
+
+    state = {"session_token": "synthetic-session-a", "user_contribution_count": 1}
+    api.routes = {"list_coop": [[MEMBER_ROW]]}
+    _render_coop_teaser(page(state))
+    apply_upload_result(state, {"coop_id": "synthetic", "status": "pending", "duplicate": duplicate,
+                                "contribution_count": 1})
+    st = page(state)
+    assert _render_coop_teaser(st) is False
+    assert len(api.calls) == 1 and "Member Visible Co" in "\n".join(shown(st))
+
+
+def test_contribution_change_cannot_fall_back_to_the_old_scope(api, clock):
+    from app.coop_view import apply_upload_result
+    from app.discover_view import _render_coop_teaser
+
+    state = {"session_token": "synthetic-session-a", "user_contribution_count": 0}
+    api.routes = {"list_coop": [[MEMBER_ROW], busy()]}
+    _render_coop_teaser(page(state))
+    apply_upload_result(state, {"coop_id": "synthetic", "status": "pending", "duplicate": False,
+                                "contribution_count": 1})
+    view_cache.begin_run(state)
+    st = page(state)
+    assert _render_coop_teaser(st) is True
+    assert len(api.calls) == 2 and not st.log
+    assert "Member Visible Co" not in repr(state)
+    assert not view_cache.served_fallback(state)
+
+
+@pytest.mark.parametrize("count", [0, 1, 2, 3, 100])
+def test_viewer_scope_includes_the_full_contribution_count(count):
+    token = "synthetic-session-a"
+    expected = "session:" + hashlib.sha256(token.encode()).hexdigest() + f":c{count}"
+    scope = view_cache.viewer_scope({"session_token": token, "user_contribution_count": count})
+    assert scope == expected
+    assert token not in scope
+
+
+@pytest.mark.parametrize("count", [None, "1", -1, True, False, 1.0, [], {}])
+def test_invalid_contribution_values_have_a_separate_scope(count):
+    identity = {"session_token": "synthetic-session-a"}
+    zero = view_cache.viewer_scope(identity)
+    assert zero == view_cache.viewer_scope({**identity, "user_contribution_count": 0})
+    bad = view_cache.viewer_scope({**identity, "user_contribution_count": count})
+    assert bad == zero.removesuffix(":c0") + ":c?"
+    assert bad not in {zero, view_cache.viewer_scope({**identity, "user_contribution_count": 1})}
+
+
+@pytest.mark.parametrize("count", [0, 1, 2, None, "1", -1, True, []])
+def test_guest_scope_does_not_depend_on_contribution_count(count):
+    assert view_cache.viewer_scope({"user_contribution_count": count}) == view_cache.GUEST_SCOPE
+
+
+def test_the_teaser_reads_a_missing_count_as_zero(api, clock):
+    from app.discover_view import _render_coop_teaser
+
+    api.routes = {"list_coop": [[MEMBER_ROW]]}
+    state = {"session_token": "synthetic-session-a"}  # No count key yet; init_state() would write 0.
+    _render_coop_teaser(page(state))
+    state["user_contribution_count"] = 0
+    _render_coop_teaser(page(state))
+    assert len(api.calls) == 1

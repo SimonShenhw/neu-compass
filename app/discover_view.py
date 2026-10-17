@@ -195,26 +195,31 @@ def _render_starter_row(st) -> bool:
 
 def _render_coop_teaser(st) -> bool:
     """💼 first two Co-op rows as one-liners + a hand-off button. The
-    listing is cached per tab under the viewer's scope (the API redacts
-    /coop by tier, so a guest's or another account's listing is never
-    reused after a login, logout or account switch). A transient failure
-    keeps the viewer's last listing if there is one; otherwise it hides the
-    section and is tried again 30 s later. Returns True when the listing
-    could not be loaded for a reason that can pass (view_cache.transient);
-    a 401 for an expired session hides the section without promising a retry.
+    listing is cached per tab under the viewer's scope: the session token
+    plus the contribution count this tab knows (the API redacts /coop by
+    tier). A listing fetched for a guest, another account, or this account
+    at another known count is never reused, not even as the fallback;
+    changes this tab is not told about show up at the next fetch. A
+    transient failure keeps this scope's last listing if there is one;
+    otherwise it hides the section and is tried again 30 s later. Returns
+    True when the listing could not be loaded for a reason that can pass
+    (view_cache.transient); a 401 for an expired session hides the section
+    without promising a retry.
 
     💼 展示最近两条 Co-op 记录的一句话摘要 + 一个跳转按钮。列表按访客
-    范围缓存在本标签页里（API 按等级裁剪 /coop，所以登录、登出或换账号
-    之后，绝不会沿用游客或另一个账号的列表）。暂时性失败时，这位访客上次
-    有列表就继续显示，没有就隐藏该区块，30 秒后重试。列表因为可能自己恢复
-    的原因（view_cache.transient）加载不了时返回 True；会话过期导致的 401
-    只隐藏区块，不说稍后会重试。"""
+    范围缓存在本标签页里：会话 token 加本标签页已知的贡献数（API 按等级
+    裁剪 /coop）。替游客、别的账号、或同一账号在另一个已知贡献数下取到的
+    列表，都不会再用，失败时也不拿来回退；本标签页不知道的变化，要到下一次
+    获取才体现。暂时性失败时，这个范围上次有列表就继续显示，没有就隐藏该
+    区块，30 秒后重试。列表因为可能自己恢复的原因（view_cache.transient）
+    加载不了时返回 True；会话过期导致的 401 只隐藏区块，不说稍后会重试。"""
     from app import view_cache  # noqa: PLC0415
     from app.api_client import ApiClient, ApiError  # noqa: PLC0415
 
-    # One read of the token for both the request and the scope it is stored under.
-    # 中文：请求和存放范围用同一次读到的 token。
+    # Capture the token and count together; the request and its scope use this same snapshot.
+    # 中文：在同一处各读一次 token 和贡献数，请求与存放范围都使用这次捕获的值。
     token = st.session_state.get("session_token")
+    contribution_count = st.session_state.get("user_contribution_count", 0)
 
     def fetch() -> object:
         with ApiClient(session_token=token, timeout=5.0) as api:
@@ -223,7 +228,7 @@ def _render_coop_teaser(st) -> bool:
     try:
         coops = view_cache.cached(
             st.session_state, view_cache.COOP_TEASER_KEY, fetch,
-            scope=view_cache.viewer_scope({"session_token": token}),
+            scope=view_cache.viewer_scope({"session_token": token, "user_contribution_count": contribution_count}),
         )
     except ApiError as exc:
         return view_cache.transient(exc)

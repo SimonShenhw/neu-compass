@@ -13,7 +13,8 @@ again. Every entry remembers when it was fetched and for which viewer:
   served until the next try, and the caller gets the ApiError only when there is no such success.
   A definite answer (401, 403, 404, other client errors) drops that success and goes to the caller;
 - content that depends on who is asking (the API redacts /coop by the viewer's tier) is stored under
-  viewer_scope(), and an entry is never served to another scope, not even as that fallback.
+  viewer_scope(), one per session token plus known contribution count (fixed for guests), and an
+  entry is never served to another scope, not even as that fallback.
 
 Only GETs go through here. expire_all() (the sidebar's refresh button) makes the next read of every
 entry fetch again; it never repeats a chat question, a Co-op submission or a vote. begin_run() and
@@ -30,8 +31,8 @@ served_fallback() let the page say when it showed an earlier success because fet
 - 因为可能自己恢复的原因（transient()：超时、限流、服务端错误、连接失败、响应不是 JSON）获取失败
   时，继续给出同一访客上次成功获取的内容，等下一次重试；没有这样的内容时调用方才收到 ApiError。
   明确的答复（401、403、404 等客户端错误）会丢掉上次的成功结果，直接交给调用方；
-- 随访客变化的内容（API 按访客等级裁剪 /coop）存在 viewer_scope() 下，记录绝不会给另一个范围用，
-  失败时的回退也不行。
+- 随访客变化的内容（API 按访客等级裁剪 /coop）存在 viewer_scope() 下，每个会话 token 加已知贡献数
+  一个范围，游客固定。记录绝不会给另一个范围用，失败时的回退也不行。
 
 这里只走 GET。expire_all()（侧边栏的刷新按钮）让每条记录下一次读取时重新获取；它绝不会重发提问、
 Co-op 投稿或评价。begin_run() 和 served_fallback() 让页面在因为重新获取失败而显示了上次的成功结果
@@ -88,15 +89,18 @@ _NO_VALUE = object()
 
 
 def viewer_scope(state: MutableMapping[str, Any]) -> str:
-    """The scope of content the API redacts by viewer: one per session token, 'guest' without one.
+    """Content the API redacts by viewer: one scope per token and contribution count; fixed for guests.
 
-    A digest, so the entry does not hold a second copy of the token; a new token is a new scope.
-    中文：按访客裁剪的内容所用的范围：每个会话 token 一个，没有 token 时是 'guest'。存的是摘要，记录里
-    不再多存一份 token；换了 token 就是新的范围。"""
+    Missing counts mean zero; malformed counts use c? and cannot reuse a real count's entry. Store a
+    digest, not another copy of the token; do not duplicate the API's tier rules here.
+    中文：每个会话 token 加贡献数一个范围，游客固定 guest。缺失计数按 0，畸形值为 c?，不与真实计数
+    共用。只存 token 摘要，不多存原文；不在客户端复制 API 等级规则。"""
     token = state.get("session_token")
     if not isinstance(token, str) or not token:
         return GUEST_SCOPE
-    return "session:" + hashlib.sha256(token.encode("utf-8")).hexdigest()
+    count = state.get("user_contribution_count", 0)
+    contribution = str(count) if type(count) is int and count >= 0 else "?"
+    return "session:" + hashlib.sha256(token.encode("utf-8")).hexdigest() + ":c" + contribution
 
 
 def curricula(state: MutableMapping[str, Any]) -> dict:

@@ -5,14 +5,16 @@
   not fetched again on reruns, and is fetched again after 5 min.
 - The sidebar's refresh button fetches the cached content again and never repeats a POST: not the
   question, not the vote, not the Co-op submission.
-- The Co-op teaser follows the session token: a login fetches it with the token, and dropping the
-  token never shows the member's listing again.
+- The Co-op teaser follows the session token and the contribution count the page knows: a login fetches
+  it with the token, an upload response with a new count fetches it again (without repeating the POST),
+  and dropping the token never shows the member's listing again. Empty lists are fresh successes too.
 
 中文：真实 Streamlit 页面上的 OPT-02（AppTest + 模拟 API + 替换过的页面缓存时钟）。API 预热期间（GET
 返回 503），hero、项目行和 Co-op 预览只取一次，然后 30 秒内不再取；之后的第一次 rerun 就能恢复，不用
 重新加载页面。有效期内的内容 rerun 时不重新获取，5 分钟后重新获取。侧边栏的刷新按钮重新获取缓存的
-内容，绝不重发任何 POST：提问、评价、Co-op 投稿都不会。Co-op 预览跟着会话 token 走：登录后带 token
-重新获取，token 没了之后绝不再显示会员看到的列表。
+内容，绝不重发任何 POST：提问、评价、Co-op 投稿都不会。Co-op 预览跟着会话 token 和页面已知的贡献数
+走：登录后带 token 重新获取，投稿响应带回新的贡献数时也重新获取（不重发 POST），token 没了之后绝不再
+显示会员看到的列表。空列表同样是有效的成功结果。
 """
 
 from __future__ import annotations
@@ -59,6 +61,11 @@ class Backend:
         self.expired = False  # A token is sent but the API no longer accepts it (401 on /coop).
         self.not_json: set[str] = set()  # GET paths answered 200 with an HTML page.
         self.curriculum = CURRICULUM
+        self.empty_lists = False
+        self.contribution_rows = False
+        self.contribution_count = 0
+        # Models an earlier contribution being published, not credit for this pending upload.
+        self.upload_contribution_count = None
         self.requests: list[tuple[str, str, str | None]] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -74,8 +81,11 @@ class Backend:
             if path == "/feedback":
                 return httpx.Response(200, json={"answer_id": body["answer_id"], "rating": body["rating"]})
             if path == "/coop":
+                if self.upload_contribution_count is not None:
+                    self.contribution_count = self.upload_contribution_count
                 return httpx.Response(201, json={"coop_id": "c-synthetic", "accepted": True, "visibility_level": 0,
-                                                 "status": "pending", "duplicate": False, "contribution_count": 0})
+                                                 "status": "pending", "duplicate": False,
+                                                 "contribution_count": self.contribution_count})
             return httpx.Response(404, json={"detail": "not found"})
         if self.down:
             return httpx.Response(503, json={"status": "warming", "courses_indexed": 0, "bm25_corpus": 0})
@@ -86,9 +96,19 @@ class Backend:
         if path == "/ready":
             return httpx.Response(200, json={"status": "ready", "courses_indexed": 4321, "bm25_corpus": 3})
         if path == "/coop":
+            if self.empty_lists:
+                return httpx.Response(200, json=[])
+            if self.contribution_rows and auth:
+                # Like the API: same public rows; only gated fields change, not the row's intrinsic level.
+                return httpx.Response(200, json=[
+                    {"company": "Synthetic Interview Co", "role": "SWE", "visibility_level": 1,
+                     "interview_summary": "Synthetic interview" if self.contribution_count >= 1 else None},
+                    {"company": "Synthetic Salary Co", "role": "SWE", "visibility_level": 2,
+                     "salary_range_usd": "$40/hr" if self.contribution_count >= 2 else None},
+                ])
             return httpx.Response(200, json=[MEMBER_ROW] if auth else [GUEST_ROW])
         if path == "/programs":
-            return httpx.Response(200, json=PROGRAMS)
+            return httpx.Response(200, json=[] if self.empty_lists else PROGRAMS)
         if path.startswith("/programs/"):
             return httpx.Response(200, json=self.curriculum)
         return httpx.Response(404, json={"detail": "not found"})
@@ -463,3 +483,53 @@ def test_an_expired_session_drops_the_member_teaser_and_promises_no_retry(page):
     run(app)
     assert "Member Visible Co" not in markdown(app)
     assert PARTIAL_NOTICE not in captions(app) and FALLBACK_NOTICE not in sidebar_captions(app)
+
+
+def test_empty_successful_home_lists_are_fresh_for_five_minutes(page):
+    from app.discover_view import PARTIAL_NOTICE
+    from app.streamlit_app import FALLBACK_NOTICE
+
+    clock, backend = page
+    backend.empty_lists = True
+    app = AppTest.from_string(SCRIPT)
+    for now, calls in ((START, 1), (START + 31, 1), (START + 300, 2)):
+        clock.now = now
+        run(app)
+        assert backend.gets().count("/coop") == calls
+        assert backend.gets().count("/programs") == calls
+        assert PARTIAL_NOTICE not in captions(app)
+        assert FALLBACK_NOTICE not in sidebar_captions(app)
+        assert "**💼 最近的 Co-op 经验**" not in markdown(app)
+        assert "**🎓 按培养方案浏览**" not in markdown(app)
+    assert not backend.posts()
+
+
+def test_upload_response_count_change_refreshes_home_teaser_without_reposting(page):
+    clock, backend = page
+    backend.contribution_rows = True
+    backend.upload_contribution_count = 1
+    app = AppTest.from_string(SCRIPT)
+    app.session_state["user_id"] = "u-synthetic"
+    app.session_state["user_email"] = "synthetic@northeastern.edu"
+    app.session_state["session_token"] = "synthetic-session-a"
+    app.session_state["user_contribution_count"] = 0
+    run(app)
+    assert any("🔒 这条有面试细节" in text for text in captions(app))
+    app.radio[0].set_value("💼 Co-op 经验")
+    run(app)
+    next(item for item in app.text_input if item.label == "公司 *").input("Synthetic Pending Co")
+    next(item for item in app.text_input if item.label == "职位 *").input("Synthetic role")
+    next(item for item in app.button if item.label == "提交").click()
+    run(app)
+    assert app.session_state["user_contribution_count"] == 1
+    app.radio[0].set_value("🔍 课程搜索 · Search")
+    run(app)
+    assert not any("🔒 这条有面试细节" in text for text in captions(app))
+    assert any("🔒 这条有薪资区间" in text for text in captions(app))
+    # Same token and the clock never moved, so the refetch came from the new count, not the 5-minute TTL.
+    assert clock.now == START and app.session_state["session_token"] == "synthetic-session-a"
+    gets = backend.gets()
+    run(app)
+    run(app)
+    assert backend.gets() == gets
+    assert backend.posts() == ["/coop"]
