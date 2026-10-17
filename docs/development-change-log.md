@@ -3088,7 +3088,7 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 分支 `fix/opt02-empty-and-contribution`，起点 `6e1a01d`。实现、独立审查和评审后修复已完成；推送、开 PR 随后进行，合并由用户操作。仅 UI 需要部署，计划与 A 一起，须另行授权。没有数据迁移；会话中的旧 token-only 缓存首次读取时因范围不同自然重取。没有真实数据／NAS／模型调用，不把本地测试称为已经上线。
 
-## 25 — 离线完整链路评测与检查器身份（OPT-06，2026-10-16）
+## 25 — 离线完整链路评测与检查器身份（OPT-06，2026-10-16–17）
 
 ### 范围与原因
 
@@ -3100,35 +3100,49 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 2. 汇总和 Markdown 表列出 unattributed；新增课号超出证据、来源数值分歧未完整说明两个信号，不加入 HARD_FAILURES。
 3. 记录 CHECKER_VERSION 和检查器／关键源文件 SHA-256，固定证据结果标明 live_api 或 live_model；旧结果缺层级时重评标 legacy_unknown，不臆测原始来源。
 4. --rescore 必须给 --out 新目录，原 results.json／summary.md 永不覆盖；记录 rescore_of 路径、原文件哈希、前后检查器版本。旧上下文仍能读取，估计项身份标 unavailable，错误记录和原运行分母保留。
-5. C-2 离线完整路由评测尚未实现，不把检查器测试当成整批完成。
+5. C-2 建立独立内存世界：10 门 Synthetic 课程、主题向量 FAISS＋真实 BM25／融合和真实 /chat 路由；课程别名、年度规则、共享 CS 前缀的两个项目、版本方案和数值冲突都来自合成 seed。所有种子时间固定，world_sha256 对实际种子行规范化后计算。
+6. 固定 32 用例／8 类，合计 36 轮；逐轮记录实际请求、路由、结果、notices、prompt 哈希、回答和错误。上下文从实际 prompt＋全部 meta 证据构造，并与固定证据工具多课对拍。
+7. 多轮直接使用 UI 的 history／context helpers，按 UI 的方式保留部分回答、错误提示与已收到的证据。HTTP 409／404 和断流都保留在分母；意外异常保留为 harness_error 并继续后面的用例。
+8. 检索和生成分开计分，按类别列分母；R@k／MRR 只对 hybrid 类并列 n。输出有意包含坏回答与失败脚本，用于检查检测器；complete 只表示计划全部执行，绝不表示回答全对。
+9. 离线层固定 offline_synthetic、真实 API／模型调用 0、production_quality_verified=false；不允许与其他层级混合汇总。只有 --out 的薄 CLI 独占创建新文件，不接受地址、模型或库路径。
+10. 调用接缝遗漏时拒绝真实库；验证只有 eval 标记的 query_log 新增，其他表逐行不变。子进程 audit 钩子实测禁止网络、真实 SQLite、模型导入、.env 读取和输出文件之外的写入。
 
 ### 有意的行为变化
 
 - `test_case_is_built_like_chat_and_the_context_reflects_the_evidence` 和 `test_an_estimate_in_one_sentence_does_not_cover_a_number_in_the_next` 从合并数值升级到课程／字段三元组；保留原有语义断言。
 - 旧的重评调用方测试改为提供新目录，并从新目录核对结果；未删错误保留、无需联网和检查器 bug 保留 traceback 的断言。
 - summarize 新增按 kind 和身份未解析计数；新结果增加身份字段；原地 --rescore 改为新目录输出。
+- C-2 复现并补正中文紧邻／小写课号归属，检查器版本升至 2.1-route-identity；不跨句继承。顺手补齐错误行的 Markdown 表格列数和关键辅助脚本／schema／history helper 的源文件哈希。
 
 ### 修改文件
 
 - `eval/answer_checks.py`、`scripts/eval_answers_live.py`：检查器和固定证据工具。
 - `tests/test_opt06_answer_identity.py`、`tests/test_eval_answers_live.py`、`tests/test_answer_checks.py`：复现、兼容和不可覆盖契约。
+- `eval/route_world.py`、`eval/route_cases_v1.json`、`eval/route_eval.py`、`scripts/eval_route_offline.py`、`tests/test_route_eval_offline.py`：合成世界、用例、路由评测、薄 CLI 与隔离测试。
 - 本文件；完整日志、测试冻结哈希和 WORKLOG 在仓库外保留。
 
 ### 验证记录
 
 - C-1 正式红色基线：六文件 15 failed／184 passed／3 warnings；实现后相同冻结测试 199 passed／3 warnings。
-- 显式六文件构成的 C-1 隔离副本串行全量 3883 passed／7 warnings／257.73 秒，退出码 0；五个 Python 文件前后哈希与工作区一致。提前预写的 C-2 测试不在 C-1 副本或本提交中。
+- 显式六文件构成的 C-1 隔离副本串行全量 3883 passed／7 warnings／257.73 秒，退出码 0；五个 Python 文件前后哈希与当时工作区一致。提前预写的 C-2 测试不在 C-1 副本或 C-1 提交中。
 - M01–M05、M14 六个具名变异在六文件定向范围全部 killed，逐项有真实 FAILED 身份，不称为全量变异。Ruff F/E9/B、UTF-8／LF、差异检查和运行代码边界检查通过。
+- C-2 接口／课号边界红色检查 9 failed／7 errors；原有三份测试和新路由测试分别冻结。实现后的十一文件定向 476 passed／4 warnings／39.06 秒；补齐身份元数据后的精确副本绿色基线另为 476 passed／4 warnings／30.73 秒。
+- 最终串行全量 **3899 passed／7 warnings／365.04 秒，退出码 0**。四份冻结测试哈希不变；全量启动与结束的十个非文档文件 SHA-256 一致，随后仅填补本节验收记录。七个警告为三项 SWIG 类型及四次 HTTP 422 名称弃用，不是测试失败。
+- M01–M14 在上述十一文件定向范围、6 worker 下 **14/14 killed**，逐项核对原始日志中的实际 FAILED 测试身份；无存活、未解决超时或仅 setup ERROR。此包不是 tests/ 全范围变异，也不与先前 C-1 六项相加称作二十种。
+- 九个 Python 文件 Ruff F/E9/B 通过，默认布局快照核对 9/9 相同（没有 --write）。十一文件 UTF-8／LF、whitespace、公开差异中的私有路径／地址／凭据模式检查通过；运行目录、共享夹具与历史评测数据对基线无差异。
+- 独立运行薄 CLI：32 cases planned＝attempted＝completed，36 turns planned＝attempted；结果在仓库外。测试只验证合成链路与计分，不作为真实模型质量。
 
 ### 审查
 
-本地开发中，尚未独立审查；不把单元测试通过写成真实模型或生产验收。
+本地两步开发和离线验收已完成，待独立审查；不把单元测试通过写成真实模型或生产验收。
 
 ### 已知、未处理
 
 - 真实 API、真实模型和本机真实索引层不在本批，不读取真实数据。
 - 同句课程／字段归属、冲突数值和课号检查只是有限文本信号，不证明答案正确，不自动跨句推断。
-- C-2 合成完整链路评测尚待实现；最终离线层将固定 production_quality_verified=false。
+- 合成 `good` 标签不保证所有信号为零：未提及的证据课程也可能触发遗漏冲突数值；记录归属词只检查数值前 20 个字符，超出窗口时仍可能误报为评价归属。完整运行保留原回答与信号，不通过改脚本措辞隐藏这些边界。
+- 合成世界不代表真实检索质量；离线层固定 production_quality_verified=false。只有两个 hybrid 指标样本，不外推到真实课程分布。
+- partial／no_answer／HTTP 决策分开列出；部分回答保留 checks 供查看，但不计入完整回答 checked 分母。已执行的预期失败脚本不等于 harness_error。
 
 ### 发布状态
 

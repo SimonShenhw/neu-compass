@@ -1,0 +1,73 @@
+{
+  "case_set_version": "1.0-synthetic",
+  "cases": [
+    {"case_id":"alias_good","category":"alias_hybrid","answer_kind":"good","turns":[
+      {"request":{"query":"Graphy"},"stream":{"chunks":["CS 9001 covers graph algorithms."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"alias_bad","category":"alias_hybrid","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":["The internal identifier is neu-cs-9001."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"hybrid_good","category":"alias_hybrid","answer_kind":"good","turns":[
+      {"request":{"query":"graph algorithms shortest paths"},"stream":{"chunks":["CS 9001 covers shortest paths."]},"expected":{"http_status":200,"matched_via":"hybrid","must_include":["neu-cs-9001"],"must_exclude":["neu-ds-9003"],"notices":[],"error_type":null}}]},
+    {"case_id":"hybrid_bad","category":"alias_hybrid","answer_kind":"bad","turns":[
+      {"request":{"query":"neural learning backprop"},"stream":{"chunks":["Use neu-ds-9003."]},"expected":{"http_status":200,"matched_via":"hybrid","must_include":["neu-ds-9003"],"must_exclude":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"filter_credits","category":"filters","answer_kind":"good","turns":[
+      {"request":{"query":"graph algorithms","credits":4},"stream":{"chunks":["The returned graph course has 4 credits."]},"expected":{"http_status":200,"matched_via":"hybrid","must_include":["neu-cs-9001"],"must_exclude":["neu-ds-9007"],"notices":[],"error_type":null}}]},
+    {"case_id":"filter_bad","category":"filters","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001","credits":4},"stream":{"chunks":["neu-cs-9001 has 4 credits."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"filter_exact_excluded","category":"filters","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9001","term":"Fall 2026"},"stream":{"chunks":["No matching course under those filters."]},"expected":{"http_status":200,"matched_via":"empty","exact_ids":[],"notices":[],"error_type":null}}]},
+    {"case_id":"filter_anchor","category":"filters","answer_kind":"good","turns":[
+      {"request":{"query":"courses like CS 9001 graph algorithms","term":"Fall 2026"},"stream":{"chunks":["The graph alternative is CS 9009."]},"expected":{"http_status":200,"matched_via":"hybrid","must_include":["neu-cs-9009"],"must_exclude":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"followup_good","category":"followup","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":["CS 9001 covers graph algorithms."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}},
+      {"request":{"query":"这门课作业多吗"},"stream":{"chunks":["引文写每周约 12 小时。"]},"expected":{"http_status":200,"matched_via":"context","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"followup_bad","category":"followup","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":["CS 9001 covers graphs."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}},
+      {"request":{"query":"这门课作业多吗"},"stream":{"chunks":["The evidence id is neu-cs-9001."]},"expected":{"http_status":200,"matched_via":"context","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"followup_switch","category":"followup","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":["CS 9001 covers graphs."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}},
+      {"request":{"query":"DS 9003 neural learning"},"stream":{"chunks":["DS 9003 covers neural learning."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-ds-9003"],"notices":[],"error_type":null}}]},
+    {"case_id":"program_ambiguous","category":"program","answer_kind":"good","turns":[
+      {"request":{"query":"CS first semester"},"stream":{"chunks":[]},"expected":{"http_status":409,"matched_via":null,"exact_ids":[],"notices":[],"error_type":"http_409","detail_contains":["synthetic-cs-standard","synthetic-cs-align"]}}]},
+    {"case_id":"program_selected","category":"program","answer_kind":"good","turns":[
+      {"request":{"query":"CS first semester","program_id":"synthetic-cs-standard"},"stream":{"chunks":["These are unverified seed suggestions, not an official semester plan. CS 9002 has no recorded catalog."]},"expected":{"http_status":200,"matched_via":"program","exact_ids":["neu-cs-9001","neu-cs-9002"],"notices":[],"error_type":null}}]},
+    {"case_id":"program_bad","category":"program","answer_kind":"bad","turns":[
+      {"request":{"query":"CS first semester","program_id":"synthetic-cs-standard"},"stream":{"chunks":["Take neu-cs-9001 and neu-cs-9002."]},"expected":{"http_status":200,"matched_via":"program","exact_ids":["neu-cs-9001","neu-cs-9002"],"notices":[],"error_type":null}}]},
+    {"case_id":"program_versioned","category":"program","answer_kind":"good","turns":[
+      {"request":{"query":"CS first semester graph algorithms","program_id":"synthetic-cs-align"},"stream":{"chunks":["There is no verified semester schedule. See the Programs page; graph courses are only topic matches."]},"expected":{"http_status":200,"matched_via":"hybrid","must_include":["neu-cs-9001"],"must_exclude":["neu-ds-9003"],"notices":["program_schedule_unverified"],"error_type":null}}]},
+    {"case_id":"program_conflict","category":"program","answer_kind":"good","turns":[
+      {"request":{"query":"CS first semester","program_id":"synthetic-ds"},"stream":{"chunks":[]},"expected":{"http_status":409,"matched_via":null,"exact_ids":[],"notices":[],"error_type":"http_409"}}]},
+    {"case_id":"program_missing","category":"program","answer_kind":"good","turns":[
+      {"request":{"query":"graph algorithms","program_id":"synthetic-missing"},"stream":{"chunks":[]},"expected":{"http_status":404,"matched_via":null,"exact_ids":[],"notices":[],"error_type":"http_404"}}]},
+    {"case_id":"numeric_good","category":"numeric_identity","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9001 CS 9002"},"stream":{"chunks":["CS 9001 的引文写每周约 12 小时。CS 9002 的工作量是估计约 12 小时。CS 9002 没有官方目录描述。"]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001","neu-cs-9002"],"notices":[],"error_type":null}}]},
+    {"case_id":"numeric_bad","category":"numeric_identity","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001 CS 9002"},"stream":{"chunks":["CS 9001 的评价说每周 12 小时。CS 9002 的评价说每周 12 小时。"]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001","neu-cs-9002"],"notices":[],"error_type":null}}]},
+    {"case_id":"numeric_course_count","category":"numeric_identity","answer_kind":"good","turns":[
+      {"request":{"query":"DS 9003"},"stream":{"chunks":["DS 9003 的评价说推荐先修 4 门课。"]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-ds-9003"],"notices":[],"error_type":null}}]},
+    {"case_id":"conflict_credits_good","category":"source_conflict","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9005"},"stream":{"chunks":["CS 9005 has 3 credits in the record and 4 credits in the catalog snapshot; the sources disagree."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9005"],"notices":[],"error_type":null}}]},
+    {"case_id":"conflict_credits_bad","category":"source_conflict","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9005"},"stream":{"chunks":["CS 9005 has 3 credits."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9005"],"notices":[],"error_type":null}}]},
+    {"case_id":"conflict_workload_good","category":"source_conflict","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9006"},"stream":{"chunks":["CS 9006 has a recorded workload of 12 hours, but the quote says about 6 hours; the sources disagree."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9006"],"notices":[],"error_type":null}}]},
+    {"case_id":"conflict_workload_bad","category":"source_conflict","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9006"},"stream":{"chunks":["CS 9006 takes 12 hours a week."]},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9006"],"notices":[],"error_type":null}}]},
+    {"case_id":"no_results_good","category":"no_results","answer_kind":"good","turns":[
+      {"request":{"query":"qzxv quuxzz"},"stream":{"chunks":["No matching record was found; please clarify the topic."]},"expected":{"http_status":200,"matched_via":"rejected","exact_ids":[],"notices":[],"error_type":null}}]},
+    {"case_id":"no_results_bad","category":"no_results","answer_kind":"bad","turns":[
+      {"request":{"query":"qzxv quuxzz"},"stream":{"chunks":["CS 9099 is definitely the correct course."]},"expected":{"http_status":200,"matched_via":"rejected","exact_ids":[],"notices":[],"error_type":null}}]},
+    {"case_id":"no_results_empty","category":"no_results","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9001","term":"Winter 2099"},"stream":{"chunks":["No course satisfies that term filter."]},"expected":{"http_status":200,"matched_via":"empty","exact_ids":[],"notices":[],"error_type":null}}]},
+    {"case_id":"stream_partial","category":"stream_recovery","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":["Synthetic partial answer"],"error":"upstream_error"},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":"upstream_error"}}]},
+    {"case_id":"stream_empty","category":"stream_recovery","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":[],"error":"empty_stream"},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":"no_answer"}}]},
+    {"case_id":"stream_nontext","category":"stream_recovery","answer_kind":"bad","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":[],"error":"non_text"},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":"internal_error"}}]},
+    {"case_id":"stream_recovery_good","category":"stream_recovery","answer_kind":"good","turns":[
+      {"request":{"query":"CS 9001"},"stream":{"chunks":["Synthetic partial answer"],"error":"upstream_error"},"expected":{"http_status":200,"matched_via":"alias","exact_ids":["neu-cs-9001"],"notices":[],"error_type":"upstream_error"}},
+      {"request":{"query":"这门课作业多吗"},"stream":{"chunks":["The quote says about 12 hours a week."]},"expected":{"http_status":200,"matched_via":"context","exact_ids":["neu-cs-9001"],"notices":[],"error_type":null}}]},
+    {"case_id":"stream_rescue_failure","category":"stream_recovery","answer_kind":"good","turns":[
+      {"request":{"query":"qzxv quuxzz"},"stream":{"chunks":["No grounded match; please clarify."],"rescue":"error"},"expected":{"http_status":200,"matched_via":"rejected","exact_ids":[],"notices":[],"error_type":null}}]}
+  ]
+}

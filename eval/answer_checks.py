@@ -18,9 +18,9 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.0-course-field"
+CHECKER_VERSION = "2.1-route-identity"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
-ANSWER_COURSE_CODE = re.compile(r"\b([A-Z]{2,4})\s*(\d{4}[A-Z]?)\b")
+ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
 WORKLOAD_UNIT = re.compile(r"小时|\bhours?\b|\bhrs?\b|每周|per week", re.I)
 DIFFICULTY_UNIT = re.compile(r"难度|difficulty|/\s*5\b", re.I)
 COURSE_COUNT_UNIT = re.compile(r"\s*(?:门|courses?\b|classes?\b|prerequisites?\b)", re.I)
@@ -245,8 +245,11 @@ def find_links(text: str) -> list[dict]:
     return links
 
 
-def _course_codes(text: str) -> set[str]:
-    return {f"{match[1]} {match[2]}" for match in ANSWER_COURSE_CODE.finditer(text)}
+def _course_codes(text: str, known_codes=()) -> set[str]:
+    # ASCII boundaries allow Chinese adjacency; mixed-case ordinary words (Fall 2026) are not departments.
+    known = {code.split()[0] for code in known_codes} | {"CS", "DS", "AAI"}
+    return {f"{match[1]} {match[2]}".upper() for match in ANSWER_COURSE_CODE.finditer(text)
+            if match[1].isupper() or match[1].upper() in known}
 
 
 def _number_field(sentence: str, number: re.Match, candidates: set[str]) -> str | None:
@@ -271,7 +274,7 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
     identified = bool(context.course_codes or context.unstated)
     values = {item[2] for item in context.unstated} if identified else set(context.unstated_values)
     for sentence in parts:
-        mentioned = _course_codes(sentence)
+        mentioned = _course_codes(sentence, context.course_codes) & set(context.course_codes)
         course = (next(iter(mentioned)) if len(mentioned) == 1 else
                   context.course_codes[0] if not mentioned and len(context.course_codes) == 1 else None)
         for value in sorted(values):
@@ -305,9 +308,9 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
 def _conflict_signals(parts: list[str], context: AnswerContext) -> list[dict]:
     missing = []
     for code, field_name, values in context.conflicts:
-        relevant = " ".join(part for part in parts if _course_codes(part) == {code}
-                            or (not _course_codes(part) and context.course_codes == (code,)))
-        absent = [value for value in values if not re.search(rf"(?<![\d.]){value:g}(?:\.0+)?(?![\d.]|\s*/)", relevant)]
+        relevant = " ".join(part for part in parts if _course_codes(part, context.course_codes) == {code}
+                            or (not _course_codes(part, context.course_codes) and context.course_codes == (code,)))
+        absent = [value for value in values if not re.search(rf"(?<![\d.]){re.escape(f'{value:g}')}(?:\.0+)?(?![\d.])", relevant)]
         if absent:
             missing.append({"course": code, "field": field_name, "missing_values": absent})
     return missing
@@ -369,7 +372,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "caveats_missing": missing,
         "estimates": estimates,
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
-        "course_codes_outside_evidence": sorted(_course_codes(text) - set(context.course_codes)),
+        "course_codes_outside_evidence": sorted(_course_codes(text, context.course_codes) - set(context.course_codes)),
         "conflicts_missing_values": _conflict_signals(parts, context),
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
         # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.

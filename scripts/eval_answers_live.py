@@ -188,7 +188,8 @@ def checker_identity() -> dict:
 
 def code_identity() -> dict:
     files = ("api/routes/chat.py", "api/routes/common.py", "api/routes/search.py", "llm/prompts/chat_v4.py",
-             "llm/prompts/chat_v3.py", "rag/answer_evidence.py", "eval/answer_checks.py")
+             "llm/prompts/chat_v3.py", "rag/answer_evidence.py", "eval/answer_checks.py",
+             "scripts/eval_answers_live.py", "db/init.sql", "app/chat_view.py")
     try:
         result = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
                                 capture_output=True, text=True, timeout=5, check=True)
@@ -275,7 +276,7 @@ def write_report(out: Path, report: dict) -> None:
              "|---|---|---|---|---|---|"]
     for record in report["records"]:
         if "checks" not in record:
-            lines.append(f"| {record['qid']} run {record['run']} | error | | | |")
+            lines.append(f"| {record['qid']} run {record['run']} | error | | | | |")
             continue
         checks = record["checks"]
         failed = ", ".join(name for name in HARD_FAILURES if checks[name]) or "none"
