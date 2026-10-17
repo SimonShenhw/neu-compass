@@ -143,10 +143,11 @@ def conflict_values(records: list[dict]) -> tuple:
         catalog = evidence.get("catalog") or {}
         pairs = {"credits": [metadata.get("credits"), catalog.get("credits")]}
         for item in evidence["field_evidence"]:
-            pattern = (r"(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|小时)" if item["field"] == "workload_hours_per_week"
+            pattern = (r"(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|小时)\s*(?:(?:a|per|each)\s+week|/\s*(?:week|wk|周))" if item["field"] == "workload_hours_per_week"
                        else r"(?:difficulty|难度)\D{0,12}(\d+(?:\.\d+)?)" if item["field"] == "difficulty_score" else None)
             if pattern:
-                pairs.setdefault(item["field"], [metadata.get(item["field"]), item["supported_value"]]).extend(
+                pairs.setdefault(item["field"], [metadata.get(item["field"])]).append(item["supported_value"])
+                pairs[item["field"]].extend(
                     float(match[1]) for match in re.finditer(pattern, item["quote"], re.I))
         for name, candidates in pairs.items():
             values = tuple(sorted({float(value) for value in candidates if type(value) in (int, float)}))
@@ -233,7 +234,8 @@ def context_from_json(data: dict):
               "unstated_values": tuple(data["unstated_values"])}
     for name in ("course_codes", "unstated", "conflicts"):
         if name in values:
-            values[name] = (tuple(values[name]) if name == "course_codes" else
+            values[name] = (None if name == "course_codes" and values[name] is None else
+                            tuple(values[name]) if name == "course_codes" else
                             tuple(tuple(item) if name == "unstated" else (item[0], item[1], tuple(item[2]))
                                   for item in values[name]))
     return AnswerContext(**values)
@@ -311,7 +313,7 @@ def _context_ok(context: object) -> bool:
                     for name in ("allowed_urls", "prompt_keys"))
             and _is(context["unstated_values"], list)
             and all(numeric(value) for value in context["unstated_values"])
-            and ("course_codes" not in context or isinstance(context["course_codes"], list)
+            and (context.get("course_codes") is None or isinstance(context["course_codes"], list)
                  and all(isinstance(code, str) and bool(code.strip()) for code in context["course_codes"]))
             and all(name not in context or isinstance(context[name], list) and all(
                 isinstance(item, list) and len(item) == 3 and isinstance(item[0], str)

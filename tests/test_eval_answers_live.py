@@ -251,10 +251,13 @@ def test_every_prompt_is_saved_before_the_first_model_call(tmp_path):
 
 
 def test_a_bad_rescore_file_is_a_setup_error(tmp_path):
-    assert main(["--rescore", str(tmp_path / "missing.json")]) == 2
+    target = tmp_path / "bad-out"
+    assert main(["--rescore", str(tmp_path / "missing.json"), "--out", str(target)]) == 2
+    assert not target.exists()
     broken = tmp_path / "broken.json"
     broken.write_text("{not json", encoding="utf-8")
-    assert main(["--rescore", str(broken)]) == 2
+    assert main(["--rescore", str(broken), "--out", str(target)]) == 2
+    assert not target.exists()
     run([QUESTION], PAYLOADS, out=tmp_path, runs=1, max_calls=1, stream_fn=lambda prompt: iter([PLAIN]))
     good = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
     record, context = good["records"][0], good["records"][0]["context"]
@@ -269,11 +272,13 @@ def test_a_bad_rescore_file_is_a_setup_error(tmp_path):
     ]
     for bad in bad_records:
         odd.write_text(json.dumps({**good, "records": [bad]}), encoding="utf-8")
-        assert main(["--rescore", str(odd)]) == 2, bad
+        assert main(["--rescore", str(odd), "--out", str(target)]) == 2, bad
+        assert not target.exists()
     for report in ({key: value for key, value in good.items() if key != "chat_v4_sha256"}, {**good, "chat_v4_sha256": 5},
                    {**good, "model_calls": "1"}, {**good, "planned_calls": None}):
         odd.write_text(json.dumps(report), encoding="utf-8")
-        assert main(["--rescore", str(odd)]) == 2
+        assert main(["--rescore", str(odd), "--out", str(target)]) == 2
+        assert not target.exists()
     odd.write_text(json.dumps(good), encoding="utf-8")
     assert main(["--rescore", str(odd), "--out", str(tmp_path / "rescored")]) == 0
 

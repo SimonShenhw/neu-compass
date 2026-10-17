@@ -18,7 +18,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.1-route-identity"
+CHECKER_VERSION = "2.2-review-identity"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
 ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
 WORKLOAD_UNIT = re.compile(r"小时|\bhours?\b|\bhrs?\b|每周|per week", re.I)
@@ -157,7 +157,7 @@ class AnswerContext:
     program_notice: bool = False  # program_schedule_unverified was passed
     unstated_values: tuple[float, ...] = ()  # numeric estimates that no supplied quote states
     prompt_keys: frozenset[str] = field(default_factory=frozenset)  # JSON keys in the prompt's course block
-    course_codes: tuple[str, ...] = ()
+    course_codes: tuple[str, ...] | None = None  # None = legacy unknown; () = known empty evidence.
     unstated: tuple[tuple[str, str, float], ...] = ()  # (course code, field, value); old contexts keep unstated_values.
     conflicts: tuple[tuple[str, str, tuple[float, ...]], ...] = ()  # Numeric source disagreements; signals only.
 
@@ -247,9 +247,17 @@ def find_links(text: str) -> list[dict]:
 
 def _course_codes(text: str, known_codes=()) -> set[str]:
     # ASCII boundaries allow Chinese adjacency; mixed-case ordinary words (Fall 2026) are not departments.
-    known = {code.split()[0] for code in known_codes} | {"CS", "DS", "AAI"}
-    return {f"{match[1]} {match[2]}".upper() for match in ANSWER_COURSE_CODE.finditer(text)
-            if match[1].isupper() or match[1].upper() in known}
+    known = {code.split()[0] for code in (known_codes or ())} | {"CS", "DS", "AAI"}
+    codes = set()
+    for match in ANSWER_COURSE_CODE.finditer(text):
+        if not (match[1].isupper() or match[1].upper() in known):
+            continue
+        codes.add(f"{match[1]} {match[2]}".upper())
+        tail = text[match.end():]
+        while short := re.match(r"\s*(?:和|与|、|and\b|or\b|[,/])\s*(\d{4}[A-Z]?)(?![A-Za-z0-9])", tail, re.I):
+            codes.add(f"{match[1]} {short[1]}".upper())
+            tail = tail[short.end():]
+    return codes
 
 
 def _number_field(sentence: str, number: re.Match, candidates: set[str]) -> str | None:
@@ -274,14 +282,23 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
     identified = bool(context.course_codes or context.unstated)
     values = {item[2] for item in context.unstated} if identified else set(context.unstated_values)
     for sentence in parts:
-        mentioned = _course_codes(sentence, context.course_codes) & set(context.course_codes)
+        all_codes = _course_codes(sentence, context.course_codes)
+        mentioned = all_codes & set(context.course_codes or ())
         course = (next(iter(mentioned)) if len(mentioned) == 1 else
-                  context.course_codes[0] if not mentioned and len(context.course_codes) == 1 else None)
+                  context.course_codes[0] if not all_codes and len(context.course_codes or ()) == 1 else None)
+        if len(all_codes) > 1:
+            course = None
         for value in sorted(values):
             for number in number_pattern(value).finditer(sentence):
                 field_name, identity = None, "unavailable"
                 if identified:
                     if COURSE_COUNT_UNIT.match(sentence[number.end():]):
+                        continue
+                    before_number, after_number = sentence[:number.start()], sentence[number.end():]
+                    if (re.match(r"\s*(?:[%％]|次|assignments?\b)", after_number, re.I)
+                            or re.search(r"(?:学分|credits?|GPA|日期|date)\s*(?:为|是|of|is|:)?\s*$", before_number, re.I)
+                            or re.search(r"\d[-/]$", before_number)
+                            or re.match(r"[-/]\d", after_number) and not re.match(r"/5\b", after_number)):
                         continue
                     candidates = [(code, name) for code, name, candidate in context.unstated
                                   if candidate == value and (course is None or code == course)]
@@ -291,7 +308,8 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
                     if field_name is not None and not any(name == field_name for _, name in candidates):
                         continue
                     identity = "course_unresolved" if course is None else "field_unresolved" if field_name is None else "resolved"
-                before = sentence[max(0, number.start() - 20):number.start()]
+                before = (re.split(r"[;；,，]", sentence[:number.start()])[-1][-40:] if identified
+                          else sentence[max(0, number.start() - 20):number.start()])
                 if RECORD_CUE.search(before):
                     kind = "attributed to the record"
                 elif ESTIMATE_CUE.search(sentence):
@@ -307,10 +325,13 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
 
 def _conflict_signals(parts: list[str], context: AnswerContext) -> list[dict]:
     missing = []
+    mentioned = _course_codes(" ".join(parts), context.course_codes)
     for code, field_name, values in context.conflicts:
+        if code not in mentioned and (mentioned or context.course_codes != (code,)):
+            continue
         relevant = " ".join(part for part in parts if _course_codes(part, context.course_codes) == {code}
                             or (not _course_codes(part, context.course_codes) and context.course_codes == (code,)))
-        absent = [value for value in values if not re.search(rf"(?<![\d.]){re.escape(f'{value:g}')}(?:\.0+)?(?![\d.])", relevant)]
+        absent = [value for value in values if not re.search(rf"(?<![\d.]){re.escape(f'{value:g}')}(?:\.0+)?(?!\d|\.\d)", relevant)]
         if absent:
             missing.append({"course": code, "field": field_name, "missing_values": absent})
     return missing
@@ -372,7 +393,8 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "caveats_missing": missing,
         "estimates": estimates,
         "estimates_as_reported": [item for item in estimates if item["kind"] == "AS REVIEWER-REPORTED"],
-        "course_codes_outside_evidence": sorted(_course_codes(text, context.course_codes) - set(context.course_codes)),
+        "course_codes_outside_evidence": (None if context.course_codes is None else
+                                          sorted(_course_codes(text, context.course_codes) - set(context.course_codes))),
         "conflicts_missing_values": _conflict_signals(parts, context),
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
         # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.
