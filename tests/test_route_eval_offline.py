@@ -34,7 +34,7 @@ def test_case_set_covers_all_categories_with_good_and_bad_answers():
     from eval.route_eval import load_cases
 
     bundle = load_cases()
-    assert 25 <= len(bundle["cases"]) <= 35
+    assert 35 <= len(bundle["cases"]) <= 50
     assert {item["category"] for item in bundle["cases"]} == CATEGORIES
     assert len({item["case_id"] for item in bundle["cases"]}) == len(bundle["cases"])
     for category in CATEGORIES:
@@ -50,14 +50,14 @@ def test_all_cases_and_turns_stay_in_the_denominator(report):
     assert population["cases_planned"] == sum(population[key] for key in (
         "cases_completed", "cases_errored", "cases_not_attempted"))
     assert population["turns_planned"] == population["turns_attempted"] == sum(len(item["turns"]) for item in cases)
-    retrieval, generation = report["retrieval"], report["generation"]
+    retrieval, generation = report["route_contract"], report["generation"]
     assert retrieval["planned"] == retrieval["scored"] + retrieval["not_scored"] == population["turns_planned"]
     assert retrieval["scored"] == retrieval["pass"] + retrieval["fail"]
     assert generation["planned"] == sum(generation[name] for name in (
-        "checked", "stream_error", "no_answer", "not_applicable", "not_checked"))
+        "checked", "stream_error", "no_answer", "not_applicable", "unexpected_http", "not_checked"))
     assert generation["planned"] == population["turns_planned"] and generation["hard_fail"] <= generation["checked"]
-    assert set(report["retrieval"]["by_category"]) == CATEGORIES
-    assert all(turn["retrieval"]["verdict"] == "pass" for item in report["cases"] for turn in item["turns"])
+    assert set(report["route_contract"]["by_category"]) == CATEGORIES
+    assert all(turn["route_contract"]["verdict"] == "pass" for item in report["cases"] for turn in item["turns"])
 
 
 def test_stream_errors_and_http_decisions_do_not_disappear(report):
@@ -73,11 +73,11 @@ def test_retrieval_and_generation_are_independent(report):
     from eval.route_eval import load_cases, run_eval
 
     leaked = case(report, "alias_bad")["turns"][0]
-    assert leaked["retrieval"]["verdict"] == "pass" and leaked["generation"]["verdict"] == "hard_fail"
+    assert leaked["route_contract"]["verdict"] == "pass" and leaked["generation"]["verdict"] == "hard_fail"
     altered = copy.deepcopy(load_cases()["cases"][0])
     altered["turns"][0]["expected"]["exact_ids"] = ["neu-cs-9002"]
     result = run_eval([altered])["cases"][0]["turns"][0]
-    assert result["retrieval"]["verdict"] == "fail" and result["generation"]["verdict"] == "pass"
+    assert result["route_contract"]["verdict"] == "fail" and result["generation"]["verdict"] == "pass"
 
 
 def test_a_forbidden_actual_hit_fails_even_when_required_hits_match():
@@ -86,7 +86,7 @@ def test_a_forbidden_actual_hit_fails_even_when_required_hits_match():
     altered = copy.deepcopy(load_cases()["cases"][0])
     altered["turns"][0]["expected"]["must_exclude"] = ["neu-cs-9001"]
     turn = run_eval([altered])["cases"][0]["turns"][0]
-    assert turn["result_ids"] == ["neu-cs-9001"] and turn["retrieval"]["verdict"] == "fail"
+    assert turn["result_ids"] == ["neu-cs-9001"] and turn["route_contract"]["verdict"] == "fail"
 
 
 def test_layer_and_source_identities_are_explicit_and_cannot_be_mixed(report):
@@ -110,7 +110,7 @@ def test_synthetic_retrieval_has_discrimination_and_real_exclusions(report):
 
     with SyntheticWorld() as world:
         courses = world.conn.execute("SELECT primary_code,primary_name FROM courses").fetchall()
-        assert 8 <= len(courses) <= 12
+        assert 25 <= len(courses) <= 30
         assert all(row[1].startswith("Synthetic") and 9001 <= int(row[0].split()[1]) <= 9099 for row in courses)
         assert world.app.state.faiss_index is not None
         digest = world.world_sha256
@@ -120,9 +120,9 @@ def test_synthetic_retrieval_has_discrimination_and_real_exclusions(report):
     assert "neu-ds-9007" not in filtered["result_ids"] and "neu-cs-9001" in filtered["result_ids"]
     hybrid = case(report, "hybrid_good")["turns"][0]
     assert len(hybrid["result_ids"]) < len(courses) and hybrid["result_ids"][0] == "neu-cs-9001"
-    assert report["retrieval"]["hybrid_metrics"]["n"] > 0
-    assert 0 <= report["retrieval"]["hybrid_metrics"]["recall_at_k"] <= 1
-    assert 0 <= report["retrieval"]["hybrid_metrics"]["mrr"] <= 1
+    assert report["route_contract"]["hybrid_metrics"]["n"] > 0
+    assert 0 <= report["route_contract"]["hybrid_metrics"]["recall_at_10"] <= 1
+    assert 0 <= report["route_contract"]["hybrid_metrics"]["mrr"] <= 1
 
 
 def test_followup_and_failure_recovery_use_current_turn_evidence(report):
@@ -135,7 +135,8 @@ def test_followup_and_failure_recovery_use_current_turn_evidence(report):
     assert recovery[0]["generation"]["verdict"] == "stream_error"
     assert recovery[1]["result_ids"] == recovery[0]["result_ids"]
     assert recovery[1]["request"]["history"][1]["content"].startswith("Synthetic partial answer")
-    assert "⚠️ 提示" in recovery[1]["request"]["history"][1]["content"]
+    assert "\n\n⚠️ " in recovery[1]["request"]["history"][1]["content"]
+    assert "⚠️ 提示" not in recovery[1]["request"]["history"][1]["content"]
 
 
 def test_context_from_actual_prompt_matches_fixed_evidence_for_multiple_courses():
@@ -189,8 +190,8 @@ def test_an_unexpected_turn_error_is_recorded_and_later_cases_still_run(monkeypa
     assert len(result["cases"]) == result["population"]["cases_attempted"] == 2
     assert result["population"]["cases_errored"] == 1 and result["population"]["cases_completed"] == 1
     assert result["cases"][0]["turns"][0]["error_type"] == "harness_error"
-    assert result["generation"]["not_checked"] == result["retrieval"]["not_scored"] == 1
-    assert result["cases"][1]["turns"][0]["retrieval"]["verdict"] == "pass"
+    assert result["generation"]["not_checked"] == result["route_contract"]["not_scored"] == 1
+    assert result["cases"][1]["turns"][0]["route_contract"]["verdict"] == "pass"
 
 
 @pytest.mark.parametrize("text", ["CS9002每周需要12小时。", "这门CS9002每周需要12小时。", "cs9002每周需要12小时。"])
@@ -252,4 +253,7 @@ runpy.run_path(script, run_name='__main__')
     assert result.returncode == 0, result.stdout + result.stderr
     data = json.loads((tmp_path / "offline.json").read_text(encoding="utf-8"))
     assert data["real_model_calls"] == data["real_api_calls"] == 0
+    assert not any(data["isolation"].values())
+    assert data["route_contract"]["fail"] == data["stream_contract"]["fail"] == 0
+    assert data["generation"]["unexpected_http"] == data["expectation_mismatches"] == 0
     assert sorted(path.name for path in tmp_path.iterdir()) == ["offline.json"]

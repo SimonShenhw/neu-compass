@@ -3092,9 +3092,9 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 ### 范围与原因
 
-从 origin/main `6e1a01d` 独立推进 C，不混入 B 的缓存修复。分 C-1、C-2 两个提交；本节预计编号 25，合并前按最终合并顺序调整。只改评测工具、测试和记录，线上运行路径不变。
+从 origin/main `6e1a01d` 独立推进 C，不混入 B 的缓存修复。第一轮分 C-1、C-2 两个提交，第二轮按检查器／路由另做修复提交；本节预计编号 25，合并前按最终合并顺序调整。只改评测工具、测试和记录，线上运行路径不变。
 
-### 已实现
+### 第一轮实现（保留历史；现行契约见第二轮修复）
 
 1. C-1 的未陈述数值保留课程＋字段身份，只做 workload／difficulty；同句归属，单课可直接归属，不跨句继承。课程或字段判不出时保留未解析信号。
 2. 汇总和 Markdown 表列出 unattributed；新增课号超出证据、来源数值分歧未完整说明两个信号，不加入 HARD_FAILURES。
@@ -3138,13 +3138,38 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 第二轮先修检查器：旧上下文未知课程身份为 null，不冒充已知空证据；新无结果上下文仍是显式空集合。补跨句、字段匹配／最近提示／唯一字段兜底、未知课程、简写课号、非估计单位、冲突英文句末、同分句记录归属和多引文冲突测试。恢复坏文件测试的 --out 与“未创建输出目录”断言；保留旧 unstated_values 路径与新三元组双覆盖。检查器升为 2.2-review-identity。四文件红色基线 11 failed／87 passed，冻结相同断言实现后 98 passed／3 warnings／5.37 秒；这只是检查器定向，不代表整批返工验收。
 
+### 第二轮修复与现行契约
+
+1. 世界为 28 门 Synthetic 课程，42 用例／48 轮。真实 FAISS、BM25、融合／门控／路由与合成主题向量、语义＋词重叠重排替身组合；替身不读期望答案。新增 3 条向量专属查询，实际融合入口的 BM25 列表为空，记录向量／BM25 排名轨迹；补小写别名、中英 hybrid、追问加筛选、409 后恢复、救援成功与课号保护、部分回答泄露。
+2. 固定 UI 默认 k=10；候选池、缩写扩展、融合与门控配置按生产代码默认值读取，α／阈值使用 shared common 常量。配置逐项记录 value、source、production_default；合成词表替换真实词表，依赖替身、反馈关闭和逐轮脚本救援标为 harness_pin。deployment_verified=false，不读 NAS 实时配置或 .env。
+3. route_contract 不含流错误；stream_contract 单独检查 error_type／rescue_calls。每轮 expected_generation 明确 verdict、必须与禁止的信号；坏回答触发预期信号算契约相符，不强行升级成硬失败。部分回答硬失败另列，不混进完整回答 checked。
+4. UI 错误历史使用真实规则：有已输出文字时追加空行＋⚠️，无文字时直接 ⚠️，不写“提示：”。与实际 stream_assistant generator 对拍两种情形，不再依赖方案转述。
+5. 预期之外 HTTP 单列 unexpected_http。执行完整性与契约成功分开；CLI 输出 route pass/fail、stream fail、mismatch。退出码为 0 全部预期相符、1 契约／预期／隔离失败、2 准备错误、3 不完整。--out 必须在仓库外且为新文件。
+6. 同时封住 dependencies.connect／db.connection.connect、生成和救援函数，审计钩子保护原始 SQLite、网络、进程、模型／真实数据读取和文件变更。只注册一次、上下文启停并恢复 bytecode 与原依赖；被禁止尝试立即阻止并计数，真实调用计数字段表示接缝调用尝试，不再是假定 0。
+7. 账目使用显式校验，不依赖 assert。正常运行 query_log 行数等于实际 HTTP 200 轮次；投影异常发生在响应之后也保留真实 HTTP 状态与请求。非法访问可能在 query_log 已插入后触发 500：这种不一致写入 accounting_errors 并令整轮失败，保留报告，不能以异常掩盖计数或报成功。
+8. expected 的键、类型、路由枚举、结果与生成预期严格校验；每项判定有独立负例。新增 git_dirty 和检索、依赖、UI、配置、审计守卫关键源文件身份；旧报告／原始结果不覆盖。
+
+两位只读复核另外发现 4 项 MEDIUM／P2 和 2 项 LOW，全部补独立失败测试后修复：周工时同时支持前置“每周”和后置 weekly，完整日期过滤不再误删连字符工时区间，检查器升为 2.3-review-ranges；SQLite authorizer 拒绝 ATTACH／DETACH，FAISS 原生文件入口及项目模型加载／推理接缝按尝试计数并拒绝，覆盖缓存模块绕过导入检查的情况；同对象重入在替换 cleanup stack 之前拒绝；HTTP 500／503／非 JSON 的历史复用实际 ApiClient 安全转换，保留 Retry-After 提示。关键源码身份增加 API client、db.connection 和模型 backend。另补非法枚举类型／非整数 k 的准备错误契约。
+
+单变量对照固定世界、用例、重排器与 k，仅改变查询向量路径。向量专属正确候选数为正常 3/3、常数 1/3、反主题 0/3、禁用 0/3；正常 Recall@10=1、MRR=0.30556，常数 Recall@10=1/3，其余 0。它证明合成评测能检测这些退化，不代表真实模型质量或性能提升。hybrid 与 vector_required 子集分别记录 n 与 k。
+
+新增 `eval/route_guard.py` 与 `tests/test_opt06_review_checker.py`、`test_opt06_review_routes.py`、`test_opt06_review_integrity.py`、`test_opt06_review_guards.py`、`test_opt06_review_followup.py`、`test_opt06_review_native.py`、`test_opt06_review_validation.py`；更新原世界／用例／评测／CLI／检查器和相关测试。原冻结路由测试中的数量、字段名、指标名及错误历史断言按审查确认的契约有意升级；历史冻结证据保留在仓库外，不沿用第一轮覆盖结论。
+
+第二轮最终验收：18 文件定向 **557 passed／4 warnings／84.63 秒**，串行全量 **3980 passed／7 warnings／414.07 秒，exit 0**。全量前后 16 个非文档文件哈希一致，8 个最终冻结测试文件核对通过；新增准备校验文件只追加双候选提示测试，原七项红色断言的源码前缀哈希另核对。15 个 Python 文件 Ruff F/E9/B 通过，默认九布局快照全部相同，没有 --write。七个全量警告仍为三项 SWIG 类型和四次 HTTP 422 名称弃用。17 个变更文件 UTF-8／LF、whitespace 和公开差异有限模式扫描通过；运行目录、共享夹具、历史评测 JSON 对第二轮起点无差异。
+
+指定去重后的 56 个变异 ID 加 11 个守卫／复核变异，在上述 18 文件定向范围、6 worker 下 **67/67 killed**。精确副本绿色基线另为 **557 passed／4 warnings／28.89 秒**；67 项逐一核对原始日志中的实际 FAILED 身份，无存活、仅 setup ERROR 或未解决超时，不称全 tests/ 变异或 67 种互不相同的故障类。中间轮 59/60 的 E06 存活曾暴露最近字段测试没有两个可识别提示；保留原断言、补双向 hours／difficulty 后，最终 E06 有实际字段选择断言失败。中间日志不覆盖，也不与最终 67 项相加。
+
+独立薄 CLI 工作区版为 42 用例全部完成／48 轮，route／stream 各 pass 48、fail 0，generation mismatch=0；query_log=实际 HTTP 200=44，其他表不变，受控接缝非法尝试计数全 0。39 个完整回答含 5 个故意硬失败；stream_error=4、no_answer=1、not_applicable=4，另列 partial_hard_fail=1，均符合显式脚本预期。提交后的干净版本 CLI 和四组向量对照单独封存，不覆盖工作区报告。完整 ID、红绿基线、两位只读复核与修复、最终源码／报告身份和日志入口都在仓库外 WORKLOG。
+
 ### 已知、未处理
 
 - 真实 API、真实模型和本机真实索引层不在本批，不读取真实数据。
 - 同句课程／字段归属、冲突数值和课号检查只是有限文本信号，不证明答案正确，不自动跨句推断。
-- 合成 `good` 标签不保证所有信号为零：未提及的证据课程也可能触发遗漏冲突数值；记录归属词只检查数值前 20 个字符，超出窗口时仍可能误报为评价归属。完整运行保留原回答与信号，不通过改脚本措辞隐藏这些边界。
-- 合成世界不代表真实检索质量；离线层固定 production_quality_verified=false。只有两个 hybrid 指标样本，不外推到真实课程分布。
+- 第一轮保留的两处噪声已修：未提及课程不借用其他课程文本，记录归属词在同一分句内回看 40 字符；仍是有限文本启发式。good 标签只承诺显式 expected_generation，不证明全部事实正确。
+- 合成世界不代表真实检索质量；离线层固定 production_quality_verified=false。当前 hybrid 指标 n=6、向量专属 n=3，不外推到真实课程分布。
+- 合成来源 URL 仍使用 NEU 域名：生产 schema 明确只接受官方目录 URL，本批不放宽或绕过校验。Synthetic 名称、标题、未核验说明与离线证据层标记保留，禁止任何网络访问；此 NIT 如需彻底替换，须另定来源 schema 契约。
 - partial／no_answer／HTTP 决策分开列出；部分回答保留 checks 供查看，但不计入完整回答 checked 分母。已执行的预期失败脚本不等于 harness_error。
+- 隔离针对项目已知接缝、Python audit 事件和合成连接；不是 OS 沙箱，不能阻止任意恶意 native／ctypes 调用。当前零计数仅代表这些受控接缝没有触发非法尝试。
 
 ### 发布状态
 

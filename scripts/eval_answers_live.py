@@ -143,12 +143,14 @@ def conflict_values(records: list[dict]) -> tuple:
         catalog = evidence.get("catalog") or {}
         pairs = {"credits": [metadata.get("credits"), catalog.get("credits")]}
         for item in evidence["field_evidence"]:
-            pattern = (r"(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|小时)\s*(?:(?:a|per|each)\s+week|/\s*(?:week|wk|周))" if item["field"] == "workload_hours_per_week"
-                       else r"(?:difficulty|难度)\D{0,12}(\d+(?:\.\d+)?)" if item["field"] == "difficulty_score" else None)
-            if pattern:
+            patterns = ((r"每周\s*(\d+(?:\.\d+)?)\s*(?:小时|hours?\b|hrs?\b)",
+                         r"(\d+(?:\.\d+)?)\s*(?:hours?\b|hrs?\b|小时)\s*(?:(?:a|per|each)\s+week\b|weekly\b|/\s*(?:week\b|wk\b|周))")
+                        if item["field"] == "workload_hours_per_week" else
+                        (r"(?:difficulty|难度)\D{0,12}(\d+(?:\.\d+)?)",) if item["field"] == "difficulty_score" else ())
+            if patterns:
                 pairs.setdefault(item["field"], [metadata.get(item["field"])]).append(item["supported_value"])
                 pairs[item["field"]].extend(
-                    float(match[1]) for match in re.finditer(pattern, item["quote"], re.I))
+                    float(match[1]) for pattern in patterns for match in re.finditer(pattern, item["quote"], re.I))
         for name, candidates in pairs.items():
             values = tuple(sorted({float(value) for value in candidates if type(value) in (int, float)}))
             if len(values) > 1:
@@ -190,14 +192,20 @@ def checker_identity() -> dict:
 def code_identity() -> dict:
     files = ("api/routes/chat.py", "api/routes/common.py", "api/routes/search.py", "llm/prompts/chat_v4.py",
              "llm/prompts/chat_v3.py", "rag/answer_evidence.py", "eval/answer_checks.py",
-             "scripts/eval_answers_live.py", "db/init.sql", "app/chat_view.py")
+             "scripts/eval_answers_live.py", "db/init.sql", "app/chat_view.py", "app/state_manager.py",
+             "app/streamlit_app.py", "rag/hybrid.py", "rag/reranker.py", "rag/retriever.py", "api/dependencies.py",
+             "config/settings.py", "rag/acronyms.py", "rag/hyde.py", "rag/index.py", "api/main.py",
+             "app/api_client.py", "db/connection.py", "rag/embedder.py", "rag/onnx_backend.py", "rag/openvino_backend.py")
     try:
         result = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
                                 capture_output=True, text=True, timeout=5, check=True)
         commit = result.stdout.strip()
+        dirty = bool(subprocess.run(["git", "-C", str(PROJECT_ROOT), "status", "--porcelain"],
+                                   capture_output=True, text=True, timeout=5, check=True).stdout.strip())
     except (OSError, RuntimeError, subprocess.SubprocessError):
         commit = None
-    return {"git_commit": commit, "code_files_sha256": {
+        dirty = None
+    return {"git_commit": commit, "git_dirty": dirty, "code_files_sha256": {
         name: hashlib.sha256((PROJECT_ROOT / name).read_bytes()).hexdigest() for name in files}}
 
 

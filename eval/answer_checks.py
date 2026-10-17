@@ -18,12 +18,13 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.2-review-identity"
+CHECKER_VERSION = "2.3-review-ranges"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
 ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
 WORKLOAD_UNIT = re.compile(r"小时|\bhours?\b|\bhrs?\b|每周|per week", re.I)
 DIFFICULTY_UNIT = re.compile(r"难度|difficulty|/\s*5\b", re.I)
 COURSE_COUNT_UNIT = re.compile(r"\s*(?:门|courses?\b|classes?\b|prerequisites?\b)", re.I)
+NUMERIC_DATE = re.compile(r"(?<!\d)(?:\d{4}([-/])\d{1,2}\1\d{1,2}|\d{1,2}([-/])\d{1,2}\2\d{4})(?!\d)")
 
 # JSON field names and warning/notice codes the prompt contains; an answer must not print them.
 FIELD_NAMES = ("snapshot_id", "source_kind", "recorded_sources", "field_evidence", "catalog_url",
@@ -297,8 +298,8 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
                     before_number, after_number = sentence[:number.start()], sentence[number.end():]
                     if (re.match(r"\s*(?:[%％]|次|assignments?\b)", after_number, re.I)
                             or re.search(r"(?:学分|credits?|GPA|日期|date)\s*(?:为|是|of|is|:)?\s*$", before_number, re.I)
-                            or re.search(r"\d[-/]$", before_number)
-                            or re.match(r"[-/]\d", after_number) and not re.match(r"/5\b", after_number)):
+                            or any(date.start() <= number.start() and number.end() <= date.end()
+                                   for date in NUMERIC_DATE.finditer(sentence))):
                         continue
                     candidates = [(code, name) for code, name, candidate in context.unstated
                                   if candidate == value and (course is None or code == course)]

@@ -19,11 +19,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], allow_abbrev=False)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
-    if args.out.exists() or not args.out.parent.is_dir():
+    if args.out.exists() or not args.out.parent.is_dir() or args.out.resolve().is_relative_to(ROOT):
         print("setup error: --out must be a new file in an existing directory", file=sys.stderr)
         return 2
     try:
-        from eval.route_eval import run_eval
+        from eval.route_eval import exit_code, run_eval
 
         report = run_eval()
         with args.out.open("x", encoding="utf-8", newline="\n") as handle:
@@ -32,10 +32,15 @@ def main(argv=None):
     except (OSError, ValueError) as exc:
         print(f"offline evaluation error: {type(exc).__name__}", file=sys.stderr)
         return 2
+    except RuntimeError as exc:
+        print(f"offline evaluation incomplete: {type(exc).__name__}", file=sys.stderr)
+        return 3
     print(json.dumps({"status": report["status"], "evidence_layer": report["evidence_layer"],
-                      "population": report["population"], "production_quality_verified": False}))
+                      "population": report["population"], "production_quality_verified": False,
+                      "route_pass": report["route_contract"]["pass"], "route_fail": report["route_contract"]["fail"],
+                      "stream_fail": report["stream_contract"]["fail"], "expectation_mismatches": report["expectation_mismatches"]}))
     # Deliberately bad scripted answers are negative controls, not a failed harness run.
-    return 0 if report["status"] == "complete" else 1
+    return exit_code(report)
 
 
 if __name__ == "__main__":
