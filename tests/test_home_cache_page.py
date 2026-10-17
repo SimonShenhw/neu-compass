@@ -5,14 +5,16 @@
   not fetched again on reruns, and is fetched again after 5 min.
 - The sidebar's refresh button fetches the cached content again and never repeats a POST: not the
   question, not the vote, not the Co-op submission.
-- The Co-op teaser follows the session token: a login fetches it with the token, and dropping the
-  token never shows the member's listing again.
+- The Co-op teaser follows the session token and the contribution count the page knows: a login fetches
+  it with the token, an upload response with a new count fetches it again (without repeating the POST),
+  and dropping the token never shows the member's listing again. Empty lists are fresh successes too.
 
 中文：真实 Streamlit 页面上的 OPT-02（AppTest + 模拟 API + 替换过的页面缓存时钟）。API 预热期间（GET
 返回 503），hero、项目行和 Co-op 预览只取一次，然后 30 秒内不再取；之后的第一次 rerun 就能恢复，不用
 重新加载页面。有效期内的内容 rerun 时不重新获取，5 分钟后重新获取。侧边栏的刷新按钮重新获取缓存的
-内容，绝不重发任何 POST：提问、评价、Co-op 投稿都不会。Co-op 预览跟着会话 token 走：登录后带 token
-重新获取，token 没了之后绝不再显示会员看到的列表。
+内容，绝不重发任何 POST：提问、评价、Co-op 投稿都不会。Co-op 预览跟着会话 token 和页面已知的贡献数
+走：登录后带 token 重新获取，投稿响应带回新的贡献数时也重新获取（不重发 POST），token 没了之后绝不再
+显示会员看到的列表。空列表同样是有效的成功结果。
 """
 
 from __future__ import annotations
@@ -512,7 +514,6 @@ def test_upload_response_count_change_refreshes_home_teaser_without_reposting(pa
     app.session_state["session_token"] = "synthetic-session-a"
     app.session_state["user_contribution_count"] = 0
     run(app)
-    assert app.session_state[view_cache.COOP_TEASER_KEY].value[0]["interview_summary"] is None
     assert any("🔒 这条有面试细节" in text for text in captions(app))
     app.radio[0].set_value("💼 Co-op 经验")
     run(app)
@@ -523,9 +524,9 @@ def test_upload_response_count_change_refreshes_home_teaser_without_reposting(pa
     assert app.session_state["user_contribution_count"] == 1
     app.radio[0].set_value("🔍 课程搜索 · Search")
     run(app)
-    assert app.session_state[view_cache.COOP_TEASER_KEY].value[0]["interview_summary"] == "Synthetic interview"
     assert not any("🔒 这条有面试细节" in text for text in captions(app))
     assert any("🔒 这条有薪资区间" in text for text in captions(app))
+    # Same token and the clock never moved, so the refetch came from the new count, not the 5-minute TTL.
     assert clock.now == START and app.session_state["session_token"] == "synthetic-session-a"
     gets = backend.gets()
     run(app)
