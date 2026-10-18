@@ -53,8 +53,85 @@ ROWS = (
     ("AAI", 9027, "Control Systems", "robotics control motion", 4, "Fall 2026"),
     ("DS", 9028, "Visual Systems", "vision images classification", 4, "Fall 2026"),
 )
-SETTING_NAMES = ("rejection_mode", "hyde_rescue", "acronym_expansion", "fusion_mode", "fusion_weight", "rerank_pool_size", "enable_reranker")
+SETTING_NAMES = ("rejection_mode", "hyde_rescue", "acronym_expansion", "fusion_mode", "fusion_weight", "rerank_pool_size",
+                 "enable_reranker", "rescue_min_probability")
+# The repository's production compose file documents the deployed values of some of these; the profile measured here
+# is the code defaults, and every difference is reported. 中文：仓库的生产 compose 写了部署值；这里测的是代码默认值，
+# 差异逐项写进报告。
+COMPOSE_ENV = {name: name.upper() for name in SETTING_NAMES}
 SYNTHETIC_GLOSSARY = {"GPH": ("graph algorithms",)}
+
+
+def _yaml_block(lines, path):
+    """The stripped lines nested under a key path of a block-style YAML file (indentation only: no flow style, anchors
+    or multi-line values). Keys may be quoted, and the last block may be a list at its key's own indentation.
+    中文：按缩进取出块格式 YAML 里某个键路径下的各行；键可以带引号，最后一层可以是和键同缩进的列表。"""
+    parent, child, depth, found = -1, None, 0, []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        level = len(line) - len(line.lstrip())
+        if level < parent or (level == parent and not (depth == len(path) and stripped.startswith("-"))):
+            break
+        if child is None:
+            child = level
+        if depth == len(path):
+            found.append(stripped)
+        elif level == child and re.fullmatch(rf"([\"']?){re.escape(path[depth])}\1:\s*(?:#.*)?", stripped):
+            parent, child, depth = level, None, depth + 1
+    return found if depth == len(path) else []
+
+
+def _unquote(text):
+    text = re.split(r"\s+#", text, maxsplit=1)[0].strip()
+    return text[1:-1] if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"" else text
+
+
+def _interpolate(text):
+    """`${VAR:-default}` / `${VAR-default}` is its default; an empty default, `$VAR` and any other `${...}` leave the
+    value to the host environment (None); `$$` is a literal dollar sign."""
+    if (match := re.fullmatch(r"\$\{\w+:?-([^}]*)\}", text)) and match[1]:
+        return match[1]
+    return None if re.search(r"(?<!\$)\$(?:\{|[A-Za-z_])", text.replace("$$", "")) else text.replace("$$", "$")
+
+
+def documented_deployment():
+    """Deployed values as written for the api service in docker-compose.yml (text only; never the NAS, never .env).
+
+    Reads `services.api.environment` in map form (`KEY: value`) or list form (`- KEY=value`, also at the key's own
+    indentation); quotes, comments and a byte-order mark are stripped. A name the api service does not set, or leaves
+    to the host environment (`KEY:`, `KEY: null`, `KEY: ~`, `- KEY`, `$VAR`), is None; `- KEY=` is an empty string.
+    中文：只读 compose 文本里 api 服务的 environment（映射或列表写法），去掉引号、注释和 BOM；没写、或留给宿主环境的
+    （映射写法的空值、null、~、$VAR）是 None；列表写法的 `- KEY=` 是空字符串。
+    """
+    lines = (ROOT / "docker-compose.yml").read_text(encoding="utf-8-sig").splitlines()
+    written = {}
+    for item in _yaml_block(lines, ("services", "api", "environment")):
+        key, sep, value = _unquote(item[1:]).partition("=") if item.startswith("-") else item.partition(":")
+        raw = re.split(r"\s+#", value, maxsplit=1)[0].strip()
+        listed = item.startswith("-")  # "- KEY=" sets an empty string; "KEY:" leaves the value to the host
+        empty = not sep or (not raw and not listed) or (not listed and raw in ("null", "Null", "NULL", "~"))
+        written[_unquote(key.strip())] = None if empty else _interpolate(_unquote(raw))
+    return {name: written.get(env) for name, env in COMPOSE_ENV.items()}
+
+
+# How pydantic reads a boolean setting from the environment. 中文：pydantic 从环境变量读布尔值的方式。
+_BOOL_TEXT = {"1": True, "true": True, "yes": True, "on": True, "t": True, "y": True,
+              "0": False, "false": False, "no": False, "off": False, "f": False, "n": False}
+
+
+def _same_value(default, written):
+    if written is None:
+        return True
+    if isinstance(default, bool):
+        return _BOOL_TEXT.get(written.strip().lower()) is default
+    if isinstance(default, (int, float)):
+        try:
+            return float(written) == float(default)
+        except ValueError:
+            return False
+    return written == str(default)
 
 
 def topic_vector(text):
@@ -187,10 +264,16 @@ class SyntheticWorld:
             raise RuntimeError("cannot reenter a synthetic world; nesting is forbidden")
         if Path(".env").exists():
             raise ValueError("run the offline world from a directory without .env")
+        deployed = documented_deployment()
+        from config import settings as configured
+
         self.stack = ExitStack()
         try:
             from eval.route_guard import OfflineGuard
-            self.guard = self.stack.enter_context(OfflineGuard(ROOT / "data"))
+            # Also guard the configured real database and index paths, wherever SQLITE_PATH / FAISS_INDEX_PATH point.
+            # 中文：同时保护配置里真实库和索引的路径，不管环境变量指到哪里。
+            self.guard = self.stack.enter_context(OfflineGuard(
+                ROOT / "data", protected=(Path(configured.sqlite_path), Path(configured.faiss_index_path))))
             import api.dependencies as dependencies
             import api.routes.chat as chat
             import api.routes.common as common
@@ -210,21 +293,33 @@ class SyntheticWorld:
             from rag.onnx_backend import OnnxEmbedder, OnnxReranker
             from rag.openvino_backend import OvEmbedder, OvReranker
 
-            self.config = {name: {"value": type(settings).model_fields[name].default, "source": "production",
-                                  "production_default": type(settings).model_fields[name].default} for name in SETTING_NAMES}
-            for name, item in self.config.items():
-                value = item["value"]
-                self.stack.enter_context(patch.object(settings, name, value))
+            fields = type(settings).model_fields
+            for name in SETTING_NAMES:
+                self.stack.enter_context(patch.object(settings, name, fields[name].default))
             self.stack.enter_context(patch.object(settings, "answer_feedback_enabled", False))
             self.settings = settings
             for name, value in (("RERANK_POOL_SIZE", settings.rerank_pool_size), ("BLEND_ALPHA", common.BLEND_ALPHA),
                                 ("RERANKER_REJECT_THRESHOLD", common.RERANKER_REJECT_THRESHOLD)):
                 self.stack.enter_context(patch.object(chat, name, value))
-            for key, value in (("blend_alpha", chat.BLEND_ALPHA), ("reject_threshold", chat.RERANKER_REJECT_THRESHOLD)):
-                self.config[key] = {"value": value, "source": "production", "production_default": value}
-            self.config.update({"deployment_verified": False,
-                "answer_feedback_enabled": {"value": False, "source": "harness_pin", "production_default": type(settings).model_fields["answer_feedback_enabled"].default},
-                "glossary": {"value": SYNTHETIC_GLOSSARY, "source": "harness_pin", "production_default": "external data, not read"}})
+            # value = what the route actually uses (read back after patching); code_default = read independently.
+            # 中文：value 是路由实际用的值（打补丁后回读）；code_default 另外独立读取，两者不一致就是隐藏的钉值。
+            effective = {name: getattr(settings, name) for name in SETTING_NAMES}
+            effective["rerank_pool_size"] = chat.RERANK_POOL_SIZE
+            self.config = {name: {"value": effective[name], "source": "code_default", "code_default": fields[name].default,
+                                  "documented_deployment": deployed[name],
+                                  "differs_from_documented_deployment": not _same_value(fields[name].default, deployed[name])}
+                           for name in SETTING_NAMES}
+            for key, attr in (("blend_alpha", "BLEND_ALPHA"), ("reject_threshold", "RERANKER_REJECT_THRESHOLD")):
+                self.config[key] = {"value": getattr(chat, attr), "source": "code_default",
+                                    "code_default": getattr(common, attr), "documented_deployment": None,
+                                    "differs_from_documented_deployment": False}
+            self.config.update({
+                "profile": "code_defaults", "deployment_verified": False, "documented_deployment_source": "docker-compose.yml",
+                "documented_deployment_differs": sorted(name for name in SETTING_NAMES
+                                                        if self.config[name]["differs_from_documented_deployment"]),
+                "answer_feedback_enabled": {"value": False, "source": "harness_pin",
+                                            "code_default": fields["answer_feedback_enabled"].default},
+                "glossary": {"value": SYNTHETIC_GLOSSARY, "source": "harness_pin", "code_default": "external data, not read"}})
             for module in (dependencies, connection):
                 self.stack.enter_context(patch.object(module, "connect", side_effect=lambda *a, **k: self.guard.deny("database_attempts")))
             for module, name in ((dependencies, "generate_text_stream"), (gemini, "generate_text_stream"), (hyde, "rescue_expand")):
@@ -247,16 +342,14 @@ class SyntheticWorld:
                 return original_fusion(rankings, **kwargs)
 
             self.stack.enter_context(patch.object(hybrid_module, "reciprocal_rank_fusion", capture_fusion))
+            # The world's own connection and every other one opened while it is active go through guarded_connect: no
+            # ATTACH, and a connection opened any other way is refused (eval/route_guard.py).
+            # 中文：世界自己的连接和存续期间新开的连接都走 guarded_connect：不能 ATTACH；用别的方式新开连接会被拒绝。
+            from eval.route_guard import guarded_connect
+
+            self.stack.enter_context(patch.object(sqlite3, "connect", guarded_connect(sqlite3.connect)))
             self.conn = sqlite3.connect(":memory:", check_same_thread=False)
             self.stack.callback(self.conn.close)
-
-            def authorize(action, *args):
-                if action in {sqlite3.SQLITE_ATTACH, sqlite3.SQLITE_DETACH}:
-                    self.guard.counters["database_attempts"] += 1
-                    return sqlite3.SQLITE_DENY
-                return sqlite3.SQLITE_OK
-
-            self.conn.set_authorizer(authorize)
             self.conn.row_factory = sqlite3.Row
             self.conn.execute("PRAGMA foreign_keys=ON")
             self.conn.executescript((ROOT / "db/init.sql").read_text(encoding="utf-8"))

@@ -80,15 +80,24 @@ def test_metrics_have_exact_subset_denominators_and_degradation_loses_actual_hit
     from eval.route_eval import load_cases, run_eval
 
     report = run_eval()
-    assert report["route_contract"]["hybrid_metrics"]["n"] == 6
+    assert report["route_contract"]["hybrid_metrics"]["n"] == 11
     assert report["route_contract"]["vector_required_metrics"]["n"] == 3
+    assert report["route_contract"]["lexical_required_metrics"]["n"] == 5
     cases = [item for item in load_cases()["cases"] if item.get("vector_required")]
     for mode in ("constant", "anti_topic", "disabled"):
         broken = run_eval(cases, vector_mode=mode)
+        # Round 17 (F25a N1): the trace check is the tie-independent signal for every mode. Candidate loss is asserted
+        # only where it does not depend on how FAISS orders exact ties (not for constant query vectors).
+        # 中文：第 17 轮：轨迹检查对每种退化都不依赖并列名次；常数模式丢不丢候选取决于并列顺序，不再断言。
+        # A disabled vector leg leaves fusion with nothing to fuse, so the trace itself is missing; both fail closed.
+        assert all({"vector_top_mismatch", "trace_missing"} & set(actual["turns"][0]["route_contract"]["reasons"])
+                   for actual in broken["cases"])
         metrics = broken["route_contract"]["vector_required_metrics"]
-        assert 0 <= metrics["recall_at_10"] < 1 and 0 <= metrics["mrr"] <= 1
-        assert any(not set(item["turns"][0]["expected"]["must_include"]) <= set(actual["turns"][0]["result_ids"])
-                   for item, actual in zip(cases, broken["cases"]))
+        assert 0 <= metrics["recall_at_10"] <= 1 and 0 <= metrics["mrr"] <= 1
+        if mode != "constant":
+            assert metrics["recall_at_10"] < 1
+            assert any(not set(item["turns"][0]["expected"]["must_include"]) <= set(actual["turns"][0]["result_ids"])
+                       for item, actual in zip(cases, broken["cases"]))
 
 
 def test_saved_checker_hash_conflicts_and_layer_are_really_refreshed(tmp_path):

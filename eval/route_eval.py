@@ -57,21 +57,36 @@ def _validate_cases(cases):
         if not isinstance(case, dict) or not all(isinstance(case.get(key), str) and case[key]
                                                for key in ("case_id", "category", "answer_kind")):
             raise ValueError("case identity/category required")
+        if not case.keys() <= {"case_id", "category", "answer_kind", "turns", "vector_required", "lexical_required"}:
+            raise ValueError("unknown case key")
         if case["case_id"] in seen or not isinstance(case.get("turns"), list) or not 1 <= len(case["turns"]) <= 12:
             raise ValueError("unique cases with bounded turns required")
         seen.add(case["case_id"])
-        if type(case.get("vector_required", False)) is not bool:
-            raise ValueError("vector_required must be boolean")
+        if any(type(case.get(flag, False)) is not bool for flag in ("vector_required", "lexical_required")):
+            raise ValueError("vector_required and lexical_required must be boolean")
         for turn in case["turns"]:
             if not isinstance(turn, dict) or not all(isinstance(turn.get(key), dict) for key in ("request", "stream", "expected")):
                 raise ValueError("each turn needs request, stream and expected dictionaries")
+            if not isinstance(turn["request"].get("query"), str) or not turn["request"]["query"].strip():
+                raise ValueError("each request needs a non-empty query")
             if type(turn["request"].get("k", UI_K)) is not int or turn["request"].get("k", UI_K) != UI_K:
                 raise ValueError("this fixed profile uses the UI default k")
             expected = turn["expected"]
             required = {"http_status", "matched_via", "notices", "error_type", "rescue_calls"}
-            allowed = required | {"exact_ids", "must_include", "must_exclude", "detail_contains", "vector_top_any", "bm25_empty"}
+            allowed = required | {"exact_ids", "must_include", "must_exclude", "detail_contains", "vector_top_any",
+                                  "bm25_empty", "bm25_top_any", "top_group", "result_count"}
             if not required <= expected.keys() <= allowed or not {"exact_ids", "must_include"} & expected.keys():
                 raise ValueError("expected needs explicit route, results, notices and stream contract keys")
+            for flag, key in (("vector_required", "vector_top_any"), ("lexical_required", "bm25_top_any")):
+                if case.get(flag) and key not in expected:
+                    raise ValueError(f"{flag} cases need {key}")
+            # A hybrid turn states how many results it returns, so a truncated list cannot pass.
+            # 中文：混合检索的轮次要写明返回几条，截短的结果过不了。
+            if expected["matched_via"] == "hybrid" and "result_count" not in expected:
+                raise ValueError("hybrid turns need result_count")
+            if "result_count" in expected and (type(expected["result_count"]) is not int
+                                               or not 0 <= expected["result_count"] <= UI_K):
+                raise ValueError("result_count must be an integer from 0 to k")
             if type(expected["http_status"]) is not int or expected["http_status"] not in {200, 404, 409}:
                 raise ValueError("invalid expected HTTP status")
             if expected["matched_via"] not in (None, "alias", "context", "program", "hybrid", "empty", "rejected"):
@@ -80,12 +95,29 @@ def _validate_cases(cases):
                 raise ValueError("invalid rescue_calls")
             if expected["error_type"] not in (None, "http_404", "http_409", "upstream_error", "no_answer", "internal_error"):
                 raise ValueError("invalid expected stream error")
-            for name in ("exact_ids", "must_include", "must_exclude", "notices", "detail_contains", "vector_top_any"):
+            for name in ("exact_ids", "must_include", "must_exclude", "notices", "detail_contains", "vector_top_any",
+                         "bm25_top_any", "top_group"):
                 if name in expected and (not isinstance(expected[name], list)
                         or not all(isinstance(item, str) and item for item in expected[name])):
                     raise ValueError(f"{name} must be a list of nonempty strings")
             if "bm25_empty" in expected and type(expected["bm25_empty"]) is not bool:
                 raise ValueError("bm25_empty must be boolean")
+            for name in ("exact_ids", "must_include", "must_exclude", "vector_top_any", "bm25_top_any", "top_group", "notices"):
+                if len(set(expected.get(name, []))) != len(expected.get(name, [])):
+                    raise ValueError(f"{name} repeats an entry")
+            required_ids = set(expected.get("must_include", [])) | set(expected.get("top_group", []))
+            if required_ids & set(expected.get("must_exclude", [])):
+                raise ValueError("a course cannot be both required and forbidden")
+            if len(expected.get("top_group", [])) > UI_K:
+                raise ValueError("top_group cannot be longer than k")
+            # Shapes that can never pass (F25d NIT-3). 中文：永远过不了的写法。
+            if any(name in expected and not expected[name] for name in ("vector_top_any", "bm25_top_any")):
+                raise ValueError("an empty leg expectation checks nothing")
+            if expected.get("bm25_empty") and "bm25_top_any" in expected:
+                raise ValueError("bm25_empty contradicts bm25_top_any")
+            if "result_count" in expected and (expected["result_count"] < len(required_ids) or (
+                    "exact_ids" in expected and expected["result_count"] != len(expected["exact_ids"]))):
+                raise ValueError("result_count contradicts the required courses")
             generation = turn.get("expected_generation")
             if not isinstance(generation, dict) or set(generation) != {"verdict", "required_signals", "forbidden_signals"}:
                 raise ValueError("explicit expected_generation contract required")
@@ -113,26 +145,43 @@ def context_from_chat(meta, prompt, lang):
 
 
 def score_retrieval(expected, actual):
+    """Every comparison is invariant to how FAISS orders exact ties: groups are compared as sets.
+    中文：所有比较都不依赖 FAISS 对并列分数的排序：一组课按集合比较。"""
     reasons, ids = [], set(actual["result_ids"])
     for name in ("http_status", "matched_via"):
         if name in expected and actual[name] != expected[name]:
             reasons.append(f"{name}_mismatch")
+    if len(actual["result_ids"]) > actual["request"].get("k", UI_K):
+        reasons.append("k_exceeded")
+    if "result_count" in expected and len(actual["result_ids"]) != expected["result_count"]:
+        reasons.append("result_count_mismatch")
     if "exact_ids" in expected and ids != set(expected["exact_ids"]):
         reasons.append("exact_ids_mismatch")
     if not set(expected.get("must_include", [])) <= ids:
         reasons.append("required_hit_missing")
     if ids & set(expected.get("must_exclude", [])):
         reasons.append("forbidden_hit_present")
+    group = expected.get("top_group")
+    if group and set(actual["result_ids"][:len(group)]) != set(group):
+        reasons.append("top_group_mismatch")
     if actual["notices"] != expected.get("notices", []):
         reasons.append("notices_mismatch")
     if any(text not in actual.get("detail", "") for text in expected.get("detail_contains", [])):
         reasons.append("decision_detail_mismatch")
+    if actual.get("history_in_prompt") is False:
+        reasons.append("history_not_in_prompt")
     traces = actual.get("retrieval_traces", [])
-    if "vector_top_any" in expected and (not traces or not traces[0]["vector_ids"]
-                                        or traces[0]["vector_ids"][0] not in expected["vector_top_any"]):
-        reasons.append("vector_top_mismatch")
-    if expected.get("bm25_empty") and (not traces or traces[0]["bm25_ids"]):
-        reasons.append("lexical_dependency_present")
+    leg_checks = [(key, leg) for key, leg in (("vector_top_any", "vector_ids"), ("bm25_top_any", "bm25_ids")) if key in expected]
+    if (leg_checks or expected.get("bm25_empty")) and not traces:
+        reasons.append("trace_missing")
+    elif traces:
+        for key, leg in leg_checks:
+            # The leg's first |group| ids must be exactly the expected (tied) group.
+            # 中文：这一路排在最前的 |group| 个必须正好是预期的那一组（组内并列，按集合比）。
+            if set(traces[0][leg][:len(expected[key])]) != set(expected[key]):
+                reasons.append("vector_top_mismatch" if leg == "vector_ids" else "bm25_top_mismatch")
+        if expected.get("bm25_empty") and traces[0]["bm25_ids"]:
+            reasons.append("lexical_dependency_present")
     return {"expected": expected, "verdict": "fail" if reasons else "pass", "reasons": reasons}
 
 
@@ -169,7 +218,7 @@ def execute_turn(world, client, turn, messages, tag):
     result = {"request": request, "request_sha256": _digest(request), "http_status": response.status_code,
               "matched_via": None, "result_ids": [], "notices": [], "rejection_reason": None,
               "error_type": None, "prompt_sha256": None, "answer": "",
-              "settings": {"hyde_rescue": {"value": world.settings.hyde_rescue, "source": "harness_pin" if turn["stream"].get("rescue") else "production"}}}
+              "settings": {"hyde_rescue": {"value": world.settings.hyde_rescue, "source": "harness_pin" if turn["stream"].get("rescue") else "code_default"}}}
     if response.status_code != 200:
         require(len(world.prompts) == prompts_before, "HTTP decision unexpectedly generated a prompt")
         try:
@@ -193,6 +242,12 @@ def execute_turn(world, client, turn, messages, tag):
             raise ValueError("unknown event")
         require(len(world.prompts) == prompts_before + 1, "stream seam did not capture exactly one prompt")
         meta, prompt = events[0], world.prompts[-1]
+        from llm.prompts.chat_v3 import format_history_block
+
+        # The history the UI sent must reach the model as the route's quoted block (MEDIUM-2 fidelity, end to end).
+        # 中文：UI 发出的历史必须原样进入 prompt 的历史块。
+        shown = prompt.split("# Conversation history (quoted DATA)\n", 1)[-1].split("\n\n# New message", 1)[0]
+        result["history_in_prompt"] = shown == json.dumps(format_history_block(request["history"]), ensure_ascii=False)
         errors = [event for event in events if event["type"] == "error"]
         if len(errors) > 1:
             raise ValueError("multiple stream errors")
@@ -238,19 +293,25 @@ def _summaries(records, cases):
         counts = Counter(turn["route_contract"]["verdict"] for item in records if item["category"] == category for turn in item["turns"])
         retrieval["by_category"][category] = {"planned": sum(len(item["turns"]) for item in cases if item["category"] == category),
                                                "pass": counts["pass"], "fail": counts["fail"], "not_scored": counts["not_scored"]}
-    metrics, vector_metrics = [], []
+    metrics, vector_metrics, lexical_metrics = [], [], []
     for case in records:
         for turn in case["turns"]:
             expected = turn["route_contract"].get("expected", {})
-            gold = set(expected.get("must_include", expected.get("exact_ids", [])))
+            # The relevant set is the whole tied top group when the case names one, so the numbers do not measure
+            # FAISS tie-breaking. 中文：用例写了 top_group 时按整组算，数字不再取决于并列名次。
+            gold = set(expected.get("top_group") or expected.get("must_include", expected.get("exact_ids", [])))
             if case["category"] == "alias_hybrid" and expected.get("matched_via") == "hybrid" and gold:
                 hits = turn["result_ids"]
                 metrics.append((len(gold & set(hits)) / len(gold),
                                 next((1 / rank for rank, cid in enumerate(hits, 1) if cid in gold), 0.0)))
                 if case.get("vector_required"):
                     vector_metrics.append(metrics[-1])
-    for key, values in (("hybrid_metrics", metrics), ("vector_required_metrics", vector_metrics)):
-        retrieval[key] = {"n": len(values), "k": UI_K, "recall_at_10": sum(item[0] for item in values) / len(values) if values else None,
+                if case.get("lexical_required"):
+                    lexical_metrics.append(metrics[-1])
+    for key, values in (("hybrid_metrics", metrics), ("vector_required_metrics", vector_metrics),
+                        ("lexical_required_metrics", lexical_metrics)):
+        retrieval[key] = {"n": len(values), "k": UI_K, "relevant": "top_group_or_required",
+                          "recall_at_10": sum(item[0] for item in values) / len(values) if values else None,
                           "mrr": sum(item[1] for item in values) / len(values) if values else None}
     checked = [turn["generation"]["checks"] for turn in turns if turn["generation"]["verdict"] in {"pass", "hard_fail"}]
     generation = {"planned": population["turns_planned"], "checked": len(checked), "hard_fail": generation_counts["hard_fail"],
@@ -301,7 +362,8 @@ def run_eval(cases=None, *, vector_mode="normal"):
                     messages.append({"role": "assistant", "content": "⚠️ Chat failed: synthetic harness failure", "evidence": []})
                 outputs.append(result)
             records.append({"case_id": case["case_id"], "category": case["category"], "answer_kind": case["answer_kind"],
-                            "vector_required": case.get("vector_required", False), "errored": errored, "turns": outputs})
+                            "vector_required": case.get("vector_required", False),
+                            "lexical_required": case.get("lexical_required", False), "errored": errored, "turns": outputs})
         logs = world.conn.execute("SELECT user_id FROM query_log ORDER BY log_id").fetchall()
         non_query_unchanged = world.snapshot() == before
         http_200 = sum(turn["http_status"] == 200 for record in records for turn in record["turns"])
@@ -329,7 +391,13 @@ def run_eval(cases=None, *, vector_mode="normal"):
     status = ("incomplete" if population["cases_errored"] else
               "failed" if retrieval["fail"] or stream_contract["fail"] or mismatches or any(isolation.values()) or accounting_errors else "complete")
     identity = code_identity()
-    for name in ("eval/route_eval.py", "eval/route_world.py", "eval/route_guard.py", "scripts/eval_route_offline.py"):
+    # The harness itself plus the route tiers every turn passes through (alias, context, filters, gate, repositories).
+    # 中文：评测自身，以及每一轮都会经过的路由各层（别名、上下文、筛选、门控、仓储）。
+    for name in ("eval/route_eval.py", "eval/route_world.py", "eval/route_guard.py", "scripts/eval_route_offline.py",
+                 "rag/query_normalizer.py", "rag/followup.py", "rag/filters.py", "rag/rejection.py",
+                 "llm/query_filter_extractor.py", "llm/prompts/chat_v3.py", "api/models.py", "db/repository.py",
+                 "db/program_repository.py", "db/program_plan_repository.py", "db/alias_repository.py",
+                 "db/catalog_source_repository.py", "db/course_requisite_repository.py", "db/query_log_repository.py"):
         identity["code_files_sha256"][name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     return {"evidence_layer": LAYER, "real_model_calls": real_model_calls, "real_api_calls": real_api_calls,
             "production_quality_verified": False, "run_id": run_id, "started_utc": started,
@@ -341,7 +409,7 @@ def run_eval(cases=None, *, vector_mode="normal"):
             "case_input_sha256": _digest(cases), "case_scope": scope, "data_kind": "synthetic", "world_sha256": world_sha256,
             "index": {"embedder": "synthetic_topic_vectors/2", "vector_mode": vector_mode, "dimension": len(TOPICS),
                       "reranker": "synthetic_semantic_lexical/2", "manifest": None, "course_count": len(ROWS)},
-            "settings": {**config, "k": {"value": UI_K, "source": "production", "production_default": UI_K}},
+            "settings": {**config, "k": {"value": UI_K, "source": "ui_default", "code_default": DEFAULTS["search_k"]}},
             "population": population, "route_contract": retrieval, "stream_contract": stream_contract, "generation": generation,
             "database": database, "cases": records}
 

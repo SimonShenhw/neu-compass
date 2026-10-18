@@ -3094,7 +3094,7 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 从 origin/main `6e1a01d` 独立推进 C，不混入 B 的缓存修复。第一轮分 C-1、C-2 两个提交，第二轮按检查器／路由另做修复提交；本节预计编号 25，合并前按最终合并顺序调整。只改评测工具、测试和记录，线上运行路径不变。
 
-### 第一轮实现（保留历史；现行契约见第二轮修复）
+### 第一轮实现（保留历史；现行契约见第二轮修复和第 17 轮）
 
 1. C-1 的未陈述数值保留课程＋字段身份，只做 workload／difficulty；同句归属，单课可直接归属，不跨句继承。课程或字段判不出时保留未解析信号。
 2. 汇总和 Markdown 表列出 unattributed；新增课号超出证据、来源数值分歧未完整说明两个信号，不加入 HARD_FAILURES。
@@ -3138,7 +3138,7 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 第二轮先修检查器：旧上下文未知课程身份为 null，不冒充已知空证据；新无结果上下文仍是显式空集合。补跨句、字段匹配／最近提示／唯一字段兜底、未知课程、简写课号、非估计单位、冲突英文句末、同分句记录归属和多引文冲突测试。恢复坏文件测试的 --out 与“未创建输出目录”断言；保留旧 unstated_values 路径与新三元组双覆盖。检查器升为 2.2-review-identity。四文件红色基线 11 failed／87 passed，冻结相同断言实现后 98 passed／3 warnings／5.37 秒；这只是检查器定向，不代表整批返工验收。
 
-### 第二轮修复与现行契约
+### 第二轮修复（数字和部分契约已由第 17 轮更新，以下一节为准）
 
 1. 世界为 28 门 Synthetic 课程，42 用例／48 轮。真实 FAISS、BM25、融合／门控／路由与合成主题向量、语义＋词重叠重排替身组合；替身不读期望答案。新增 3 条向量专属查询，实际融合入口的 BM25 列表为空，记录向量／BM25 排名轨迹；补小写别名、中英 hybrid、追问加筛选、409 后恢复、救援成功与课号保护、部分回答泄露。
 2. 固定 UI 默认 k=10；候选池、缩写扩展、融合与门控配置按生产代码默认值读取，α／阈值使用 shared common 常量。配置逐项记录 value、source、production_default；合成词表替换真实词表，依赖替身、反馈关闭和逐轮脚本救援标为 harness_pin。deployment_verified=false，不读 NAS 实时配置或 .env。
@@ -3151,7 +3151,7 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 两位只读复核另外发现 4 项 MEDIUM／P2 和 2 项 LOW，全部补独立失败测试后修复：周工时同时支持前置“每周”和后置 weekly，完整日期过滤不再误删连字符工时区间，检查器升为 2.3-review-ranges；SQLite authorizer 拒绝 ATTACH／DETACH，FAISS 原生文件入口及项目模型加载／推理接缝按尝试计数并拒绝，覆盖缓存模块绕过导入检查的情况；同对象重入在替换 cleanup stack 之前拒绝；HTTP 500／503／非 JSON 的历史复用实际 ApiClient 安全转换，保留 Retry-After 提示。关键源码身份增加 API client、db.connection 和模型 backend。另补非法枚举类型／非整数 k 的准备错误契约。
 
-单变量对照固定世界、用例、重排器与 k，仅改变查询向量路径。向量专属正确候选数为正常 3/3、常数 1/3、反主题 0/3、禁用 0/3；正常 Recall@10=1、MRR=0.30556，常数 Recall@10=1/3，其余 0。它证明合成评测能检测这些退化，不代表真实模型质量或性能提升。hybrid 与 vector_required 子集分别记录 n 与 k。
+单变量对照固定世界、用例、重排器与 k，仅改变查询向量路径。向量专属正确候选数为正常 3/3、常数 1/3、反主题 0/3、禁用 0/3；正常 Recall@10=1、MRR=0.30556，常数 Recall@10=1/3，其余 0。它证明合成评测能检测这些退化，不代表真实模型质量或性能提升。hybrid 与 vector_required 子集分别记录 n 与 k。（第 17 轮更正：常数组的 1/3 和两个 MRR 取决于 FAISS 对并列分数的排序，不是真实的候选丢失或排序质量；检测能力来自轨迹检查，见下一节。）
 
 新增 `eval/route_guard.py` 与 `tests/test_opt06_review_checker.py`、`test_opt06_review_routes.py`、`test_opt06_review_integrity.py`、`test_opt06_review_guards.py`、`test_opt06_review_followup.py`、`test_opt06_review_native.py`、`test_opt06_review_validation.py`；更新原世界／用例／评测／CLI／检查器和相关测试。原冻结路由测试中的数量、字段名、指标名及错误历史断言按审查确认的契约有意升级；历史冻结证据保留在仓库外，不沿用第一轮覆盖结论。
 
@@ -3161,17 +3161,122 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 独立薄 CLI 工作区版为 42 用例全部完成／48 轮，route／stream 各 pass 48、fail 0，generation mismatch=0；query_log=实际 HTTP 200=44，其他表不变，受控接缝非法尝试计数全 0。39 个完整回答含 5 个故意硬失败；stream_error=4、no_answer=1、not_applicable=4，另列 partial_hard_fail=1，均符合显式脚本预期。提交后的干净版本 CLI 和四组向量对照单独封存，不覆盖工作区报告。完整 ID、红绿基线、两位只读复核与修复、最终源码／报告身份和日志入口都在仓库外 WORKLOG。
 
+### 第 17 轮评审与修复（2026-10-17–18，现行契约）
+
+第二轮之后又做了两份只读审查：路由侧 0 CRITICAL／0 HIGH／4 MEDIUM（另 5 LOW），检查器侧 0／0／1 MEDIUM（另 4 LOW）。评审方修复后，又做了六份只读复核，每份只看上一次的修复：
+- 第三份：0／0／0，另 4 LOW、7 NIT；
+- 第四份：0／0／0，另 4 LOW、6 NIT。4 条 LOW 是新规则带来的信号回退，NIT 是路由侧的遗留和文档；
+- 第五份：0／0／0，另 5 LOW、6 NIT。LOW 是检查器信号的回退或遗留；NIT 是没钉住的规则、量表、课号、路由侧的校验和 compose 读取，以及文档；
+- 第六份：0／0／0，另 5 LOW、6 NIT，都是检查器信号的回退、遗留和文档；
+- 第七份：0／0／0，另 9 LOW、5 NIT。这一份只把相对上一版的回退算作 LOW：8 条是第六份修复里的新规则在普通句子上越界（其中三条出自第六份原样建议的改法），1 条是文档；
+- 第八份（这一批的最后一份）：0／0／0，另 9 LOW、5 NIT，都是第七份修复里的规则边缘，各附一行改法，复核方已在副本上试过；评审方照改后没有再复核，靠全部探针、变异和全量验证。
+
+六份复核都不改硬失败。LOW 和 NIT 都已处理，写在下面各条里。第三份的 LOW-4 只修了能修的部分；剩下的部分、第五份的一条校验 NIT、第六份的两处句型、第七份退回上一版的两条写法和其他没修的 NIT 都写在「已知、未处理」。新发现由评审方修复，单独提交：
+
+1. **并列名次（MEDIUM）。** 主题向量是二值的，FAISS 对完全相同的分数按实现决定的顺序排。第二轮 9 条 must_exclude 里有 6 条、两个 MRR 和常数组的「1/3」都取决于插入顺序。
+   - must_exclude 只留筛选和前缀排除的 3 条；
+   - 新增 top_group：结果前 |组| 名必须正好是这一组，组内不计顺序；新增 k_exceeded；
+   - 向量和 BM25 轨迹都按整组比较；
+   - hybrid、向量专属、词专属三组指标都按整组计算（`relevant=top_group_or_required`），所以都是 1.0。它们是契约检查，不是质量数字；
+   - 新测试把 FAISS 插入顺序倒过来、再打乱三种，判定和指标必须逐项相同。
+2. **BM25 一路（MEDIUM）。** 新增 5 条词专属用例（BFS DFS、transactions、sensors、query optimization、geometry recognition），检查融合入口的 BM25 排名。
+   - 最后一条里 BM25 把含两个查询词的 DS 9019 排在只含一个的 DS 9010 前面，和语料顺序相反；
+   - BM25 返回空、倒序或所有命中同分，都会有用例失败，不管 FAISS 怎么排并列；
+   - 每个 hybrid 轮次写明 result_count，结果被截短就报 result_count_mismatch；
+   - 用例集现为 2.2-synthetic-ui10-counts，共 47 个用例、53 轮（第二轮的「42 用例／48 轮」是当时的数字）。
+3. **配置来源（MEDIUM）。**
+   - source 改为 code_default，旁边列出 `docker-compose.yml` 写的部署值和是否不同。目前有 5 项不同：候选池、拒答方式、HyDE 救援、融合方式和融合权重；`profile=code_defaults`；测试钉住这 5 项；
+   - compose 只读 api 服务的 environment，映射和列表两种写法都认（列表也可以和键同缩进），键和服务名可以带引号，去掉引号、注释和 BOM，`${VAR:-x}` 取默认值；留给宿主环境的（映射写法的空值、null、~、`$VAR`、`${VAR}`、空默认值）记为未写，列表写法的 `- KEY=` 是空字符串；布尔值按 pydantic 的读法比较；
+   - value 从路由实际使用的模块值回读，code_default 独立读取，两者不一致就是隐藏的钉值；
+   - 补记 rescue_min_probability；
+   - convex 融合和校准门不在这个离线档里。
+4. **隔离守卫（MEDIUM＋LOW）。**
+   - 每条审计规则补一条在合成世界里的「拒绝并计数」测试；每个拒绝集合的每个成员另有单独的测试；
+   - 路由吞掉被拒的访问时，整轮仍然失败；
+   - 新增拒绝：socket.bind／sendto／gethostbyname、进程派生、修改文件权限和时间、加载 SQLite 扩展；
+   - 合成世界存续期间，新的 SQLite 连接只能用 `sqlite3.connect` 打开，打开后同样不能 ATTACH。用 `sqlite3.dbapi2.connect`、`sqlite3.Connection(...)`、`_sqlite3.connect` 或提前保存的函数新开连接，会被拒绝并计数。原因是 SQLite 用自己的 VFS 读附加的文件，文件读取规则看不到；
+   - 配置里的真实库和索引路径受保护，不管指向哪里。
+5. **路由评测的 LOW。**
+   - 缺少融合轨迹时报 trace_missing，不再给出误导性的原因；
+   - 追问轮的历史必须原样进入 prompt，否则报 history_not_in_prompt；
+   - 以下都是准备错误：用例级的未知键、缺少 query、同时必须出现又禁止的课号（含 top_group 与 must_exclude 重叠）、同一列表里重复的课号或 notice、比 k 长的 top_group、旗标缺少对应的轨迹检查、hybrid 轮次缺 result_count、空的 vector_top_any 或 bm25_top_any、bm25_empty 和 bm25_top_any 同时出现、result_count 少于必须出现的课数或不等于 exact_ids 的长度；
+   - CLI：未预期的异常退出 3，隔离违规退出 1；控制台行加上 isolation 和 accounting_errors；准备错误给出一行原因；
+   - 路由评测的源码身份增加别名、上下文、筛选、门控和各仓储模块。
+6. **检查器（MEDIUM＋LOW）。**
+   - **记录归属：** 看数字前最近的来源。来源可以是记录、评价、论坛上的说法或别人（同学、有人、老师、旁听生、很多人、Reddit、commenter 等）、估计，也可以是记录缺口。
+     - 说记录里没有这个数的记录词是缺口，不是来源。三种写法：
+       - 记录词前有否定，中间只隔着数值或填充词（「未记录」「没有工作量记录」「没有该课程的工作量记录」「no recorded」「no workload in the record」「missing from the record」「not listed in the record」）；
+       - 分句里的否定词后面是数值、数据词或什么都没有（「记录里没有工作量」「记录里没有每周学习时间」「记录里没有评价数据」「记录里没有。」「the record has no weekly hours」「the record doesn't report hours」「the record is silent on hours」）。也可以是：
+         - 并列的第二个宾语，后面到分句结尾或转折词（「记录里没有评价和工作量数据，」「the record doesn't list exams or workload;」）。第二项以动词开头时是另一个谓语，不算（「has no reviews and lists the workload:」；「有关」不是动词）；跟在别的宾语后面的评分类词也不算（「no student reviews or ratings」）；
+         - 补语说的也是数值（「no information about how many hours it takes」）；补语里的 office hours、lab hours、exam scores 不算；
+         - 下一个分句以「也没有」「and no」「nor」接着说，宾语（连同并列的第二个宾语）里有评分以外的数值词（「记录里没有评价，也没有工作量数据」「也没有评分和工作量数据」；「, and no ratings」不算）；
+         - 记录词的动词后面紧跟冒号时，冒号后面仍是同一分句（「记录显示：没有工作量数据」）；
+       - 数值后面跟着「未知、缺失、不详、是空的」或 unknown、as unknown（「记录中工作量未知」「工作量一栏是空的」）；
+     - 否定别的东西是记录说的内容，不是缺口：「记录显示没有期末考试，每周 12 小时」「记录显示没有数据结构的先修要求」「the record lists no data science prereq and 12 hours」「the record has no reviews but lists 12 hours」「the record has no details on the final exam but lists 12 hours」仍算记录。
+       - 「数据结构」「数据库」「data science」「评分标准」这类复合词不算数据词；只修饰课程类名词的数值词也不算（「数值分析先修要求」「数值分析的先修要求」「评分比例」「data processing prereq」）；中间隔着「和、或」，或不是紧挨着「先修、前置」的「的」时不算修饰（「没有工作量和先修要求」「没有工作量方面的要求」是缺口）；
+       - 学生、评价类词只在引出数据词、每周时间或估计时才算（「没有学生的评价数据」「没有学生每周学习时间的数据」「no reviewer estimates of hours」是缺口，「没有学生评分」不是）；
+       - report、cover、track 在动词否定后面（doesn't track、not report）、数值词前面（中间可隔 on、about、the 之类），或不紧跟 no 时在分句末尾的代词前面才算（「doesn't track this course's workload」「doesn't cover it」是缺口，「no tracks」不是）；statistics 只在 on、about、for、of 前面算填充词（「no statistics on workload」是缺口，「no statistics course」不是）；
+     - 只抹掉否定词和它的宾语，所以缺口里的「提到」「mention」不算报告，紧跟在后面的「有同学提到」仍算；
+     - 「学生评价记录」算评价；
+     - 单独的「说、表示、称、提到」不算来源：「记录明确表示 12 小时」「记录里提到 12 小时」仍算记录，「记录是 6，评价说 12」算评价；「名称」里的「称」不算；
+     - 论坛（论坛、帖子、forum）在这几种情况下才算来源：
+       - 后面紧跟报告动词、中间没有否定（「论坛上有人说」「the forum says」；「the forum does not mention」不算）；
+       - 写成 forum posts／users 这类说法，或跟在「据」「according to」后面（论坛前面至多隔一个词）；
+       - 数字就在同一分句里，离论坛不超过 20 个字，中间没有否定和连词，而且这个分句里论坛前面没有记录词（「论坛上的讨论显示每周 12 小时」「the forum consensus is 12 hours」）。转折词（while、but、而）也开始一个新分句，所以「the record lists 6 while the forum consensus is 12」里的论坛算来源。
+       - 其他提到论坛的地方不算：「课程论坛很活跃，」「助教会在论坛上答疑，」「the TA answers questions on the course forum;」「论坛上没有人提到工作量，」「记录显示每周需要在论坛发帖并投入 12 小时」「the course has a discussion forum and takes 12 hours」；
+     - 被否定的来源词不算来源，中间可以隔着「具体的、可用的、公布的、这方面的」这类词：「记录显示没有学生评价，每周 12 小时」「there are no available reviews」仍算记录；「没时间的同学说」仍算来源；
+     - 来源只挡住记录归属；算不算报告仍看报告词，所以「有同学说」「Reddit users think」这类没有报告词的说法算 unattributed；
+     - 旧上下文仍用 20 字符窗口。
+   - **简写课号：** 补「或、以及、跟」、全角逗号、&、vs 和 Oxford 式「, and」。以下情况不当课号：
+     - 后面跟着级别：-level、级、系列、以上、+，或区间「5000- or 6000-level」「5000–6000-level」「5000～6000 级」「5000 至 6000 级」。区间要有连字符、破折号或「至、到」；整千的数字之间用裸的 or、and、to、through、和、与、及、或、、、斜杠也算（「5000 or 6000-level」「5000/6000 级」）。所以「5200 or 6000-level」里的 5200 仍算课号；后面是「Level 2」这样的编号时不算级别；
+     - 表示级别的完整课号：写成「CS 6100-level」的任何课号，以及后面跟着级别词、「以上」、不接课号的加号或带破折号、「至、到」区间的整千课号（「any CS 6000-level elective」「CS 6000 级」「CS 6000 以上」「CS 6000+」「CS 5000–6000-level」）。非整千的课号照算（「CS 5800 级别的课」「CS 5100 Level 2 sections」）；整千也可能是真课号（CS 3000、DS 3000），所以后面跟着裸连接词、接另一个课号的加号或「以下」时也照算（「CS 3000 + CS 3800」「DS 3000 and 4000-level」「CS 3000 以下」）；
+     - 2010–2039 的数字后面跟着学期、目录、届或年份区间（2026–27）。DS 2001 这样的 20xx 课号保留。
+   - **非估计数字：** 补「个学分」、-credit、第 N、N 周／月／日、N 个作业／项目、days/weeks/projects/exams、数字后的 GPA、序数词和月份名。月份名只认完整拼写和缩写，区分大小写，所以「Maybe 12」「Decent 12」仍算估计。
+   - **引文冲突：**
+     - 补「每周约／大约 N 小时」和 every week；
+     - 上课类词（含 lab、recitation、实验课、习题课）只有在同一分句里紧挨着数字、且中间和它前面都没有「之外、不含、outside、besides」这类词时，这个数字才算上课时间，不算工作量；
+     - 换行算分句结束（「Lecture: MWF」下一行「Homework: 10 hours/week」）；只有以这个数字开头的行（前面至多一个 about、约之类的词），在上一行只是标签或折行（没有每周数字，也不是「标签：值」）时才接着上一行，所以单独成行的标签或折行仍和数字在同一分句（「Lectures:」下一行「3 hours a week」），「Lectures: 3 hours a week」下一行「10 hours a week outside class」不是；
+     - 指作业的说法不算上课：复合词（lab reports、实验课的报告、lecture notes、lecture prep），以及和作业并列的 lab／实验课（homework and labs）。其他上课类词和作业并列（「上课和作业每周约 10 小时」「Lectures and homework: 10 hours」）仍是含上课的总数，不比较；
+     - 本身就是作业时间的小时数不算上课（「10 hours a week of homework」「10 hours a week on the project」「每周 10 小时作业」）；
+     - 难度值要和「难度」在同一分句，不能是门数、小时数（含「3 - 5 hours」这样的小时区间）或量表，只取 1–5。量表只认 0 或 1 开头的写法（「Difficulty (1-5): 2」里的 1）；「Difficulty: 4-5」「难度 4～5 分」读第一个值。句末的英文句号不算小数点（「Difficulty: 3.」）。
+   - **代码身份：** code_identity 增加 `llm/gemini_client.py`、`schemas/answer_evidence.py`、`schemas/course.py`；git_dirty 只看已跟踪文件；git status 失败时保留 git_commit。
+   - 检查器版本升为 2.5-review-gaps。本批几次修复之间的判定有差别，但中间状态都没有发布，所以版本号以合并时这一版为准，没有逐次升版。
+7. **测试：** 新增 `tests/test_opt06_review_round17_checker.py` 和 `test_opt06_review_round17_routes.py`。按上面的契约有意更新了两处：
+   - `test_opt06_review_guards.py` 的退化测试：常数组不再断言丢失候选，只断言轨迹检查；指标分母改为 11／3／5；
+   - `test_opt06_review_routes.py` 的来源标签。
+
+第 17 轮验收（评审方，副本上）：20 文件定向（串行）**973 passed／4 warnings／50.73 秒**，串行全量 **4437 passed／7 warnings／335.74 秒，exit 0**；七个警告仍为三项 SWIG 类型和四次 HTTP 422 名称弃用。10 个 Python 文件 Ruff F/E9/B 通过，默认九布局快照全部相同，没有 --write。CLI 47 个用例、53 轮全部完成：路由 53／0、流式 53／0；生成侧 checked 44、hard_fail 5、stream_error 4、no_answer 1、not_applicable 4、partial_hard_fail 1；query_log 49 行，等于 HTTP 200 的 49 轮；隔离计数全为 0；三组指标 n=11／3／5，都是 1.0；配置差异正好是第 3 条的 5 项。路由探针：FAISS 插入顺序 64 种、BM25 顺序 23 种，判定和指标逐项相同；常数、倒序、截短和取样后丢掉 BM25 的打分各有用例失败。检查器探针：各份复核和评审方的 879 条，在 `fc15101` 和七次修复后的树上逐条比较，和前一版不同的都是有意的修复，旧上下文的结果不变。变异：第一次修复 178／182（另 4 个等价或被遮蔽），第一次跟进 134／134，之后依次 115／117、141／143、133／135、153／155、166／168（各有 2 个等价）。
+
 ### 已知、未处理
 
 - 真实 API、真实模型和本机真实索引层不在本批，不读取真实数据。
 - 同句课程／字段归属、冲突数值和课号检查只是有限文本信号，不证明答案正确，不自动跨句推断。
-- 第一轮保留的两处噪声已修：未提及课程不借用其他课程文本，记录归属词在同一分句内回看 40 字符；仍是有限文本启发式。good 标签只承诺显式 expected_generation，不证明全部事实正确。
-- 合成世界不代表真实检索质量；离线层固定 production_quality_verified=false。当前 hybrid 指标 n=6、向量专属 n=3，不外推到真实课程分布。
+- 检查器的文本规则仍是有限启发式：
+  - 记录归属看数字前最近的来源词，不做句法分析：「The record notes that others say it is fine and lists 12 hours」这种嵌套从句会算给别人；人名词表以外的说话人（如「主任称」）不算来源；
+  - 缺口看否定词后面的词表：「没有提到难度」算缺口，「does not say how hard it is」不算；缺口也不分字段，说难度缺失（含「no ratings」）同样会挡住后面的工作量数字；
+  - 缺口的几种句型之外仍会漏判或误判：
+    - 「There's nothing in the record about workload」这种否定在记录词前、数值在后面的写法不算缺口；「Per the record: the workload is unknown」这种冒号前没有动词的写法，冒号结束分句，也不算缺口；「neither … nor」不算否定；
+    - 记录词前的否定和记录词之间只要是填充词就算缺口，所以「Not that the record says much, but it lists 12 hours」算 unattributed；「the record lists difficulty 3, and not much else」仍算记录；
+    - 「doesn't report that, but it lists 12」里的代词宾语算缺口，又因为缺口不分字段，后面的数字也挡住了；「no student estimates; it lists 12」同样算缺口；
+    - 不修饰课程类名词的复合词（词表以外）仍可能误算成数据词；
+  - 论坛离数字超过 20 个字、或中间隔着连词时不算来源，这类长句里论坛给的数字会算给前面的记录；反过来，「requires weekly forum posts and takes 12 hours」这种只是提到论坛帖子的写法会算来源；
+  - 有报告词表以外动词的来源（「有同学说」「学长觉得」「Reddit users think」）只算 unattributed，不算 AS REVIEWER-REPORTED；两者都是要人看的信号；
+  - 来源词后面紧跟否定（「RMP 上没有这门课的数据」）仍会挡住前面的记录归属；论坛后面跟着报告动词时，不看动词说的是什么（「置顶帖子提到了考试安排，每周 12 小时」算报告）；
+  - 上课类词离数字超过 25 个字符就不看，所以「Lectures plus homework come to 10 hours a week」这类总数仍按工作量比较；含上课的总数（「每周 10 小时（含上课）」）不比较；标签和数字之间隔着空行时不再接成一个分句；
+  - 非整千数字之间的裸 to、or 不算区间，所以「5200 to 6000-level」里的 5200 算课号；整千的完整课号后面跟着裸连接词的区间（「CS 5000 or 6000-level」）或另一个完整课号的级别（「CS 6000 or CS 7000-level」）时仍算课号，因为 CS 3000、DS 3000 这样的整千课号是真课；「CS 6000 及以上」「CS 6000 and above」也仍算课号；
+  - 「Difficulty (1-5): 2」「Difficulty 0-5: 4」这类先写量表的引文读不到真正的难度值（宁可读不到，也不把量表当成值）；
+  - 两段式日期（12/4、12-4）仍可能被当成估计；
+  - 多课回答里一个课号都没写的句子，不检查冲突；
+  - good 标签只承诺显式 expected_generation，不证明全部事实正确。
+- 合成世界不代表真实检索质量；离线层固定 production_quality_verified=false。当前 hybrid 指标 n=11、向量专属 3、词专属 5，按整组计算，只是契约检查，不外推到真实课程分布。
+- 离线档用的是代码默认值，不是 compose 里的部署配置（候选池 10、校准门、HyDE 救援、convex 0.7）；convex 融合和校准门没有被这份评测覆盖。compose 读取只认块写法，不认 flow 写法（`{KEY: v}`）和锚点。
+- 轨迹只在 RRF 融合的入口取样。融合之后才出现的排序错误（例如融合在取样后丢掉 BM25 一路），只能靠 top_group、must_include 和 result_count 间接发现；能不能发现取决于 FAISS 怎么排并列分数，换 FAISS 版本可能变。
+- 几条 NIT 没改，都不影响判定：重评结果里 code_files_sha256 和 answer_checks_sha256 并存；合成词表的 GPH 没有用例用到；summarize_reports 只校验证据层级，不按世界分组；所有轮次共用一个连接，也没有每轮超时；别名轮次的 must_include 不在 exact_ids 里、或 exact_ids 和 must_exclude 重叠时仍能通过校验（这样的用例永远过不了，但已有的打分测试正是用这两种写法检查 required_hit_missing 和 forbidden_hit_present）。
 - 合成来源 URL 仍使用 NEU 域名：生产 schema 明确只接受官方目录 URL，本批不放宽或绕过校验。Synthetic 名称、标题、未核验说明与离线证据层标记保留，禁止任何网络访问；此 NIT 如需彻底替换，须另定来源 schema 契约。
 - partial／no_answer／HTTP 决策分开列出；部分回答保留 checks 供查看，但不计入完整回答 checked 分母。已执行的预期失败脚本不等于 harness_error。
-- 隔离针对项目已知接缝、Python audit 事件和合成连接；不是 OS 沙箱，不能阻止任意恶意 native／ctypes 调用。当前零计数仅代表这些受控接缝没有触发非法尝试。
+- 隔离针对项目已知接缝、Python audit 事件和合成连接；不是 OS 沙箱，不能阻止任意恶意 native／ctypes 调用、预先保存的其他原函数引用和合成世界之前就打开的 SQLite 连接，也看不到复制到受保护路径之外的数据库副本。当前零计数仅代表这些受控接缝没有触发非法尝试。
 
 ### 发布状态
 
-分支 `feat/opt06-offline-route-eval`，起点 `6e1a01d`；不推送、不建 PR、不合并、不部署。本批只改评测工具和测试，不需要部署；文件虽随以后镜像打包，运行时不导入 eval。
+分支 `feat/opt06-offline-route-eval`，原起点 `6e1a01d`，合并前已 rebase 到 origin/main `d97b382`（B 的第 24 节在前）。评审方的第 17 轮修复单独提交。本批只改评测工具和测试，不需要部署；文件虽随以后镜像打包，运行时不导入 eval。
 

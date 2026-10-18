@@ -134,7 +134,7 @@ def test_new_world_and_cases_use_ui_config_and_explicit_provenance():
     assert all(turn["request"]["k"] == 10 for case in report["cases"] for turn in case["turns"])
     assert report["settings"]["rerank_pool_size"]["value"] == 20
     assert report["settings"]["acronym_expansion"]["value"] is True
-    assert report["settings"]["blend_alpha"]["source"] == "production"
+    assert report["settings"]["blend_alpha"]["source"] == "code_default"
     assert report["settings"]["deployment_verified"] is False
     assert "recall_at_10" in report["route_contract"]["hybrid_metrics"]
     assert report["database"]["query_log_rows"] == report["database"]["http_200_turns"]

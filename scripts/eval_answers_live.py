@@ -134,6 +134,91 @@ def _keys(node, found: set[str]) -> set[str]:
     return found
 
 
+# Weekly workload forms in a quote: "每周（约）N 小时" and "N hours a/per/each/every week", "weekly", "/week".
+# 中文：引文里的每周工作量写法。
+WEEKLY_HOURS = (
+    re.compile(r"每周\s*(?:约|大约|大概|平均|需要|要|花)?\s*(\d+(?:\.\d+)?)\s*(?:个\s*)?(?:小时|hours?\b|hrs?\b)", re.I),
+    re.compile(r"(\d+(?:\.\d+)?)\s*(?:hours?\b|hrs?\b|小时)\s*"
+               r"(?:(?:a|per|each|every)\s+week\b|weekly\b|/\s*(?:week\b|wk\b|周))", re.I),
+)
+# A difficulty value in the same clause as the word, not a count, hours (also a range of hours) or the scale ("难度适中，
+# 每周 3 小时" has no difficulty value; in "Difficulty (1-5): 2" the 1 is the scale, while "Difficulty: 4-5" reads 4).
+# 中文：难度值要和「难度」在同一分句，且不是门数、小时数（含小时区间）或量表（「难度（1-5）」里的 1 是量表；「难度 4～5
+# 分」读 4）。
+DIFFICULTY_VALUE = re.compile(r"(?:difficulty|难度)(?:(?![，,；;。!?！？]|\.\s)\D){0,12}(\d+(?:\.\d+)?)"
+                              r"(?!\d|\.\d|(?<=(?<![\d.])[01])\s*[-–~～]\s*5\b|"
+                              r"(?:\s*[-–~～]\s*\d+(?:\.\d+)?)?\s*(?:个|门|次|周|小时|hours?\b|hrs?\b|weeks?\b|days?\b))", re.I)
+CLASS_TIME = re.compile(r"lectures?\b|\blabs?\b|recitations?\b|discussion\s+sections?|office\s+hours?|in\s+class\b|"
+                        r"class\s+(?:time|meets?)|上课|课时|答疑|讲座|实验课|习题课|讨论课|小时的课", re.I)
+# Class words that name work, not a session: compounds ("lab reports", "实验课的报告", "lecture notes"), and lab words
+# that share the subject with work ("homework and labs"); other class words in a shared subject stay class time, so
+# "上课和作业每周 10 小时" is a total with class time and is not compared. Hours that are themselves work ("10 hours a
+# week of homework", "每周 10 小时作业") are never class time. 中文：指作业而不是上课的说法：复合词（「实验课的报告」）和
+# 与作业并列的实验课（「作业和实验」）；其他上课类词和作业并列仍算含上课的总数，不比较。本身就是作业时间的小时数不算上课。
+WORK_NOUN = (r"(?:homework|assignments?|problem\s+sets?|psets?|reports?|projects?|write-?ups?|readings?|essays?|"
+             r"作业|报告|项目|论文|阅读|习题(?!课))")
+CLASS_COMPOUND_WORK = re.compile(rf"\s*(?:的|'s)?\s*(?:{WORK_NOUN}|notes|slides|materials?|prep(?:aration)?|复习|预习)", re.I)
+LAB_WORD = re.compile(r"labs?|实验课", re.I)
+LAB_AND_WORK = re.compile(rf"\s*(?:and|&|/|、|和|与|及|以及|plus|or)\s*(?:the\s+)?{WORK_NOUN}", re.I)
+WORK_BEFORE_CLASS = re.compile(rf"{WORK_NOUN}\s*(?:and|&|/|、|和|与|及|以及|plus|or)\s*(?:the\s+)?$", re.I)
+WORK_AFTER_HOURS = re.compile(rf"[ \t]*(?:of|on)[ \t]+(?:(?:the|a|an|my|your|their)[ \t]+)?{WORK_NOUN}|的[ \t]*{WORK_NOUN}|"
+                              rf"{WORK_NOUN}", re.I)
+# Words that put class time outside the number ("outside of lectures", "不含上课"): the number is then the workload.
+# 中文：把上课时间排除在外的词（「之外」「不含」）：这时数字就是工作量本身。
+CLASS_TIME_EXCLUDED = re.compile(r"\b(?:outside|besides|beyond|excluding|apart\s+from|aside\s+from|other\s+than|"
+                                 r"not\s+(?:counting|including)|in\s+addition\s+to|on\s+top\s+of)\b|除|之外|以外|不含|不包括|"
+                                 r"不算|另有", re.I)
+QUOTE_CLAUSE_END = re.compile(r"[，,；;。!?！？]|\.(?!\d)")
+# What may stand before a weekly number that opens its line and so may continue the line above, and the "label: value"
+# shape of a line that is already a complete item. 中文：数字开头的那一行里，数字前面可以有的词（这样的行可以接着上一行）；
+# 以及已经是完整一项的「标签：值」行。
+QUOTE_LINE_LEAD = re.compile(r"\s*(?:about|around|roughly|approximately|approx|~|约|大约|大概|平均)?\s*", re.I)
+QUOTE_LABEL_VALUE = re.compile(r"[:：]\s*\S")
+
+
+def _quote_clause(quote: str, match: re.Match) -> tuple[int, int]:
+    """Start and stop of a weekly number's clause in a quote. Punctuation and line breaks end a clause, except that a
+    line which opens with the number continues the line above when that line is a bare label or a wrapped phrase: no
+    weekly number and no "label: value" of its own ("Lectures:\\n3 hours a week" stays together; "Lecture: MWF\\n10
+    hours/week outside class" and "Lectures: 3 hours a week\\n10 hours a week outside class" do not).
+    中文：引文里每周数字所在分句的起止。标点和换行结束分句；但以这个数字开头的行，在上一行只是标签或折行（没有每周数字，
+    也不是「标签：值」）时接着上一行：「上课时间：\\n每周 3 小时」在同一分句，「上课：周二\\n每周 10 小时课外」不是。"""
+    ends = [end.end() for end in QUOTE_CLAUSE_END.finditer(quote, 0, match.start())]
+    line_start = quote.rfind("\n", 0, match.start()) + 1
+    if line_start and QUOTE_LINE_LEAD.fullmatch(quote, line_start, match.start()):
+        above = quote.rfind("\n", 0, line_start - 1) + 1
+        line = quote[above:line_start - 1]
+        if not any(pattern.search(line) for pattern in WEEKLY_HOURS) and not QUOTE_LABEL_VALUE.search(line):
+            line_start = above
+    stops = [end.start() for end in QUOTE_CLAUSE_END.finditer(quote, match.end())][:1]
+    newline = quote.find("\n", match.end())
+    return max(ends + [line_start]), min(stops + ([newline] if newline >= 0 else []) + [len(quote)])
+
+
+def _class_time(quote: str, match: re.Match) -> bool:
+    """Whether class time, not the workload, owns a weekly number: a class-time word in the number's clause (see
+    _quote_clause), near it, with no exclusion word between them or right before the word, that does not name work
+    (see WORK_NOUN). Hours that are themselves work are never class time. 中文：每周小时数是不是上课时间：同一分句里、
+    紧挨着有上课类词，两者之间、或上课类词前面没有「之外、不含」这类词，且这个词指的不是作业；本身就是作业时间的小时数
+    不算上课时间。"""
+    start, stop = _quote_clause(quote, match)
+    if WORK_AFTER_HOURS.match(quote, match.end()):
+        return False
+    for word in CLASS_TIME.finditer(quote, max(start, match.start() - 25), min(stop, match.end() + 12)):
+        if CLASS_COMPOUND_WORK.match(quote, word.end()) or (LAB_WORD.fullmatch(word[0]) and (
+                LAB_AND_WORK.match(quote, word.end())
+                or WORK_BEFORE_CLASS.search(quote, max(start, word.start() - 25), word.start()))):
+            continue
+        if word.end() <= match.start():
+            excluded = (CLASS_TIME_EXCLUDED.search(quote, word.end(), match.start())
+                        or CLASS_TIME_EXCLUDED.search(quote, max(start, word.start() - 15), word.start()))
+        else:
+            excluded = CLASS_TIME_EXCLUDED.search(quote, match.end(), max(match.end(), word.start()))
+        if not excluded:
+            return True
+    return False
+
+
 def conflict_values(records: list[dict]) -> tuple:
     """Numeric disagreements visible in the prompt, not a claim that either source is correct.
     中文：只记提示词里可见的数值分歧，不裁定哪一来源正确。"""
@@ -143,14 +228,20 @@ def conflict_values(records: list[dict]) -> tuple:
         catalog = evidence.get("catalog") or {}
         pairs = {"credits": [metadata.get("credits"), catalog.get("credits")]}
         for item in evidence["field_evidence"]:
-            patterns = ((r"每周\s*(\d+(?:\.\d+)?)\s*(?:小时|hours?\b|hrs?\b)",
-                         r"(\d+(?:\.\d+)?)\s*(?:hours?\b|hrs?\b|小时)\s*(?:(?:a|per|each)\s+week\b|weekly\b|/\s*(?:week\b|wk\b|周))")
-                        if item["field"] == "workload_hours_per_week" else
-                        (r"(?:difficulty|难度)\D{0,12}(\d+(?:\.\d+)?)",) if item["field"] == "difficulty_score" else ())
+            patterns = (WEEKLY_HOURS if item["field"] == "workload_hours_per_week" else
+                        (DIFFICULTY_VALUE,) if item["field"] == "difficulty_score" else ())
             if patterns:
                 pairs.setdefault(item["field"], [metadata.get(item["field"])]).append(item["supported_value"])
-                pairs[item["field"]].extend(
-                    float(match[1]) for pattern in patterns for match in re.finditer(pattern, item["quote"], re.I))
+                for pattern in patterns:
+                    for match in pattern.finditer(item["quote"]):
+                        value = float(match[1])
+                        # Class time and office hours are weekly hours too, but not the workload; difficulty is 1–5.
+                        # 中文：上课和答疑时间也是每周小时数，但不是工作量；难度只取 1–5。
+                        if item["field"] == "workload_hours_per_week" and _class_time(item["quote"], match):
+                            continue
+                        if item["field"] == "difficulty_score" and not 1 <= value <= 5:
+                            continue
+                        pairs[item["field"]].append(value)
         for name, candidates in pairs.items():
             values = tuple(sorted({float(value) for value in candidates if type(value) in (int, float)}))
             if len(values) > 1:
@@ -195,16 +286,18 @@ def code_identity() -> dict:
              "scripts/eval_answers_live.py", "db/init.sql", "app/chat_view.py", "app/state_manager.py",
              "app/streamlit_app.py", "rag/hybrid.py", "rag/reranker.py", "rag/retriever.py", "api/dependencies.py",
              "config/settings.py", "rag/acronyms.py", "rag/hyde.py", "rag/index.py", "api/main.py",
-             "app/api_client.py", "db/connection.py", "rag/embedder.py", "rag/onnx_backend.py", "rag/openvino_backend.py")
+             "app/api_client.py", "db/connection.py", "rag/embedder.py", "rag/onnx_backend.py", "rag/openvino_backend.py",
+             "llm/gemini_client.py", "schemas/answer_evidence.py", "schemas/course.py")
+    commit = dirty = None
     try:
-        result = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
-                                capture_output=True, text=True, timeout=5, check=True)
-        commit = result.stdout.strip()
-        dirty = bool(subprocess.run(["git", "-C", str(PROJECT_ROOT), "status", "--porcelain"],
-                                   capture_output=True, text=True, timeout=5, check=True).stdout.strip())
+        commit = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
+                                capture_output=True, text=True, timeout=5, check=True).stdout.strip()
+        # Tracked changes only: this run's own untracked output (an --out inside the checkout) is not a code change.
+        # 中文：只看已跟踪文件的改动；本次运行写进仓库的未跟踪输出不算代码改动。
+        dirty = bool(subprocess.run(["git", "--no-optional-locks", "-C", str(PROJECT_ROOT), "status", "--porcelain",
+                                    "--untracked-files=no"], capture_output=True, text=True, timeout=5, check=True).stdout.strip())
     except (OSError, RuntimeError, subprocess.SubprocessError):
-        commit = None
-        dirty = None
+        pass
     return {"git_commit": commit, "git_dirty": dirty, "code_files_sha256": {
         name: hashlib.sha256((PROJECT_ROOT / name).read_bytes()).hexdigest() for name in files}}
 

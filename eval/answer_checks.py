@@ -18,13 +18,44 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.3-review-ranges"
+CHECKER_VERSION = "2.5-review-gaps"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
 ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
+# A second number after a separator shares the first code's department ("CS 5800 和 5200"), unless it reads as a level
+# ("7000-level", "5000- or 6000-level", "5000–6000 级", "6000 系列", "6000+") or, for a 2010–2039 number, a year: a term,
+# a catalog or cohort word, or the rest of a year range ("2026 Fall", "2026 catalog", "2027 届", "2026–27"). DS 2001
+# stays a course, and so does 5200 in "5200 or 6000-level": a range needs a dash, 至/到, or a hyphen before "or",
+# except after a round thousand ("5000 or 6000-level", "5000/6000 级" are levels).
+SHORT_CODE = re.compile(r"\s*(?:以及|或者|还是|和|与|及|或|跟|、|，|,\s*(?:and|or)\b|and\b|or\b|vs\.?|&|[,/])\s*"
+                        r"(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
+SHORT_CODE_LEVEL = re.compile(r"\s*(?:(?:-\s*(?:or|and|to|through|或|和|至|到)|[~～–—\-－]|至|到)\s*\d{4}\s*)?-?\s*"
+                              r"(?:level\b(?!\s*\d)|级|年|学年|series\b|系列|以上|以下|\+)", re.I)
+SHORT_CODE_ROUND_RANGE = re.compile(r"\s*(?:or|and|to|through|或|和|与|及|、|/)\s*\d{4}\s*-?\s*(?:level\b|级|series\b|系列|以上|\+)",
+                                    re.I)
+# A full code that names a level is not a course: any code written "CS 6100-level", and a round thousand followed by a
+# level word, 以上, a "+" that does not lead into another code, or a range with a dash or 至/到 ("CS 6000 级", "CS 6000
+# 以上", "CS 6000+", "CS 5000–6000-level"). Real courses can be round thousands (CS 3000, DS 3000), so a bare connective,
+# "+ CS 3800" or 以下 after one keeps it, and so do "CS 5800 级别的课" and "CS 5800 Level 2". 中文：表示级别的完整课号不算
+# 课：写成「CS 6100-level」的任何课号，以及后面跟着级别词、「以上」、不接课号的加号或带破折号、「至、到」区间的整千课号；
+# 整千也可能是真课号（CS 3000、DS 3000），后面是裸连接词、接课号的加号或「以下」时仍算课。
+FULL_CODE_HYPHEN_LEVEL = re.compile(r"-\s*level\b(?!\s*\d)", re.I)
+FULL_CODE_LEVEL = re.compile(r"\s*(?:(?:-\s*(?:or|and|to|through|或|和|至|到)|[~～–—\-－]|至|到)\s*\d{4}\s*)?-?\s*"
+                             r"(?:level\b(?!\s*\d)|级|series\b|系列|以上|\+(?!\s*[A-Za-z]{2,4}\s*\d))", re.I)
+SHORT_CODE_YEAR = re.compile(r"\s*(?:fall|spring|summer|winter|秋|春|夏|冬|catalog\b|目录|届|学年|academic\s+year|cohort\b|"
+                             r"[-–—/~]\s*(?:20)?\d\d(?!\d))", re.I)
 WORKLOAD_UNIT = re.compile(r"小时|\bhours?\b|\bhrs?\b|每周|per week", re.I)
 DIFFICULTY_UNIT = re.compile(r"难度|difficulty|/\s*5\b", re.I)
 COURSE_COUNT_UNIT = re.compile(r"\s*(?:门|courses?\b|classes?\b|prerequisites?\b)", re.I)
 NUMERIC_DATE = re.compile(r"(?<!\d)(?:\d{4}([-/])\d{1,2}\1\d{1,2}|\d{1,2}([-/])\d{1,2}\2\d{4})(?!\d)")
+# Numbers that count something else or name a date, week or grade; identified contexts never read them as estimates.
+NOT_ESTIMATE_AFTER = re.compile(r"\s*(?:[%％]|次|assignments?\b|个\s*学分|个?\s*(?:作业|项目|考试|测验)|[周月日号]|"
+                                r"days?\b|weeks?\b|projects?\b|exams?\b|quiz(?:zes)?\b|homework\b|GPA\b|(?:st|nd|rd|th)\b)"
+                                r"|-\s*credits?\b", re.I)
+NOT_ESTIMATE_BEFORE = re.compile(r"(?:(?:学分数?|credits?|GPA|日期|date)\s*(?:要求|requirement)?\s*(?:为|是|of|is|:)?|第)\s*$",
+                                 re.I)
+# Month names and their abbreviations only, capitalised: "Maybe 12" and "Decent 12" are estimates.
+MONTH_BEFORE = re.compile(r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|"
+                          r"Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s*$")
 
 # JSON field names and warning/notice codes the prompt contains; an answer must not print them.
 FIELD_NAMES = ("snapshot_id", "source_kind", "recorded_sources", "field_evidence", "catalog_url",
@@ -143,6 +174,132 @@ REPORT_CUE = re.compile(r"报告|称|表示|提到|指出|反映|认为|评价(�
                         r"\bnote[sd]?\b|\bdescribe|\breviews?\b|\breviewers?\b", re.I)
 ESTIMATE_CUE = re.compile(r"估计|估算|推断|推测|抽取|提取|整理|得出|预估|estimat|inferr|\binfer\b|extract|derived", re.I)
 RECORD_CUE = re.compile(r"记录|存储|recorded|stored|the record|record shows|record lists", re.I)
+# A record cue that says the record lacks the value marks a data gap, not a source: a negation before the cue with only
+# the value or filler words (GAP_FILLER) in between ("未记录", "没有工作量记录", "no recorded", "no workload in the
+# record", "missing from the record"); a negation in the cue's clause whose object is the value, a data word or nothing
+# at all ("记录里没有工作量", "记录里没有。", "the record has no workload figure", "the record doesn't say", "the record is
+# silent on hours"), also as the second of two objects ("no reviews or workload data") or in a next clause that goes on
+# with 也没有 / "and no" ("记录里没有评价，也没有工作量数据"); or a value followed by a word of absence ("记录中工作量未知").
+# A negation of anything else is part of what the record says ("记录显示没有期末考试", "the record lists no prerequisites
+# and 12 hours"). "学生评价记录" / "review record" is the reviews' own record. 中文：记录词前有否定、中间只隔着数值或
+# 填充词（「未记录」「没有工作量记录」）；或分句里的否定词后面是数值、数据词或什么都没有（「记录里没有工作量」「记录里
+# 没有。」），也可以是并列的第二个宾语（「没有评价和工作量数据」），或下一个以「也没有」接着说的分句；或数值后面跟着
+# 「未知、缺失」，才算数据缺口；否定别的东西（「记录显示没有期末考试」）是记录说的内容。「学生评价记录」是评价的记录。
+GAP_NEGATION = re.compile(r"没有|没(?!错)|未(?!来)|无(?!论|误|疑)|不含|不包括|缺少?|查不到|找不到|为空|"
+                          r"\b(?:no|not|nothing|none|never|lacks?|lacking|silent|missing|absent|empty|blank)\b|n't\b", re.I)
+# Value and data words. A compound that names a subject is not data ("数据结构", "data science", "评分标准").
+# 中文：数值和数据词；表示学科的复合词（「数据结构」「评分标准」）不算数据。
+GAP_DATA = (r"每周(?:的)?(?:要花)?(?:多少)?(?:学习)?(?:时间|时长|小时数?)|学习(?:时间|时长)|工作量|小时|时长|资料|"
+            r"数据(?!结构|库|科学|挖掘|分析|处理|集|管理|可视化|工程|通信|隐私)|信息(?!检索|安全|论|系统|科学|技术|管理|可视化|学)|"
+            r"\b(?:workload|hours?|figures?|info)\b|\bnumbers?\b(?!\s+theory)|"
+            r"\bdata\b(?!\s+(?:science|structures?|mining|analy(?:sis|tics)|engineering|visuali[sz]ation|management|privacy|ethics))|"
+            r"\binformation\b(?!\s+(?:retrieval|security|theory|systems?|science|technology|visuali[sz]ation))")
+GAP_VALUE = (r"难度|学时|课时|数值|分数(?!线)|数字(?!逻辑|电路|信号|媒体|图像|化)|评分(?!标准|方式|细则|规则|办法|方法|机制)|"
+             rf"\b(?:difficulty|values?|details?|estimates?|scores?|ratings?)\b|{GAP_DATA}")
+# Words that may stand between the negation and the value. A review or student word counts only when it leads into a
+# data word or an estimate; report/cover/track count right after a verb negation, before a value word, or (not right
+# after "no") before a pronoun that ends the clause; statistics only before on/about/for/of. So "没有学生的评价数据",
+# "the record doesn't track this course's workload", "doesn't cover it" and "no statistics on workload" are gaps, while
+# "记录显示没有评价，每周 12 小时", "no student ratings", "no tracks" and "no statistics course" are not.
+# 中文：否定词和数值之间可以出现的词；评价、学生类词只在引出数据词或估计时才算（「没有学生的评价数据」是缺口，「没有学生
+# 评分」「记录显示没有评价，……」不是）；report/cover/track 在动词否定后面、数值词前面，或（不紧跟 no 时）分句末尾的代词前面
+# 才算；statistics 只在 on、about、for、of 前面才算。
+GAP_FILLER = (r"提到|提及|写明|写出|写|列明|列出|列|给出|给|说明|显示|提供|公布|统计|标明|标注|注明|记载|包含|包括|涉及|这个|"
+              r"这项|这方面|这门课程|该课程|本课程|这门课|该课|本课|该|此|相关|具体|关于|有关|每周|每星期|一周|平均|投入|时间|可用|的|"
+              rf"(?:评价|评论|点评|学生|\b(?:reviews?|reviewers?|students?)\b)(?=\s*(?:的\s*)?(?:(?:评价|评论|点评|"
+              rf"\b(?:reviews?|reviewers?)\b)\s*(?:的\s*)?)?(?:{GAP_DATA}|\bestimates?\b))|"
+              rf"\b(?:reports?|covers?|tracks?)\b(?=(?:\s+(?:the|a|an|any|its|this|anything|weekly|on|about|for|of))*"
+              rf"\s*(?:{GAP_VALUE}))|"
+              r"(?<!\bno\s)\b(?:reports?|covers?|tracks?)\b(?=(?:\s+(?:it|this|that|them|anything|any|of))*\s*(?:[，,；;。.!?！？:：]|$))|"
+              r"(?:(?<=n't )|(?<=not )|(?<=never ))\b(?:reports?|covers?|tracks?)\b|"
+              r"\b(?:statistics|stats)\b(?=\s+(?:on|about|for|of|regarding)\b)|"
+              r"[A-Za-z]{2,4}\s*\d{4}[A-Z]?(?:'s)?|per[- ]week|"
+              r"\b(?:says?|states?|lists?|mentions?|gives?|shows?|includes?|contains?|has|have|provides?|specif(?:y|ies)|"
+              r"indicates?|publish(?:es)?|records?|any|such|this|that|it|its|a|an|the|on|about|"
+              r"for|of|regarding|anything|one|course'?s?|class'?s?|weekly|hourly|per|week|time|commitment|available|"
+              r"availability|average|listed|known|given|provided)\b")
+RECORD_GAP_BEFORE = re.compile(rf"(?:没有|没|未|无|不在|不见于|(?:\b(?:no|not|never|without|missing|absent)|n't)\b)"
+                               rf"(?:\s*(?:被|曾|经|{GAP_VALUE}|{GAP_FILLER}|\b(?:been|be|in|from)\b))*\s*$", re.I)
+# The negated object: value and filler words. It is the value when it holds a value word that no complement follows,
+# or whose complement is about a value too ("没有工作量数据", "no information about how many hours it takes", not "no
+# details about the final exam"), or when nothing but a conjunction or the clause end follows. 中文：否定词后面的宾语：
+# 含有后面不跟「的、关于、about」这类补语、或补语说的也是数值的数值词，或后面只剩连词和分句结尾，才算说的是这个数。
+GAP_OBJECT = re.compile(rf"(?:\s*(?:{GAP_VALUE}|{GAP_FILLER}))*", re.I)
+GAP_VALUE_WORD = re.compile(GAP_VALUE, re.I)
+GAP_COMPLEMENT = re.compile(r"\s*(?:的|关于|有关|\b(?:about|on|for|of|regarding)\b)", re.I)
+# What a complement is about: up to a conjunction, a stop word or a number. Hours of a class or an office and rating
+# words there are not the value ("no details on office hours", "no info about exam scores").
+# 中文：补语说的内容，到连词、转折词或数字为止；其中的答疑、实验课等的小时数和评分类词不算数值。
+GAP_COMPLEMENT_OBJECT = re.compile(r"(?:(?!\s*(?:\b(?:and|or|nor|but)\b|和|与|及|或|但))\D)*", re.I)
+GAP_CLASS_QUALIFIER = re.compile(r"\b(?:office|lab|labs|class|lecture|lectures|contact|credit|exam|exams|quiz|test|section|"
+                                 r"recitation)[\s-]+$", re.I)
+# A value word that only modifies a course word is not the value ("no data processing prereq", "没有数值分析先修要求",
+# "没有数值分析的先修要求", "没有评分比例", "没有分数要求"); 和/或 in between, or 的 other than right before 先修/前置, end
+# the modifier ("没有工作量和先修要求", "没有工作量方面的要求" are gaps). 中文：只修饰课程类名词的数值词不是这个数（「没有
+# 数值分析先修要求」「没有评分比例」）；中间隔着「和、或」，或不是紧挨着「先修、前置」的「的」时不算修饰。
+GAP_MODIFIER = re.compile(r"(?:[\s-]+(?!(?:for|of|on|about|in|from|and|or|but|the|a|an)\b)[A-Za-z]+){0,2}?[\s-]+"
+                          r"(?:prereq(?:uisite)?s?|requirements?|background|courses?|classes?|electives?|majors?|minors?|"
+                          r"tracks?|concentrations?)\b|(?:(?!和|与|及|或|、|的)[一-鿿]){0,4}?(?:的(?=先修|前置))?"
+                          r"(?:先修|前置|要求|背景|基础|专业|方向|比例)", re.I)
+GAP_STOP = re.compile(r"\s*(?:但|不过|可是|而|\b(?:but|however|though|although|yet|while|whereas)\b)", re.I)
+# The first of two negated objects, which may be anything: "no reviews or", "没有考试安排和". The second is not an object
+# when it starts with a verb ("has no reviews and lists the workload:"), and a rating word there belongs to the reviews
+# ("no student reviews or ratings"). 中文：并列宾语的第一个，可以是任何词：「没有考试安排和……」；第二项以动词开头时不是
+# 宾语，其中的评分类词属于评价（「没有学生评价或评分」），都不算缺口。
+GAP_PAIR = re.compile(r"(?:\s*[A-Za-z][\w'-]*){1,3}?\s*\b(?:or|and|nor)\b|[一-鿿]{1,8}?(?:以及|和|与|及|或)", re.I)
+GAP_PAIR_VERB = re.compile(r"\s*(?:\b(?:says?|states?|lists?|mentions?|gives?|shows?|includes?|contains?|has|have|had|"
+                           r"provides?|specif(?:y|ies)|indicates?|publish(?:es)?|records?|notes?|reports?|covers?|tracks?|"
+                           r"is|are|was|were|puts?|sets?)\b|写|列|给|显示|提供|公布|标明|标注|注明|说明|提到|提及|记载|有(?!关))", re.I)
+GAP_RATING = re.compile(r"评分|分数|\b(?:scores?|ratings?)\b", re.I)
+GAP_JOIN = re.compile(r"\s*(?:\b(?:or|and|nor)\b|以及|和|与|及|或)", re.I)
+# A next clause that goes on with the negation ("，也没有工作量数据", ", and no workload figure", ", nor any data").
+# 中文：接着否定的下一个分句（「，也没有……」）。
+GAP_CONTINUED = re.compile(r"\s*(?:(?:也|又|亦|并且|而且|\b(?:and|or)\b)\s*(?:还\s*)?(?:没有|没|无|未|\b(?:no|not|never)\b)|"
+                           r"\bnor\b)", re.I)
+# A value word followed by a word of absence is a gap too ("工作量未知", "工作量一栏是空的", "the workload is unknown",
+# "lists the workload as unknown"). 中文：数值词后面跟着「未知、缺失、不详、是空的」也是缺口。
+GAP_ABSENT = re.compile(rf"(?:{GAP_VALUE})\s*(?:(?:is|are|was|were|remains?|as)\s+)?(?:缺失|不详|未知|不明|空缺|暂缺|"
+                        r"(?:一栏|栏)?(?:是|为)?空(?:的|白)|\b(?:unknown|unavailable|n/a)\b)", re.I)
+REVIEW_RECORD = re.compile(r"(?:评价|评论|点评|\breviews?|\breviewers?)\s*的?\s*$", re.I)
+CUE_CLAUSE_END = re.compile(r"[，,；;。！？!?：:、]")
+# A colon right after the cue's verb opens the clause instead of ending it ("记录显示：没有工作量数据").
+# 中文：记录词的动词后面紧跟冒号时，冒号后面仍是同一分句。
+COLON_LEAD = re.compile(r"\s*(?:里|中|上)?\s*(?:显示|表明|写着|写道|写明|列出|说明|说|shows?|lists?|says?|states?|notes?|reads?)"
+                        r"\s*[：:]", re.I)
+# Who a number comes from, for attribution: reviews, or a person who reports ("有同学提到", "网上有人称", "老师表示",
+# "很多人说", "a commenter", "people on Reddit say", "on RMP"); not a reporting verb alone ("the record says 12",
+# "记录明确表示 12" are the record). A forum is a source with a reporting verb right after it and no negation between
+# ("论坛上有人说", "the forum says", not "论坛上没有人提到"), as forum posts or users, after 据 or "according to", or close
+# before the number in its clause (see _review_sources); a forum merely named elsewhere is not ("课程论坛很活跃，",
+# "助教会在论坛上答疑，", "the TA answers questions on the forum;"). 中文：归属看来源：评价，或会报告的人（同学、有人、
+# 老师、很多人、Reddit、RMP……）；单独的「说、表示、提到」不算：「记录明确表示 12 小时」仍是记录。论坛在后面紧跟报告动词、
+# 中间没有否定（「论坛上有人说」，不是「论坛上没有人提到」）、写成帖子或论坛用户、跟在「据」后面，或在同一分句里紧挨着数字
+# 时才算来源；只在别处提到论坛（「课程论坛很活跃，」「助教会在论坛上答疑，」）不算。
+REVIEW_SOURCE_CUE = re.compile(
+    r"评价|评论|(?:学生|同学|学长|学姐|助教|网友|网上|有人|别人|大家|前辈|旁听生|老师|教授|讲师|校友|(?-i:TA)|"
+    r"(?:很多|许多|不少|好多|大多数|多数|大部分)(?:的)?(?:人|同学|学生))\s*们?(?:都|也)?"
+    r"(?:说(?!明)|称|反映|提到|认为|反馈|觉得|表示)|(?:论坛|帖子)(?:(?!没|无|不)[^，,。；;]){0,6}?"
+    r"(?:说(?!明)|称(?<!名称|简称|全称|号称)|反映|提到|表示|认为|觉得|反馈)|(?:据|根据)[^，,。；;]{0,8}?(?:论坛|帖子)|"
+    r"\breviews?\b|\breviewers?\b|\bRMP\b|rate\s*my\s*professors?|\b(?:reddit|commenters?|redditors?)\b|"
+    r"\bforums?\s+(?:posts?|users?|members?|threads?|comments?)\b|\baccording\s+to\s+(?:the\s+|a\s+)?(?:\w+\s+)?forums?\b|"
+    r"\bforums?\b(?:\s+(?!(?:and|or|but|not|never|no)\b)[a-z]+){0,2}?\s+(?:says?|said|reports?|mentions?|claims?|notes?)\b|"
+    r"\bstudents?\s+(?:say|said|report|mention|note|describe|found)|"
+    r"\b(?:people|others|someone|somebody|classmates?|(?-i:TAs?))\b(?:\s+[a-z]+){0,2}?\s+(?:say|said|report|mention|claim|note)",
+    re.I)
+FORUM_SOURCE = re.compile(r"论坛|帖子|\bforums?\b", re.I)
+FORUM_CONJUNCTION = re.compile(r"\b(?:and|but|or|while)\b|和|并且|并|而且|但|或", re.I)
+# A contrast word starts a new clause for the record-cue test ("The record lists 6 while the forum consensus is 12").
+# 中文：转折词也开始一个新分句（「记录显示每周 6 小时而论坛上的共识是每周 12 小时」）。
+FORUM_CONTRAST = re.compile(r"但|不过|可是|而(?!且)|\b(?:but|however|though|although|yet|while|whereas)\b", re.I)
+# A source word that is itself negated ("没有学生评价", "没有可用的学生评价", "no available reviews") is not a source;
+# "没时间的同学说" is. 中文：被否定的来源词（「没有学生评价」「没有可用的学生评价」）不算来源；「没时间的同学说」仍算。
+SOURCE_FILLER = (r"提到|提及|写明|写出|写|列明|列出|列|给出|给|说明|显示|提供|公布|公开|官方|统计|标明|标注|注明|记载|包含|包括|涉及|"
+                 r"这个|这项|这方面|这门课程|该课程|本课程|这门课|该课|本课|这|该|此|相关|具体|可用|关于|有关|学生|同学|任何|足够|的|"
+                 r"[A-Za-z]{2,4}\s*\d{4}[A-Z]?(?:'s)?|\b(?:says?|states?|lists?|mentions?|gives?|shows?|includes?|contains?|has|"
+                 r"have|provides?|specif(?:y|ies)|indicates?|publish(?:es)?|any|such|this|that|it|its|a|an|the|on|about|for|of|"
+                 r"regarding|anything|one|course'?s?|class'?s?|available|listed|known|given|provided|public|published|"
+                 r"official|specific|real|actual|students?|enough)\b")
+NEGATED_SOURCE = re.compile(rf"(?:{GAP_NEGATION.pattern})(?:\s*(?:{SOURCE_FILLER}))*\s*$", re.I)
 
 
 @dataclass(frozen=True)
@@ -251,13 +408,19 @@ def _course_codes(text: str, known_codes=()) -> set[str]:
     known = {code.split()[0] for code in (known_codes or ())} | {"CS", "DS", "AAI"}
     codes = set()
     for match in ANSWER_COURSE_CODE.finditer(text):
-        if not (match[1].isupper() or match[1].upper() in known):
+        after = text[match.end():]
+        if not (match[1].isupper() or match[1].upper() in known) or FULL_CODE_HYPHEN_LEVEL.match(after) or (
+                match[2].endswith("000") and FULL_CODE_LEVEL.match(after)):
             continue
         codes.add(f"{match[1]} {match[2]}".upper())
         tail = text[match.end():]
-        while short := re.match(r"\s*(?:和|与|、|and\b|or\b|[,/])\s*(\d{4}[A-Z]?)(?![A-Za-z0-9])", tail, re.I):
+        while short := SHORT_CODE.match(tail):
+            rest = tail[short.end():]
+            if (SHORT_CODE_LEVEL.match(rest) or (short[1].endswith("000") and SHORT_CODE_ROUND_RANGE.match(rest))
+                    or (re.fullmatch(r"20[1-3]\d", short[1]) and SHORT_CODE_YEAR.match(rest))):
+                break
             codes.add(f"{match[1]} {short[1]}".upper())
-            tail = tail[short.end():]
+            tail = rest
     return codes
 
 
@@ -278,11 +441,149 @@ def _number_field(sentence: str, number: re.Match, candidates: set[str]) -> str 
     return next(iter(candidates)) if len(candidates) == 1 else None
 
 
+def _gap_end(clause: str, start: int, ended: bool) -> int | None:
+    """Where the object of the negation that ends at `start` ends, when that object is the value (see GAP_OBJECT);
+    None when the negation is about something else. `ended` says the clause ends inside the text read.
+    中文：否定词宾语的结尾（宾语说的是这个数时）；否定别的东西时返回 None。"""
+    run = GAP_OBJECT.match(clause, start)
+    rest = clause[run.end():]
+    values = [value for value in GAP_VALUE_WORD.finditer(clause, start) if value.end() <= run.end()]
+    if any(_names_value(clause, value) for value in values) or GAP_STOP.match(rest) or (ended and not rest.strip()):
+        return run.end()
+    # The value as the second of two objects, which then closes the clause ("no reviews or workload data,"); not a second
+    # verb phrase ("has no reviews and lists the workload:"). 中文：数值是并列的第二个宾语，而且分句到此为止（「没有评价和
+    # 工作量数据，」）；第二项以动词开头时不算。
+    pair = GAP_PAIR.match(clause, run.end())
+    second = GAP_OBJECT.match(clause, pair.end()) if pair and not GAP_PAIR_VERB.match(clause, pair.end()) else None
+    if second and second.end() > pair.end():
+        after = clause[second.end():]
+        values = [value for value in GAP_VALUE_WORD.finditer(clause, pair.end())
+                  if value.end() <= second.end() and not GAP_RATING.fullmatch(value[0])]
+        if any(_names_value(clause, value) for value in values) and (GAP_STOP.match(after) or (ended and not after.strip())):
+            return second.end()
+    return None
+
+
+def _names_value(clause: str, value: re.Match) -> bool:
+    """Whether a value word in a negated object names the value: it does not only modify a course word (GAP_MODIFIER),
+    and no complement follows it, or the complement is about a value too (GAP_COMPLEMENT_OBJECT), other than a rating
+    or the hours of a class or an office (GAP_CLASS_QUALIFIER).
+    中文：否定宾语里的数值词是不是在说这个数：不只是修饰课程类名词，而且后面没有补语，或补语说的也是数值（评分类词和
+    答疑、实验课等的小时数除外）。"""
+    if GAP_MODIFIER.match(clause, value.end()):
+        return False
+    if not (complement := GAP_COMPLEMENT.match(clause, value.end())):
+        return True
+    about = GAP_COMPLEMENT_OBJECT.match(clause, complement.end())[0]
+    return any(not GAP_RATING.fullmatch(word[0]) and not GAP_CLASS_QUALIFIER.search(about, 0, word.start())
+               for word in GAP_VALUE_WORD.finditer(about))
+
+
+def _continued_gap(text: str, position: int) -> int | None:
+    """Where a gap ends in the clause after the clause end at `position`, when that clause goes on with the negation
+    (GAP_CONTINUED) and its object, with a second object joined to it, holds a value word other than a rating
+    ("，也没有工作量数据", "也没有评分和工作量数据", not ", and no ratings"); None otherwise. 中文：下一个分句以「也没有」
+    接着说、而且宾语（连同并列的第二个宾语）里有评分以外的数值词时，缺口在原文里的结尾；否则返回 None。"""
+    if not CUE_CLAUSE_END.match(text, position):
+        return None
+    following = text[position + 1:position + 41]
+    clause = CUE_CLAUSE_END.split(following, maxsplit=1)[0]
+    if not (go_on := GAP_CONTINUED.match(clause)):
+        return None
+    end = _gap_end(clause, go_on.end(), len(clause) < len(following) or position + 41 >= len(text))
+    if end is None:
+        return None
+    if (join := GAP_JOIN.match(clause, end)) and not GAP_PAIR_VERB.match(clause, join.end()):
+        end = max(end, GAP_OBJECT.match(clause, join.end()).end())
+    if all(GAP_RATING.fullmatch(value[0]) for value in GAP_VALUE_WORD.finditer(clause, go_on.end(), end)):
+        return None
+    return position + 1 + end
+
+
+def _record_mentions(text: str):
+    """Each record cue in text as (start, end, kind, span_end). kind is "record" (the record is the source), "gap" (the
+    record lacks the value; start..span_end covers the negation and its object) or "review" (the reviews' record).
+    中文：文本里每个记录词：record＝来源是记录；gap＝说记录里没有这个数（start..span_end 盖住否定词和它的宾语）；
+    review＝评价的记录。"""
+    for match in RECORD_CUE.finditer(text):
+        before = text[max(0, match.start() - 20):match.start()]
+        window = text[match.end():match.end() + 40]
+        lead = COLON_LEAD.match(window)
+        skip = lead.end() if lead else 0
+        clause = window[:skip] + CUE_CLAUSE_END.split(window[skip:], maxsplit=1)[0]
+        ended = len(clause) < len(window) or match.end() + 40 >= len(text)
+        if REVIEW_RECORD.search(before):
+            yield match.start(), match.end(), "review", match.end()
+        elif gap := RECORD_GAP_BEFORE.search(before):
+            start = match.start() - len(before) + gap.start()
+            yield start, match.end(), "gap", match.end() + GAP_OBJECT.match(clause).end()
+        else:
+            ends = (_gap_end(clause, negation.end(), ended) for negation in GAP_NEGATION.finditer(clause))
+            end = next((end for end in ends if end is not None), None)
+            if end is None and (absent := GAP_ABSENT.search(clause)):
+                end = absent.end()
+            if end is None and (more := _continued_gap(text, match.end() + len(clause))) is not None:
+                end = more - match.end()
+            if end is None:
+                yield match.start(), match.end(), "record", match.end()
+            else:
+                yield match.start(), match.end(), "gap", match.end() + end
+
+
+def _review_sources(text: str) -> list[int]:
+    """End positions of the review, forum and person sources in text (the text before a number), leaving out a negated
+    one (NEGATED_SOURCE). A forum named without a reporting verb (FORUM_SOURCE) counts only within 20 characters before
+    the number, in its clause, with no negation or conjunction in between and no record cue before it in that clause; a
+    contrast word starts a new clause ("论坛上的讨论显示每周 12 小时" and "the record lists 6 while the forum consensus is
+    12" count; "记录显示每周需要在论坛发帖并投入 12 小时" and "the course has a forum and takes 12 hours" do not).
+    中文：数字前面的评价、论坛和别人来源的位置，被否定的不算；没有报告动词的论坛，只在同一分句里离数字不到 20 个字、中间
+    没有否定和连词、而且这个分句里它前面没有记录词时才算；转折词也开始一个新分句。"""
+    sources = list(REVIEW_SOURCE_CUE.finditer(text))
+    for match in FORUM_SOURCE.finditer(text):
+        clause_start = max([end.end() for end in CUE_CLAUSE_END.finditer(text, 0, match.start())]
+                           + [end.end() for end in FORUM_CONTRAST.finditer(text, 0, match.start())], default=0)
+        between = text[match.end():]
+        if (len(between) <= 20 and not CUE_CLAUSE_END.search(between) and not GAP_NEGATION.search(between)
+                and not FORUM_CONJUNCTION.search(between) and not RECORD_CUE.search(text, clause_start, match.start())):
+            sources.append(match)
+    return [match.end() for match in sources if not NEGATED_SOURCE.search(text, max(0, match.start() - 20), match.start())]
+
+
+def _from_record(head: str, identified: bool) -> bool:
+    """Whether the number before which `head` ends is attributed to the record.
+
+    Identified contexts: of the sources named before the number the closest one wins. Sources are the record, a review,
+    a forum or another person (see _review_sources), an estimate, and a record gap ("记录里没有", "the record has no
+    workload figure"). So "根据记录，… 12 小时", "记录明确表示 12 小时" and "the record notes 12" are the record; "the
+    record lists 6 but reviews report 12" and "记录里没有，有同学提到 12 小时" are not. Legacy contexts keep the
+    20-character window, so old results keep their meaning on rescore.
+    中文：有身份的上下文看数字前最近的来源：记录、评价／论坛／别人、估计、记录缺口（「记录里没有」）。只有最近的是记录本身
+    才算归给记录。旧上下文仍用 20 个字符的窗口，重评时含义不变。
+    """
+    if not identified:
+        return bool(RECORD_CUE.search(head[-20:]))
+    mentions = list(_record_mentions(head))
+    records = [end for _, end, kind, _ in mentions if kind == "record"]
+    other = max([match.end() for match in ESTIMATE_CUE.finditer(head)] + _review_sources(head)
+                + [end for _, end, kind, _ in mentions if kind != "record"], default=-1)
+    return max(records, default=-1) > other
+
+
+def _without_gaps(sentence: str) -> str:
+    """The sentence with each record gap (the negation and its object) blanked, so "记录里没有提到难度" does not count as
+    a report or an estimate. 中文：把「记录里没有提到难度」这类缺口（否定词和宾语）抹成空格，其中的「提到」不算报告。"""
+    for start, _, kind, span_end in _record_mentions(sentence):
+        if kind == "gap":
+            sentence = sentence[:start] + " " * (span_end - start) + sentence[span_end:]
+    return sentence
+
+
 def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
     estimates = []
     identified = bool(context.course_codes or context.unstated)
     values = {item[2] for item in context.unstated} if identified else set(context.unstated_values)
     for sentence in parts:
+        cues = _without_gaps(sentence) if identified else sentence
         all_codes = _course_codes(sentence, context.course_codes)
         mentioned = all_codes & set(context.course_codes or ())
         course = (next(iter(mentioned)) if len(mentioned) == 1 else
@@ -296,8 +597,8 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
                     if COURSE_COUNT_UNIT.match(sentence[number.end():]):
                         continue
                     before_number, after_number = sentence[:number.start()], sentence[number.end():]
-                    if (re.match(r"\s*(?:[%％]|次|assignments?\b)", after_number, re.I)
-                            or re.search(r"(?:学分|credits?|GPA|日期|date)\s*(?:为|是|of|is|:)?\s*$", before_number, re.I)
+                    if (NOT_ESTIMATE_AFTER.match(after_number) or NOT_ESTIMATE_BEFORE.search(before_number)
+                            or MONTH_BEFORE.search(before_number)
                             or any(date.start() <= number.start() and number.end() <= date.end()
                                    for date in NUMERIC_DATE.finditer(sentence))):
                         continue
@@ -309,13 +610,11 @@ def _estimates(parts: list[str], context: AnswerContext) -> list[dict]:
                     if field_name is not None and not any(name == field_name for _, name in candidates):
                         continue
                     identity = "course_unresolved" if course is None else "field_unresolved" if field_name is None else "resolved"
-                before = (re.split(r"[;；,，]", sentence[:number.start()])[-1][-40:] if identified
-                          else sentence[max(0, number.start() - 20):number.start()])
-                if RECORD_CUE.search(before):
+                if _from_record(sentence[:number.start()], identified):
                     kind = "attributed to the record"
-                elif ESTIMATE_CUE.search(sentence):
+                elif ESTIMATE_CUE.search(cues):
                     kind = "qualified as estimate"
-                elif REPORT_CUE.search(sentence):
+                elif REPORT_CUE.search(cues):
                     kind = "AS REVIEWER-REPORTED"
                 else:
                     kind = "unattributed"
