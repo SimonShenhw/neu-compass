@@ -164,9 +164,10 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   means an any_of above makes it one alternative; activate_when lists the conditions of the optional
   branches above it, which are not evaluated. A course the plan names gets no open_pool
   position: do not say it can also count toward a prefix or range pool (the plan does not say so;
-  the program confirms). No positions means the plan neither names nor covers the course, which
-  does not make it excluded. more_positions_not_shown counts positions left out. If
-  placements_not_shown is true, do not work positions out yourself; point to the evidence panel.
+  only the program can confirm it). No positions means the plan neither names nor covers the course,
+  which does not make it excluded. more_positions_not_shown counts positions left out. If
+  placements_not_shown is true, do not work positions out yourself; point to the
+  「📘 所选方案与课程位置」 panel.
 - The plan's rules can name courses that were not retrieved: name them only to state that rule,
   and give no other facts about them (these records have none).
 - Explain placements only as document rules. Overlapping pools do not let a course count twice
@@ -178,10 +179,11 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   (other_years_recorded counts recorded years left out); call it the selected plan's catalog-year
   course block (e.g. 'the 2026-2027 catalog's course block'), not the student's own rule unless the
   student named that year, and never say which edition registration checks. If the student names
-  another catalog year, say this answer follows the selected plan's year and that year's rule is not
-  shown here (it may be recorded: see the course details in this app, or ask without a plan); never
-  call it unrecorded or not applicable. If requisite_year_not_recorded is present, none of the listed
-  years is the selected plan's year; never present one as that year's rule.
+  another catalog year that has an entry here, explain that entry as that year's course block; if it
+  has none, say this answer follows the selected plan's year and that year's rule is not shown here
+  (it may be recorded: see the course details in this app, or ask without a plan); never call it
+  unrecorded or not applicable. If requisite_year_not_recorded is present, none of the listed years
+  is the selected plan's year; never present one as that year's rule.
 - Cite the plan in words by program_name, campus, catalog year, pathway and concentration (e.g.
   Align, never a slug or identifier); never write its URL. The source link is in the evidence
   panel, not an answer link. If rules_not_shown is true, do not reconstruct the missing tree;
@@ -274,9 +276,9 @@ def _position(entry) -> dict:
 
 def format_plan_block(plan, context=None, hits: Sequence[SearchHit] = (), program_name: str | None = None) -> str:
     """Bound the whole projection, never a broken JSON prefix; no provenance dump or URL. The positions are the
-    meta's own PlanContext when the route passes it, so the answer and the evidence panel place a course alike.
+    meta's own PlanContext when the route passes it, so the model gets the positions the evidence panel shows.
     中文：只投影规则语义；超过预算整棵树省略，不截出看似完整的部分规则。路由传入 meta 用的同一份 PlanContext，
-    回答和证据面板对一门课的位置说法一致。
+    模型拿到的位置和证据面板显示的相同。
     """
     if plan is None:
         return "null"

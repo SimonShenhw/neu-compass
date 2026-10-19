@@ -253,3 +253,5 @@ def test_the_chat_caption_claims_only_the_years_chat_gets():
     render(st, bundle(*(document(f"{year}-{year + 1}") for year in range(2022, 2027))))
     assert any(f"最多引用最近 {MAX_REQUISITE_EDITIONS} 个已记录年份" in caption for caption in st.captions)
     assert not any("对话回答会按年份引用这些规则" in caption for caption in st.captions)
+    # With a plan selected in chat (F), a recorded plan year is the only one cited.
+    assert any("在对话里选了方案、且方案那一年有记录时，只引用那一年" in caption for caption in st.captions)

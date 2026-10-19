@@ -293,8 +293,8 @@ def chat(
         conn, [hit.course for hit in hits], program_seed=matched_via == "program",
         **({"selected_year": plan.catalog_year} if plan is not None else {}),
     )
-    # One placement result feeds the prompt and the meta, so the answer and the evidence panel agree.
-    # 中文：提示词和 meta 用同一份课程位置结果，回答和证据面板说法一致。
+    # One placement result feeds the prompt and the meta, so the model and the evidence panel get the same positions.
+    # 中文：提示词和 meta 用同一份课程位置结果，模型和证据面板拿到的位置相同。
     plan_context = build_plan_context(plan, [hit.course for hit in hits]) if plan is not None else None
     prompt = build_prompt(
         req.query, hits,

@@ -252,7 +252,9 @@ def requisite_years_line(evidence: dict) -> str | None:
             return None
         if not any(item.catalog_year == requisites.selected_year for item in requisites.editions):
             shown = "；展示的其他年份不能替代" if requisites.editions else ""
-            return f"所选方案 Catalog {requisites.selected_year} 没有课程块规则记录{shown}。"
+            # Covers a stored rule that failed its checks too; the warnings say which.
+            # 中文：也包括存了但没通过核对的规则；具体是哪种由警告说明。
+            return f"所选方案 Catalog {requisites.selected_year} 没有可用的课程块规则{shown}。"
         others = (f"；另有 {requisites.other_years_recorded} 个其他年份未用于本次解释"
                   if requisites.other_years_recorded else "")
         return (f"先修/共修规则：所选方案 Catalog {requisites.selected_year} 的课程块原文{others}"

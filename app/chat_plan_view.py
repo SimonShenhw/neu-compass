@@ -31,10 +31,12 @@ def selectable_chat_plans(documents, program_id):
 
 def queue_chat_plan_reset(state, program_id, detail):
     """Only after a plan-selection 409 (another 409, such as a program conflict, keeps the choice): clear the
-    choice on the next run and drop the family's cached plan list, so that run offers the server's current
-    revision rather than the one just refused.
-    中文：只在方案选择的 409 之后这样做（项目冲突等其他 409 保留选择）：下一轮清除选择，并丢掉这个项目缓存的
-    方案列表，让下一轮给出服务器现在的版本，而不是刚被拒绝的那一版。"""
+    choice on the next run and expire the family's cached plan list, so that run fetches the server's current
+    revision rather than offering the one just refused. Expired, not dropped: the last list stays the baseline
+    the Programs page compares against, so an unchanged list does not clear that page's choice.
+    中文：只在方案选择的 409 之后这样做（项目冲突等其他 409 保留选择）：下一轮清除选择，并让这个项目缓存的
+    方案列表过期，下一轮重新获取服务器现在的版本，而不是再给出刚被拒绝的那一版。是过期、不是删掉：上一份
+    列表仍是培养方案页比较的基准，列表没变时不会清掉那一页的选择。"""
     from app import view_cache
 
     if detail not in PLAN_SELECTION_MESSAGES.values():
@@ -42,7 +44,7 @@ def queue_chat_plan_reset(state, program_id, detail):
     # A 409 arrives after the widget exists; only the next run may set its bound key.
     state["_chat_plan_reset_pending"] = True
     if program_id is not None:
-        view_cache.curricula(state).pop(program_id, None)
+        view_cache.expire(view_cache.curricula(state), program_id)
 
 
 def render_chat_plan_selector(st, program_id):

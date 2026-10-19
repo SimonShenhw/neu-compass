@@ -165,9 +165,12 @@ def test_prompt_rules_use_the_positions_and_never_overclaim_the_plan_year():
                    "No positions means the plan neither names nor covers the course", "If placements_not_shown is true",
                    "name them only to state that rule", "not the student's own rule unless the student named that year",
                    "never call it unrecorded or not applicable", "never present one as that year's rule",
+                   "another catalog year that has an entry here, explain that entry as that year's course block",
+                   "only the program can confirm it", "point to the 「📘 所选方案与课程位置」 panel",
                    "Cite the plan in words by program_name", "「方案版本（可选）」, which appears below 「你的项目（可选）」 only for"):
         assert phrase in text, phrase
-    for removed in ("counts as explicitly named", "not rules applicable to this student", "suggest the plan selector instead"):
+    for removed in ("counts as explicitly named", "not rules applicable to this student", "suggest the plan selector instead",
+                    "the program confirms)", "point to the evidence panel"):
         assert removed not in text, removed
 
 
@@ -239,8 +242,8 @@ def test_the_prompt_keeps_the_selected_year_and_the_other_years_count(empty_db):
     (("2025-2026", "2026-2027"),
      "先修/共修规则：所选方案 Catalog 2026-2027 的课程块原文；另有 1 个其他年份未用于本次解释（不判断注册适用年度）", None),
     (("2026-2027",), "先修/共修规则：所选方案 Catalog 2026-2027 的课程块原文（不判断注册适用年度）", "另有"),
-    (("2025-2026",), "所选方案 Catalog 2026-2027 没有课程块规则记录；展示的其他年份不能替代。", "的课程块原文"),
-    ((), "所选方案 Catalog 2026-2027 没有课程块规则记录。", "展示的其他年份"),
+    (("2025-2026",), "所选方案 Catalog 2026-2027 没有可用的课程块规则；展示的其他年份不能替代。", "的课程块原文"),
+    ((), "所选方案 Catalog 2026-2027 没有可用的课程块规则。", "展示的其他年份"),
 ])
 def test_the_card_year_line_matches_what_was_shown(empty_db, years, expected, absent):
     from app.answer_evidence_view import requisite_years_line
@@ -552,3 +555,19 @@ def test_a_plan_409_refetches_the_family_list_so_choosing_again_sends_the_curren
     expected = [content_hash(ProgramPlan.model_validate(next(item for item in documents if item["plan_id"] == align.plan_id)))
                 for documents in (first, revised)]
     assert [post["plan"]["plan_content_sha256"] for post in backend.posts] == expected and len(gets) == 2
+
+
+def test_a_plan_409_with_an_unchanged_list_keeps_the_programs_page_choice(monkeypatch):
+    # Expired, not dropped: the refetch is still compared with the last list, so nothing reads as "updated".
+    align = plan_where(pathway="align")
+    documents = [plan.model_dump(mode="json") for plan in plans() if plan.program_id == "cs-ms"]
+    backend, gets = real_cache_page(monkeypatch, lambda count: documents,
+                                    lambda count: httpx.Response(409, json={"detail": PLAN_SELECTION_MESSAGES["unavailable"]}))
+    app = choose(page(), plan_id=align.plan_id)
+    app.session_state["program-plan-cs-ms"] = align.plan_id
+    run(app)
+    app.chat_input[0].set_value("question")
+    run(app)
+    assert len(gets) == 2 and app.session_state["chat_plan_id"] is None
+    assert app.session_state["program-plan-cs-ms"] == align.plan_id
+    assert "_program_plan_revised" not in app.session_state
