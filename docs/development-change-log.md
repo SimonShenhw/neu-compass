@@ -3280,3 +3280,41 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 分支 `feat/opt06-offline-route-eval`，原起点 `6e1a01d`，合并前已 rebase 到 origin/main `d97b382`（B 的第 24 节在前）。评审方的第 17 轮修复单独提交。本批只改评测工具和测试，不需要部署；文件虽随以后镜像打包，运行时不导入 eval。
 
+## 26 — 脚本索引与两个调试脚本的删除（H，2026-10-19）
+
+### 范围与原因
+
+10-17 的只读脚本盘点（SIM-05）结论是：不合并辅助函数，加一份索引；两个一次性的调试脚本可以删。用户 10-19 确认：`scripts/enrich_course_via_rmp.py`、`eval/ragas_runner.py`、`scripts/seed_program.py` 都还在用，两个调试脚本删掉。从已合并 C 的 origin/main `d7c5530` 开分支。本批只加一份文档、删两个没人用的脚本，不改任何代码。
+
+### 已实现
+
+1. 新增 `scripts/README.md`：按用途分 7 组，列出 `scripts/` 和 `eval/` 下的全部 84 个脚本（75 个 Python、9 个非 Python）。每个写一行：用途、主要参数、会碰什么、状态。开头另写了几条：
+   - 写库的脚本大多要加 `--commit`，不传 `--db-path` 时用配置里的库；
+   - 哪些会碰线上：`deploy.ps1`，以及指向线上地址时的 `eval_via_api.py`、`probe_inference_latency.py`、`eval_answers_live.py`（都带 `X-Eval-Run` 评测标记）；
+   - 测线上性能用 `eval_via_api.py`，不用 `eval/run_eval.py`；
+   - `start_stack.ps1` 不加 `-Local` 会起接公网域名的 cloudflared 隧道。
+2. 删除 `scripts/debug_aai_lookup.py`、`scripts/debug_print_chat.py`：05-08 的一次性排查，仓库里没有任何引用，也没有测试。
+3. 和盘点的差别：
+   - `eval/ragas_runner.py` 从「历史」挪到「评测和测量」，因为用户确认还在用；
+   - 加上 C 新增的 4 个文件（`eval/route_world.py`、`eval/route_eval.py`、`eval/route_guard.py`、`scripts/eval_route_offline.py`）；
+   - `seed_program.py` 和 `sync_program_plans.py` 各写一句分工：前者从 `data/program_seed/` 写方案和它的必修课、先修，后者写经过来源核对的结构化方案文档；
+   - 盘点没覆盖的 9 个非 Python 脚本单列一组，内容取自各自文件开头的说明。
+
+### 验证记录
+
+- 删除前 `git grep` 两个文件名：仓库里 0 处引用。
+- 用仓库外的核对脚本对照 worktree：
+  - 每个文件恰好一行，没有指向不存在文件的行；
+  - 表里列出的参数在对应文件里都存在；
+  - 副作用标注和代码里的静态迹象逐条对过。对不上的 18 处都看过了，都不是错标：有的写法出现在合成库、临时库或内存里的参考 schema 里；有的联网、调模型发生在导入的模块里或服务端（HyDE）；有的只是文字里提到 Gemini；还有两处表里已经换了说法（登录 NAS、cloudflared 隧道）。`release_preflight.py` 是只读打开副本，表里补了「只读打开」。
+- 串行全量 **4437 passed／7 warnings／334.76 秒**，退出码 0。和 C 合并后的 main 一样多：删掉的两个脚本本来就没有测试。7 个警告仍是 3 个 SWIG 和 4 处 HTTP 422 弃用。
+
+### 已知、未处理
+
+1. 「会碰什么」一列是按代码写法静态整理的，可能有出入，README 开头写明了。
+2. 上线脚本用 tar 覆盖代码目录，不删多出来的文件，所以 NAS 上仍留着这两个调试脚本。它们不会被导入，不影响运行。
+
+### 发布状态
+
+分支 `docs/scripts-index`，起点 `d7c5530`。只加文档、删两个没人用的脚本，不需要部署。`scripts/README.md` 会随下一次上线上传到 NAS，不影响运行。
+
