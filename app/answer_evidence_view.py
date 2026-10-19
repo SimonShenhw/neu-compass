@@ -40,6 +40,7 @@ WARNING_LABELS = {
     "requisites_differ_by_catalog_year": "不同 Catalog 年份记录的先修/共修规则不一样，要看你适用哪一年。",
     "requisite_clause_unparsed": "有一段先修/共修原文没能解析成规则，只能照原文核对。",
     "structured_requisites_unusable": "有已存的年度先修/共修规则读不出来或校验没通过；不能当作那一年没有要求。",
+    "requisite_year_not_recorded": "所选方案的 Catalog 年度没有可用课程块规则，其他年份不能代替所选年度。",
     "program_seed_unverified": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。",
     "catalog_metadata_conflict": "目录快照与课程记录的学分不一致，需向官方核实，不能静默合并。",
     "field_evidence_value_conflict": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
@@ -58,6 +59,7 @@ SHORT_WARNING_LABELS = {
     "requisites_differ_by_catalog_year": "先修/共修规则各年份不一样，要看你的 Catalog 年份",
     "requisite_clause_unparsed": "有一段先修/共修原文没能解析，请照原文核对",
     "structured_requisites_unusable": "有年度先修/共修规则读不出来，不是没有要求",
+    "requisite_year_not_recorded": "所选方案年度没有课程块规则，其他年份不能替代",
     "program_seed_unverified": "培养方案关系没有核实，不是正式的 Plan of Study",
     "catalog_metadata_conflict": "目录学分和课程记录不一致，请向学校核实",
     "field_evidence_value_conflict": "有估计值和评价原文对不上，需要核实",
@@ -88,6 +90,7 @@ COMPACT_WARNINGS = {
     "synthetic_record_not_real_course", "prerequisite_logic_unavailable",
     "extracted_evidence_not_official_facts", "requisites_differ_by_catalog_year",
     "requisite_clause_unparsed", "structured_requisites_unusable",
+    "requisite_year_not_recorded",
 }
 
 
@@ -242,6 +245,11 @@ def requisite_years_line(evidence: dict) -> str | None:
         requisites = RequisiteEvidence.model_validate(evidence.get("requisites"))
     except ValidationError:
         return None
+    if requisites.selected_year is not None:
+        if not any(item.catalog_year == requisites.selected_year for item in requisites.editions):
+            return f"所选方案 Catalog {requisites.selected_year} 没有课程块规则记录；展示的其他年份不能替代。"
+        return (f"先修/共修规则：所选方案 Catalog {requisites.selected_year} 的课程块原文；另有 "
+                f"{requisites.other_years_recorded} 个其他年份未用于本次解释（不判断注册适用年度）")
     if not requisites.editions:
         return None
     years = "、".join(f"Catalog {edition.catalog_year}" for edition in requisites.editions)

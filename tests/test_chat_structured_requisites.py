@@ -527,7 +527,7 @@ def test_chat_meta_course_page_and_prompt_share_the_year_rules(api_client):
     CourseRequisiteRepository(conn).store(document("2025-2026", prerequisite="CS 5004"))
     CourseRequisiteRepository(conn).store(document("2026-2027"))
     meta, prompt = capture_chat(api_client)
-    assert meta["prompt_version"] == "4.4"
+    assert meta["prompt_version"] == "4.5"
     evidence = meta["results"][0]["answer_evidence"]
     assert [edition["catalog_year"] for edition in evidence["requisites"]["editions"]] == ["2026-2027", "2025-2026"]
     assert "requisites_differ_by_catalog_year" in evidence["warnings"]

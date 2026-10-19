@@ -6,14 +6,20 @@ import hashlib
 import json
 import sqlite3
 from datetime import date, datetime
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import structlog
 
 from schemas.program_plan import ProgramPlan
+from schemas.plan_selection import PlanSelection
 from schemas.course_program_context import CourseProgramContext, explicitly_mentions
 
 log = structlog.get_logger("neu_compass.program_plans")
+
+
+class PlanResolution(NamedTuple):
+    outcome: Literal["selected", "missing", "stale", "draft", "unusable", "unavailable"]
+    plan: ProgramPlan | None = None
 
 
 def content_hash(plan: ProgramPlan) -> str:
@@ -132,6 +138,35 @@ class ProgramPlanRepository:
 
     def available(self) -> bool:
         return self._conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='program_plans'").fetchone() is not None
+
+    def resolve_selection(self, selection: PlanSelection) -> PlanResolution:
+        """Verify the exact stored row, scope, revision and review before retrieval; never write.
+        中文：不找同范围替代品，不回落旧 seed，不能确认时不带方案继续回答。
+        """
+        try:
+            selection = PlanSelection.model_validate(selection.model_dump())
+            if not self.available():
+                return PlanResolution("unavailable")
+            rows = self._conn.execute("SELECT * FROM program_plans WHERE plan_id=?", (selection.plan_id,)).fetchall()
+            if not rows:
+                return PlanResolution("missing")
+            if len(rows) != 1 or len(rows[0]["document"]) > 200_000:
+                return PlanResolution("unusable")
+            plan = _verified(rows[0])
+            count = self._conn.execute(
+                "SELECT COUNT(*) FROM program_plans WHERE program_id=? AND campus=? AND catalog_year=? AND pathway=? AND concentration=?",
+                plan.scope_key()).fetchone()[0]
+            if count != 1:
+                return PlanResolution("unusable")
+            if plan.scope_key() != selection.scope_key() or content_hash(plan) != selection.plan_content_sha256:
+                return PlanResolution("stale")
+            if plan.review_status != "source_checked":
+                return PlanResolution("draft")
+            return PlanResolution("selected", plan)
+        except sqlite3.DatabaseError:
+            return PlanResolution("unavailable")
+        except (ValueError, TypeError):
+            return PlanResolution("unusable")
 
     def has_records_for_program(self, program_id: str) -> bool:
         # Even corrupt scoped records must not silently reactivate guessed schedules.

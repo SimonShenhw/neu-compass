@@ -66,6 +66,10 @@ def render_chat_history(
 
             render_message_text(st, msg)
             render_retrieval_notices(st, msg.get("notices"))
+            if msg.get("plan_context") is not None:
+                from app.chat_plan_view import render_plan_context
+                with st.expander("📘 所选方案与课程位置"):
+                    render_plan_context(st, msg["plan_context"], msg.get("evidence", []))
             if msg.get("evidence"):
                 n_ev = len(msg["evidence"])
                 with st.expander(

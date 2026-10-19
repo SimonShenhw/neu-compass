@@ -287,7 +287,10 @@ def code_identity() -> dict:
              "app/streamlit_app.py", "rag/hybrid.py", "rag/reranker.py", "rag/retriever.py", "api/dependencies.py",
              "config/settings.py", "rag/acronyms.py", "rag/hyde.py", "rag/index.py", "api/main.py",
              "app/api_client.py", "db/connection.py", "rag/embedder.py", "rag/onnx_backend.py", "rag/openvino_backend.py",
-             "llm/gemini_client.py", "schemas/answer_evidence.py", "schemas/course.py")
+             "llm/gemini_client.py", "schemas/answer_evidence.py", "schemas/course.py",
+             "schemas/plan_selection.py", "schemas/program_plan.py", "schemas/course_program_context.py",
+             "db/program_plan_repository.py", "api/models.py", "app/chat_plan_view.py",
+             "app/program_plan_links.py", "app/program_plan_view.py", "app/answer_evidence_view.py")
     commit = dirty = None
     try:
         commit = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
