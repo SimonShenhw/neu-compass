@@ -10,7 +10,7 @@ from app.program_plan_links import PlanLink
 from app.program_plan_view import PLAN_PLACEHOLDER, scope_label
 from app.text_render import literal_markdown
 from schemas.answer_evidence import PlanContext
-from schemas.plan_selection import PLAN_SELECTOR_LABEL, PlanSelection
+from schemas.plan_selection import PLAN_SELECTION_MESSAGES, PLAN_SELECTOR_LABEL, PlanSelection
 from schemas.program_plan import ProgramPlan
 
 CHAT_PLAN_KEY = "chat_plan_id"
@@ -29,9 +29,20 @@ def selectable_chat_plans(documents, program_id):
             and ids[plan.plan_id] == scopes[plan.scope_key()] == 1]
 
 
-def queue_chat_plan_reset(state):
+def queue_chat_plan_reset(state, program_id, detail):
+    """Only after a plan-selection 409 (another 409, such as a program conflict, keeps the choice): clear the
+    choice on the next run and drop the family's cached plan list, so that run offers the server's current
+    revision rather than the one just refused.
+    中文：只在方案选择的 409 之后这样做（项目冲突等其他 409 保留选择）：下一轮清除选择，并丢掉这个项目缓存的
+    方案列表，让下一轮给出服务器现在的版本，而不是刚被拒绝的那一版。"""
+    from app import view_cache
+
+    if detail not in PLAN_SELECTION_MESSAGES.values():
+        return
     # A 409 arrives after the widget exists; only the next run may set its bound key.
     state["_chat_plan_reset_pending"] = True
+    if program_id is not None:
+        view_cache.curricula(state).pop(program_id, None)
 
 
 def render_chat_plan_selector(st, program_id):
@@ -67,7 +78,9 @@ def render_chat_plan_selector(st, program_id):
     if not by_id:
         return None
     chosen = st.selectbox(PLAN_SELECTOR_LABEL, [None, *by_id], key=CHAT_PLAN_KEY, placeholder=PLAN_PLACEHOLDER,
-        format_func=lambda value: PLAN_PLACEHOLDER if value is None else scope_label(by_id[value]))
+        format_func=lambda value: PLAN_PLACEHOLDER if value is None else scope_label(by_id[value]),
+        help="选了以后，回答会按这个方案文档说明检索到的课程在规则里的位置；不改变搜索结果，"
+             "不判断你是否适用、能否注册或毕业。")
     if chosen is None or chosen not in by_id:
         return None
     st.caption("只按你选的方案解释规则；不判断你是否适用、能否注册或毕业。")
@@ -103,13 +116,13 @@ def render_plan_context(st, value, courses=None):
     for index, (course_id, entries) in enumerate(context.placements.items(), 1):
         code = by_id.get(course_id) or f"课程 {index}"
         if not entries:
-            st.text(f"{code}：方案没有显式位置记录，不表示不允许或能计入。")
+            st.text(f"{code}：方案里没有写到这门课；不代表不能算，也不代表能算，请向项目核实。")
         for entry in entries:
             details = [labels[entry.relation], " > ".join(entry.path)]
             if entry.under_any_of:
                 details.append("上层有 OR 分支，不是所有分支共同必修")
             details.extend(f"条件：{condition}" for condition in entry.activate_when)
-            details.extend(f"至少 {getattr(entry, key)} {label}" for key, label in (
+            details.extend(f"该组至少 {getattr(entry, key)} {label}" for key, label in (
                 ("min_courses", "门"), ("min_credits", "学分"), ("min_areas", "领域")) if getattr(entry, key) is not None)
             if entry.areas:
                 details.append("所属领域：" + "、".join(entry.areas))

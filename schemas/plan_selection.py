@@ -9,12 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from schemas.program_plan import ProgramPlan
 
 PLAN_SELECTOR_LABEL = "方案版本（可选）"
+# The page clears the choice on these (and only these) 409s, so each says the question was not answered.
+# 中文：页面只在这几种 409 时清除方案选择，所以每条都说明这个问题还没有回答。
+_AGAIN = "可以在上方「方案版本（可选）」重新选择后再问，或不选方案直接再问。"
 PLAN_SELECTION_MESSAGES = {
-    "missing": "所选方案已不可用；请在上方「方案版本（可选）」重新选择。",
-    "stale": "所选方案的范围或内容版本已变化；请在上方「方案版本（可选）」重新选择。",
-    "draft": "所选方案尚未完成来源对照；请在上方「方案版本（可选）」重新选择。",
-    "unusable": "所选方案的身份、范围或格式无法确认；请在上方「方案版本（可选）」重新选择。",
-    "unavailable": "暂时无法核对所选方案；请在上方「方案版本（可选）」清除或重新选择。",
+    "missing": "所选方案已不可用，这个问题还没有回答；方案选择已清除。" + _AGAIN,
+    "stale": "所选方案的范围或内容版本已变化，这个问题还没有回答；方案选择已清除。" + _AGAIN,
+    "draft": "所选方案尚未完成来源对照，这个问题还没有回答；方案选择已清除。" + _AGAIN,
+    "unusable": "所选方案的身份、范围或格式无法确认，这个问题还没有回答；方案选择已清除。" + _AGAIN,
+    "unavailable": ("暂时无法核对所选方案，这个问题还没有回答；方案选择已清除。可以先不选方案直接再问，"
+                    "稍后再到上方「方案版本（可选）」选择。"),
 }
 
 

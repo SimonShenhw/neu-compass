@@ -218,9 +218,10 @@ def chat(
             ) from e
 
     started = time.perf_counter()
+    program = None
     if req.program_id is not None:
         try:
-            program_repo.get_program(req.program_id)
+            program = program_repo.get_program(req.program_id)
         except ProgramNotFound as exc:
             raise HTTPException(status_code=404, detail="Selected program_id not found") from exc
     plan = None
@@ -292,11 +293,14 @@ def chat(
         conn, [hit.course for hit in hits], program_seed=matched_via == "program",
         **({"selected_year": plan.catalog_year} if plan is not None else {}),
     )
+    # One placement result feeds the prompt and the meta, so the answer and the evidence panel agree.
+    # 中文：提示词和 meta 用同一份课程位置结果，回答和证据面板说法一致。
+    plan_context = build_plan_context(plan, [hit.course for hit in hits]) if plan is not None else None
     prompt = build_prompt(
         req.query, hits,
         history=[t.model_dump() for t in req.history],
         evidence=answer_evidence, retrieval_mode=matched_via, notices=notices,
-        **({"plan": plan} if plan is not None else {}),
+        **({"plan": plan, "plan_context": plan_context, "program_name": program.full_name} if plan is not None else {}),
     )
 
     # Meta first so the client can render evidence bubbles before LLM tokens land. It is built
@@ -326,8 +330,8 @@ def chat(
     # 中文：仅在非空时出现，旧的 meta 形状保持不变。
     if notices:
         meta_payload["notices"] = list(notices)
-    if plan is not None:
-        meta_payload["plan_context"] = build_plan_context(plan, [hit.course for hit in hits]).model_dump(mode="json")
+    if plan_context is not None:
+        meta_payload["plan_context"] = plan_context.model_dump(mode="json")
     meta_line = (json.dumps(meta_payload) + "\n").encode("utf-8")
 
     def event_stream() -> Iterator[bytes]:

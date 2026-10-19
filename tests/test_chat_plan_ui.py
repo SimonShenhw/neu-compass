@@ -11,8 +11,8 @@ from tests.page_layout_support import install_backend, page, run
 from tests.test_program_plan_links import plans
 
 
-@pytest.fixture
-def chat_page(monkeypatch):
+def plan_curricula(monkeypatch):
+    """The page over MockTransport, with the curated cs-ms and ds-ms plans as the families' plan lists."""
     import app.program_view as programs
     backend = install_backend(monkeypatch)
     backend.programs = [{"program_id": family, "full_name": family, "prefix": prefix}
@@ -27,6 +27,11 @@ def chat_page(monkeypatch):
 
     monkeypatch.setattr(programs, "get_curriculum_cached", curriculum)
     return backend, documents, calls
+
+
+@pytest.fixture
+def chat_page(monkeypatch):
+    return plan_curricula(monkeypatch)
 
 
 def choose(app, family="cs-ms", plan_id=None):
@@ -119,6 +124,7 @@ def test_revision_change_drops_choice_and_only_notifies_once(chat_page):
 
 
 def test_409_clears_selection_on_the_next_rerun_not_after_widget_creation(chat_page, monkeypatch):
+    from schemas.plan_selection import PLAN_SELECTION_MESSAGES
     backend, documents, calls = chat_page
     plan = next(plan for plan in plans() if plan.pathway == "align")
     original = type(backend).__call__
@@ -126,7 +132,7 @@ def test_409_clears_selection_on_the_next_rerun_not_after_widget_creation(chat_p
     def transport(self, request):
         if request.method == "POST":
             self.posts.append(json.loads(request.content))
-            return httpx.Response(409, json={"detail": "请在上方「方案版本（可选）」重新选择。"})
+            return httpx.Response(409, json={"detail": PLAN_SELECTION_MESSAGES["stale"]})
         return original(self, request)
 
     monkeypatch.setattr(type(backend), "__call__", transport)

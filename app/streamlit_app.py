@@ -640,7 +640,7 @@ def render() -> None:
                 except ApiError as e:
                     if e.status_code == 409:
                         from app.chat_plan_view import queue_chat_plan_reset  # noqa: PLC0415
-                        queue_chat_plan_reset(st.session_state)
+                        queue_chat_plan_reset(st.session_state, chat_program_id, e.detail)
                     # 409 = the API needs the student to clarify the program
                     # (ambiguous prefix / selection conflict), not a failure.
                     # 中文：409 表示需要学生明确项目（前缀歧义或选择冲突），不是故障。

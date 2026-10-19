@@ -306,7 +306,9 @@ def code_identity() -> dict:
 
 
 def build_case(question: dict, payloads: dict[str, dict]):
-    """(prompt, AnswerContext) for one question, mirroring api/routes/chat.py."""
+    """(prompt, AnswerContext) for one question, mirroring api/routes/chat.py without a selected plan: questions
+    carry no plan, so the plan block is null and the checks know nothing about plan-only course codes.
+    中文：按 api/routes/chat.py 的方式组装，但没有所选方案：问题里不带方案，方案块是 null，检查也不认识方案里才有的课号。"""
     from llm.prompts.chat_v4 import build_prompt, format_courses_block  # noqa: PLC0415
     from rag.answer_evidence import course_answer_evidence  # noqa: PLC0415
     from rag.retriever import SearchHit  # noqa: PLC0415

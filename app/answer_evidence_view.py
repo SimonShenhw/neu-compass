@@ -246,10 +246,17 @@ def requisite_years_line(evidence: dict) -> str | None:
     except ValidationError:
         return None
     if requisites.selected_year is not None:
+        # Unreadable or missing storage is not "no record"; its warnings say so instead.
+        # 中文：存储缺失或读不出不等于「没有记录」，由警告说明。
+        if requisites.storage != "available":
+            return None
         if not any(item.catalog_year == requisites.selected_year for item in requisites.editions):
-            return f"所选方案 Catalog {requisites.selected_year} 没有课程块规则记录；展示的其他年份不能替代。"
-        return (f"先修/共修规则：所选方案 Catalog {requisites.selected_year} 的课程块原文；另有 "
-                f"{requisites.other_years_recorded} 个其他年份未用于本次解释（不判断注册适用年度）")
+            shown = "；展示的其他年份不能替代" if requisites.editions else ""
+            return f"所选方案 Catalog {requisites.selected_year} 没有课程块规则记录{shown}。"
+        others = (f"；另有 {requisites.other_years_recorded} 个其他年份未用于本次解释"
+                  if requisites.other_years_recorded else "")
+        return (f"先修/共修规则：所选方案 Catalog {requisites.selected_year} 的课程块原文{others}"
+                "（不判断注册适用年度）")
     if not requisites.editions:
         return None
     years = "、".join(f"Catalog {edition.catalog_year}" for edition in requisites.editions)
