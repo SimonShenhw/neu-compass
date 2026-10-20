@@ -60,6 +60,7 @@ from api.dependencies import (
     get_reranker,
 )
 from api.models import SearchHitOut, SearchRequest, SearchResponse
+from api.query_fields import query_fields
 from api.routes.common import (
     BLEND_ALPHA,
     RERANK_POOL_SIZE,
@@ -194,7 +195,7 @@ def search(
         anchor_excluded = bool(alias_courses) and not courses and bool(hard_filters) \
             and asks_for_alternatives(req.query)
         if anchor_excluded:
-            log.info("search.alias_anchor_filtered_fallback", query=req.query)
+            log.info("search.alias_anchor_filtered_fallback", **query_fields(req.query))
         if alias_courses and not anchor_excluded:
             results = [
                 SearchHitOut(
@@ -207,7 +208,7 @@ def search(
             elapsed_ms = _elapsed_ms(started)
             log.info(
                 "search.alias_hit" if results else "search.alias_filtered_empty",
-                query=req.query, count=len(results), duration_ms=elapsed_ms,
+                **query_fields(req.query), count=len(results), duration_ms=elapsed_ms,
             )
             log_query(
                 conn, route="search", query=req.query, matched_via=matched_via,
@@ -240,7 +241,7 @@ def search(
         log.info(
             "search.prefilter_applied",
             program_prefix=extracted.program_prefix,
-            sanitized_query=extracted.sanitized_query[:80],
+            **query_fields(extracted.sanitized_query, "sanitized_query"),
         )
 
     # The query passed to the embedder/BM25 is the sanitized form when
@@ -262,7 +263,7 @@ def search(
         elapsed_ms = _elapsed_ms(started)
         log.info(
             "search.hybrid_empty",
-            query=req.query,
+            **query_fields(req.query),
             duration_ms=elapsed_ms,
         )
         log_query(
@@ -294,7 +295,7 @@ def search(
         if decision.rejected:
             elapsed_ms = _elapsed_ms(started)
             log.info(
-                "search.rejected", query=req.query,
+                "search.rejected", **query_fields(req.query),
                 max_sigmoid=decision.meta["max_sigmoid"],
                 n_candidates=decision.meta["n_candidates"], duration_ms=elapsed_ms,
             )
@@ -312,7 +313,7 @@ def search(
         rejection_reason = decision.rejection_reason
         was_rescued = decision.rescued
         if was_rescued:
-            log.info("search.hyde_rescued", query=req.query, count=len(final_hits))
+            log.info("search.hyde_rescued", **query_fields(req.query), count=len(final_hits))
 
     results = [
         SearchHitOut(
@@ -327,7 +328,7 @@ def search(
     elapsed_ms = (time.perf_counter() - started) * 1000
     log.info(
         "search.hybrid",
-        query=req.query,
+        **query_fields(req.query),
         count=len(results),
         rerank_applied=reranker is not None,
         duration_ms=round(elapsed_ms, 2),

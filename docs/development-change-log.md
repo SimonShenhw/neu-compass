@@ -3457,3 +3457,45 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 ### 发布状态
 
 分支 `feat/course-compare`，10-19 晚 rebase 到 F 合并后的 `56a03d6`。复核第 1 轮通过以后 push、开 PR，由用户合并。G 只改页面，上线另行授权，可以等下一次上线一起上。没有使用真实模型、账号、运行数据库或 NAS。
+
+## 29 — 运行日志里不再记学生问题的原文（K／Z5，2026-10-19）
+
+### 范围与原因
+
+成功请求的结构化日志里记着学生问题的原文：`chat.retrieved`、`search.hybrid` 等记整句，`rescue.*`、`chat.context_path` 等截到 80 个字。`query_log` 表本来就存原文，导出要两个开关一起给才带原文，所以日志里是多出来的一份副本，而且是最常被翻看、粘贴的那一份。用户 10-19 在三个选项里选了「只记哈希和长度」（留着、截短、只记哈希和长度）。§28 留给 G，合并前按实际合并顺序核对编号。
+
+### 已实现
+
+1. 新模块 `api/query_fields.py`：`query_fields(text, name="query")` 返回 `{name}_hash`（16 位十六进制）和 `{name}_len`（字符数）。
+   - 哈希是 HMAC-SHA256。密钥用 `SESSION_SECRET` 加固定标签派生，和会话令牌的签名分开。学生的问题短、好猜，普通哈希挡不住「猜一句、算一下」，所以用带密钥的。
+   - 有密钥的人对 `query_log.query` 算同样的哈希，就能找到对应的日志行；做法写在 `docs/pii_redaction.md` 第 11 节。
+   - 没配 `SESSION_SECRET`（本地开发、测试）时用每个进程随机的密钥：同一进程里一致，对不上 `query_log`。
+   - 不成对的代理字符也不会让日志调用抛异常（编码用 `surrogatepass`）。
+2. 16 个事件改成只记哈希和长度：`/search` 7 个（`search.alias_anchor_filtered_fallback`、`search.alias_hit`／`search.alias_filtered_empty`、`search.prefilter_applied`、`search.hybrid_empty`、`search.rejected`、`search.hyde_rescued`、`search.hybrid`），`/chat` 5 个（`chat.hyde_rescued`、`chat.retrieved`、`chat.context_path`、`chat.alias_anchor_filtered_fallback`、`chat.prefilter_applied`），HyDE 救援 4 个（`rescue.code_pattern_guard`、`rescue.declined`、`rescue.empty_retrieval`、`rescue.accepted`）。两个 `prefilter_applied` 记的是去掉专业前缀以后那一句，字段名是 `sanitized_query_hash`、`sanitized_query_len`；其余都对原问题算，和 `query_log.query` 是同一段文字。
+3. `query_log`、导出、接口响应和别的日志字段都不变。
+
+### 修改文件
+
+新建 `api/query_fields.py`、`tests/test_log_query_fields.py`；改 `api/routes/search.py`、`api/routes/chat.py`、`api/routes/common.py` 里的日志调用；`tests/test_retrieval_decision_rescue_rules.py` 里两个测试原来钉着 `query` 字段，改成期望哈希和长度；`docs/pii_redaction.md` 加第 11 节。
+
+### 验证记录
+
+- 新测试 15 项是和代码一起写的，没有先跑一遍红。改用 31 个变异来证明测试有效：16 个把调用改回记原文，都被静态检查抓到；5 个对错误的文字算哈希，都被路由测试抓到；10 个削弱哈希函数，都被单元测试抓到。**31/31 killed**。
+- 第一遍 12 文件定向有 3 项失败：`tests/test_retrieval_decision_rescue_rules.py` 有两个测试钉着旧的 `query` 字段，其中一个按路由参数化成两项。改掉这个字段正是本批的目的，测试改成期望哈希和长度以后通过。
+- Ruff F／E9／B 通过；九快照 9/9；C CLI 47／53 complete，route 53／0，隔离计数为 0。
+- 串行全量 **4549 passed／7 warnings／485.08 秒**，退出码 0，等于 main 的 4534 加上新的 15 项。上面那两个测试是在这次全量开始以后才改完的，所以在本地提交上又跑了定向和全量，结果在复核以后补上。
+
+### 审查
+
+两路只读审查在本地提交之后进行：A21 看隐私和正确性，B21 看测试、文档和运维。
+
+### 已知、未处理
+
+1. 哈希和长度仍是私有的可关联数据：同一句话的哈希总是相同，能看出同一个问题问了几次；不能当成匿名数据公开。
+2. 换 `SESSION_SECRET` 以后，旧日志里的哈希就对不上 `query_log` 了；这版不另设日志专用密钥。
+3. `query_log` 的留存、删除和备份不变；Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串也不在这批。
+4. 没有加对照日志和 `query_log` 的脚本，`docs/pii_redaction.md` 第 11 节写了几行做法。
+
+### 发布状态
+
+分支 `fix/log-query-hash`，基底 `56a03d6`。随下一次上线生效，上线要另外授权；不改配置、数据库或 NAS。

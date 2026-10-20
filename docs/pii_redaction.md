@@ -275,3 +275,22 @@ def auto_redact_pre(text: str) -> str:
 尚未发送响应的未捕获异常在请求中间件消化，只有一条安全错误事件，不再向 ServerErrorMiddleware／uvicorn 传播。流头发送后无法换成固定 500：会记一条安全的 `unhandled_exception`，但 uvicorn 自己的 handler 不经过 root 过滤器，仍会打印带异常原文的 traceback。聊天流的 meta 行在响应开始前就构造好，模型流的错误转成流内错误事件，所以目前没有已知的生产路径会走到这里。Python `warnings` 和 Streamlit 进程日志（UI 未捕获异常）也仍打印原文；浏览器里只显示错误类型。Streamlit 发布配置默认仅显示错误类型；完整详情仅供本地显式开启。
 
 这不是「所有日志没有 PII」：成功查询原文及 query_log 留存、本来的 Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串仍需单独治理。本批不改留存／删除／备份、不改 Docker 启动参数，不执行真实账号或线上验收。
+
+## 11. 运行日志里的学生问题（K／Z5，2026-10-19）
+
+上一节说的「成功查询原文」里，运行日志那一份已经去掉：`/search`、`/chat` 和 HyDE 救援的 16 个事件以前记问题原文（有的整句，有的截到 80 个字），现在只记 `query_hash` 和 `query_len`。去掉专业前缀以后的那一句记 `sanitized_query_hash` 和 `sanitized_query_len`。这些字段都由 `api/query_fields.py` 生成。
+
+- 哈希是 HMAC-SHA256，取前 16 位十六进制。密钥从 `SESSION_SECRET` 派生（标签 `neu-compass/log-query-hash/v1`），和会话令牌的签名分开。学生的问题往往很短、很好猜，用普通哈希的话，拿到日志的人猜一句、算一下就能确认；用 HMAC，没有密钥就做不到。
+- 有密钥的人可以对 `query_log.query` 算同样的哈希，找到对应的日志行（在 API 容器里，只读库，只输出 `log_id`，不打印原文）：
+
+  ```python
+  from api.query_fields import query_fields
+  # rows：只读连接上 SELECT log_id, query FROM query_log 的结果
+  matches = [log_id for log_id, text in rows if query_fields(text)["query_hash"] == "<日志里的 16 位>"]
+  ```
+
+  换了 `SESSION_SECRET` 以后，旧日志里的哈希就对不上了。
+- 没有配置 `SESSION_SECRET`（本地开发、测试）时，每个进程随机生成一把密钥：同一个进程里同一句话的哈希相同，但对不上 `query_log`。
+- 长度按字符数算。哈希和长度仍然是私有的可关联数据：同一句话的哈希总是相同，能看出同一个问题出现了几次。不能把它们当成匿名数据公开。
+- `query_log` 照旧存原文，导出仍要两个开关（第 9 节）；保留期、删除和备份都没有变。Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串也照旧。
+- `tests/test_log_query_fields.py` 扫描产品代码里的每个日志调用，不许把问题文字直接当字段值；路由测试用一个特殊字符串确认它不出现在任何日志事件里，并且 `query_log` 那一行按上面的算法能对上日志里的哈希。
