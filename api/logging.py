@@ -39,6 +39,33 @@ from api.exceptions import internal_error_response
 
 _CONFIGURED = False
 _REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
+_COURSE_READ_PATHS = {"/resolve/course", "/course/{course_id}", "/course/{course_id}/requisites"}
+_COURSE_READ_FIELDS = {
+    "event", "level", "timestamp", "request_id", "method", "path", "status", "duration_ms",
+    "count", "dangling", "courses", "unusable_records", "error_type", "exc_type", "cause_type", "frames",
+}
+
+
+def _course_read_log_path(path: str) -> str:
+    """Template all course-ID paths, including 404 tails; never retain the ID in context.
+    中文：课程读请求只记路径模板；未知尾段也不保留，其他接口不变。
+    """
+    if path.rstrip("/") == "/resolve/course":
+        return "/resolve/course"
+    if path.startswith("/course/"):
+        return "/course/{course_id}/requisites" if path.rstrip("/").split("/")[3:] == ["requisites"] else "/course/{course_id}"
+    return path
+
+
+def _course_read_fields(_logger: Any, _name: str, event: dict[str, Any]) -> dict[str, Any]:
+    """Final allowlist for course-read diagnostics, including nested repository events.
+    中文：仅此类请求保留代码定义的诊断字段，不记录 ref、课程 ID、来源文本或任意新字段。
+    """
+    path = structlog.contextvars.get_contextvars().get("path")
+    if path in _COURSE_READ_PATHS:
+        event = {key: value for key, value in event.items() if key in _COURSE_READ_FIELDS}
+        event["path"] = path
+    return event
 
 
 def _safe_exception(_logger: Any, _name: str, event: dict[str, Any]) -> dict[str, Any]:
@@ -116,6 +143,7 @@ def configure_logging() -> structlog.stdlib.BoundLogger:
                 structlog.stdlib.add_log_level,
                 structlog.processors.TimeStamper(fmt="iso", utc=True),
                 _safe_exception,
+                _course_read_fields,
                 render_safe,
             ],
             logger_factory=structlog.stdlib.LoggerFactory(),
@@ -158,7 +186,7 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         structlog.contextvars.bind_contextvars(
             request_id=request_id,
             method=request.method,
-            path=request.url.path,
+            path=_course_read_log_path(request.url.path),
         )
 
         log = structlog.get_logger("neu_compass.request")
