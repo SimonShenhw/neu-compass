@@ -12,7 +12,8 @@
 
 ## API、提示词和界面共用的契约
 
-- `/chat` 首个 NDJSON meta 带 `prompt_version`（代码里当前是 `"4.4"`：在 4.3 的基础上加了按 Catalog 年度的先修规则，见下面 4.4 一条；4.3 在 4.2 的基础上让存档副本那句每个回答只说一次、数值冲突时两个数都要写出来；4.2 从未部署），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
+- `/chat` 首个 NDJSON meta 带 `prompt_version`（代码里当前是 `"4.5"`：在 4.4 的基础上加了明确选择的培养方案，见下一条；4.4 在 4.3 的基础上加了按 Catalog 年度的先修规则，见下面 4.4 一条；4.3 在 4.2 的基础上让存档副本那句每个回答只说一次、数值冲突时两个数都要写出来；4.2 从未部署），每个结果附 `answer_evidence`。`GET /course/{course_id}` 也返回该结构，不改持久化 `Course` schema v1.1。
+- 4.5（OPT-04 第二步）：请求带了服务端核对过的方案时，meta 另有 `plan_context`（方案范围、来源与对照日期、内容版本，以及每门检索课程在规则里的位置），提示词的方案数据块用同一份位置；课程的 `requisites` 另有 `selected_year` 和 `other_years_recorded`，所选年度没有可用记录时警告 `requisite_year_not_recorded`。没选方案时这几项都不出现。细节见 [版本化培养方案](program-plans.md)。
 - `answer_evidence` 包含 `catalog`、`field_evidence`、`source_review_ids`、`missing_fields`、`warnings`、`requisites`（4.4；没查时为 `null`）。缺失包括官方描述及常用选课字段；`None`/空列表表示记录未提供，数值 0 不当成缺失。这不是完整 syllabus 字段的覆盖率报告；全库按院系／字段的统计见 [数据覆盖、冲突与来源报告](data-coverage-report.md)（OPT-03：每个字段的 `missing`、`catalog_only`、`catalog_lists_none` 三类合起来，就是这里 `missing_fields` 里的这个字段，有可用年度先修文档时先修归 `year_rules`、不算缺失；学分的 `catalog_conflict` 就是这里的 `catalog_metadata_conflict`；另外比较先修代码集合，这一项回答路径没有对应警告）。
 - v4 提示词与 SSE meta 使用同一份读取结果，避免模型拿到一套依据、界面显示另一套。课程详情涉及培养方案时另外标记未核验 seed；chat 的培养方案捷径也标记该限制。不同查询语境的警告不必逐字相同。
 - 目录与课程学分冲突、数值估计与支持值冲突时保留两边并警告，不静默改写课程或选择一个值。先修代码列表不保留 AND/OR（有年度规则时提示词不再给这两份列表，见 4.4）；培养方案 seed 不等于正式 Plan of Study 或选课资格保证。

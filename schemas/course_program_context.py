@@ -1,9 +1,77 @@
-"""Same-edition plans that explicitly name a course; NOT personal membership."""
+"""Same-edition plans and bounded placements; NOT personal membership."""
+
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from schemas.program_plan import ProgramPlan, RequirementNode, normalize_code
+from schemas.program_plan import CourseRange, ProgramPlan, RequirementNode, normalize_code
 from schemas.course_requisite_source import CourseRequisiteSource
+
+
+class CoursePlacement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    path: list[str] = Field(min_length=1, max_length=8)
+    relation: Literal["required", "any_of_option", "select_candidate", "optional_branch", "excluded", "open_pool"]
+    under_any_of: bool = False
+    activate_when: list[str] = Field(default_factory=list, max_length=8)
+    min_courses: int | None = Field(default=None, ge=1, le=100)
+    min_credits: int | None = Field(default=None, ge=1, le=200)
+    min_areas: int | None = Field(default=None, ge=1, le=40)
+    areas: list[str] = Field(default_factory=list, max_length=40)
+    subject_codes: list[str] = Field(default_factory=list, max_length=20)
+    course_ranges: list[CourseRange] = Field(default_factory=list, max_length=20)
+
+    @field_validator("path", "areas")
+    @classmethod
+    def bounded_labels(cls, values):
+        if any(not value or len(value) > 300 for value in values):
+            raise ValueError("Placement labels must be bounded")
+        return values
+
+    @field_validator("activate_when")
+    @classmethod
+    def bounded_conditions(cls, values):
+        if any(not value.strip() or len(value) > 500 for value in values):
+            raise ValueError("Placement activation must be bounded and explicit")
+        return values
+
+
+def course_placements(root: RequirementNode, code: str) -> tuple[list[CoursePlacement], int]:
+    """Leaf, candidate, exclusion, then open pool; a named code never also gets an open-pool claim.
+    中文：保留 OR／可选条件两条独立轴，不把候选或可选分支变成共同必修。
+    """
+    code = normalize_code(code)
+
+    def named(node):
+        return (node.course_code == code or code in node.course_codes or code in node.excluded_course_codes
+                or any(named(child) for child in node.children))
+
+    explicitly_named = named(root)
+    found = []
+
+    def visit(node, path=(), under_any=False, conditions=()):
+        here = [*path, node.label[:300]]
+        common = {"path": here, "under_any_of": under_any, "activate_when": list(conditions)}
+        if node.kind == "course" and node.course_code == code:
+            relation = "any_of_option" if under_any else "optional_branch" if conditions else "required"
+            found.append((0, CoursePlacement(**common, relation=relation)))
+        elif node.kind == "select":
+            relation = ("excluded" if code in node.excluded_course_codes else
+                        "select_candidate" if code in node.course_codes else
+                        "open_pool" if not explicitly_named and (code.split()[0] in node.subject_codes
+                            or any(interval.contains(code) for interval in node.course_ranges)) else None)
+            if relation:
+                found.append(({"select_candidate": 1, "excluded": 2, "open_pool": 3}[relation], CoursePlacement(
+                    **common, relation=relation, min_courses=node.min_courses, min_credits=node.min_credits,
+                    min_areas=node.min_areas, areas=[name[:300] for name, codes in node.areas.items() if code in codes],
+                    subject_codes=node.subject_codes, course_ranges=[item.model_dump() for item in node.course_ranges])))
+        for child in node.children:
+            visit(child, here, under_any or node.kind == "any_of",
+                  (*conditions, node.activate_when) if node.kind == "optional" else conditions)
+
+    visit(root)
+    ordered = [item for _, item in sorted(found, key=lambda pair: pair[0])]
+    return ordered[:4], max(0, len(ordered) - 4)
 
 
 def explicitly_mentions(node: RequirementNode, code: str) -> bool:

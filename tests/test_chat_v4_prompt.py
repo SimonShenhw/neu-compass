@@ -23,7 +23,7 @@ def course(**updates):
 
 
 def test_version_and_empty_candidates():
-    assert PROMPT_VERSION == "4.4"
+    assert PROMPT_VERSION == "4.5"
     assert "no matches found in catalog" in build_prompt("unknown", [])
 
 

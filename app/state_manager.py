@@ -145,6 +145,7 @@ def add_message(
     matched_via: str | None = None,
     feedback: dict | None = None,
     notices: list[str] | None = None,
+    plan_context: dict | None = None,
 ) -> None:
     if role not in {"user", "assistant"}:
         raise ValueError(f"role must be 'user' or 'assistant', got {role!r}")
@@ -170,6 +171,11 @@ def add_message(
         target = bind_feedback_receipt(feedback, content)
         if target is not None:
             state['messages'][-1]['feedback'] = target
+    if role == "assistant" and plan_context is not None:
+        from app.chat_plan_view import validated_plan_context
+        context = validated_plan_context(plan_context)
+        if context is not None and set(context.placements) == {item["course_id"] for item in evidence or []}:
+            state["messages"][-1]["plan_context"] = context.model_dump(mode="json")
 
 
 def get_messages(state: SessionState) -> list[dict]:

@@ -78,13 +78,14 @@ from llm.gemini_client import GeminiError, error_log_fields
 from llm.prompts.chat_v4 import PROMPT_VERSION, build_prompt
 from llm.query_filter_extractor import extract_filters_adaptive
 from rag.followup import is_followup_query
-from rag.answer_evidence import build_answer_evidence
+from rag.answer_evidence import build_answer_evidence, build_plan_context
 from rag.hybrid import HybridRetriever
 from rag.query_normalizer import asks_for_alternatives, normalize_query_to_course_ids
 from rag.rejection import build_gate_fn
 from rag.reranker import CrossEncoderReranker
 from rag.retriever import SearchHit
 from schemas.course import DeliveryMode
+from schemas.plan_selection import PLAN_SELECTION_MESSAGES
 
 # Layer 3 (PLAN v3.0): regex detecting "first-semester / foundational" intent.
 # When this fires AND the user mentions a program prefix, we short-circuit
@@ -217,11 +218,20 @@ def chat(
             ) from e
 
     started = time.perf_counter()
+    program = None
     if req.program_id is not None:
         try:
-            program_repo.get_program(req.program_id)
+            program = program_repo.get_program(req.program_id)
         except ProgramNotFound as exc:
             raise HTTPException(status_code=404, detail="Selected program_id not found") from exc
+    plan = None
+    if req.plan is not None:
+        resolution = ProgramPlanRepository(conn).resolve_selection(req.plan)
+        if resolution.outcome != "selected":
+            # Controlled outcome and bounded plan ID only; no query/scope/exception reflection.
+            log.warning("chat.plan_selection", plan_outcome=resolution.outcome, plan_id=req.plan.plan_id)
+            raise HTTPException(status_code=409, detail=PLAN_SELECTION_MESSAGES[resolution.outcome])
+        plan = resolution.plan
     try:
         hits, matched_via, hard_filters, notices = _retrieve(
             req, alias_repo, course_repo, hybrid, reranker, program_repo, conn,
@@ -281,11 +291,16 @@ def chat(
 
     answer_evidence = build_answer_evidence(
         conn, [hit.course for hit in hits], program_seed=matched_via == "program",
+        **({"selected_year": plan.catalog_year} if plan is not None else {}),
     )
+    # One placement result feeds the prompt and the meta, so the model and the evidence panel get the same positions.
+    # 中文：提示词和 meta 用同一份课程位置结果，模型和证据面板拿到的位置相同。
+    plan_context = build_plan_context(plan, [hit.course for hit in hits]) if plan is not None else None
     prompt = build_prompt(
         req.query, hits,
         history=[t.model_dump() for t in req.history],
         evidence=answer_evidence, retrieval_mode=matched_via, notices=notices,
+        **({"plan": plan, "plan_context": plan_context, "program_name": program.full_name} if plan is not None else {}),
     )
 
     # Meta first so the client can render evidence bubbles before LLM tokens land. It is built
@@ -315,6 +330,8 @@ def chat(
     # 中文：仅在非空时出现，旧的 meta 形状保持不变。
     if notices:
         meta_payload["notices"] = list(notices)
+    if plan_context is not None:
+        meta_payload["plan_context"] = plan_context.model_dump(mode="json")
     meta_line = (json.dumps(meta_payload) + "\n").encode("utf-8")
 
     def event_stream() -> Iterator[bytes]:
@@ -380,6 +397,8 @@ def _store_completed_answer(conn, query_log_id, text, req):
         context = req.model_dump(include={'k','term','credits','delivery_mode','professor',
             'program_id','context_course_ids'})
         context['history_turn_count'] = len(req.history)
+        if req.plan is not None:
+            context.update(plan_id=req.plan.plan_id, plan_content_sha256=req.plan.plan_content_sha256)
         receipt = repo.store_completed(query_log_id=query_log_id, answer_text=text,
             prompt_version=PROMPT_VERSION, request_context=context)
         conn.commit()

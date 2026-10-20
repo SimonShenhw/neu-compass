@@ -287,7 +287,10 @@ def code_identity() -> dict:
              "app/streamlit_app.py", "rag/hybrid.py", "rag/reranker.py", "rag/retriever.py", "api/dependencies.py",
              "config/settings.py", "rag/acronyms.py", "rag/hyde.py", "rag/index.py", "api/main.py",
              "app/api_client.py", "db/connection.py", "rag/embedder.py", "rag/onnx_backend.py", "rag/openvino_backend.py",
-             "llm/gemini_client.py", "schemas/answer_evidence.py", "schemas/course.py")
+             "llm/gemini_client.py", "schemas/answer_evidence.py", "schemas/course.py",
+             "schemas/plan_selection.py", "schemas/program_plan.py", "schemas/course_program_context.py",
+             "db/program_plan_repository.py", "api/models.py", "app/chat_plan_view.py",
+             "app/program_plan_links.py", "app/program_plan_view.py", "app/answer_evidence_view.py")
     commit = dirty = None
     try:
         commit = subprocess.run(["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
@@ -303,7 +306,9 @@ def code_identity() -> dict:
 
 
 def build_case(question: dict, payloads: dict[str, dict]):
-    """(prompt, AnswerContext) for one question, mirroring api/routes/chat.py."""
+    """(prompt, AnswerContext) for one question, mirroring api/routes/chat.py without a selected plan: questions
+    carry no plan, so the plan block is null and the checks know nothing about plan-only course codes.
+    中文：按 api/routes/chat.py 的方式组装，但没有所选方案：问题里不带方案，方案块是 null，检查也不认识方案里才有的课号。"""
     from llm.prompts.chat_v4 import build_prompt, format_courses_block  # noqa: PLC0415
     from rag.answer_evidence import course_answer_evidence  # noqa: PLC0415
     from rag.retriever import SearchHit  # noqa: PLC0415

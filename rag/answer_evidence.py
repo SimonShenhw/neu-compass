@@ -12,7 +12,7 @@ from db.catalog_source_repository import CatalogSourceRepository
 from db.course_requisite_repository import CourseRequisiteRepository
 from schemas.answer_evidence import (
     CLAUSE_LIMIT, MAX_REQUISITE_EDITIONS, CatalogSnapshot, CourseAnswerEvidence, RequisiteEdition,
-    RequisiteEvidence, RequisiteSectionEvidence,
+    RequisiteEvidence, RequisiteSectionEvidence, PlanContext,
 )
 from schemas.course import Course
 from schemas.course_requisite_document import CourseRequisiteDocument
@@ -51,7 +51,8 @@ def requisite_edition(document: CourseRequisiteDocument) -> RequisiteEdition:
         prerequisite=_section(document.requisites.prerequisite), corequisite=_section(document.requisites.corequisite))
 
 
-def requisite_evidence(course: Course, documents: list[CourseRequisiteDocument], unusable: int = 0) -> RequisiteEvidence:
+def requisite_evidence(course: Course, documents: list[CourseRequisiteDocument], unusable: int = 0,
+                       *, selected_year: str | None = None) -> RequisiteEvidence:
     """The editions an answer may use, from documents that already passed the repository's checks.
     A document for another course code or title than the course being answered about, and every
     document of a catalog year that has more than one, are counted unusable; none is chosen. So is a
@@ -72,10 +73,12 @@ def requisite_evidence(course: Course, documents: list[CourseRequisiteDocument],
         except ValueError:  # pydantic's ValidationError is a ValueError.
             log.warning("answer_evidence.requisite_edition_unusable", course_id=document.course_id,
                         catalog_year=document.catalog_year)
+    selected = [edition for edition in editions if edition.catalog_year == selected_year]
     return RequisiteEvidence(
-        storage="available", editions=editions[:MAX_REQUISITE_EDITIONS],
-        editions_omitted=max(0, len(editions) - MAX_REQUISITE_EDITIONS),
-        unusable_records=unusable + len(documents) - len(editions))
+        storage="available", editions=selected if selected else editions[:MAX_REQUISITE_EDITIONS],
+        editions_omitted=0 if selected else max(0, len(editions) - MAX_REQUISITE_EDITIONS),
+        unusable_records=unusable + len(documents) - len(editions), selected_year=selected_year,
+        other_years_recorded=len(editions) - len(selected) if selected_year is not None else 0)
 
 
 def _rules(edition: RequisiteEdition) -> tuple:
@@ -122,6 +125,9 @@ def course_answer_evidence(course: Course, catalog: CatalogSnapshot | None = Non
         warnings.append("requisite_clause_unparsed")
     if requisites and (requisites.unusable_records or requisites.storage == "schema_unusable"):
         warnings.append("structured_requisites_unusable")
+    if requisites and requisites.selected_year is not None and not any(
+            edition.catalog_year == requisites.selected_year for edition in editions):
+        warnings.append("requisite_year_not_recorded")
     if program_seed:
         warnings.append("program_seed_unverified")
     if course.course_id.startswith("synth-") or any(source.startswith("synthetic_seed_") for source in course.source_review_ids):
@@ -133,18 +139,32 @@ def course_answer_evidence(course: Course, catalog: CatalogSnapshot | None = Non
 
 
 def build_answer_evidence(conn: sqlite3.Connection, courses: list[Course],
-                          *, program_seed: bool = False) -> dict[str, CourseAnswerEvidence]:
+                          *, program_seed: bool = False, selected_year: str | None = None) -> dict[str, CourseAnswerEvidence]:
     catalogs = CatalogSourceRepository(conn).get_batch(courses)
     batch = CourseRequisiteRepository(conn).read_batch([course.course_id for course in courses])
     evidence = {}
     for course in courses:
         if batch.storage != "available":
-            requisites = RequisiteEvidence(storage=batch.storage)
+            requisites = RequisiteEvidence(storage=batch.storage, selected_year=selected_year)
         elif course.course_id in batch.unreadable:  # Its own rows could not be read; the other courses keep theirs.
-            requisites = RequisiteEvidence(storage="schema_unusable")
+            requisites = RequisiteEvidence(storage="schema_unusable", selected_year=selected_year)
         else:
             requisites = requisite_evidence(course, batch.documents.get(course.course_id, []),
-                                            batch.unusable[course.course_id])
+                                            batch.unusable[course.course_id], selected_year=selected_year)
         evidence[course.course_id] = course_answer_evidence(
             course, catalogs.get(course.course_id), program_seed=program_seed, requisites=requisites)
     return evidence
+
+
+def build_plan_context(plan, courses: list[Course]) -> PlanContext:
+    from db.program_plan_repository import content_hash
+    from schemas.course_program_context import course_placements
+    from schemas.program_plan import ProgramPlan
+
+    plan = ProgramPlan.model_validate(plan.model_dump())
+    entries = {course.course_id: course_placements(plan.requirements, course.primary_code) for course in courses}
+    return PlanContext(
+        **{name: getattr(plan, name) for name in ("program_id", "plan_id", "campus", "catalog_year", "pathway",
+            "concentration", "coverage", "review_status", "checked_on", "captured_on", "source_catalog_year", "source_url")},
+        plan_content_sha256=content_hash(plan), placements={key: value[0] for key, value in entries.items()},
+        placements_omitted={key: value[1] for key, value in entries.items()})

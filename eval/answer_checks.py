@@ -18,7 +18,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.5-review-gaps"
+CHECKER_VERSION = "2.6-plan-year"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
 ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
 # A second number after a separator shares the first code's department ("CS 5800 和 5200"), unless it reads as a level
@@ -64,7 +64,7 @@ CODES = ("catalog_source_unavailable", "catalog_retrieval_date_unknown", "catalo
          "extracted_evidence_not_official_facts", "field_evidence_value_conflict", "topics_source_unavailable",
          "prerequisite_logic_unavailable", "program_seed_unverified", "synthetic_record_not_real_course",
          "program_schedule_unverified", "requisites_differ_by_catalog_year", "requisite_clause_unparsed",
-         "structured_requisites_unusable")
+         "structured_requisites_unusable", "requisite_year_not_recorded")
 
 CATALOG_HEX = re.compile(r"catalog:[0-9a-fA-F]+")
 HEX_RUN = re.compile(r"[0-9a-fA-F]{12,}")

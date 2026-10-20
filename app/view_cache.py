@@ -242,6 +242,14 @@ def expire_all(state: MutableMapping[str, Any]) -> None:
             _expire(nested, key)
 
 
+def expire(container: MutableMapping[str, Any], key: str) -> None:
+    """Make the next read of one entry fetch again, keeping its last success as expire_all() does (the
+    fallback, and the baseline a curriculum's plans are compared against).
+    中文：让一条记录下一次读取时重新获取；和 expire_all() 一样保留上次的成功结果（失败时的回退，也是比较
+    课程表方案的基准）。"""
+    _expire(container, key)
+
+
 def _expire(container: MutableMapping[str, Any], key: str) -> None:
     entry = container.get(key)
     if isinstance(entry, _Entry):
@@ -263,6 +271,7 @@ __all__ = [
     "begin_run",
     "cached",
     "curricula",
+    "expire",
     "expire_all",
     "peek",
     "served_fallback",

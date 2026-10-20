@@ -6,7 +6,7 @@
 
 每次成功的 `/chat` 请求继续按原机制写一条 `query_log`。`log_query` 仅在该次 INSERT 与 commit 成功后返回准确 `log_id`，失败返回 None，不能用最大 ID、最近一条记录或客户端传来的行号猜测。
 
-运营开关 `ANSWER_FEEDBACK_ENABLED` 默认 false；即使有 v1.7 表也不启用。`POST /chat` 的 `allow_feedback_capture` 默认 false、只接受 JSON bool；只有运营启用且该请求明确 true，再满足上游流**正常结束**、回答非空且不超过 64000 个字符、关联查询及新表可用，才将逐 token 拼接的完整回答保存到私有 `chat_answers`，并在最后一个 NDJSON `done` 事件附带凭证。记录包含原查询外键、回答原文／SHA-256、prompt version、请求的筛选／项目／上下文课程 ID、历史轮数及凭证过期时间；**不另存完整对话历史、OAuth token 或账号身份**。许可不进入 prompt／既有上下文白名单，也没有新增同意账本；它不是真人／身份／法律同意证明。上下文没有全部历史／当时检索索引快照，不是任意追问可独立重放的评测包。
+运营开关 `ANSWER_FEEDBACK_ENABLED` 默认 false；即使有 v1.7 表也不启用。`POST /chat` 的 `allow_feedback_capture` 默认 false、只接受 JSON bool；只有运营启用且该请求明确 true，再满足上游流**正常结束**、回答非空且不超过 64000 个字符、关联查询及新表可用，才将逐 token 拼接的完整回答保存到私有 `chat_answers`，并在最后一个 NDJSON `done` 事件附带凭证。记录包含原查询外键、回答原文／SHA-256、prompt version、请求的筛选／项目／上下文课程 ID、历史轮数及凭证过期时间，选了方案时另有方案 ID 和内容版本（`plan_id`、`plan_content_sha256`，不存方案内容）；**不另存完整对话历史、OAuth token 或账号身份**。许可不进入 prompt／既有上下文白名单，也没有新增同意账本；它不是真人／身份／法律同意证明。上下文没有全部历史／当时检索索引快照，不是任意追问可独立重放的评测包。
 
 原 `meta`／`token`／`error` 顺序和旧客户端消费方式保留；`done.feedback` 是可选扩展，示意为：
 

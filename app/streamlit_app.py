@@ -551,6 +551,8 @@ def render() -> None:
         except ApiError:
             chat_program_id = None
             st.caption("暂时无法加载项目列表；课程搜索仍可使用。")
+        from app.chat_plan_view import render_chat_plan_selector  # noqa: PLC0415
+        chat_plan = render_chat_plan_selector(st, chat_program_id)
 
     # In the main body, not inside a column: Streamlit pins a main-body chat_input to the bottom
     # of the window. Inside chat_col it rendered inline after the landing content, about 2.5
@@ -611,6 +613,8 @@ def render() -> None:
             }
             if chat_program_id is not None:
                 chat_body["program_id"] = chat_program_id
+            if chat_plan is not None:
+                chat_body["plan"] = chat_plan.model_dump(mode="json")
             if chat_history:
                 chat_body["history"] = chat_history
             if context_ids:
@@ -634,6 +638,9 @@ def render() -> None:
                         stream = stream_assistant(api, chat_body, st.session_state)
                         final_text = render_streamed_answer(st, stream)
                 except ApiError as e:
+                    if e.status_code == 409:
+                        from app.chat_plan_view import queue_chat_plan_reset  # noqa: PLC0415
+                        queue_chat_plan_reset(st.session_state, chat_program_id, e.detail)
                     # 409 = the API needs the student to clarify the program
                     # (ambiguous prefix / selection conflict), not a failure.
                     # 中文：409 表示需要学生明确项目（前缀歧义或选择冲突），不是故障。
@@ -650,6 +657,10 @@ def render() -> None:
                 meta = st.session_state.get("last_chat_meta") or {}
                 results = meta.get("results", [])
                 matched_via = meta.get("matched_via", "empty")
+                if meta.get("plan_context") is not None:
+                    from app.chat_plan_view import render_plan_context  # noqa: PLC0415
+                    with st.expander("📘 所选方案与课程位置"):
+                        render_plan_context(st, meta["plan_context"], results)
                 if results:
                     record_search(
                         st.session_state,
@@ -675,6 +686,7 @@ def render() -> None:
                 matched_via=matched_via,
                 feedback=st.session_state.get('last_chat_feedback'),
                 notices=meta.get("notices"),
+                plan_context=meta.get("plan_context"),
             )
             # Rerun immediately so the message renders via the HISTORY path.
             # The live evidence block above only exists inside `if prompt:`;

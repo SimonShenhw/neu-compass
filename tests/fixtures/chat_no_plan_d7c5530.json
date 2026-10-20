@@ -1,0 +1,270 @@
+{
+  "base_commit": "d7c5530a3707151ab53bad3ad3879f15d683c3f1",
+  "normalization": [
+    "retrieval_ms",
+    "prompt_version"
+  ],
+  "turns": {
+    "alias_good:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "alias_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "hybrid_good:0": {
+      "http_status": 200,
+      "meta_sha256": "3425586a12a285e356e1df8466e920e520d466108dc5fe923b00a8621aa1c389",
+      "course_block_sha256": "fa8b0cf687f40e01f420ebfb04d34fcec5d98fb364ad96e94f1ba53d9beed3fc"
+    },
+    "hybrid_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "2f74cbd8ea1cd7e3825d056aa83655572e07f705cd81110536e79811df3e9fd9",
+      "course_block_sha256": "b4fb649ac9c4946369ada6e492e47aabd064c19060e88e79faf5a6c41ddd23aa"
+    },
+    "filter_credits:0": {
+      "http_status": 200,
+      "meta_sha256": "ba15ccfe447499094081246affe3f8e074cf4f60aa456bf2e61e972b7fafb4cc",
+      "course_block_sha256": "b1e9a6ec4eaa90621122033fd783bf6816050352c3eb0e86eeed67487ee9e912"
+    },
+    "filter_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "filter_exact_excluded:0": {
+      "http_status": 200,
+      "meta_sha256": "3eeb96329eb6548752623cdbe3449b837430ef2c3a421dd2380110d3b72c0c09",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "filter_anchor:0": {
+      "http_status": 200,
+      "meta_sha256": "2d3233ae5ab1dd0f6b6c94c9c4d6af633e055eddfb24c9fd14b9e9bc47083454",
+      "course_block_sha256": "68da67720fc216039e8ca18776b0d5edf1dd02dba28482d050a3fe62deca4adb"
+    },
+    "followup_good:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "followup_good:1": {
+      "http_status": 200,
+      "meta_sha256": "f2ce9e43f1fa04476bff308dbffee09a6ccfe0a2322703d7110525bbef0f5c6d",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "followup_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "followup_bad:1": {
+      "http_status": 200,
+      "meta_sha256": "f2ce9e43f1fa04476bff308dbffee09a6ccfe0a2322703d7110525bbef0f5c6d",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "followup_switch:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "followup_switch:1": {
+      "http_status": 200,
+      "meta_sha256": "7afeca89584451c87cf1bc5a1fd27f71cf4c0b43b135d64682c743905ad70df4",
+      "course_block_sha256": "d22b233ee4e2f635ceb6e3ebc4d8e8edce04d5706af62b76c4ca4003fd26fa20"
+    },
+    "program_ambiguous:0": {
+      "http_status": 409,
+      "detail": "这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：synthetic-cs-align, synthetic-cs-standard。"
+    },
+    "program_selected:0": {
+      "http_status": 200,
+      "meta_sha256": "4469ac4b58748754ce5e8be2053c57aecacde804cc1b943b1925f21440d5fc05",
+      "course_block_sha256": "f5f53e8852b67a2ada6c0e11e1243db43effacedbc653ae92c9ded61b8ddc2de"
+    },
+    "program_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "4469ac4b58748754ce5e8be2053c57aecacde804cc1b943b1925f21440d5fc05",
+      "course_block_sha256": "f5f53e8852b67a2ada6c0e11e1243db43effacedbc653ae92c9ded61b8ddc2de"
+    },
+    "program_versioned:0": {
+      "http_status": 200,
+      "meta_sha256": "28544034e6504a01f52012fb45fc8d1f17f1ac9f1d1fe221a160c6f0eddc8e8c",
+      "course_block_sha256": "ecd7a72ad8bf4d1e8986160afee04e0d5670a69fcf3b6575255a4e1f1aec37e9"
+    },
+    "program_conflict:0": {
+      "http_status": 409,
+      "detail": "上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。 (Selected program_id conflicts with the detected program prefix.)"
+    },
+    "program_missing:0": {
+      "http_status": 404,
+      "detail": "Selected program_id not found"
+    },
+    "numeric_good:0": {
+      "http_status": 200,
+      "meta_sha256": "923c94542985de8816d71ebd792a52bd25157bf8d7403d9c4b9d39f1c1f3905f",
+      "course_block_sha256": "adbbd15d6c69ccf656117160c3982e70fce17156a8b320a8eccad633da33e12c"
+    },
+    "numeric_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "923c94542985de8816d71ebd792a52bd25157bf8d7403d9c4b9d39f1c1f3905f",
+      "course_block_sha256": "adbbd15d6c69ccf656117160c3982e70fce17156a8b320a8eccad633da33e12c"
+    },
+    "numeric_course_count:0": {
+      "http_status": 200,
+      "meta_sha256": "7afeca89584451c87cf1bc5a1fd27f71cf4c0b43b135d64682c743905ad70df4",
+      "course_block_sha256": "d22b233ee4e2f635ceb6e3ebc4d8e8edce04d5706af62b76c4ca4003fd26fa20"
+    },
+    "conflict_credits_good:0": {
+      "http_status": 200,
+      "meta_sha256": "a1095eab788298a1b7604012d767a51c30e453ee0d39d6b4d340940ea51189c1",
+      "course_block_sha256": "4923f469cfbafd9bd0be14de11843ab143373cca850805ab67d96bcfe86e2326"
+    },
+    "conflict_credits_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "a1095eab788298a1b7604012d767a51c30e453ee0d39d6b4d340940ea51189c1",
+      "course_block_sha256": "4923f469cfbafd9bd0be14de11843ab143373cca850805ab67d96bcfe86e2326"
+    },
+    "conflict_workload_good:0": {
+      "http_status": 200,
+      "meta_sha256": "624291293e5779991324eec2244d9fe8695e4dad5db8f9c891e39cd218f5c666",
+      "course_block_sha256": "1db08ecee700af2c23683d4f7d2c3766fb2695c891cb0b1d1ef4891e143fcd7f"
+    },
+    "conflict_workload_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "624291293e5779991324eec2244d9fe8695e4dad5db8f9c891e39cd218f5c666",
+      "course_block_sha256": "1db08ecee700af2c23683d4f7d2c3766fb2695c891cb0b1d1ef4891e143fcd7f"
+    },
+    "no_results_good:0": {
+      "http_status": 200,
+      "meta_sha256": "f355a43c10f7806fc430cc757d8acaba3bd82dde45529aef95a4ed5b99f078f7",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "no_results_bad:0": {
+      "http_status": 200,
+      "meta_sha256": "f355a43c10f7806fc430cc757d8acaba3bd82dde45529aef95a4ed5b99f078f7",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "no_results_empty:0": {
+      "http_status": 200,
+      "meta_sha256": "3eeb96329eb6548752623cdbe3449b837430ef2c3a421dd2380110d3b72c0c09",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "stream_partial:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "stream_empty:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "stream_nontext:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "stream_recovery_good:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "stream_recovery_good:1": {
+      "http_status": 200,
+      "meta_sha256": "f2ce9e43f1fa04476bff308dbffee09a6ccfe0a2322703d7110525bbef0f5c6d",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "stream_rescue_failure:0": {
+      "http_status": 200,
+      "meta_sha256": "f355a43c10f7806fc430cc757d8acaba3bd82dde45529aef95a4ed5b99f078f7",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "alias_lowercase:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "hybrid_mixed_language:0": {
+      "http_status": 200,
+      "meta_sha256": "796583b9d4dfcd08d81054b714f528fae5dc1b0eea2467c2cd63f863c5301fbb",
+      "course_block_sha256": "29bea1c6e33c73542b8bc55441c0e590c48f70755d04e1cfd5bd7a6105ebb281"
+    },
+    "vector_graph:0": {
+      "http_status": 200,
+      "meta_sha256": "4cb50b6008c4da2eb28ebe2e24cc00f76083cadd297fd1d89925c4334ad64c4c",
+      "course_block_sha256": "e3ac13b6b3511977ed1a34a03c964a4bdf2a4ce637b98b6d5e508e239840379a"
+    },
+    "vector_storage:0": {
+      "http_status": 200,
+      "meta_sha256": "dad18151c5c201396828581916edff833552672c2b05086dd8cb3b1a6066e6d8",
+      "course_block_sha256": "410431c7b2b2d11fa47d953cc185c6549d09ed1d68f157316e11740ea5a92b8c"
+    },
+    "vector_neural:0": {
+      "http_status": 200,
+      "meta_sha256": "c6557997d85304e47b607251db02c50d27f7ffa6a61b44450e4ec5106555d917",
+      "course_block_sha256": "2dca22fad9fbea086036a99e5401d1e6a60539b344ddc379cb739054d48b4285"
+    },
+    "followup_filtered:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "followup_filtered:1": {
+      "http_status": 200,
+      "meta_sha256": "3eeb96329eb6548752623cdbe3449b837430ef2c3a421dd2380110d3b72c0c09",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "followup_after_409:0": {
+      "http_status": 409,
+      "detail": "这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：synthetic-cs-align, synthetic-cs-standard。"
+    },
+    "followup_after_409:1": {
+      "http_status": 200,
+      "meta_sha256": "4469ac4b58748754ce5e8be2053c57aecacde804cc1b943b1925f21440d5fc05",
+      "course_block_sha256": "f5f53e8852b67a2ada6c0e11e1243db43effacedbc653ae92c9ded61b8ddc2de"
+    },
+    "rescue_success:0": {
+      "http_status": 200,
+      "meta_sha256": "790871399c3a86fab854dd4292f66ddaf424f89cffc228acced1c9fe371d1dfb",
+      "course_block_sha256": "4f14ff07f347aa4080423bb747b3dc754c293ef43f560a4394c45e1d72651f9d"
+    },
+    "rescue_code_guard:0": {
+      "http_status": 200,
+      "meta_sha256": "f355a43c10f7806fc430cc757d8acaba3bd82dde45529aef95a4ed5b99f078f7",
+      "course_block_sha256": "afe92190c3688bed6d39c602eac0f38d082b376b20f104c46db3869de86cb9a4"
+    },
+    "stream_partial_leak:0": {
+      "http_status": 200,
+      "meta_sha256": "c89652c6a2a07539c6854824813d881a47777a77d15fd0c94e78805589ad6d60",
+      "course_block_sha256": "51417576c7c541b5800b862fe081b9e7f2a9a6d285058360d18a8956612cce74"
+    },
+    "lexical_bfs:0": {
+      "http_status": 200,
+      "meta_sha256": "4da53f1e28cfe47a31fc5f669329fa1cdd3e29fc95a92136803fdeebce8ef7c4",
+      "course_block_sha256": "e83683b228aee2e6ebf8cd7478b3a3aba50222d54ff5d266c2501c89f46a5925"
+    },
+    "lexical_transactions:0": {
+      "http_status": 200,
+      "meta_sha256": "7823ad09494cf18f4388a1c2bb050de8b20e302ce52f6c4f3565e00f86a3ef58",
+      "course_block_sha256": "97fd617e22c39fc4a05c48a14bdc356d3f2577e4f2ff76348519a709600d3f62"
+    },
+    "lexical_sensors:0": {
+      "http_status": 200,
+      "meta_sha256": "164a5ff93a9e5a79b80e43d053929c3d4cebc300c79e7a7cc7b39dfe77136f91",
+      "course_block_sha256": "dc2b57fb8e6e987a1d41643174a2f3af5d244417849535f227af60a18bee91b3"
+    },
+    "lexical_graded:0": {
+      "http_status": 200,
+      "meta_sha256": "a7d67cf3118d4d2324b6ff082f8d23e8eabe25b89cea666f16b28493333395d8",
+      "course_block_sha256": "ce01803d83a9aefcba06e2fec619a68a5e5e7b2f19ef92b625548dcc37d90da9"
+    },
+    "lexical_reverse_order:0": {
+      "http_status": 200,
+      "meta_sha256": "23409de63fdfae522082471c2c8ccc0a82caf8cd70aa614c39aee40ac4c1ecab",
+      "course_block_sha256": "78d9765d6a111b52753384a0055407afc56398813622b4011193747ff43cbd57"
+    }
+  }
+}

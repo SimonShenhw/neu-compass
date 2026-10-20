@@ -7,10 +7,9 @@ import json
 from collections import Counter
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 from db.program_plan_repository import content_hash
 from schemas.program_plan import ProgramPlan
+from schemas.plan_selection import PlanSelection
 
 QUERY_FIELDS = {
     'plan_v': 'format_version', 'program': 'program_id', 'plan': 'plan_id',
@@ -32,31 +31,8 @@ MESSAGES = {
 }
 
 
-class PlanLink(BaseModel):
-    model_config = ConfigDict(extra='forbid', strict=True)
+class PlanLink(PlanSelection):
     format_version: Literal['1'] = '1'
-    program_id: str = Field(pattern=r'^[a-z0-9][a-z0-9-]{0,63}$')
-    plan_id: str = Field(pattern=r'^[a-z0-9][a-z0-9-]{0,99}$')
-    campus: str = Field(pattern=r'^[a-z][a-z0-9-]{0,39}$')
-    catalog_year: str = Field(pattern=r'^\d{4}-\d{4}$')
-    pathway: Literal['standard', 'align', 'bridge']
-    concentration: str | None = Field(default=None, min_length=1, max_length=100)
-    plan_content_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
-
-    @field_validator('catalog_year')
-    @classmethod
-    def edition(cls, value):
-        return ProgramPlan.consecutive_years(value)
-
-    @field_validator('concentration')
-    @classmethod
-    def nonblank(cls, value):
-        if value is not None and not value.strip():
-            raise ValueError('Blank concentration is not a declared scope')
-        return value
-
-    def scope_key(self):
-        return (self.program_id, self.campus, self.catalog_year, self.pathway, self.concentration or '')
 
     @classmethod
     def from_plan(cls, plan: ProgramPlan):

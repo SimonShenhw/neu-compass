@@ -16,12 +16,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from schemas.coop import Industry
 from schemas.course import Course
 from schemas.answer_evidence import CourseAnswerEvidence
 from schemas.course_requisite_document import CourseRequisiteListing
+from schemas.plan_selection import PlanSelection
 
 
 # === /search ===
@@ -185,10 +186,17 @@ class ChatRequest(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list, max_length=12)
     context_course_ids: list[str] = Field(default_factory=list, max_length=10)
     program_id: str | None = Field(default=None, min_length=1, max_length=64)
+    plan: PlanSelection | None = None
 
     # Only a JSON boolean; omitted/false preserves legacy no-answer-storage.
     # 中文：技术保存许可，不是身份／法律同意凭证；不得将字符串转成 true。
     allow_feedback_capture: bool = Field(default=False, strict=True)
+
+    @model_validator(mode="after")
+    def plan_family_matches(self):
+        if self.plan is not None and self.program_id != self.plan.program_id:
+            raise ValueError("A plan requires its matching program_id")
+        return self
 
 
 # === /coop ===

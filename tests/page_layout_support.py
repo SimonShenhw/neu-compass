@@ -45,6 +45,11 @@ class Backend:
             return httpx.Response(200, content="".join(json.dumps(event) + "\n" for event in events).encode())
         if request.url.path == "/ready":
             return httpx.Response(200, json={"status": "ready", "courses_indexed": 3, "bm25_corpus": 3})
+        if request.url.path.startswith("/programs/"):
+            # F looks up versioned plans after a family is explicitly chosen; this legacy-only
+            # synthetic family has none. No additional widget or automatic choice is expected.
+            return httpx.Response(200, json={"program_id": request.url.path.rsplit("/", 1)[1],
+                "plan_schema_available": True, "plans": []})
         if request.url.path.startswith("/course/"):
             if self.course_status != 200:
                 return httpx.Response(self.course_status, json={"detail": "synthetic detail failure"})
