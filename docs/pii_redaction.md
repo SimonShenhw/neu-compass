@@ -274,7 +274,15 @@ def auto_redact_pre(text: str) -> str:
 
 尚未发送响应的未捕获异常在请求中间件消化，只有一条安全错误事件，不再向 ServerErrorMiddleware／uvicorn 传播。流头发送后无法换成固定 500：会记一条安全的 `unhandled_exception`，但 uvicorn 自己的 handler 不经过 root 过滤器，仍会打印带异常原文的 traceback。聊天流的 meta 行在响应开始前就构造好，模型流的错误转成流内错误事件，所以目前没有已知的生产路径会走到这里。Python `warnings` 和 Streamlit 进程日志（UI 未捕获异常）也仍打印原文；浏览器里只显示错误类型。Streamlit 发布配置默认仅显示错误类型；完整详情仅供本地显式开启。
 
-这不是「所有日志没有 PII」：成功查询原文及 query_log 留存、本来的 Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串仍需单独治理。本批不改留存／删除／备份、不改 Docker 启动参数，不执行真实账号或线上验收。
+这不是「所有日志没有 PII」：成功查询原文及 query_log 留存、本来的 Google sub 成功事件、其他请求路径和 uvicorn access log 的查询字符串仍需单独治理；课程读取的例外见下。本批不改留存／删除／备份、不改 Docker 启动参数，不执行真实账号或线上验收。
+
+### 课程读日志的补充边界（I，2026-10-20）
+
+会话内选课草案使用的 `/resolve/course`、`/course/{course_id}` 与年度先修读取，不新增清单日志或 query_log 写入。resolver 不再记录 ref；请求 context 只保留模板路径，课程读事件采用最终诊断白名单。可保留有界年度字段，畸形年度原文丢弃；正常／异常诊断不保留课程代码、ID、来源与任意载荷。
+
+独立 UI 的 HTTPX 源 logger 去掉这些课程读 URL 的查询串、具体路径及 fragment。API 的 uvicorn.access 有自己的 handler、不会经过 root 过滤器，因此 configure_logging 也在该源 logger 上幂等安装过滤器：课程读路径改成模板并去掉查询串，方法、协议和状态照常，其他访问记录不变。已用默认 uvicorn 配置经本地 Unix socket 的合成请求核对，不是部署或线上日志验收。
+
+本次不改 Docker 启动命令，不停用全部访问日志；不清理历史 docker／NAS／代理／隧道日志，不改变 query_log 留存，也不声称基础设施日志都已脱敏。聊天／搜索问题原文由独立 K 批次处理；流头之后的 traceback、warnings 与 UI 未捕获错误仍按本节已有边界单独看待。
 
 ## 11. 运行日志里的学生问题（K／Z5，2026-10-19）
 

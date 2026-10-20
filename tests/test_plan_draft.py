@@ -22,25 +22,39 @@ def evaluate(rule, courses=(), *, partial=False):
     return module.evaluate_draft(plan, [module.DraftCourse(**c) for c in courses])
 
 
+def evaluate_rule(rule, courses=()):
+    """Assert internal rule truth independently of the always-conservative plan root.
+
+    L7 changes the public root policy, not course/select/AND/OR semantics. Use a valid
+    partial plan container so the old affirmative rule assertions still exercise a child.
+    """
+    from schemas.program_plan import ProgramPlan
+
+    module = importlib.import_module("schemas.plan_draft")
+    wrapper = node("all_of", label="Unit rule container", children=[rule, node("condition", label="Personal conditions")])
+    plan = ProgramPlan.model_validate({**plans()[0].model_dump(), "coverage": "partial", "requirements": wrapper.model_dump()})
+    return module.evaluate_draft(plan, [module.DraftCourse(**c) for c in courses]).root.children[0]
+
+
 @pytest.mark.parametrize("present,status", [(False, "missing"), (True, "met")])
 def test_course_leaf_and_normalization(present, status):
-    result = evaluate(node("course", course_code="cs5001"), [course("cs5001")] if present else [])
-    assert result.root.status == status
-    assert result.root.counted == (["CS 5001"] if present else [])
-    assert result.root.missing == ([] if present else ["CS 5001"])
+    result = evaluate_rule(node("course", course_code="cs5001"), [course("cs5001")] if present else [])
+    assert result.status == status
+    assert result.counted == (["CS 5001"] if present else [])
+    assert result.missing == ([] if present else ["CS 5001"])
 
 
 @pytest.mark.parametrize("kind,courses,status", [("all_of", [], "missing"), ("all_of", [course()], "unknown"),
     ("any_of", [], "unknown"), ("any_of", [course()], "met")])
 def test_composite_precedence(kind, courses, status):
     rule = node(kind, children=[node("course", course_code="CS 5001"), node("condition", label="GPA unknown")])
-    assert evaluate(rule, courses).root.status == status
+    assert evaluate_rule(rule, courses).status == status
 
 
 def test_all_met_any_all_missing_and_optional_only_have_explicit_results():
     children = [node("course", course_code="CS 5001"), node("course", course_code="CS 5002")]
-    assert evaluate(node("all_of", children=children), [course(), course("CS 5002")]).root.status == "met"
-    assert evaluate(node("any_of", children=children)).root.status == "missing"
+    assert evaluate_rule(node("all_of", children=children), [course(), course("CS 5002")]).status == "met"
+    assert evaluate_rule(node("any_of", children=children)).status == "missing"
     opt = node("optional", activate_when="Thesis approval", children=[children[0]])
     result = evaluate(node("all_of", children=[opt, opt]), [course()])
     assert result.root.status == "unknown"  # Optional-only never creates an affirmative empty AND.
@@ -53,7 +67,8 @@ def test_optional_does_not_count_as_owner_or_participate_in_summary():
     selected = node("select", course_codes=["CS 5001"], min_courses=1)
     optional = node("optional", activate_when="Only if selected", children=[selected])
     result = evaluate(node("all_of", children=[selected, optional]), [course()])
-    assert result.root.status == "met" and result.summary_counts == {"met": 1, "missing": 0, "unknown": 0}
+    assert result.root.status == "unknown" and result.root.children[0].status == "met"
+    assert result.summary_counts == {"met": 1, "missing": 0, "unknown": 0}
     assert result.root.children[1].status == "not_evaluated"
 
 
@@ -65,7 +80,7 @@ def test_text_conditions_and_unmodeled_never_pass(kind, phrase):
 
 @pytest.mark.parametrize("credits,status,gap", [(4, "met", 0), (0, "missing", 4), (None, "unknown", 4)])
 def test_credit_none_zero_and_known_are_distinct(credits, status, gap):
-    result = evaluate(node("select", course_codes=["CS 5001"], min_credits=4), [course(credits=credits)]).root
+    result = evaluate_rule(node("select", course_codes=["CS 5001"], min_credits=4), [course(credits=credits)])
     assert result.status == status and result.shortfall["credits"] == gap
     if credits is None:
         assert "学分未知" in " ".join(result.reasons) and result.possible == ["CS 5001"]
@@ -74,14 +89,14 @@ def test_credit_none_zero_and_known_are_distinct(credits, status, gap):
 def test_unknown_credit_upper_bound_can_prove_missing_and_known_suffices():
     pool = ["CS 5001", "CS 5002"]
     assert evaluate(node("select", course_codes=pool, min_credits=20), [course(credits=None)]).root.status == "missing"
-    result = evaluate(node("select", course_codes=pool, min_credits=4), [course(), course("CS 5002", None)]).root
+    result = evaluate_rule(node("select", course_codes=pool, min_credits=4), [course(), course("CS 5002", None)])
     assert result.status == "met"
 
 
 @pytest.mark.parametrize("courses,status,gap", [([], "missing", 2), ([course()], "missing", 1),
     ([course(), course("CS 5999")], "unknown", 0), ([course(), course("CS 5002")], "met", 0)])
 def test_count_threshold_with_open_pool(courses, status, gap):
-    result = evaluate(node("select", course_codes=["CS 5001", "CS 5002"], subject_codes=["CS"], min_courses=2), courses).root
+    result = evaluate_rule(node("select", course_codes=["CS 5001", "CS 5002"], subject_codes=["CS"], min_courses=2), courses)
     assert result.status == status and result.shortfall["courses"] == gap
 
 
@@ -91,7 +106,7 @@ def test_named_anywhere_including_exclusions_cannot_become_open_pool():
     result = evaluate(root, [course()])
     assert result.root.children[0].status == "missing" and result.root.children[0].possible == []
     assert "明确排除" in " ".join(result.root.children[1].reasons)
-    assert result.unplaced == ["CS 5001"]
+    assert result.unplaced == []  # M2: explicitly excluded is mentioned, not eligible.
 
 
 def test_shared_named_helper_does_not_use_truncated_four_placements():
@@ -111,7 +126,7 @@ def test_open_ranges_credits_and_excluded_courses():
                 excluded_course_codes=["CS 5200"], min_credits=4)
     result = evaluate(pool, [course("CS 5100"), course("CS 5200"), course("CS 6000")])
     assert result.root.status == "unknown" and result.root.possible == ["CS 5100"]
-    assert result.unplaced == ["CS 5200", "CS 6000"]
+    assert result.unplaced == ["CS 6000"]
 
 
 @pytest.mark.parametrize("codes,status,areas", [(["CS 5001", "CS 5002"], "missing", 1),
@@ -119,7 +134,7 @@ def test_open_ranges_credits_and_excluded_courses():
 def test_areas_are_counted_by_partition_not_course_count(codes, status, areas):
     pool = node("select", course_codes=["CS 5001", "CS 5002", "DS 5001"], min_courses=2, min_areas=2,
                 areas={"CS": ["CS 5001", "CS 5002"], "DS": ["DS 5001"]})
-    result = evaluate(pool, [course(c) for c in codes]).root
+    result = evaluate_rule(pool, [course(c) for c in codes])
     assert result.status == status and result.shortfall["areas"] == areas
 
 
@@ -190,7 +205,7 @@ def test_nested_missing_omissions_propagate_without_losing_counts():
 
 def test_satisfied_or_does_not_promote_unused_alternatives_to_group_missing():
     root = node("any_of", children=[node("course", course_code="CS 5001"), node("course", course_code="CS 5002")])
-    result = evaluate(root, [course()]).root
+    result = evaluate_rule(root, [course()])
     assert result.status == "met" and result.missing == [] and result.missing_omitted == 0
 
 
@@ -227,11 +242,11 @@ def test_reason_cap_counts_omitted_exclusions():
 
 def test_same_course_in_mutually_exclusive_or_exits_is_not_double_counting():
     leaf = node("course", course_code="CS 5001")
-    result = evaluate(node("any_of", children=[leaf, leaf]), [course()]).root
+    result = evaluate_rule(node("any_of", children=[leaf, leaf]), [course()])
     assert result.status == "met" and all(c.status == "met" for c in result.children)
     first = node("select", course_codes=["CS 5001"], min_courses=1)
     second = node("select", course_codes=["CS 5001"], min_credits=4)
-    result = evaluate(node("any_of", children=[first, second]), [course()]).root
+    result = evaluate_rule(node("any_of", children=[first, second]), [course()])
     assert result.status == "met" and all(c.status == "met" for c in result.children)
 
 
@@ -270,7 +285,7 @@ def test_exclusion_only_mention_blocks_other_open_pools(optional):
     assert [p.relation for p in placements] == ["excluded"] and omitted == 0
     result = evaluate_draft(plan, [DraftCourse(**course())])
     assert result.root.children[0].status == "missing" and result.root.children[0].possible == []
-    assert result.unplaced == ["CS 5001"]
+    assert result.unplaced == []  # Exclusion-only mention still blocks other open pools (H3 unchanged).
 
 
 def test_valid_partial_condition_child_never_claims_met():

@@ -27,6 +27,7 @@ import sys
 import time
 import uuid
 from typing import Any
+from urllib.parse import unquote
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -43,6 +44,7 @@ _COURSE_READ_PATHS = {"/resolve/course", "/course/{course_id}", "/course/{course
 _COURSE_READ_FIELDS = {
     "event", "level", "timestamp", "request_id", "method", "path", "status", "duration_ms",
     "count", "dangling", "courses", "unusable_records", "error_type", "exc_type", "cause_type", "frames",
+    "catalog_year",
 }
 
 
@@ -64,6 +66,9 @@ def _course_read_fields(_logger: Any, _name: str, event: dict[str, Any]) -> dict
     path = structlog.contextvars.get_contextvars().get("path")
     if path in _COURSE_READ_PATHS:
         event = {key: value for key, value in event.items() if key in _COURSE_READ_FIELDS}
+        if "catalog_year" in event and (not isinstance(event["catalog_year"], str)
+                                       or not re.fullmatch(r"[0-9]{4}-[0-9]{4}", event["catalog_year"])):
+            event.pop("catalog_year")
         event["path"] = path
     return event
 
@@ -79,6 +84,23 @@ def _safe_exception(_logger: Any, _name: str, event: dict[str, Any]) -> dict[str
         if isinstance(exc, BaseException):
             event.update(safe_error_fields(exc))
     return event
+
+
+class _CourseReadAccessFilter(logging.Filter):
+    """Uvicorn owns non-propagating handlers; sanitize its source record first.
+    中文：只替换课程读的访问路径和查询串，保留方法、协议、状态及其他接口日志。
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple) and len(record.args) == 5 and isinstance(record.args[2], str):
+            path = unquote(record.args[2].partition("?")[0])
+            safe = _course_read_log_path(path)
+            if safe in _COURSE_READ_PATHS:
+                record.args = (*record.args[:2], safe, *record.args[3:])
+        return True
+
+
+_COURSE_READ_ACCESS_FILTER = _CourseReadAccessFilter()
 
 
 class _SafeForeignLogs(logging.Filter):
@@ -125,6 +147,9 @@ def configure_logging() -> structlog.stdlib.BoundLogger:
     配置。
     """
     global _CONFIGURED
+    # Install even when project logging is already configured; uvicorn has its own handlers.
+    # 中文：重复调用仍补装，addFilter 对同一实例幂等；不改 handler、传播或部署参数。
+    logging.getLogger("uvicorn.access").addFilter(_COURSE_READ_ACCESS_FILTER)
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
 
     if not _CONFIGURED:

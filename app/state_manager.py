@@ -245,6 +245,8 @@ def add_draft_courses(state: SessionState, courses: list[dict]) -> str:
     from schemas.plan_draft import MAX_DRAFT_COURSES, DraftCourse
 
     incoming = [DraftCourse.model_validate(c).model_dump() for c in courses]
+    if not incoming:
+        return "none"
     old = state.get("plan_draft_courses", [])
     by_code = {c["code"]: c for c in old}
     for c in incoming:

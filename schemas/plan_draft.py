@@ -74,11 +74,12 @@ def _selection(node: RequirementNode, certain: list[DraftCourse], opened: list[D
                 if any(c.credits is None for c in [*certain, *opened]):
                     reasons.append("学分未知：" + "、".join(c.code for c in [*certain, *opened] if c.credits is None))
             elif dimension == "courses":
-                reasons.append(f"还差 {max(0, target-upper)} 门（含可能候选的门数上限）。")
+                reasons.append(f"还差 {target-upper} 门（含可能候选的门数上限）。" if upper < target else
+                               f"确定计入 {known} 门，其余要靠范围内可能计入的课，需项目确认。")
             else:
                 reasons.append(f"还差 {target-known} 个领域。")
             if opened and dimension != "areas":
-                reasons.append("开放池可能计入：" + "、".join(c.code for c in opened) + "；是否能算，要项目确认。")
+                reasons.append("范围内可能计入：" + "、".join(c.code for c in opened) + "；是否能算，要项目确认。")
     status = "missing" if "missing" in statuses else "unknown" if "unknown" in statuses else "met"
     return status, gaps, reasons
 
@@ -108,6 +109,7 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
         codes = [node.course_code] if node.kind == "course" and node.course_code in by_code else [c.code for c in certain]
         placed.update(codes)
         placed.update(c.code for c in opened)
+        placed.update(c.code for c in courses if c.code in node.excluded_course_codes)
         if active and node.kind in {"course", "select"}:
             for code in codes:
                 owners[code].append((path, node.label, node.kind))
@@ -115,6 +117,21 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
             collect(child, (*path, i), active)
 
     collect(plan.requirements)
+
+    def group_missing(child):
+        if child.kind == "any_of":
+            return child.label + "（任选其一，见子项）"
+        if child.kind == "all_of":
+            return child.label + "（全部子项，见下方）"
+        if child.kind == "course":
+            return child.label + "（" + "、".join(child.missing) + "）"
+        gaps = child.shortfall
+        parts = ([f"还差 {gaps['courses']} 门"] if gaps.get("courses") else [])
+        if gaps.get("credits"):
+            parts.append(f"按已知确定学分距目标差 {gaps['credits']} 学分")
+        if gaps.get("areas"):
+            parts.append(f"还差 {gaps['areas']} 个领域")
+        return child.label + ("（" + "；".join(parts) + "）" if parts else "")
 
     def coactive(first, second):
         common = ()
@@ -171,8 +188,10 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
             counted = list(dict.fromkeys(code for child in applicable for code in child.counted))
             possible = list(dict.fromkeys(code for child in applicable for code in child.possible))
             if status != "met":
-                missing = [item for child in applicable if child.status == "missing" for item in (child.missing or [child.label])]
-                inherited_missing = sum(child.missing_omitted for child in applicable if child.status == "missing")
+                missing = list(dict.fromkeys(item for child in applicable if child.status == "missing"
+                    for item in ([group_missing(child)] if node.kind == "any_of" or child.kind in {"select", "any_of"} else child.missing or [child.label])))
+                inherited_missing = sum(child.missing_omitted for child in applicable
+                    if child.status == "missing" and node.kind != "any_of" and child.kind not in {"select", "any_of"})
         else:
             status, reasons = "unknown", ["未支持的规则，未自动判定。"]
         if not active:
@@ -183,14 +202,19 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
             missing_omitted=max(0, len(missing)-10) + inherited_missing, shortfall=gaps, children=children)
 
     root = visit(plan.requirements)
-    if plan.coverage == "partial" and root.status == "met":
+    if root.status == "met":
         root.status = "unknown"
-        root.reasons = ["这个方案只记录了部分规则。", *root.reasons][:10]
+        note = "这个方案只记录了部分规则。" if plan.coverage == "partial" else "只按已记录规则计算，不作个人学位或注册审核。"
+        reasons = [note, *root.reasons]
+        root.reasons_omitted += max(0, len(reasons)-10)
+        root.reasons = reasons[:10]
     counts = {"met": 0, "missing": 0, "unknown": 0}
 
     def summarize(result, is_root=False):
         if not is_root and result.kind in {"all_of", "any_of", "select"} and result.status in counts:
             counts[result.status] += 1
+        if result.kind == "any_of":
+            return  # One choice group, not every alternative as a simultaneous requirement.
         for child in result.children:
             summarize(child)
     summarize(root, True)

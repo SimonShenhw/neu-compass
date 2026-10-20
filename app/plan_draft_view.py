@@ -15,6 +15,7 @@ from schemas.program_plan import ProgramPlan, normalize_code
 
 
 def parse_course_codes(raw: str) -> tuple[list[str], list[str]]:
+    raw = re.sub(r"(?i)\b([a-z]{2,4})[-_](?=\d{4}[a-z]?\b)", r"\1 ", raw)
     tokens = re.split(r"[,，;；\s]+", raw.strip())
     codes, invalid = [], []
     i = 0
@@ -53,39 +54,56 @@ def _add(st, raw: str, existing: list[DraftCourse]) -> None:
     known = {c.code for c in existing}
     pending = [code for code in codes if code not in known]
     if not pending:
-        st.info("没有新课号；已在草案里的课程不会重复加入。")
+        if codes:
+            st.info("这些课号已在草案里，不会重复加入。")
+        return
+    excess = len(known) + len(pending) - MAX_DRAFT_COURSES
+    if excess > 0:
+        st.warning(f"草案最多 20 门，本次尚未核对；请从输入减少 {excess} 门，或从草案移除至少 {excess} 门。")
         return
     accepted = []
-    with ApiClient(session_token=st.session_state.get("session_token")) as api:
-        for code in pending:
+    with st.spinner("正在核对课程…"), ApiClient(session_token=st.session_state.get("session_token")) as api:
+        for index, code in enumerate(pending):
             try:
                 raw_matches = api.resolve_course(code)["matches"]
                 if not isinstance(raw_matches, list):
                     raise ValueError("Malformed match list")
                 matches = [DraftCourse(course_id=m["course_id"], code=m["primary_code"], name=m["primary_name"])
-                           for m in raw_matches[:10]]
+                           for m in raw_matches]
                 if not matches:
                     st.warning(literal_markdown("没有找到 " + code + "；未加入。"))
                     continue
                 if len(matches) != 1:
-                    st.warning(literal_markdown("对上多门，未加入；请核对完整课号：" + code))
-                    for match in matches[:10]:
-                        st.text(match.code + " · " + match.name)
-                    continue
-                match = matches[0]
+                    exact = [m for m in matches if m.code == code]
+                    if len(exact) != 1:
+                        st.warning(literal_markdown("对上多门，未加入；请核对完整课号：" + code))
+                        for match in matches[:10]:
+                            st.text(match.code + " · " + match.name)
+                        if len(matches) > 10:
+                            st.caption(f"另有 {len(matches)-10} 个候选未展开。")
+                        continue
+                    match = exact[0]
+                    others = list(dict.fromkeys(m.code for m in matches if m != match))
+                    st.warning(literal_markdown("按输入主课号核对 " + code + "；同一引用也匹配 " + "、".join(others[:10])
+                        + "（可能交叉列出）；方案按哪个课号算，请向项目核实。"))
+                else:
+                    match = matches[0]
                 detail = api.get_course(match.course_id)
                 candidate = DraftCourse(course_id=detail["course_id"], code=detail["primary_code"],
                     name=detail["primary_name"], credits=detail.get("credits"))
                 if candidate.course_id != match.course_id or candidate.code != match.code:
                     raise ValueError("Course identity mismatch")
                 accepted.append(candidate.model_dump())
-            except ApiError:
+            except ApiError as exc:
                 st.warning(literal_markdown(code + " 暂时无法核对或加载，未加入；请稍后手动重试。"))
+                if exc.error_type in {"transport_error", "transport_timeout"}:
+                    st.warning(f"连接或传输中断，后面 {len(pending)-index-1} 门未核对；请稍后手动重试。")
+                    break
             except (KeyError, TypeError, ValueError):
                 st.warning(literal_markdown(code + " 返回的课程身份或字段无效，未加入。"))
     outcome = add_draft_courses(st.session_state, accepted)
     if outcome == "full":
-        st.warning("草案最多 20 门；本次没有加入课程，请先移除一门。")
+        st.warning("草案最多 20 门；本次没有加入课程，请减少本次输入后重试。")
     elif outcome == "already":
         st.info("没有新增课程；重复课号不会重复加入。")
 
@@ -95,8 +113,10 @@ def _tree_lines(node: DraftNode, depth: int = 0) -> list[str]:
               "not_evaluated": "⏸ 可选分支，不自动判断", None: "仅列出，不自动判断"}
     prefix = "  " * depth
     operator = {"all_of": "全部分支（AND）", "any_of": "任选其一（OR）", "select": "组选（非全部必修）"}.get(node.kind, "")
-    lines = [f"{prefix}{labels[node.status]} — {operator} {node.label}"]
-    for label, codes in [("按填写计入", node.counted), ("可能计入／学分未知", node.possible), ("缺项候选", node.missing)]:
+    title = f"{operator} {node.label}" if operator else node.label
+    lines = [f"{prefix}{labels[node.status]} — {title}"]
+    certain = [code for code in node.counted if code not in node.possible]
+    for label, codes in [("按填写计入", certain), ("可能计入／学分未知", node.possible), ("缺项候选", node.missing)]:
         if codes:
             lines.append(f"{prefix}  {label}：{'、'.join(codes)}")
     if node.missing_omitted:
@@ -122,7 +142,7 @@ def render_plan_draft(st, plan: ProgramPlan | None) -> None:
     except (ValueError, TypeError):
         st.error("草案数据格式异常，未计算；请清空后重新添加。")
         return
-    with st.form("plan-draft-form", clear_on_submit=True):
+    with st.form("plan-draft-form", clear_on_submit=False):
         raw = st.text_area("课号（逗号、空格或换行分开，例如 CS 5010, CS 5800）", key="plan-draft-input", max_chars=4000)
         submitted = st.form_submit_button("加入草案")
     if submitted:
@@ -135,8 +155,8 @@ def render_plan_draft(st, plan: ProgramPlan | None) -> None:
     for course in courses:
         credits = "学分未知" if course.credits is None else f"{course.credits} 学分"
         st.text(f"{course.code} · {course.name} · {credits}")
-        st.markdown(f"[课程页／年度先修]({share_url(settings.public_base_url, course=course_share_ref(course.code))})")
-        st.button("移除", key=f"draft-remove-{course.code}", on_click=remove_draft_course, args=(st.session_state, course.code))
+        st.markdown(f"[{course.code} · 课程页／年度先修]({share_url(settings.public_base_url, course=course_share_ref(course.code))})")
+        st.button(f"移除 {course.code}", key=f"draft-remove-{course.code}", on_click=remove_draft_course, args=(st.session_state, course.code))
     try:
         result = evaluate_draft(plan, courses)
     except (ValidationError, ValueError):
