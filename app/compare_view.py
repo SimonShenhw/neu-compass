@@ -20,7 +20,7 @@ ROWS = ("官方目录描述", "学生评价里的估计", "先修／共修", "�
 NO_RULES = "没有可用的年度规则；不表示没有先修或共修要求。"
 UNRECOGNISED = "服务返回了无法识别的内容。"
 BAD_CELL = "这一项的数据格式不对，没有显示。"
-SESSION_NOTE = "列表只保存在这个页面会话里；刷新浏览器或重新登录以后要重新加入。"
+SESSION_NOTE = "列表只保存在这个页面会话里；刷新浏览器、登录或退出以后要重新加入。"
 # Caveats that qualify one cell are repeated there; the description row keeps the full line.
 # 中文：只针对某一格的提醒在那一格再写一次；描述那一行仍保留完整的提醒。
 HEADER_NOTICES = frozenset({"catalog_metadata_conflict", "synthetic_record_not_real_course"})
@@ -81,10 +81,11 @@ def credit_range_note(course: dict) -> str | None:
     own = _own_documents(course)
     if not own or len({d.catalog_year for d in own}) != len(own):
         return None
-    hours = max(own, key=lambda d: d.catalog_year).credit_hours
+    newest = max(own, key=lambda d: d.catalog_year)
+    hours = newest.credit_hours
     if hours is None or hours.kind != "range":
         return None
-    return f"目录标题学分：{hours.raw_text}；实际班次学分未声明。"
+    return f"{newest.catalog_year} 目录标题学分：{hours.raw_text}；实际班次学分未声明。"
 
 
 def _usable(body: object) -> bool:

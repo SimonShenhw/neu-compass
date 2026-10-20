@@ -17,7 +17,7 @@ from tests.test_course_requisite_view import bundle, document
 OWN = {"course_id": "c1", "course_code": "CS 5001", "course_name": "Synthetic 1"}
 # Written out, not imported: a test that compares against the module's own constant cannot catch a changed sentence.
 NO_RULES = "没有可用的年度规则；不表示没有先修或共修要求。"
-SESSION_NOTE = "列表只保存在这个页面会话里；刷新浏览器或重新登录以后要重新加入。"
+SESSION_NOTE = "列表只保存在这个页面会话里；刷新浏览器、登录或退出以后要重新加入。"
 ESTIMATE, PREREQ, TOPICS, GRADING, PROGRAM, MISSING, ACTIONS = 2, 3, 4, 5, 6, 7, 8  # Row blocks; 0 is the header.
 
 
@@ -205,10 +205,26 @@ def test_a_title_credit_range_is_named_under_the_header(backend):
     newest, older = own_docs(("2026-2027", "CS 5010"), ("2025-2026", "CS 5010"))
     backend.courses["c1"]["course_requisites"] = bundle(newest.model_copy(update={"credit_hours": hours}), older)
     cells = grid(comparison(["c1"]), 1)
-    assert literal_markdown("目录标题学分：1-4 Hours；实际班次学分未声明。") in [e.value for e in cells[0][0].caption]
+    assert (literal_markdown("2026-2027 目录标题学分：1-4 Hours；实际班次学分未声明。")
+            in [e.value for e in cells[0][0].caption])
     fixed = newest.model_copy(update={"credit_hours": CatalogCreditHours.from_text("4 Hours")})
     assert credit_range_note({**backend.courses["c1"], "course_requisites": bundle(fixed)}) is None
     assert credit_range_note(backend.courses["c2"]) is None
+
+
+def test_the_credit_note_ignores_other_courses_and_conflicting_years(backend):
+    hours = {"credit_hours": CatalogCreditHours.from_text("1-4 Hours")}
+    [own] = own_docs(("2025-2026", "CS 5010"))
+    # A range on a document of another course, even a newer one, is not this course's range.
+    # 中文：别的课的文档上写着范围学分，哪怕年份更新，也不是这门课的。
+    foreign = document("2026-2027", raw="CS 5010").model_copy(update={**OWN, "course_code": "CS 5999", **hours})
+    assert credit_range_note({**backend.courses["c1"], "course_requisites": bundle(foreign, own)}) is None
+    # Two documents for the newest year: the prerequisite row says it did not pick one, so neither does the note.
+    # 中文：最新年度有两份记录：先修那一行说没有任取一份，学分提示也不任取。
+    first, second = own_docs(("2026-2027", "CS 5010"), ("2026-2027", "CS 5020"))
+    listing = bundle(first.model_copy(update=hours), second)
+    assert credit_range_note({**backend.courses["c1"], "course_requisites": listing}) is None
+    assert requisite_summary({**backend.courses["c1"], "course_requisites": listing})[-1] == "同年度有冲突记录，未任取一份比较。"
 
 
 def test_detail_caption_counts_the_list_not_the_position(backend):
