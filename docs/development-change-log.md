@@ -3462,7 +3462,7 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
 
 ### 范围与原因
 
-成功请求的结构化日志里记着学生问题的原文：`chat.retrieved`、`search.hybrid` 等记整句，`rescue.*`、`chat.context_path` 等截到 80 个字。`query_log` 表本来就存原文，导出要两个开关一起给才带原文，所以日志里是多出来的一份副本，而且是最常被翻看、粘贴的那一份。用户 10-19 在三个选项里选了「只记哈希和长度」（留着、截短、只记哈希和长度）。§28 留给 G，合并前按实际合并顺序核对编号。
+成功请求的结构化日志里记着学生问题的原文：`chat.retrieved`、`search.hybrid` 等记整句，`rescue.*`、`chat.context_path` 等截到 80 个字。`query_log` 表本来就存原文，导出要两个开关一起给才带原文，所以日志里是多出来的一份副本，而且是最常被翻看、粘贴的那一份。用户 10-19 在三个选项里选了「只记哈希和长度」（留着、截短、只记哈希和长度）。G 先合并（PR #20，§28），所以本节是 §29。
 
 ### 已实现
 
@@ -3470,32 +3470,59 @@ main 809→701 行，render 389→308 行；这是减少主入口内联职责，
    - 哈希是 HMAC-SHA256。密钥用 `SESSION_SECRET` 加固定标签派生，和会话令牌的签名分开。学生的问题短、好猜，普通哈希挡不住「猜一句、算一下」，所以用带密钥的。
    - 有密钥的人对 `query_log.query` 算同样的哈希，就能找到对应的日志行；做法写在 `docs/pii_redaction.md` 第 11 节。
    - 没配 `SESSION_SECRET`（本地开发、测试）时用每个进程随机的密钥：同一进程里一致，对不上 `query_log`。
-   - 不成对的代理字符也不会让日志调用抛异常（编码用 `surrogatepass`）。
-2. 16 个事件改成只记哈希和长度：`/search` 7 个（`search.alias_anchor_filtered_fallback`、`search.alias_hit`／`search.alias_filtered_empty`、`search.prefilter_applied`、`search.hybrid_empty`、`search.rejected`、`search.hyde_rescued`、`search.hybrid`），`/chat` 5 个（`chat.hyde_rescued`、`chat.retrieved`、`chat.context_path`、`chat.alias_anchor_filtered_fallback`、`chat.prefilter_applied`），HyDE 救援 4 个（`rescue.code_pattern_guard`、`rescue.declined`、`rescue.empty_retrieval`、`rescue.accepted`）。两个 `prefilter_applied` 记的是去掉专业前缀以后那一句，字段名是 `sanitized_query_hash`、`sanitized_query_len`；其余都对原问题算，和 `query_log.query` 是同一段文字。
-3. `query_log`、导出、接口响应和别的日志字段都不变。
+   - 问题和密钥里不成对的代理字符都不会让日志调用抛异常（编码都用 `surrogatepass`）。环境变量里解不开的字节会变成代理字符，原来严格编码密钥的话，每个 `/search`、`/chat` 都会 500；正常密钥的结果不变。
+2. 16 处日志调用改成只记哈希和长度，共 17 个事件名：
+   - `/search` 7 处、8 个事件名：`search.alias_anchor_filtered_fallback`、`search.alias_hit`／`search.alias_filtered_empty`（共用一处）、`search.prefilter_applied`、`search.hybrid_empty`、`search.rejected`、`search.hyde_rescued`、`search.hybrid`；
+   - `/chat` 5 个：`chat.hyde_rescued`、`chat.retrieved`、`chat.context_path`、`chat.alias_anchor_filtered_fallback`、`chat.prefilter_applied`；
+   - HyDE 救援 4 个：`rescue.code_pattern_guard`、`rescue.declined`、`rescue.empty_retrieval`、`rescue.accepted`。
+
+   两个 `prefilter_applied` 记的是去掉专业前缀以后那一句，字段名是 `sanitized_query_hash`、`sanitized_query_len`。其余都对原问题算，和 `query_log.query` 是同一段文字。
+3. 新事件 `query_log.written`：`log_query()` 写入成功以后记一条，只有行号 `query_log_id`，两条路由共用这一处；写入失败时不记，照旧只有 `query_log.write_failed`。同一个请求的日志行都带着同一个 `request_id`，所以用它就能把日志和 `query_log` 那一行对上，不用密钥，换 `SESSION_SECRET` 以后也照样能用。这是 B21 的建议，用户 10-20 定了要加。
+4. `query_log`、导出、接口响应和别的日志字段都不变，日志里只是多了 `query_log.written`。
+5. 评审修复（10-20，见「审查」）：
+   - 静态检查扩到 `bind`／`new`／`bind_contextvars` 和 `print`，事件名必须是常量，问题文字的来源扩到 `retrieval_query`、救援拼出来的文字、历史消息等；检查规则本身也有正反两组测试。
+   - 运行时检查改用 parity 测试的场景，14 个请求走遍 17 个事件的每条路径。每个场景都检查：日志事件里（连请求上下文里绑定的字段）、`print` 输出里、经过真实 `configure_logging()` 渲染出来的日志行里都没有问题原文；每个哈希都等于 `query_log` 那一行按文档算法算出的值；`query_log.written` 的行号就是那一行的 `log_id`。
+   - 另补：第三方库 INFO 日志由 root 过滤器替换的测试，写入失败时不记行号，密钥里有坏字节，长度算上首尾空格。子进程测试只给最小的环境变量。
+   - `docs/pii_redaction.md` 第 11 节重写：对照方法（先用 `request_id` 和 `query_log.written`，只有哈希时用容器里的完整命令）、能看日志又能提问的人可以问一遍再比哈希、回退和旧日志、本地开发、测试实际钉住了什么。
 
 ### 修改文件
 
-新建 `api/query_fields.py`、`tests/test_log_query_fields.py`；改 `api/routes/search.py`、`api/routes/chat.py`、`api/routes/common.py` 里的日志调用；`tests/test_retrieval_decision_rescue_rules.py` 里两个测试原来钉着 `query` 字段，改成期望哈希和长度；`docs/pii_redaction.md` 加第 11 节。
+新建 `api/query_fields.py`、`tests/test_log_query_fields.py`；改 `api/routes/search.py`、`api/routes/chat.py`、`api/routes/common.py` 里的日志调用，`log_query()` 加 `query_log.written`；`tests/test_retrieval_decision_rescue_rules.py` 里两个测试原来钉着 `query` 字段，改成期望哈希和长度；`docs/pii_redaction.md` 加第 11 节。评审修复又改了 `api/query_fields.py`（密钥编码、说明）、`api/routes/common.py`（新事件）、`tests/test_log_query_fields.py`（重写）和这两份文档。
 
 ### 验证记录
 
 - 新测试 15 项是和代码一起写的，没有先跑一遍红。改用 31 个变异来证明测试有效：16 个把调用改回记原文，都被静态检查抓到；5 个对错误的文字算哈希，都被路由测试抓到；10 个削弱哈希函数，都被单元测试抓到。**31/31 killed**。
 - 第一遍 12 文件定向有 3 项失败：`tests/test_retrieval_decision_rescue_rules.py` 有两个测试钉着旧的 `query` 字段，其中一个按路由参数化成两项。改掉这个字段正是本批的目的，测试改成期望哈希和长度以后通过。
 - Ruff F／E9／B 通过；九快照 9/9；C CLI 47／53 complete，route 53／0，隔离计数为 0。
-- 串行全量 **4549 passed／7 warnings／485.08 秒**，退出码 0，等于 main 的 4534 加上新的 15 项。上面那两个测试是在这次全量开始以后才改完的，所以在本地提交上又跑了定向和全量，结果在复核以后补上。
+- 串行全量 **4549 passed／7 warnings／485.08 秒**，退出码 0，等于 main 的 4534 加上新的 15 项。上面那两个测试是在这次全量开始以后才改完的，所以在本地提交 `02217c5` 上又跑了一遍：12 文件定向 **308 passed**、Ruff 通过、串行全量 **4549 passed／7 warnings／509.25 秒**，退出码 0。
+- 评审修复以后：
+  - 变异 66 个：协调方原来的 31 个（H2 换了锚点）；两位审查活下来的 29 个，即 A21 的 13 个和 B21 的 16 个（B17 实际等价、B18 和 A13 相同，没再跑）；再加 6 个针对修复本身的（不记 `query_log.written`、行号记错、带上原文、写入失败也记；密钥严格编码、用 `surrogateescape`）。第一遍 **64/66**：A09（`search.alias_filtered_empty` 改个字段名）和 B13（`chat` 锚点回退只对前 40 个字算哈希）活下来，因为测试没要求每个该有的事件都带哈希字段，场景里的问题也太短，截不截都一样。测试补上这两点（场景里的问题都长于 80 个字）以后，第二遍 **66/66 killed**，每个都由对应的测试抓到，没有一个是靠超时算的。
+  - rebase 以前（`56a03d6` 加修复）：新测试文件 65 项；12 文件定向 **358 passed**；Ruff 通过；九快照 9/9；C CLI 47／53 complete，route 53／0，隔离计数为 0，输出和 main（`56a03d6`）的一次运行只差合成用户名里的运行号；串行全量 **4599 passed／7 warnings／443.74 秒**，退出码 0，等于 main 的 4534 加 K 的 65 项。
+- rebase 到 `deaf750`（G 合并以后）：只有这份变更记录要合，结果是 main 的文件加本节。K 别的文件逐个比过，加减的行和 rebase 前完全相同；评审修复放回去以后也逐字节相同。rebase 以后：新测试 65 项；12 文件定向 **358 passed**；Ruff 通过；九快照 9/9；C CLI 同上，和 rebase 前的输出只差运行号；串行全量 **4667 passed／7 warnings／477.72 秒**，退出码 0，等于 main 的 4602 加 K 的 65 项。
 
 ### 审查
 
-两路只读审查在本地提交之后进行：A21 看隐私和正确性，B21 看测试、文档和运维。
+两路只读审查在本地提交 `02217c5` 之后进行（10-19 晚），协调方复现了要点。两人都说产品改动本身是对的，没有 CRITICAL、HIGH：
+- A21 用真实日志配置（JSON 和控制台两种）发了 60 个请求，走遍各条路由、救援、流错误和各种错误响应。日志里都没有问题原文；16 处调用的哈希都等于那一行 `query_log` 的值；响应、`query_log` 行和事件名和改之前完全一样。
+- B21 也走了真实 JSON 管道，结论相同；文档里的对照片段能找对行，也不打印原文。
+
+问题都出在测试、文档和上线检查上：
+- **MEDIUM（两人都报）：** 测试看不到 `bind`／`bind_contextvars`／`print`，`capture_logs()` 也不收请求上下文里的字段。往路由里加一句 `bind_contextvars(query=req.query)`，全部测试照样通过，线上日志里却会出现原文。已修：静态检查扩大，运行时检查合并 contextvars、看 `print`、看渲染出来的行。
+- **MEDIUM（B21）：** 上线检查里有一步拿问题原文去日志里找请求（P6c），K 以后会静默找到 0 条。上线工具不在仓库里，下次上线前改成按 `request_id`／`query_log.written` 找。
+- **LOW：** 17 个事件名里有 6～7 个没有运行时检查（已修，14 个场景走遍）；坏字节的密钥会让每个请求 500（已修）；文档把「没有密钥就确认不了」说过头了，还缺操作步骤（已修）；第三方 INFO 日志的过滤没有测试（这是旧代码，已补测试）。
+- **NIT：** 「16 个事件」其实是 16 处调用、17 个事件名；检查规则的自测是另写了一遍；子进程测试把整个环境传过去；长度没测首尾空格。都已修。
+- **建议（B21）：** 多记 `query_log_id`。用户 10-20 定了要加，见「已实现」第 3 条。
+- 两人的变异：A21 13 个，活 12 个；B21 18 个，活 14 个（1 个实际等价）。修复后的结果见「验证记录」。
 
 ### 已知、未处理
 
-1. 哈希和长度仍是私有的可关联数据：同一句话的哈希总是相同，能看出同一个问题问了几次；不能当成匿名数据公开。
-2. 换 `SESSION_SECRET` 以后，旧日志里的哈希就对不上 `query_log` 了；这版不另设日志专用密钥。
+1. 哈希和长度仍是私有的可关联数据：同一句话的哈希总是相同，能看出同一个问题问了几次；不能当成匿名数据公开。能看日志、又能提问的人，可以把猜的那句问一遍，再找相同的哈希，所以日志的访问要和 `query_log` 一样管住。
+2. 换 `SESSION_SECRET` 以后，旧日志里的哈希就对不上 `query_log` 了，`query_log.written` 不受影响；这版不另设日志专用密钥。
 3. `query_log` 的留存、删除和备份不变；Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串也不在这批。
-4. 没有加对照日志和 `query_log` 的脚本，`docs/pii_redaction.md` 第 11 节写了几行做法。
+4. 没有单独的对照脚本，`docs/pii_redaction.md` 第 11 节写了完整命令。
+5. 静态检查只是一道绊线：把问题赋给别的名字再记，它看不出来；靠的是运行时那 14 个场景。新加的事件要记得加进场景表。
+6. 上线以前写下的日志行还在旧容器的日志里，容器重建以后才会消失；回退到这一版之前的镜像，日志里会重新出现问题原文。
 
 ### 发布状态
 
-分支 `fix/log-query-hash`，基底 `56a03d6`。随下一次上线生效，上线要另外授权；不改配置、数据库或 NAS。
+分支 `fix/log-query-hash`，基底 `deaf750`：G 合并以后 rebase 过来，只有这份变更记录要合。随下一次上线生效，上线要另外授权；不改配置、数据库或 NAS。上线检查里按问题原文去日志找请求的那一步，要先改成按 `request_id` 或 `query_log.written` 找。

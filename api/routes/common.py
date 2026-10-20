@@ -337,10 +337,13 @@ def log_query(
             rejection_reason=rejection_reason, user_id=user_id,
         )
         conn.commit()
-        return log_id
     except Exception as e:  # noqa: BLE001 — telemetry is best-effort / 遥测是尽力而为
         log.warning("query_log.write_failed", **safe_error_fields(e))
         return None
+    # The row id joins this request's log lines to query_log without the hash key; the text stays in the table.
+    # 中文：用行号把这个请求的日志行和 query_log 对上，不需要哈希密钥；原文仍只在表里。
+    log.info("query_log.written", query_log_id=log_id)
+    return log_id
 
 
 __all__ = ["BLEND_ALPHA", "RERANK_POOL_SIZE", "RERANKER_REJECT_THRESHOLD", "RetrievalDecision",

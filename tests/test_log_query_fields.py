@@ -1,7 +1,8 @@
 """K (Z5): the operational log carries a keyed hash and the length of a student's question, never its text.
 
-`query_log` still stores the text, and its row can be matched to the log lines with the key.
-中文：运行日志里只有学生问题的带密钥哈希和长度，没有原文；`query_log` 照旧存原文，有密钥就能对上日志行。
+`query_log` still stores the text; `query_log.written` names the row, and whoever holds the key can match the hash.
+中文：运行日志里只有学生问题的带密钥哈希和长度，没有原文；`query_log` 照旧存原文，`query_log.written` 给出行号，
+有密钥的人也能用哈希对上。
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import hmac
+import logging
 import os
 import sqlite3
 import subprocess
@@ -16,13 +18,18 @@ import sys
 from pathlib import Path
 
 import pytest
+import structlog
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
 from api.dependencies import get_chat_stream_fn, get_hyde_rescue_fn
+from api.logging import _SafeForeignLogs, configure_logging
 from api.query_fields import query_fields
 from config import settings
+from tests import test_retrieval_decision_parity as parity
 from tests.conftest import build_test_app
+
+decision_client = parity.decision_client
 
 ROOT = Path(__file__).resolve().parents[1]
 SECRET = "synthetic-log-hash-secret"
@@ -31,12 +38,22 @@ CANARY = "zqx7canary"
 # 中文：比原来截断的 80 个字符长；对截断后的文字算哈希就对不上。
 LONG = "graph algorithms " + CANARY + " " + " ".join(f"pad{i}" for i in range(20))
 EXPANSION = "This course covers graph algorithms BFS DFS shortest paths."
+CONTEXT = {"request_id", "method", "path"}  # bound by the request middleware / 请求中间件绑定的字段
+# Every event that carries a question hash, written out: a renamed or dropped event fails the scenario check.
+# 中文：所有带问题哈希的事件，照写一遍：事件改名或消失，场景检查就会失败。
+EVENTS = {
+    "search.alias_anchor_filtered_fallback", "search.alias_hit", "search.alias_filtered_empty",
+    "search.prefilter_applied", "search.hybrid_empty", "search.rejected", "search.hyde_rescued", "search.hybrid",
+    "chat.hyde_rescued", "chat.retrieved", "chat.context_path", "chat.alias_anchor_filtered_fallback",
+    "chat.prefilter_applied", "rescue.code_pattern_guard", "rescue.declined", "rescue.empty_retrieval",
+    "rescue.accepted",
+}
 
 
 def documented(secret: str, text: str) -> str:
     # Written out, not imported: this construction is how an operator matches a query_log row to its log lines.
     # 中文：照写一遍、不从模块导入：运维就是按这个算法把 query_log 的一行和日志对上的。
-    key = hmac.new(secret.encode("utf-8"), b"neu-compass/log-query-hash/v1", hashlib.sha256).digest()
+    key = hmac.new(secret.encode("utf-8", "surrogatepass"), b"neu-compass/log-query-hash/v1", hashlib.sha256).digest()
     return hmac.new(key, text.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
 
 
@@ -53,8 +70,14 @@ def app_and_db(empty_db: sqlite3.Connection, secret: None):
         yield client, empty_db
 
 
+def _capture():
+    # merge_contextvars as in production: a question bound to the request context shows up here too.
+    # 中文：和线上一样合并 contextvars：绑到请求上下文里的问题也会出现在这里。
+    return capture_logs(processors=[structlog.contextvars.merge_contextvars])
+
+
 def _post(client: TestClient, path: str, body: dict) -> tuple[dict | str, list[dict]]:
-    with capture_logs() as entries:
+    with _capture() as entries:
         response = client.post(path, json=body)
     assert response.status_code == 200, response.text
     return (response.json() if path == "/search" else response.text), entries
@@ -86,7 +109,12 @@ def test_named_fields_count_characters(secret: None) -> None:
         "sanitized_query_hash": documented(SECRET, "数据科学的课"), "sanitized_query_len": 6}
 
 
-def test_a_short_question_cannot_be_confirmed_from_the_log_alone(secret: None) -> None:
+def test_surrounding_spaces_count_and_change_the_hash(secret: None) -> None:
+    assert query_fields(CANARY + " ") == {"query_hash": documented(SECRET, CANARY + " "), "query_len": len(CANARY) + 1}
+    assert query_fields(CANARY + " ")["query_hash"] != query_fields(CANARY)["query_hash"]
+
+
+def test_a_short_question_cannot_be_confirmed_by_hashing_guesses(secret: None) -> None:
     text = "CS 5800 先修是什么"
     digest = query_fields(text)["query_hash"]
     # Not a plain hash anyone can recompute, and not keyed by the session secret itself.
@@ -109,6 +137,14 @@ def test_an_unpaired_surrogate_does_not_raise(secret: None) -> None:
     assert fields["query_len"] == 3 and len(fields["query_hash"]) == 16
 
 
+@pytest.mark.parametrize("odd", ["synthetic-\udcff", "synthetic-\ud800"])
+def test_a_secret_with_a_stray_byte_still_hashes(monkeypatch: pytest.MonkeyPatch, odd: str) -> None:
+    # os.environ turns an undecodable byte into a surrogate; a strict encode would fail every request.
+    # 中文：环境变量里解不开的字节会变成代理字符；严格编码的话每个请求都会失败。
+    monkeypatch.setattr(settings, "session_secret", odd)
+    assert query_fields(CANARY) == {"query_hash": documented(odd, CANARY), "query_len": len(CANARY)}
+
+
 def test_without_a_secret_each_process_has_its_own_random_key(monkeypatch: pytest.MonkeyPatch,
                                                               tmp_path: Path) -> None:
     monkeypatch.setattr(settings, "session_secret", "")
@@ -117,23 +153,43 @@ def test_without_a_secret_each_process_has_its_own_random_key(monkeypatch: pytes
     assert here != hashlib.sha256(CANARY.encode("utf-8")).hexdigest()[:16]
     assert here != documented("", CANARY)
     code = f"from api.query_fields import query_fields; print(query_fields({CANARY!r})['query_hash'])"
-    env = {**os.environ, "SESSION_SECRET": "", "PYTHONPATH": str(ROOT)}
+    # A minimal environment: the child needs no secret, no .env and nothing else from this process.
+    # 中文：最小环境：子进程不需要密钥、.env，也不需要本进程的其他环境变量。
+    env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT), "HOME": str(tmp_path), "SESSION_SECRET": "",
+           "GEMINI_API_KEY": "ci-placeholder-not-a-secret", "PYTHONDONTWRITEBYTECODE": "1"}
     others = [subprocess.run([sys.executable, "-c", code], cwd=tmp_path, env=env, capture_output=True, text=True,
                              check=True, timeout=60).stdout.strip() for _ in range(2)]
     assert all(len(other) == 16 for other in others)
     assert len({here, *others}) == 3
 
 
-# --- every log call in product code -------------------------------------------------------------------------
+# --- every log, bind and print call in product code ---------------------------------------------------------
 
-LOG_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "msg"}
+EVENT_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "msg"}
+BIND_METHODS = {"bind", "new", "bind_contextvars", "bound_contextvars"}
+BARE_CALLS = {"print", "bind_contextvars", "bound_contextvars"}
 TEXT_KEYWORDS = {"query", "sanitized_query", "question", "prompt", "message", "text", "q"}
-TEXT_SOURCES = {"query", "sanitized_query", "question", "prompt"}
+TEXT_SOURCES = {"query", "sanitized_query", "question", "prompt", "retrieval_query", "combined", "expansion",
+                "history", "messages", "content", "text"}
+
+
+def _is_log_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    if isinstance(node.func, ast.Name):
+        return node.func.id in BARE_CALLS
+    return (isinstance(node.func, ast.Attribute) and node.func.attr in EVENT_METHODS | BIND_METHODS
+            and "log" in ast.unparse(node.func.value).lower())
+
+
+def _is_wrapper(node: ast.AST) -> bool:
+    return isinstance(node, ast.Call) and (getattr(node.func, "id", None) == "query_fields"
+                                           or getattr(node.func, "attr", None) == "query_fields")
 
 
 def _raw_uses(node: ast.AST) -> list[str]:
-    """Names or attributes holding question text, outside a `query_fields(...)` call."""
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "query_fields":
+    """Names or attributes that hold question text, outside a `query_fields(...)` call."""
+    if _is_wrapper(node):
         return []
     found = []
     if isinstance(node, ast.Name) and node.id in TEXT_SOURCES:
@@ -145,34 +201,203 @@ def _raw_uses(node: ast.AST) -> list[str]:
     return found
 
 
-def test_no_log_call_in_product_code_passes_question_text() -> None:
-    calls, problems = 0, []
+def _constant_event(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, str)
+    return isinstance(node, ast.IfExp) and _constant_event(node.body) and _constant_event(node.orelse)
+
+
+def problems(call: ast.Call) -> list[str]:
+    """Why this log, bind or print call could carry question text; empty when it cannot.
+
+    中文：这个日志、绑定或 print 调用为什么可能带出问题原文；带不出时返回空列表。
+    """
+    found, values = [], list(call.args)
+    if getattr(call.func, "attr", None) in EVENT_METHODS:
+        if not (values and _constant_event(values[0])):
+            found.append("event name is not a constant string")
+        values = values[1:]
+    for keyword in call.keywords:
+        if keyword.arg in TEXT_KEYWORDS:
+            found.append(f"{keyword.arg}=")
+        if keyword.arg is None and isinstance(keyword.value, ast.Dict):
+            found += [f"**{{{key.value!r}: ...}}" for key in keyword.value.keys
+                      if isinstance(key, ast.Constant) and key.value in TEXT_KEYWORDS]
+        values.append(keyword.value)
+    return found + [use for value in values for use in _raw_uses(value)]
+
+
+def test_no_log_bind_or_print_call_in_product_code_passes_question_text() -> None:
+    calls, found = 0, []
     for folder in ("api", "app", "rag", "llm", "db", "schemas", "config"):
         for path in sorted((ROOT / folder).rglob("*.py")):
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                        and node.func.attr in LOG_METHODS and "log" in ast.unparse(node.func.value).lower()):
-                    continue
-                calls += 1
-                where = f"{path.relative_to(ROOT).as_posix()}:{node.lineno}"
-                problems += [f"{where} {kw.arg}=" for kw in node.keywords if kw.arg in TEXT_KEYWORDS]
-                problems += [f"{where} {use}" for value in [*node.args[1:], *(kw.value for kw in node.keywords)]
-                             for use in _raw_uses(value)]
+                if _is_log_call(node):
+                    calls += 1
+                    found += [f"{path.relative_to(ROOT).as_posix()}:{node.lineno} {what}" for what in problems(node)]
     assert calls > 60, calls  # the walk really found the log calls
-    assert problems == []
+    assert found == [], "log question text only through query_fields(...), or rename the field"
 
 
-def test_the_guard_catches_the_old_forms() -> None:
-    for source in ('log.info("chat.retrieved", query=req.query)', 'log.info("x", q=req.query[:80])',
-                   'log.info("x", sanitized=extracted.sanitized_query[:80])', 'log.info("x", n=len(query))'):
-        call = ast.parse(source).body[0].value
-        found = [kw.arg for kw in call.keywords if kw.arg in TEXT_KEYWORDS]
-        found += [use for kw in call.keywords for use in _raw_uses(kw.value)]
-        assert found, source
-    assert _raw_uses(ast.parse('f(**query_fields(req.query), count=len(hits))').body[0].value) == []
+@pytest.mark.parametrize("source", [
+    'log.info("chat.retrieved", query=req.query)',
+    'log.info("x", q=req.query[:80])',
+    'log.info("x", sanitized=extracted.sanitized_query[:80])',
+    'log.info("x", n=len(query))',
+    'log.info(f"rescue.code_pattern_guard {query[:80]}")',
+    'log.info("x %s" % query)',
+    'log.info("x", **{"query": q})',
+    'log.info("x", retry=combined[:80])',
+    'log.info("x", tail=req.history[-1].content[:80])',
+    'log.bind(question=query).info("rescue.empty_retrieval", **query_fields(query))',
+    'structlog.contextvars.bind_contextvars(query=req.query)',
+    'bind_contextvars(query=req.query)',
+    'print("search.hybrid", req.query[:80])',
+])
+def test_the_guard_catches_the_old_and_the_bound_forms(source: str) -> None:
+    calls = [node for node in ast.walk(ast.parse(source)) if _is_log_call(node)]
+    assert calls and any(problems(call) for call in calls), source
 
 
-# --- the routes ---------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("source", [
+    'log.info("search.alias_hit" if results else "search.alias_filtered_empty", **query_fields(req.query), count=1)',
+    'log.info("x", **qf.query_fields(extracted.sanitized_query, "sanitized_query"))',
+    'structlog.contextvars.bind_contextvars(request_id=request_id, method=request.method, path=request.url.path)',
+    'print("fixed text")',
+])
+def test_the_guard_lets_text_free_forms_through(source: str) -> None:
+    calls = [node for node in ast.walk(ast.parse(source)) if _is_log_call(node)]
+    assert calls and not any(problems(call) for call in calls), source
+
+
+# --- the routes, on every branch that logs a question hash ---------------------------------------------------
+
+# Every scenario question is longer than 80 characters, and the ones with a course code mix cases, so a hash over
+# a cut or case-changed copy does not match.
+# 中文：每个场景的问题都超过 80 个字符，带课号的那些大小写混排；对截断或改了大小写的文字算哈希就对不上。
+TAIL = " " + " ".join(f"pad{i}" for i in range(16))
+# id, route, query, extra request fields, world set-up, events that must each appear once.
+# 中文：编号、路由、问题、其他请求字段、场景设置、必须各出现一次的事件。
+SCENARIOS = [
+    ("search-hybrid", "/search", f"opaque topic {CANARY}{TAIL}", {}, {}, ["search.hybrid"]),
+    ("search-prefix", "/search", f"CS opaque topic {CANARY}{TAIL}", {}, {},
+     ["search.prefilter_applied", "search.hybrid"]),
+    ("search-alias", "/search", f"CS 5800 {CANARY}{TAIL}", {}, {}, ["search.alias_hit"]),
+    ("search-alias-filtered", "/search", f"CS 5800 {CANARY}{TAIL}", {"credits": 3}, {},
+     ["search.alias_filtered_empty"]),
+    ("search-anchor", "/search", f"planning courses like CS 5800 {CANARY}{TAIL}", {"credits": 3}, {},
+     ["search.alias_anchor_filtered_fallback", "search.prefilter_applied", "search.hybrid_empty"]),
+    ("search-declined", "/search", f"opaque topic {CANARY}{TAIL}", {}, {"rescue": "decline"},
+     ["rescue.declined", "search.rejected"]),
+    ("search-rescued", "/search", f"CS opaque topic {CANARY}{TAIL}", {}, {"rescue": "expand"},
+     ["search.prefilter_applied", "rescue.accepted", "search.hyde_rescued", "search.hybrid"]),
+    ("search-rescue-empty", "/search", f"opaque topic {CANARY}{TAIL}", {}, {"rescue": "expand", "empty_retry": True},
+     ["rescue.empty_retrieval", "search.rejected"]),
+    ("search-code-guard", "/search", f"CS 9999 {CANARY}{TAIL}", {}, {"rescue": "expand"},
+     ["search.prefilter_applied", "rescue.code_pattern_guard", "search.rejected"]),
+    ("chat-hybrid", "/chat", f"opaque topic {CANARY}{TAIL}", {}, {}, ["chat.retrieved"]),
+    ("chat-prefix", "/chat", f"CS opaque topic {CANARY}{TAIL}", {}, {}, ["chat.prefilter_applied", "chat.retrieved"]),
+    ("chat-context", "/chat", f"this course please {CANARY}{TAIL}", {"context_course_ids": [parity.IDS[0]]}, {},
+     ["chat.context_path", "chat.retrieved"]),
+    ("chat-anchor", "/chat", f"planning courses like CS 5800 {CANARY}{TAIL}", {"credits": 3}, {},
+     ["chat.alias_anchor_filtered_fallback", "chat.prefilter_applied", "chat.retrieved"]),
+    ("chat-rescued", "/chat", f"CS opaque topic {CANARY}{TAIL}", {}, {"rescue": "expand"},
+     ["chat.prefilter_applied", "rescue.accepted", "chat.hyde_rescued", "chat.retrieved"]),
+]
+ARGS = "name, route, query, extra, setup, events"
+
+
+def _arrange(state, setup: dict) -> None:
+    if "rescue" in setup:
+        state.reranker.scores = [0.0] * 3  # rejected first, so the rescue runs / 先被拒答，救援才会运行
+        state.enable_rescue()
+        state.rescue_mode = setup["rescue"]
+        state.hybrid.empty_retry = setup.get("empty_retry", False)
+
+
+def _sanitized(query: str) -> str:
+    # The program prefix the scenarios use is "CS"; the extractor removes it and collapses spaces.
+    # 中文：场景里的专业前缀都是 "CS"；抽取器去掉它并合并空格。
+    return " ".join(query.replace("CS", "", 1).split())
+
+
+def test_the_scenarios_reach_every_event_that_logs_a_question() -> None:
+    assert {event for *_, events in SCENARIOS for event in events} == EVENTS
+    assert min(len(query) for _, _, query, *_ in SCENARIOS) > 80
+
+
+@pytest.mark.parametrize(ARGS, SCENARIOS, ids=[s[0] for s in SCENARIOS])
+def test_every_event_hashes_the_stored_text_and_carries_none_of_it(decision_client, secret, capfd, name, route,
+                                                                    query, extra, setup, events) -> None:
+    state = decision_client
+    _arrange(state, setup)
+    with _capture() as entries:
+        response = state.client.post(route, json={"query": query, "k": 1, **extra})
+    assert response.status_code == 200, response.text
+    out, err = capfd.readouterr()
+    assert CANARY not in out + err  # print() would reach the container log / print 会进容器日志
+    _text_free(entries)
+    [row] = state.conn.execute("SELECT log_id, query FROM query_log").fetchall()
+    assert row["query"] == query
+    for event in events:
+        # Each expected event carries its own hash fields under their names, not some other spelling.
+        # 中文：每个预期事件都要带自己的哈希字段，字段名也不能换。
+        fields = ("sanitized_query_hash", "sanitized_query_len") if event.endswith(".prefilter_applied") else (
+            "query_hash", "query_len")
+        assert set(fields) <= _one(entries, event).keys(), event
+    for entry in entries:
+        if "query_hash" in entry:
+            assert (entry["query_hash"], entry["query_len"]) == (documented(SECRET, query), len(query)), entry["event"]
+        if "sanitized_query_hash" in entry:
+            sanitized = _sanitized(query)
+            assert (entry["sanitized_query_hash"], entry["sanitized_query_len"]) == (
+                documented(SECRET, sanitized), len(sanitized)), entry["event"]
+    written = _one(entries, "query_log.written")
+    assert {key: value for key, value in written.items() if key not in CONTEXT} == {
+        "event": "query_log.written", "log_level": "info", "query_log_id": row["log_id"]}
+
+
+@pytest.fixture
+def real_logging() -> None:
+    # During setup, so pytest's call-phase capture handler is installed after it (the set-up resets root handlers).
+    # 中文：在 setup 阶段配置：配置会重置 root handler，pytest 在调用阶段才装自己的捕获 handler。
+    configure_logging()
+
+
+@pytest.mark.parametrize(ARGS, SCENARIOS, ids=[s[0] for s in SCENARIOS])
+def test_the_rendered_log_lines_carry_no_question_text(real_logging, decision_client, secret, caplog, name, route,
+                                                       query, extra, setup, events) -> None:
+    state = decision_client
+    _arrange(state, setup)
+    response = state.client.post(route, json={"query": query, "k": 1, **extra})
+    assert response.status_code == 200, response.text
+    lines = [record.getMessage() for record in caplog.records]
+    rendered = "\n".join(lines)
+    assert all(event in rendered for event in [*events, "query_log.written"]), rendered
+    assert [line for line in lines if CANARY in line] == []
+
+
+def test_a_library_info_message_is_replaced_before_any_handler_sees_it() -> None:
+    record = logging.LogRecord("httpx", logging.INFO, __file__, 1, "GET %s",
+                               (f"https://example.invalid/?q={CANARY}",), None)
+    assert _SafeForeignLogs(structlog.processors.JSONRenderer()).filter(record) is True
+    assert CANARY not in record.getMessage() and '"event": "stdlib.log"' in record.getMessage()
+
+
+def test_a_failed_write_logs_no_row_id(app_and_db, monkeypatch: pytest.MonkeyPatch) -> None:
+    from db.query_log_repository import QueryLogRepository  # noqa: PLC0415
+
+    def broken(self, **kwargs):
+        raise sqlite3.OperationalError(f"synthetic failure for {CANARY}")
+
+    monkeypatch.setattr(QueryLogRepository, "add", broken)
+    client, _ = app_and_db
+    _, entries = _post(client, "/search", {"query": LONG, "k": 3})
+    _text_free(entries)
+    assert [entry["event"] for entry in entries if entry["event"].startswith("query_log.")] == ["query_log.write_failed"]
+
+
+# --- the earlier route checks on the plain test app ---------------------------------------------------------
 
 
 def test_search_logs_the_hash_and_query_log_keeps_the_text_that_matches_it(app_and_db) -> None:
@@ -182,8 +407,9 @@ def test_search_logs_the_hash_and_query_log_keeps_the_text_that_matches_it(app_a
     _text_free(entries)
     event = _one(entries, "search.hybrid")
     assert (event["query_hash"], event["query_len"]) == (documented(SECRET, LONG), len(LONG))
-    [row] = conn.execute("SELECT query FROM query_log").fetchall()
+    [row] = conn.execute("SELECT log_id, query FROM query_log").fetchall()
     assert row["query"] == LONG and documented(SECRET, row["query"]) == event["query_hash"]
+    assert _one(entries, "query_log.written")["query_log_id"] == row["log_id"]
 
 
 def test_search_prefilter_hashes_the_sanitized_question(app_and_db) -> None:
