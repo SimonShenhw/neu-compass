@@ -15,8 +15,8 @@ BAD = '<b>unsafe</b> [x](https://elsewhere.example)\n\n**bold**'
 ROWS = ["官方目录描述", "学生评价里的估计", "先修／共修", "主题", "考核构成", "在培养方案里的位置", "缺的数据", "操作"]
 
 
-@pytest.fixture
-def backend(monkeypatch):
+def make_backend(monkeypatch):
+    """Five synthetic courses behind the guarded transport; `failed` answers 503, `status` any other code."""
     base = install_backend(monkeypatch)
     original = httpx.Client.send
     base.courses = {}
@@ -25,6 +25,7 @@ def backend(monkeypatch):
             "primary_name": f"Synthetic {i}", "credits": i, "term": "Fall 2026", "delivery_mode": "in_person",
             "answer_evidence": {"catalog": None, "missing_fields": ["professor", "skill_tags"], "warnings": []}}
     base.failed = set()
+    base.status = {}
     base.reads = []
 
     def send(client, request, **kwargs):
@@ -32,12 +33,21 @@ def backend(monkeypatch):
         if request.url.path.startswith("/course/c"):
             cid = request.url.path.rsplit("/", 1)[1]
             base.reads.append((request.method, cid, request.headers.get("authorization")))
-            status = 503 if cid in base.failed else 200
+            status = base.status.get(cid, 503 if cid in base.failed else 200)
+            if status == 204:
+                return httpx.Response(204, request=request)
+            if status == 200 and base.courses[cid] is None:  # A JSON null body; json=None would send no body.
+                return httpx.Response(200, content=b"null", headers={"content-type": "application/json"}, request=request)
             return httpx.Response(status, json={"detail": BAD} if status != 200 else base.courses[cid], request=request)
         return original(client, request, **kwargs)
 
     monkeypatch.setattr(httpx.Client, "send", send)
     return base
+
+
+@pytest.fixture
+def backend(monkeypatch):
+    return make_backend(monkeypatch)
 
 
 def comparison(ids=(), *, token=None):
@@ -57,7 +67,7 @@ def text(app):
 def test_empty_page_navigation_order_footer_and_no_search_or_fetch(backend):
     app = comparison()
     assert app.radio(key="nav_page").options == [SEARCH, PROGRAMS, COOP, COMPARE]
-    assert "在课程详情里点 ➕ 加入对比" in text(app)
+    assert "打开一门课的详情，点 ➕ 加入对比" in text(app)
     assert not app.chat_input and not backend.reads and not backend.posts
     assert "nc-footer" in text(app)
 
@@ -75,7 +85,8 @@ def test_one_two_four_columns_keep_order_and_fetch_once_per_run(backend, ids):
     row_blocks = [b for b in app.get("flex_container") if len(list(b.children.values())) == len(ids)
                   and all(child.type == "column" for child in b.children.values())]
     assert len(row_blocks) == 9
-    assert [next(iter(b.children.values())).markdown[0].value for b in row_blocks[1:]] == [f"**{r}**" for r in ROWS]
+    first_code = backend.courses[ids[0]]["primary_code"]
+    assert [next(iter(b.children.values())).markdown[0].value for b in row_blocks[1:]] == [f"**{r}** · {first_code}" for r in ROWS]
     for block in row_blocks:
         assert len(block.children) == len(ids)
 
@@ -191,8 +202,8 @@ def test_catalog_archive_and_capture_date_are_not_live_facts(backend, snapshot, 
         assert "不是实时" in text(app)
 
 
-@pytest.mark.parametrize("kind,expected", [("none", "没有可用的年度规则"), ("unavailable", "存储尚不可用"),
-    ("bad", "校验未通过"), ("same", "条款结构相同"), ("different", "条款不同"),
+@pytest.mark.parametrize("kind,expected", [("none", "没有可用的年度规则"), ("unavailable", "暂时不可用"),
+    ("bad", "没有通过校验"),("same", "条款结构相同"), ("different", "条款不同"),
     ("one", "只记录了一个年度"), ("foreign", "身份不符"), ("duplicate", "同年度有冲突"), ("unusable", "不可用记录")])
 def test_prerequisite_summary_full_listing_not_capped_answer_years(backend, kind, expected):
     first = document()
