@@ -98,3 +98,13 @@ def test_final_processor_drops_arbitrary_fields_but_other_paths_unchanged(monkey
         structlog.contextvars.bind_contextvars(path="/chat")
         structlog.get_logger("synthetic.outside").info("synthetic.outside", query=MARKER)
         assert MARKER in stream.getvalue()  # Separate K batch retains authority over chat/search logs.
+
+
+def test_resolver_does_not_emit_raw_ref_even_before_processors(api_client):
+    from structlog.testing import capture_logs
+
+    with capture_logs() as events:
+        response = api_client.get("/resolve/course", params={"ref": REF})
+    assert response.status_code == 200 and response.json()["ref"] == REF
+    event = next(e for e in events if e["event"] == "resolve.course")
+    assert "ref" not in event and event["count"] == 1 and event["dangling"] == 0
