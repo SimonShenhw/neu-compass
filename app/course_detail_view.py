@@ -50,6 +50,7 @@ def render_course_detail(st: Any, course: dict, *, cid: str) -> None:
         course_header_html, plain_text_html, program_context_html, topic_pills_html,
     )
     from config import settings  # noqa: PLC0415
+    from app.state_manager import MAX_COMPARE_COURSES, add_to_compare  # noqa: PLC0415
 
     evidence = course.get("answer_evidence")
     st.markdown(
@@ -59,6 +60,15 @@ def render_course_detail(st: Any, course: dict, *, cid: str) -> None:
         ),
         unsafe_allow_html=True,
     )
+    compare_ids = st.session_state.get("compare_course_ids", [])
+    already = cid in compare_ids
+    full = len(compare_ids) >= MAX_COMPARE_COURSES
+    st.button("➕ 加入对比", key=f"compare-add-{cid}", disabled=already or full,
+        on_click=add_to_compare, args=(st.session_state, cid))
+    if already:
+        st.caption(f"已在对比中（{len(compare_ids)}/{MAX_COMPARE_COURSES}）")
+    elif full:
+        st.caption("对比列表已满，请到课程对比页先移出一门。")
     render_course_overview(st, evidence)
 
     # The product's own sample chips advertise "课业最轻": when the estimates exist they must be

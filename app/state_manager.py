@@ -35,6 +35,7 @@ from typing import Any, MutableMapping
 
 # Mapping abstraction: production gets st.session_state, tests get dict().
 SessionState = MutableMapping[str, Any]
+MAX_COMPARE_COURSES = 4
 
 DEFAULTS: dict[str, Any] = {
     # Auth
@@ -53,6 +54,7 @@ DEFAULTS: dict[str, Any] = {
     "search_k": 10,
     "filters": {},
     "selected_course_id": None,
+    "compare_course_ids": [],
 }
 
 
@@ -127,6 +129,7 @@ def logout(state: SessionState) -> None:
     state["messages"] = []
     state["search_results"] = []
     state["selected_course_id"] = None
+    clear_compare(state)
     for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in',
                 '_coop_teaser_cache']:
         state.pop(key, None)
@@ -212,10 +215,34 @@ def select_course(state: SessionState, course_id: str | None) -> None:
     state["selected_course_id"] = course_id
 
 
+def add_to_compare(state: SessionState, course_id: str) -> str:
+    """Ordered per-tab IDs only; duplicates take precedence over a full list.
+    中文：只保留标签页内有序 ID，不存详情；满额时已在列表的课仍返回 already。
+    """
+    ids = state.get("compare_course_ids", [])
+    if course_id in ids:
+        return "already"
+    if len(ids) >= MAX_COMPARE_COURSES:
+        return "full"
+    state["compare_course_ids"] = [*ids, course_id]
+    return "added"
+
+
+def remove_from_compare(state: SessionState, course_id: str) -> None:
+    state["compare_course_ids"] = [cid for cid in state.get("compare_course_ids", []) if cid != course_id]
+
+
+def clear_compare(state: SessionState) -> None:
+    state["compare_course_ids"] = []
+
+
 __all__ = [
     "DEFAULTS",
+    "MAX_COMPARE_COURSES",
     "SessionState",
+    "add_to_compare",
     "add_message",
+    "clear_compare",
     "clear_conversation",
     "get_messages",
     "init_state",
@@ -223,5 +250,6 @@ __all__ = [
     "login",
     "logout",
     "record_search",
+    "remove_from_compare",
     "select_course",
 ]
