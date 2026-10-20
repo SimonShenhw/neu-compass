@@ -55,6 +55,7 @@ DEFAULTS: dict[str, Any] = {
     "filters": {},
     "selected_course_id": None,
     "compare_course_ids": [],
+    "plan_draft_courses": [],
 }
 
 
@@ -105,6 +106,8 @@ def login(
     contribution_count: int = 0,
     session_token: str | None = None,
 ) -> None:
+    if state.get("user_id") != user_id:
+        clear_draft(state)
     state["user_id"] = user_id
     state["user_email"] = user_email
     state["user_contribution_count"] = contribution_count
@@ -130,6 +133,7 @@ def logout(state: SessionState) -> None:
     state["search_results"] = []
     state["selected_course_id"] = None
     clear_compare(state)
+    clear_draft(state)
     for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in',
                 '_coop_teaser_cache']:
         state.pop(key, None)
@@ -236,6 +240,36 @@ def clear_compare(state: SessionState) -> None:
     state["compare_course_ids"] = []
 
 
+def add_draft_courses(state: SessionState, courses: list[dict]) -> str:
+    """Validate the whole batch before an immutable, bounded session-only update."""
+    from schemas.plan_draft import MAX_DRAFT_COURSES, DraftCourse
+
+    incoming = [DraftCourse.model_validate(c).model_dump() for c in courses]
+    old = state.get("plan_draft_courses", [])
+    by_code = {c["code"]: c for c in old}
+    for c in incoming:
+        by_code.setdefault(c["code"], c)
+    if len(by_code) > MAX_DRAFT_COURSES:
+        return "full"
+    if len(by_code) == len(old):
+        return "already"
+    state["plan_draft_courses"] = list(by_code.values())
+    return "added"
+
+
+def remove_draft_course(state: SessionState, code: str) -> None:
+    from schemas.program_plan import normalize_code
+
+    code = normalize_code(code)
+    state["plan_draft_courses"] = [c for c in state.get("plan_draft_courses", []) if c["code"] != code]
+
+
+def clear_draft(state: SessionState) -> None:
+    state["plan_draft_courses"] = []
+    if "plan-draft-input" in state:
+        state["plan-draft-input"] = ""
+
+
 __all__ = [
     "DEFAULTS",
     "MAX_COMPARE_COURSES",
@@ -243,6 +277,9 @@ __all__ = [
     "add_to_compare",
     "add_message",
     "clear_compare",
+    "add_draft_courses",
+    "remove_draft_course",
+    "clear_draft",
     "clear_conversation",
     "get_messages",
     "init_state",

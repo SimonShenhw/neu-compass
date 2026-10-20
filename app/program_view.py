@@ -327,6 +327,9 @@ def _render_curriculum(st, program_id: str) -> None:
     if plan is not None:
         from app.program_policy_view import load_selected_program_policy_evidence  # noqa: PLC0415
         load_selected_program_policy_evidence(st, plan)
+        if plan.review_status == "source_checked":
+            from app.plan_draft_view import render_plan_draft  # noqa: PLC0415
+            render_plan_draft(st, plan)
     st.caption("以下是旧 seed 的课程分类与学期建议，未经官方核验；校区/年度/路径未知。")
 
     # Share link (deep-link produce half). program_id is already the URL

@@ -1,0 +1,3645 @@
+[
+  {
+    "seed": "boston_2026_2027_core_fragments.json",
+    "plan_id": "cs-ms-boston-2026-2027-standard",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-CS-5001",
+        "code": "CS 5001",
+        "name": "Synthetic CS 5001",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5003",
+        "code": "CS 5003",
+        "name": "Synthetic CS 5003",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5004",
+        "code": "CS 5004",
+        "name": "Synthetic CS 5004",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5005",
+        "code": "CS 5005",
+        "name": "Synthetic CS 5005",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5006",
+        "code": "CS 5006",
+        "name": "Synthetic CS 5006",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5007",
+        "code": "CS 5007",
+        "name": "Synthetic CS 5007",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5002",
+        "code": "CS 5002",
+        "name": "Synthetic CS 5002",
+        "credits": 0
+      },
+      {
+        "course_id": "synthetic-CS-5010",
+        "code": "CS 5010",
+        "name": "Synthetic CS 5010",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6240",
+        "code": "CS 6240",
+        "name": "Synthetic CS 6240",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-7180",
+        "code": "CS 7180",
+        "name": "Synthetic CS 7180",
+        "credits": null
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "普通 MSCS 局部规则（非完整培养方案）",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5010",
+          "CS 5800"
+        ],
+        "possible": [],
+        "missing": [
+          "CS 5011"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "Core 课程组合",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5010",
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [
+              "CS 5011"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Programming 主课",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5010"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "Programming recitation 配套",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "CS 5011"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "Algorithms",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5800"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "广度领域选择、选修学分、毕业出口、总学分与 GPA 等尚未完整建模；不能据此判毕业。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：广度领域选择、选修学分、毕业出口、总学分与 GPA 等尚未完整建模；不能据此判毕业。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "CS 5001",
+        "CS 5003",
+        "CS 5004",
+        "CS 5005",
+        "CS 5006",
+        "CS 5007",
+        "CS 5002",
+        "CS 6140",
+        "CS 6240",
+        "CS 7180"
+      ],
+      "summary_counts": {
+        "met": 0,
+        "missing": 1,
+        "unknown": 0
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_core_fragments.json",
+    "plan_id": "ds-ms-boston-2026-2027-standard",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-DS-5110",
+        "code": "DS 5110",
+        "name": "Synthetic DS 5110",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-5220",
+        "code": "DS 5220",
+        "name": "Synthetic DS 5220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-7205",
+        "code": "EECE 7205",
+        "name": "Synthetic EECE 7205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-5360",
+        "code": "EECE 5360",
+        "name": "Synthetic EECE 5360",
+        "credits": 12
+      },
+      {
+        "course_id": "synthetic-DS-5500",
+        "code": "DS 5500",
+        "name": "Synthetic DS 5500",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-7995",
+        "code": "DS 7995",
+        "name": "Synthetic DS 7995",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "MSDS 共享核心片段",
+        "status": "unknown",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "DS 5110",
+          "CS 5800",
+          "EECE 7205",
+          "CS 6140",
+          "DS 5500"
+        ],
+        "possible": [],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming with Data",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 5110"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "any_of",
+            "label": "Algorithms 二选一",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5800",
+              "EECE 7205"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Algorithms",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5800"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "Computer Engineering",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "EECE 7205"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "any_of",
+            "label": "Machine Learning 二选一",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 6140"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Machine Learning",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 6140"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "Machine Learning and Pattern Recognition",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "EECE 5644"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "course",
+            "label": "Interdisciplinary Capstone",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 5500"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "核心课程累计 GPA 至少 3.000；此处不计算个人成绩。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：核心课程累计 GPA 至少 3.000；此处不计算个人成绩。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Concentration 选修组、Co-op 条件、总学分与个体学院政策未完整建模。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Concentration 选修组、Co-op 条件、总学分与个体学院政策未完整建模。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "DS 5220",
+        "EECE 5360",
+        "DS 7995"
+      ],
+      "summary_counts": {
+        "met": 2,
+        "missing": 0,
+        "unknown": 0
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_core_fragments.json",
+    "plan_id": "info-ms-boston-2026-2027-standard-general",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-INFO-5100",
+        "code": "INFO 5100",
+        "name": "Synthetic INFO 5100",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6210",
+        "code": "INFO 6210",
+        "name": "Synthetic INFO 6210",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6205",
+        "code": "INFO 6205",
+        "name": "Synthetic INFO 6205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6105",
+        "code": "INFO 6105",
+        "name": "Synthetic INFO 6105",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CSYE-6220",
+        "code": "CSYE 6220",
+        "name": "Synthetic CSYE 6220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-5200",
+        "code": "INFO 5200",
+        "name": "Synthetic INFO 5200",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-5001",
+        "code": "INFO 5001",
+        "name": "Synthetic INFO 5001",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-INFO-7999",
+        "code": "INFO 7999",
+        "name": "Synthetic INFO 7999",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "通用 MSIS 核心片段",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "INFO 5100"
+        ],
+        "possible": [],
+        "missing": [
+          "INFO 5101"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "Core 主课与配套 lab",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "INFO 5100"
+            ],
+            "possible": [],
+            "missing": [
+              "INFO 5101"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Application Engineering",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "INFO 5100"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "配套 lab（0 学分不等于可省略）",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "INFO 5101"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "condition",
+            "label": "工程学院 required core 课程须 C 或以上；此处不评价成绩或逐课程先修门槛。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：工程学院 required core 课程须 C 或以上；此处不评价成绩或逐课程先修门槛。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "选修组、coursework/project/thesis 出口、可选 concentration、Co-op 及总学分规则未完整建模。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：选修组、coursework/project/thesis 出口、可选 concentration、Co-op 及总学分规则未完整建模。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "INFO 6210",
+        "INFO 6205",
+        "INFO 6105",
+        "CSYE 6220",
+        "INFO 5200",
+        "INFO 5001",
+        "INFO 7999",
+        "CS 5800"
+      ],
+      "summary_counts": {
+        "met": 0,
+        "missing": 1,
+        "unknown": 0
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_extended_rules.json",
+    "plan_id": "cs-ms-boston-2026-2027-standard",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-CS-5001",
+        "code": "CS 5001",
+        "name": "Synthetic CS 5001",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5003",
+        "code": "CS 5003",
+        "name": "Synthetic CS 5003",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5004",
+        "code": "CS 5004",
+        "name": "Synthetic CS 5004",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5005",
+        "code": "CS 5005",
+        "name": "Synthetic CS 5005",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5006",
+        "code": "CS 5006",
+        "name": "Synthetic CS 5006",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5007",
+        "code": "CS 5007",
+        "name": "Synthetic CS 5007",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5002",
+        "code": "CS 5002",
+        "name": "Synthetic CS 5002",
+        "credits": 0
+      },
+      {
+        "course_id": "synthetic-CS-5010",
+        "code": "CS 5010",
+        "name": "Synthetic CS 5010",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6240",
+        "code": "CS 6240",
+        "name": "Synthetic CS 6240",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-7180",
+        "code": "CS 7180",
+        "name": "Synthetic CS 7180",
+        "credits": null
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "普通 MSCS 目录规则（仍非完整资格判定）",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5010",
+          "CS 5800",
+          "CS 6140",
+          "CS 6240"
+        ],
+        "possible": [
+          "CS 7180"
+        ],
+        "missing": [
+          "CS 5011",
+          "CS 5100",
+          "CS 5150",
+          "CS 5200",
+          "CS 5330",
+          "CS 6120",
+          "CS 6200",
+          "CS 6220",
+          "CS 7140",
+          "CS 5400"
+        ],
+        "missing_omitted": 14,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "Core：8 学分；配套组合不是先修顺序",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5010",
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [
+              "CS 5011"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Programming 主课",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5010"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "配套 recitation",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "CS 5011"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "Algorithms",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5800"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "广度：3 门、12 学分，至少覆盖 2 个领域；5500/5600 是候选，不是共同 core",
+            "status": "missing",
+            "reasons": [
+              "还差 1 门（含可能候选的门数上限）。",
+              "按已知确定学分距目标差 4 学分；不是确认还需补修的学分。",
+              "还差 1 个领域。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 6140",
+              "CS 6240"
+            ],
+            "possible": [],
+            "missing": [
+              "CS 5100",
+              "CS 5150",
+              "CS 5200",
+              "CS 5330",
+              "CS 6120",
+              "CS 6200",
+              "CS 6220",
+              "CS 7140",
+              "CS 5400",
+              "CS 5500"
+            ],
+            "missing_omitted": 13,
+            "shortfall": {
+              "courses": 1,
+              "credits": 4,
+              "areas": 1
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "另完成 12 学分选修；重叠候选不代表可与广度双重计入",
+            "status": "unknown",
+            "reasons": [
+              "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+              "学分未知：CS 7180",
+              "开放池可能计入：CS 7180；是否能算，要项目确认。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "CS 7180"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 12
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "目录总要求：32 semester hours，最低 GPA 3.000；系统未计算重复计入、免修或个人成绩。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：目录总要求：32 semester hours，最低 GPA 3.000；系统未计算重复计入、免修或个人成绩。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Thesis 委员会规则",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：选择 thesis 时；不是人人必做 thesis"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "condition",
+                "label": "委员会至少 3 人含导师；至少 2 人来自或关联 Khoury；至少 1 人与论文工作保持独立且不是共同导师。外部成员可有但非必需，额外 reader 不替代最低要求。",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "optional",
+            "label": "Engineering Leadership 联读选项",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：同时就读 Graduate Certificate in Engineering Leadership 时"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "condition",
+                "label": "目录允许 8 学分证书课程用于本项目选修要求；不表示自动录取、审批或额外学分均可计入。",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "完整学院/学校政策、选修重用与批准、具体课程先修/共修、实际开课学期、个人转学分和免修未完成核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：完整学院/学校政策、选修重用与批准、具体课程先修/共修、实际开课学期、个人转学分和免修未完成核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "CS 5001",
+        "CS 5003",
+        "CS 5004",
+        "CS 5005",
+        "CS 5006",
+        "CS 5007",
+        "CS 5002"
+      ],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 1
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_extended_rules.json",
+    "plan_id": "ds-ms-boston-2026-2027-standard-computer-science",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-DS-5110",
+        "code": "DS 5110",
+        "name": "Synthetic DS 5110",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-5220",
+        "code": "DS 5220",
+        "name": "Synthetic DS 5220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-7205",
+        "code": "EECE 7205",
+        "name": "Synthetic EECE 7205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-5360",
+        "code": "EECE 5360",
+        "name": "Synthetic EECE 5360",
+        "credits": 12
+      },
+      {
+        "course_id": "synthetic-DS-5500",
+        "code": "DS 5500",
+        "name": "Synthetic DS 5500",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-7995",
+        "code": "DS 7995",
+        "name": "Synthetic DS 7995",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "MSDS — Computer Science 目录规则",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "DS 5110",
+          "CS 5800",
+          "EECE 7205",
+          "CS 6140",
+          "DS 5500",
+          "DS 7995"
+        ],
+        "possible": [
+          "DS 7995"
+        ],
+        "missing": [
+          "CS 5100",
+          "CS 5180",
+          "CS 5200",
+          "CS 5330",
+          "CS 5340",
+          "CS 5610",
+          "CS 6120",
+          "CS 6200",
+          "CS 6220",
+          "CS 6240"
+        ],
+        "missing_omitted": 12,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "共享 core：16 学分；两处 OR 保留",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 5110",
+              "CS 5800",
+              "EECE 7205",
+              "CS 6140",
+              "DS 5500"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Programming with Data",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "DS 5110"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "any_of",
+                "label": "Algorithms 二选一",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5800",
+                  "EECE 7205"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Algorithms",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5800"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Fundamentals of Computer Engineering",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "EECE 7205"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "any_of",
+                "label": "Machine Learning 二选一",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 6140"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Machine Learning",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 6140"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Machine Learning and Pattern Recognition",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "EECE 5644"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "course",
+                "label": "Interdisciplinary Capstone",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "DS 5500"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "Computer Science concentration：从以下候选完成 16 学分",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 16 学分；不是确认还需补修的学分。",
+              "学分未知：DS 7995"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 7995"
+            ],
+            "possible": [
+              "DS 7995"
+            ],
+            "missing": [
+              "CS 5100",
+              "CS 5180",
+              "CS 5200",
+              "CS 5330",
+              "CS 5340",
+              "CS 5610",
+              "CS 6120",
+              "CS 6200",
+              "CS 6220",
+              "CS 6240"
+            ],
+            "missing_omitted": 12,
+            "shortfall": {
+              "credits": 16
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "共享 core 累计 GPA 至少 3.000；项目总要求 32 学分、最低 GPA 3.000，遵守所属 Khoury 学院政策。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：共享 core 累计 GPA 至少 3.000；项目总要求 32 学分、最低 GPA 3.000，遵守所属 Khoury 学院政策。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "目录脚注：选择不足 4 学分的选修时，应同学期搭配 DS 7995 并与教师设计配套项目取得附加学分；不是所有选修都强制增加 project。具体计入与资格未自动判定。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：目录脚注：选择不足 4 学分的选修时，应同学期搭配 DS 7995 并与教师设计配套项目取得附加学分；不是所有选修都强制增加 project。具体计入与资格未自动判定。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Khoury Co-op",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：自愿选择 Co-op 且符合学院资格时"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "any_of",
+                "label": "四种 Co-op 形式任选其一（目录列 0 学分工作经历）",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Work Experience",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Half-Time",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Abroad Half-Time",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Abroad",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "完整 Khoury/大学政策、选修与项目学分计入/审批、Co-op 个人资格、真实先修/共修和开课学期仍未核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：完整 Khoury/大学政策、选修与项目学分计入/审批、Co-op 个人资格、真实先修/共修和开课学期仍未核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "DS 5220",
+        "EECE 5360"
+      ],
+      "summary_counts": {
+        "met": 3,
+        "missing": 1,
+        "unknown": 0
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_extended_rules.json",
+    "plan_id": "ds-ms-boston-2026-2027-standard-data-design-visualization",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-DS-5110",
+        "code": "DS 5110",
+        "name": "Synthetic DS 5110",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-5220",
+        "code": "DS 5220",
+        "name": "Synthetic DS 5220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-7205",
+        "code": "EECE 7205",
+        "name": "Synthetic EECE 7205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-5360",
+        "code": "EECE 5360",
+        "name": "Synthetic EECE 5360",
+        "credits": 12
+      },
+      {
+        "course_id": "synthetic-DS-5500",
+        "code": "DS 5500",
+        "name": "Synthetic DS 5500",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-7995",
+        "code": "DS 7995",
+        "name": "Synthetic DS 7995",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "MSDS — Data Design and Visualization 目录规则",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "DS 5110",
+          "CS 5800",
+          "EECE 7205",
+          "CS 6140",
+          "DS 5500"
+        ],
+        "possible": [],
+        "missing": [
+          "ARTG 5150",
+          "ARTG 5151",
+          "ARTG 5330",
+          "ARTG 5110",
+          "ARTG 5130",
+          "ARTG 5310",
+          "ARTG 5430",
+          "ARTG 6110",
+          "ARTG 6330",
+          "CS 5340"
+        ],
+        "missing_omitted": 6,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "共享 core：16 学分",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 5110",
+              "CS 5800",
+              "EECE 7205",
+              "CS 6140",
+              "DS 5500"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Programming with Data",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "DS 5110"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "any_of",
+                "label": "Algorithms 二选一",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5800",
+                  "EECE 7205"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Algorithms",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5800"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Computer Engineering",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "EECE 7205"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "any_of",
+                "label": "Machine Learning 二选一",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 6140"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Machine Learning",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 6140"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Pattern Recognition",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "EECE 5644"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "course",
+                "label": "Capstone",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "DS 5500"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "第一个选修组：8 学分",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "ARTG 5150",
+              "ARTG 5151",
+              "ARTG 5330"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "第二个选修组：另 8 学分",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "ARTG 5110",
+              "ARTG 5130",
+              "ARTG 5310",
+              "ARTG 5430",
+              "ARTG 6110",
+              "ARTG 6330",
+              "CS 5340",
+              "CS 5610",
+              "CS 7250",
+              "EECE 5642"
+            ],
+            "missing_omitted": 3,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "共享 core 累计 GPA 至少 3.000；总要求 32 学分、最低 GPA 3.000；遵守所属 CAMD 学院政策。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：共享 core 累计 GPA 至少 3.000；总要求 32 学分、最低 GPA 3.000；遵守所属 CAMD 学院政策。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "目录脚注提及不足 4 学分选修应同学期搭配 DS 7995、与教师设计配套项目取得附加学分；具体对本组选课的适用与计入仍需学院核实。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：目录脚注提及不足 4 学分选修应同学期搭配 DS 7995、与教师设计配套项目取得附加学分；具体对本组选课的适用与计入仍需学院核实。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "CAMD Co-op",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：选择 Co-op 且符合所属学院资格时"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "any_of",
+                "label": "Co-op 形式任选其一；不是所有工作经历均须完成",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Work Experience（目录列 0 学分）",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Half-Time",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Abroad Half-Time",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Abroad",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "完整 CAMD/大学政策、附加项目与选修学分计入、Co-op 资格、具体先修/共修、个人适用性与开课学期未核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：完整 CAMD/大学政策、附加项目与选修学分计入、Co-op 资格、具体先修/共修、个人适用性与开课学期未核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "DS 5220",
+        "EECE 5360",
+        "DS 7995"
+      ],
+      "summary_counts": {
+        "met": 3,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_extended_rules.json",
+    "plan_id": "ds-ms-boston-2026-2027-standard-engineering-theory-modeling",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-DS-5110",
+        "code": "DS 5110",
+        "name": "Synthetic DS 5110",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-5220",
+        "code": "DS 5220",
+        "name": "Synthetic DS 5220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-7205",
+        "code": "EECE 7205",
+        "name": "Synthetic EECE 7205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-EECE-5360",
+        "code": "EECE 5360",
+        "name": "Synthetic EECE 5360",
+        "credits": 12
+      },
+      {
+        "course_id": "synthetic-DS-5500",
+        "code": "DS 5500",
+        "name": "Synthetic DS 5500",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-DS-7995",
+        "code": "DS 7995",
+        "name": "Synthetic DS 7995",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "MSDS — Engineering Theory and Modeling 目录规则",
+        "status": "unknown",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "DS 5110",
+          "CS 5800",
+          "EECE 7205",
+          "CS 6140",
+          "DS 5500",
+          "EECE 5360",
+          "DS 7995"
+        ],
+        "possible": [
+          "DS 7995"
+        ],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "共享 core：16 学分",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 5110",
+              "CS 5800",
+              "EECE 7205",
+              "CS 6140",
+              "DS 5500"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Programming with Data",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "DS 5110"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "any_of",
+                "label": "Algorithms 二选一",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5800",
+                  "EECE 7205"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Algorithms",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5800"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Computer Engineering",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "EECE 7205"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "any_of",
+                "label": "Machine Learning 二选一",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 6140"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Machine Learning",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 6140"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Pattern Recognition",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "EECE 5644"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "course",
+                "label": "Capstone",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "DS 5500"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "Foundational：4 学分",
+            "status": "unknown",
+            "reasons": [
+              "EECE 5360 重复计入『Translational and Advanced：剩余 12 学分』；能否两边都算，方案没有记录。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "EECE 5360",
+              "DS 7995"
+            ],
+            "possible": [
+              "DS 7995"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 0
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Translational and Advanced：剩余 12 学分",
+            "status": "unknown",
+            "reasons": [
+              "EECE 5360 重复计入『Foundational：4 学分』；能否两边都算，方案没有记录。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "EECE 5360"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 0
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "共享 core 累计 GPA 至少 3.000；总要求 32 学分、最低 GPA 3.000；Co-op 可有额外学分，遵守所属 Engineering 学院政策。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：共享 core 累计 GPA 至少 3.000；总要求 32 学分、最低 GPA 3.000；Co-op 可有额外学分，遵守所属 Engineering 学院政策。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "目录脚注：不足 4 学分选修应同学期搭配 DS 7995，与教师设计符合选修及 core 目标的配套项目取得附加学分；不自动计算重用或所有项目学分。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：目录脚注：不足 4 学分选修应同学期搭配 DS 7995，与教师设计符合选修及 core 目标的配套项目取得附加学分；不自动计算重用或所有项目学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Engineering Co-op",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：选择 Co-op 时；目录要求先完成 ENCP 6100，个人资格仍需核实"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "all_of",
+                "label": "准备课程与工作经历；不是共同必修",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Co-op 准备（1 学分，可能超出基础 32 学分）",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "any_of",
+                    "label": "工作经历四选一",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": [
+                      {
+                        "kind": "course",
+                        "label": "Work Experience（目录列 0 学分）",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Half-Time",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Abroad Half-Time",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Abroad",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "完整 Engineering/大学政策、选修组重用与项目学分审批、Co-op 全部资格、真实先修/共修、开课学期和个人适用性未核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：完整 Engineering/大学政策、选修组重用与项目学分审批、Co-op 全部资格、真实先修/共修、开课学期和个人适用性未核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "DS 5220"
+      ],
+      "summary_counts": {
+        "met": 3,
+        "missing": 0,
+        "unknown": 2
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_extended_rules.json",
+    "plan_id": "info-ms-boston-2026-2027-standard-general",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-INFO-5100",
+        "code": "INFO 5100",
+        "name": "Synthetic INFO 5100",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6210",
+        "code": "INFO 6210",
+        "name": "Synthetic INFO 6210",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6205",
+        "code": "INFO 6205",
+        "name": "Synthetic INFO 6205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6105",
+        "code": "INFO 6105",
+        "name": "Synthetic INFO 6105",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CSYE-6220",
+        "code": "CSYE 6220",
+        "name": "Synthetic CSYE 6220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-5200",
+        "code": "INFO 5200",
+        "name": "Synthetic INFO 5200",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-5001",
+        "code": "INFO 5001",
+        "name": "Synthetic INFO 5001",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-INFO-7999",
+        "code": "INFO 7999",
+        "name": "Synthetic INFO 7999",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "通用 MSIS 目录规则",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "INFO 5100"
+        ],
+        "possible": [
+          "INFO 6210",
+          "INFO 6205",
+          "INFO 6105",
+          "INFO 5001",
+          "INFO 7999"
+        ],
+        "missing": [
+          "INFO 5101"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "Core：主课 4 学分与 0 学分配套 lab",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "INFO 5100"
+            ],
+            "possible": [],
+            "missing": [
+              "INFO 5101"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Application Engineering",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "INFO 5100"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "course",
+                "label": "配套 lab，0 学分不等于可省略",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "INFO 5101"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "any_of",
+            "label": "毕业出口：Coursework / Project / Thesis 三选一",
+            "status": "unknown",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "INFO 6210",
+              "INFO 6205",
+              "INFO 6105",
+              "INFO 5001",
+              "INFO 7999"
+            ],
+            "missing": [
+              "INFO 7945",
+              "INFO 7945",
+              "INFO 7990"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "all_of",
+                "label": "Coursework Option",
+                "status": "unknown",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [
+                  "INFO 6210",
+                  "INFO 6205",
+                  "INFO 6105",
+                  "INFO 5001",
+                  "INFO 7999"
+                ],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "select",
+                    "label": "Restricted electives：16 学分",
+                    "status": "unknown",
+                    "reasons": [
+                      "按已知确定学分距目标差 16 学分；不是确认还需补修的学分。",
+                      "学分未知：INFO 5001",
+                      "开放池可能计入：INFO 6210、INFO 6205、INFO 6105、INFO 5001、INFO 7999；是否能算，要项目确认。",
+                      "INFO 5200 在这一组被明确排除，不算。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [
+                      "INFO 6210",
+                      "INFO 6205",
+                      "INFO 6105",
+                      "INFO 5001",
+                      "INFO 7999"
+                    ],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {
+                      "credits": 16
+                    },
+                    "children": []
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Other electives：12 学分",
+                    "status": "unknown",
+                    "reasons": [
+                      "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+                      "学分未知：INFO 5001",
+                      "开放池可能计入：INFO 6210、INFO 6205、INFO 6105、INFO 5001、INFO 7999；是否能算，要项目确认。",
+                      "CSYE 6220 在这一组被明确排除，不算。",
+                      "INFO 5200 在这一组被明确排除，不算。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [
+                      "INFO 6210",
+                      "INFO 6205",
+                      "INFO 6105",
+                      "INFO 5001",
+                      "INFO 7999"
+                    ],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {
+                      "credits": 12
+                    },
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "all_of",
+                "label": "Project Option",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [
+                  "INFO 6210",
+                  "INFO 6205",
+                  "INFO 6105",
+                  "INFO 5001",
+                  "INFO 7999"
+                ],
+                "missing": [
+                  "INFO 7945"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Master's Project：4 学分",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "INFO 7945"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Restricted electives：12 学分",
+                    "status": "unknown",
+                    "reasons": [
+                      "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+                      "学分未知：INFO 5001",
+                      "开放池可能计入：INFO 6210、INFO 6205、INFO 6105、INFO 5001、INFO 7999；是否能算，要项目确认。",
+                      "INFO 5200 在这一组被明确排除，不算。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [
+                      "INFO 6210",
+                      "INFO 6205",
+                      "INFO 6105",
+                      "INFO 5001",
+                      "INFO 7999"
+                    ],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {
+                      "credits": 12
+                    },
+                    "children": []
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Other electives：12 学分",
+                    "status": "unknown",
+                    "reasons": [
+                      "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+                      "学分未知：INFO 5001",
+                      "开放池可能计入：INFO 6210、INFO 6205、INFO 6105、INFO 5001、INFO 7999；是否能算，要项目确认。",
+                      "CSYE 6220 在这一组被明确排除，不算。",
+                      "INFO 5200 在这一组被明确排除，不算。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [
+                      "INFO 6210",
+                      "INFO 6205",
+                      "INFO 6105",
+                      "INFO 5001",
+                      "INFO 7999"
+                    ],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {
+                      "credits": 12
+                    },
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "all_of",
+                "label": "Thesis Option",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [
+                  "INFO 6210",
+                  "INFO 6205",
+                  "INFO 6105",
+                  "INFO 5001",
+                  "INFO 7999"
+                ],
+                "missing": [
+                  "INFO 7945",
+                  "INFO 7990"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Master's Project：4 学分",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "INFO 7945"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Thesis：4 学分",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "INFO 7990"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Restricted electives：8 学分",
+                    "status": "unknown",
+                    "reasons": [
+                      "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+                      "学分未知：INFO 5001",
+                      "开放池可能计入：INFO 6210、INFO 6205、INFO 6105、INFO 5001、INFO 7999；是否能算，要项目确认。",
+                      "INFO 5200 在这一组被明确排除，不算。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [
+                      "INFO 6210",
+                      "INFO 6205",
+                      "INFO 6105",
+                      "INFO 5001",
+                      "INFO 7999"
+                    ],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {
+                      "credits": 8
+                    },
+                    "children": []
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Other electives：12 学分",
+                    "status": "unknown",
+                    "reasons": [
+                      "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+                      "学分未知：INFO 5001",
+                      "开放池可能计入：INFO 6210、INFO 6205、INFO 6105、INFO 5001、INFO 7999；是否能算，要项目确认。",
+                      "CSYE 6220 在这一组被明确排除，不算。",
+                      "INFO 5200 在这一组被明确排除，不算。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [
+                      "INFO 6210",
+                      "INFO 6205",
+                      "INFO 6105",
+                      "INFO 5001",
+                      "INFO 7999"
+                    ],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {
+                      "credits": 12
+                    },
+                    "children": []
+                  },
+                  {
+                    "kind": "condition",
+                    "label": "还需完成 thesis 提交流程，包括委员会与 Graduate School of Engineering 签字，并向 ProQuest 提交电子版；修完 thesis 课程不等于流程完成。",
+                    "status": "unknown",
+                    "reasons": [
+                      "文字条件，草案不判断：还需完成 thesis 提交流程，包括委员会与 Graduate School of Engineering 签字，并向 ProQuest 提交电子版；修完 thesis 课程不等于流程完成。"
+                    ],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "condition",
+            "label": "required core 每门须 C 或以上；基础总要求 32 学分，最低 GPA 3.000。选修重叠不意味着一门课可在不同组双重计入。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：required core 每门须 C 或以上；基础总要求 32 学分，最低 GPA 3.000。选修重叠不意味着一门课可在不同组双重计入。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Co-op",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：选择 Co-op 时（总要求 33 学分）；必须完成 ENCP 6000，个人资格另核实"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "all_of",
+                "label": "准备课程与一项工作经历",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Career Management for Engineers：1 学分",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "any_of",
+                    "label": "工作经历四选一",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": [
+                      {
+                        "kind": "course",
+                        "label": "Work Experience（目录列 0 学分）",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Half-Time",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Abroad Half-Time",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Abroad",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Medical concentration 的 core 替代、Engineering Leadership 联读、Bridge 不在本 scope；完整院校政策、课程级别/重用/审批、先修/共修和个人适用性未核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Medical concentration 的 core 替代、Engineering Leadership 联读、Bridge 不在本 scope；完整院校政策、课程级别/重用/审批、先修/共修和个人适用性未核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "CSYE 6220",
+        "INFO 5200",
+        "CS 5800"
+      ],
+      "summary_counts": {
+        "met": 0,
+        "missing": 3,
+        "unknown": 8
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_pathway_rules.json",
+    "plan_id": "cs-ms-boston-2026-2027-align",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-CS-5001",
+        "code": "CS 5001",
+        "name": "Synthetic CS 5001",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5003",
+        "code": "CS 5003",
+        "name": "Synthetic CS 5003",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5004",
+        "code": "CS 5004",
+        "name": "Synthetic CS 5004",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5005",
+        "code": "CS 5005",
+        "name": "Synthetic CS 5005",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5006",
+        "code": "CS 5006",
+        "name": "Synthetic CS 5006",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5007",
+        "code": "CS 5007",
+        "name": "Synthetic CS 5007",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5002",
+        "code": "CS 5002",
+        "name": "Synthetic CS 5002",
+        "credits": 0
+      },
+      {
+        "course_id": "synthetic-CS-5010",
+        "code": "CS 5010",
+        "name": "Synthetic CS 5010",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6140",
+        "code": "CS 6140",
+        "name": "Synthetic CS 6140",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-6240",
+        "code": "CS 6240",
+        "name": "Synthetic CS 6240",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-7180",
+        "code": "CS 7180",
+        "name": "Synthetic CS 7180",
+        "credits": null
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "CS Align 目录规则（非完整资格判定）",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5001",
+          "CS 5003",
+          "CS 5002",
+          "CS 5004",
+          "CS 5005",
+          "CS 5800",
+          "CS 6140",
+          "CS 6240"
+        ],
+        "possible": [
+          "CS 7180"
+        ],
+        "missing": [
+          "CS 5008",
+          "CS 5009",
+          "CS 5100",
+          "CS 5150",
+          "CS 5200",
+          "CS 5330",
+          "CS 6120",
+          "CS 6200",
+          "CS 6220",
+          "CS 7140"
+        ],
+        "missing_omitted": 15,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "Align Bridge Coursework：除非项目另行决定，不是学生自由任选",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5001",
+              "CS 5003",
+              "CS 5002",
+              "CS 5004",
+              "CS 5005"
+            ],
+            "possible": [],
+            "missing": [
+              "CS 5008",
+              "CS 5009"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "all_of",
+                "label": "Fundamentals 主课与配套 recitation（组合 4 学分）",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5001",
+                  "CS 5003"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Intensive Foundations",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5001"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Recitation for CS 5001",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5003"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "course",
+                "label": "Discrete Structures（4 学分）",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5002"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "all_of",
+                "label": "Object-Oriented Design 主课与配套 recitation（组合 4 学分）",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 5004",
+                  "CS 5005"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Object-Oriented Design",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5004"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Recitation for CS 5004",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "CS 5005"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "all_of",
+                "label": "Additional Align 主课与配套 recitation（组合 4 学分）",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "CS 5008",
+                  "CS 5009"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Data Structures and Algorithms",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "CS 5008"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "Recitation for CS 5008",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "CS 5009"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "condition",
+                "label": "桥接课程每门 B 或以上；例外/减免必须由项目确定，系统不根据背景自动免修或判定学分。",
+                "status": "unknown",
+                "reasons": [
+                  "文字条件，草案不判断：桥接课程每门 B 或以上；例外/减免必须由项目确定，系统不根据背景自动免修或判定学分。"
+                ],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "course",
+            "label": "Core Algorithms（4 学分）；本路径不复制普通 MSCS 的 CS 5010/5011 core",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "广度：3 门、12 学分，覆盖至少 2 个领域",
+            "status": "missing",
+            "reasons": [
+              "还差 1 门（含可能候选的门数上限）。",
+              "按已知确定学分距目标差 4 学分；不是确认还需补修的学分。",
+              "还差 1 个领域。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 6140",
+              "CS 6240"
+            ],
+            "possible": [],
+            "missing": [
+              "CS 5100",
+              "CS 5150",
+              "CS 5200",
+              "CS 5330",
+              "CS 6120",
+              "CS 6200",
+              "CS 6220",
+              "CS 7140",
+              "CS 5400",
+              "CS 5500"
+            ],
+            "missing_omitted": 13,
+            "shortfall": {
+              "courses": 1,
+              "credits": 4,
+              "areas": 1
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "另完成 12 学分选修；重叠候选不是广度重复计入许可",
+            "status": "unknown",
+            "reasons": [
+              "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+              "学分未知：CS 7180",
+              "开放池可能计入：CS 7180；是否能算，要项目确认。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "CS 7180"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 12
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "目录总要求是 36–44 semester hours、最低 GPA 3.000；不能据此直接算个人减免后的总学分。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：目录总要求是 36–44 semester hours、最低 GPA 3.000；不能据此直接算个人减免后的总学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Thesis 委员会",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：选择 thesis 时；不是所有 Align 学生必须完成 thesis"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "condition",
+                "label": "至少 3 人含导师；至少 2 人来自或关联 Khoury；至少 1 人与论文工作保持独立且不是共同导师；外部成员可有但非必需，额外 reader 不替代最低要求。",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "项目减免/转学分、完整学院政策、跨组计入与批准、个人桥接成绩、真实先修/共修和开课学期未核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：项目减免/转学分、完整学院政策、跨组计入与批准、个人桥接成绩、真实先修/共修和开课学期未核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "CS 5006",
+        "CS 5007",
+        "CS 5010"
+      ],
+      "summary_counts": {
+        "met": 2,
+        "missing": 3,
+        "unknown": 1
+      }
+    }
+  },
+  {
+    "seed": "boston_2026_2027_pathway_rules.json",
+    "plan_id": "info-ms-boston-2026-2027-bridge",
+    "data_kind": "synthetic_only_not_real_transcript",
+    "courses": [
+      {
+        "course_id": "synthetic-INFO-5100",
+        "code": "INFO 5100",
+        "name": "Synthetic INFO 5100",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6210",
+        "code": "INFO 6210",
+        "name": "Synthetic INFO 6210",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6205",
+        "code": "INFO 6205",
+        "name": "Synthetic INFO 6205",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-6105",
+        "code": "INFO 6105",
+        "name": "Synthetic INFO 6105",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CSYE-6220",
+        "code": "CSYE 6220",
+        "name": "Synthetic CSYE 6220",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-5200",
+        "code": "INFO 5200",
+        "name": "Synthetic INFO 5200",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-INFO-5001",
+        "code": "INFO 5001",
+        "name": "Synthetic INFO 5001",
+        "credits": null
+      },
+      {
+        "course_id": "synthetic-INFO-7999",
+        "code": "INFO 7999",
+        "name": "Synthetic INFO 7999",
+        "credits": 4
+      },
+      {
+        "course_id": "synthetic-CS-5800",
+        "code": "CS 5800",
+        "name": "Synthetic CS 5800",
+        "credits": 4
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "MSIS Bridge 目录规则（非完整资格判定）",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "INFO 5001",
+          "INFO 5100",
+          "INFO 6205"
+        ],
+        "possible": [
+          "INFO 6210",
+          "INFO 6105",
+          "INFO 5200",
+          "INFO 7999"
+        ],
+        "missing": [
+          "INFO 5101",
+          "INFO 6215",
+          "DAMG 6210",
+          "INFO 6150",
+          "INFO 6245",
+          "INFO 6255",
+          "INFO 6350",
+          "INFO 7245",
+          "INFO 7385"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "all_of",
+            "label": "Core：12 学分；包含配套 lab",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "INFO 5001",
+              "INFO 5100"
+            ],
+            "possible": [],
+            "missing": [
+              "INFO 5101",
+              "INFO 6215"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Application Modeling and Design（4 学分）",
+                "status": "met",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "INFO 5001"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "all_of",
+                "label": "Application Engineering 主课与 lab（组合 4 学分）",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "INFO 5100"
+                ],
+                "possible": [],
+                "missing": [
+                  "INFO 5101"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Application Engineering",
+                    "status": "met",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [
+                      "INFO 5100"
+                    ],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "course",
+                    "label": "配套 Lab for INFO 5100，不能因 0 学分删去",
+                    "status": "missing",
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [
+                      "INFO 5101"
+                    ],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "kind": "course",
+                "label": "Business Analysis and Information Engineering（4 学分）",
+                "status": "missing",
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [
+                  "INFO 6215"
+                ],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              },
+              {
+                "kind": "condition",
+                "label": "required core 每门须 C 或以上；单门课程的先修条件可能要求更高成绩。系统未评估个人成绩或先修。",
+                "status": "unknown",
+                "reasons": [
+                  "文字条件，草案不判断：required core 每门须 C 或以上；单门课程的先修条件可能要求更高成绩。系统未评估个人成绩或先修。"
+                ],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "Restricted electives：从明确候选完成 12 学分，不是每门都必修",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "INFO 6205"
+            ],
+            "possible": [],
+            "missing": [
+              "DAMG 6210",
+              "INFO 6150",
+              "INFO 6245",
+              "INFO 6255",
+              "INFO 6350",
+              "INFO 7245",
+              "INFO 7385"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Electives：另 12 学分；不照搬普通 MSIS 的 INFO 5200 排除项",
+            "status": "unknown",
+            "reasons": [
+              "按已知确定学分距目标差 12 学分；不是确认还需补修的学分。",
+              "开放池可能计入：INFO 6210、INFO 6105、INFO 5200、INFO 7999；是否能算，要项目确认。",
+              "CSYE 6220 在这一组被明确排除，不算。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "INFO 6210",
+              "INFO 6105",
+              "INFO 5200",
+              "INFO 7999"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 12
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "目录总要求 36 学分，选 Co-op 时 37 学分，最低 GPA 3.000；跨组选修重叠不是重复计入许可。INFO 5200 在该页未列为排除，不等于已确认个人可注册/计入。",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：目录总要求 36 学分，选 Co-op 时 37 学分，最低 GPA 3.000；跨组选修重叠不是重复计入许可。INFO 5200 在该页未列为排除，不等于已确认个人可注册/计入。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Co-op",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：选择 Co-op 且符合个人资格时；必须完成 ENCP 6000"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "all_of",
+                "label": "1 学分准备课程与一项工作经历",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Career Management for Engineers（1 学分）",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": []
+                  },
+                  {
+                    "kind": "any_of",
+                    "label": "工作经历四选一（目录列 0 学分经历）",
+                    "status": null,
+                    "reasons": [],
+                    "reasons_omitted": 0,
+                    "counted": [],
+                    "possible": [],
+                    "missing": [],
+                    "missing_omitted": 0,
+                    "shortfall": {},
+                    "children": [
+                      {
+                        "kind": "course",
+                        "label": "Work Experience",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Half-Time",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Abroad Half-Time",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "label": "Abroad",
+                        "status": null,
+                        "reasons": [],
+                        "reasons_omitted": 0,
+                        "counted": [],
+                        "possible": [],
+                        "missing": [],
+                        "missing_omitted": 0,
+                        "shortfall": {},
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "unmodeled",
+            "label": "完整 Engineering/大学政策、课程级别/跨组计入/审批、真实先修/共修更高门槛、个人 Co-op 资格与开课学期未核验。",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：完整 Engineering/大学政策、课程级别/跨组计入/审批、真实先修/共修更高门槛、个人 Co-op 资格与开课学期未核验。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "CSYE 6220",
+        "CS 5800"
+      ],
+      "summary_counts": {
+        "met": 0,
+        "missing": 3,
+        "unknown": 1
+      }
+    }
+  }
+]

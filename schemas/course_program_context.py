@@ -36,17 +36,23 @@ class CoursePlacement(BaseModel):
         return values
 
 
+def explicitly_named(root: RequirementNode, code: str) -> bool:
+    """Shared whole-document mention test, including exclusions and optional branches.
+    中文：点名含排除名单，不等于显式允许计入；不依赖 placement 的四项输出上限。
+    """
+    code = normalize_code(code)
+    def named(node):
+        return (node.course_code == code or code in node.course_codes or code in node.excluded_course_codes
+                or any(named(child) for child in node.children))
+    return named(root)
+
+
 def course_placements(root: RequirementNode, code: str) -> tuple[list[CoursePlacement], int]:
     """Leaf, candidate, exclusion, then open pool; a named code never also gets an open-pool claim.
     中文：保留 OR／可选条件两条独立轴，不把候选或可选分支变成共同必修。
     """
     code = normalize_code(code)
-
-    def named(node):
-        return (node.course_code == code or code in node.course_codes or code in node.excluded_course_codes
-                or any(named(child) for child in node.children))
-
-    explicitly_named = named(root)
+    is_named = explicitly_named(root, code)
     found = []
 
     def visit(node, path=(), under_any=False, conditions=()):
@@ -58,7 +64,7 @@ def course_placements(root: RequirementNode, code: str) -> tuple[list[CoursePlac
         elif node.kind == "select":
             relation = ("excluded" if code in node.excluded_course_codes else
                         "select_candidate" if code in node.course_codes else
-                        "open_pool" if not explicitly_named and (code.split()[0] in node.subject_codes
+                        "open_pool" if not is_named and (code.split()[0] in node.subject_codes
                             or any(interval.contains(code) for interval in node.course_ranges)) else None)
             if relation:
                 found.append(({"select_candidate": 1, "excluded": 2, "open_pool": 3}[relation], CoursePlacement(
