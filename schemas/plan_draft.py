@@ -9,7 +9,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from schemas.course_program_context import explicitly_named
 from schemas.program_plan import ProgramPlan, RequirementNode, normalize_code
 
 MAX_DRAFT_COURSES = 20
@@ -51,9 +50,11 @@ class DraftResult(BaseModel):
     summary_counts: dict[str, int]
 
 
-def _selection(node: RequirementNode, certain: list[DraftCourse], opened: list[DraftCourse]):
+def _selection(node: RequirementNode, certain: list[DraftCourse], opened: list[DraftCourse],
+               elsewhere: frozenset[str] = frozenset()):
     """Lower bound: explicit known values; upper bound: unknown credits at schema cap 12.
-    中文：开放池不成为确定候选，未知学分不变成零；某维已足够时不被无关未知拖低。
+    `elsewhere`: pool courses already counted by another group; the caller names them in their own reason.
+    中文：开放池不成为确定候选，未知学分不变成零；某维已足够时不被无关未知拖低。已算进别组的开放池课程由调用方另写原因。
     """
     statuses, reasons, gaps = [], [], {}
     for dimension, target, known, upper in (
@@ -78,10 +79,23 @@ def _selection(node: RequirementNode, certain: list[DraftCourse], opened: list[D
                                f"确定计入 {known} 门，其余要靠范围内可能计入的课，需项目确认。")
             else:
                 reasons.append(f"还差 {target-known} 个领域。")
-            if opened and dimension != "areas":
-                reasons.append("范围内可能计入：" + "、".join(c.code for c in opened) + "；是否能算，要项目确认。")
+            pool = [c.code for c in opened if c.code not in elsewhere]
+            if pool and dimension != "areas":
+                reasons.append("范围内可能计入：" + "、".join(pool) + "；是否能算，要项目确认。")
     status = "missing" if "missing" in statuses else "unknown" if "unknown" in statuses else "met"
     return status, gaps, reasons
+
+
+def _blocked_codes(node: RequirementNode) -> set[str]:
+    """Codes no open pool may take: `course` leaves and exclusions anywhere in the plan.
+    Another group's finite candidates are not blocked: a spare one may still count here (H3, 2026-10-20).
+    中文：任何开放池都不收的课号：整份方案里的 `course` 叶子和任何位置的排除项。别组的有限候选不在此列，
+    多修的那门仍可能计入本组（H3，2026-10-20）。
+    """
+    found = {node.course_code} if node.kind == "course" else set(node.excluded_course_codes)
+    for child in node.children:
+        found |= _blocked_codes(child)
+    return found
 
 
 def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult:
@@ -90,7 +104,7 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
     courses = [DraftCourse.model_validate(c.model_dump() if isinstance(c, DraftCourse) else c) for c in courses]
     if len(courses) > MAX_DRAFT_COURSES or len({c.code for c in courses}) != len(courses):
         raise ValueError("At most 20 distinct course codes are allowed")
-    named = {c.code for c in courses if explicitly_named(plan.requirements, c.code)}
+    blocked = _blocked_codes(plan.requirements)
     by_code = {c.code: c for c in courses}
     owners = defaultdict(list)
     node_kinds = {}
@@ -98,7 +112,7 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
 
     def candidates(node):
         certain = [c for c in courses if c.code in node.course_codes and c.code not in node.excluded_course_codes]
-        opened = [c for c in courses if c.code not in named and c.code not in node.excluded_course_codes
+        opened = [c for c in courses if c.code not in blocked and c.code not in node.course_codes
                   and (c.code.split()[0] in node.subject_codes or any(r.contains(c.code) for r in node.course_ranges))]
         return certain, opened
 
@@ -156,7 +170,18 @@ def evaluate_draft(plan: ProgramPlan, courses: list[DraftCourse]) -> DraftResult
             certain, opened = candidates(node)
             counted = [c.code for c in certain]
             possible = [c.code for c in [*certain, *opened] if c in opened or c.credits is None]
-            status, gaps, reasons = _selection(node, certain, opened)
+            # A pool course another active group already counts: one reason line per such group, never a ✅ here.
+            # 中文：已算进另一个同时生效的组的开放池课程：每个组合成一行原因，这一组不会因此变成 ✅。
+            elsewhere = defaultdict(list)
+            for c in opened:
+                for label in dict.fromkeys(label for other, label, _ in owners[c.code]
+                                           if other != path and coactive(path, other)):
+                    elsewhere[label].append(c.code)
+            status, gaps, reasons = _selection(node, certain, opened,
+                                               frozenset(code for codes in elsewhere.values() for code in codes))
+            if status != "met":
+                reasons += [f"{'、'.join(codes)} 已算进『{label}』；能不能同时算这一组，要项目确认。"
+                            for label, codes in elsewhere.items()]
             shared = [c for c in certain if any(other != path and coactive(path, other) for other, _, _ in owners[c.code])]
             if active and status == "met" and shared:
                 alone = [c for c in certain if c not in shared]
