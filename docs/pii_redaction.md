@@ -275,3 +275,52 @@ def auto_redact_pre(text: str) -> str:
 尚未发送响应的未捕获异常在请求中间件消化，只有一条安全错误事件，不再向 ServerErrorMiddleware／uvicorn 传播。流头发送后无法换成固定 500：会记一条安全的 `unhandled_exception`，但 uvicorn 自己的 handler 不经过 root 过滤器，仍会打印带异常原文的 traceback。聊天流的 meta 行在响应开始前就构造好，模型流的错误转成流内错误事件，所以目前没有已知的生产路径会走到这里。Python `warnings` 和 Streamlit 进程日志（UI 未捕获异常）也仍打印原文；浏览器里只显示错误类型。Streamlit 发布配置默认仅显示错误类型；完整详情仅供本地显式开启。
 
 这不是「所有日志没有 PII」：成功查询原文及 query_log 留存、本来的 Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串仍需单独治理。本批不改留存／删除／备份、不改 Docker 启动参数，不执行真实账号或线上验收。
+
+## 11. 运行日志里的学生问题（K／Z5，2026-10-19）
+
+上一节说的「成功查询原文」里，运行日志那一份已经去掉。`/search`、`/chat` 和 HyDE 救援有 16 处日志调用（17 个事件名；`search.alias_hit` 和 `search.alias_filtered_empty` 共用一处）以前记问题原文，有的整句，有的截到 80 个字；现在只记 `query_hash` 和 `query_len`。去掉专业前缀以后的那一句记 `sanitized_query_hash` 和 `sanitized_query_len`。这些字段都由 `api/query_fields.py` 生成。`query_log` 每写入一行，另记一条 `query_log.written`，里面只有行号 `query_log_id`。
+
+**把日志行和 `query_log` 对上：**
+- 最简单的是用 `request_id`：同一个请求的所有日志行带着同一个 `request_id`，其中 `query_log.written` 的 `query_log_id` 就是那一行的 `log_id`。这不用密钥，换 `SESSION_SECRET` 以后也照样能用，本地开发也能用。去掉前缀的 `sanitized_query_hash` 对不上任何一行，也走这条路。
+- 只有哈希的时候（比如手里只有一行日志，找不到同一个请求的其他行），在 API 容器里对 `query_log.query` 算同样的哈希，命令在下面。写入失败的请求（日志里有 `query_log.write_failed`）在表里没有那一行，哪种办法都对不上。
+
+只读打开库，只打印行号和时间，不打印原文。命令顶格写，可以直接从这份文件复制：
+
+```bash
+docker compose exec -T api python - <<'PY'
+import sqlite3
+from api.query_fields import query_fields
+from config import settings
+assert settings.session_secret, "没有 SESSION_SECRET：算出来的哈希对不上 query_log"
+wanted = "<日志里的 16 位 query_hash>"
+conn = sqlite3.connect(f"file:{settings.sqlite_path}?mode=ro", uri=True)
+rows = conn.execute("SELECT log_id, created_at, query FROM query_log").fetchall()
+print([(log_id, created_at) for log_id, created_at, text in rows if query_fields(text)["query_hash"] == wanted])
+PY
+```
+
+同一句话问过几次，就会对出几行；用 `created_at` 和日志行的时间戳区分。换了 `SESSION_SECRET` 以后，旧日志里的哈希就对不上了。
+
+**哈希挡得住什么、挡不住什么：**
+- 哈希是 HMAC-SHA256，取前 16 位十六进制。密钥从 `SESSION_SECRET` 派生（标签 `neu-compass/log-query-hash/v1`），和会话令牌的签名分开。学生的问题往往很短、很好猜，用普通哈希的话，拿到日志的人猜一句、算一下就能确认；用 HMAC，没有密钥就做不到。
+- 但能看日志、又能提问的人（不登录也能提问），可以把猜的那句问一遍，再在日志里找相同的哈希。这是「同一句话哈希相同」的代价，对上 `query_log` 靠的也是这一点。所以日志的访问要和 `query_log` 一样管住。
+- 长度按字符数算。哈希和长度仍然是私有的可关联数据：能看出同一个问题出现了几次。不能把它们当成匿名数据公开。
+- 没有配置 `SESSION_SECRET`（本地开发、测试）时，每个进程随机生成一把密钥：同一个进程里同一句话的哈希相同，但对不上 `query_log`。本地要跨进程对，可以设一个开发用的 `SESSION_SECRET`，这样也会打开会话令牌；更简单的是用 `query_log.written`。
+
+**没有变的：**
+- `query_log` 照旧存原文，导出仍要两个开关（第 9 节）；保留期、删除和备份都没有变。Google sub 成功事件、请求路径和 uvicorn access log 的查询字符串也照旧。
+- 上线以前写下的日志行还在旧容器的日志里，容器重建以后才会消失；回退到这一版之前的镜像，日志里会重新出现问题原文。
+
+**测试怎么钉住：** `tests/test_log_query_fields.py`
+- 静态检查：扫描产品代码里所有日志调用（包括 `log.log`、`fatal` 和 structlog 的异步写法 `ainfo` 等）、`bind`／`new`／`bind_contextvars`／`bind_threadlocal`、`print`、`warnings.warn`，以及写 `sys.stdout`／`sys.stderr` 的调用。
+  - 事件名必须是常量。
+  - 字段值不许直接引用问题文字（`query`、`retrieval_query`、救援拼出来的文字、历史消息等），只能经过 `query_fields(...)`。
+  - `**` 展开的键必须看得出来：字典字面量、`dict(...)`、几个已知的辅助函数，或人工核对过的两处错误字典。
+  - 这是一道绊线。把问题赋给别的名字再记、给 `log.info` 起个别名、用名字里没有 log 的 logger，它都看不出来。
+- 事件表和代码对照：代码里展开 `query_fields(...)` 的日志事件，必须正好是测试里列的 17 个。新加一个这样的事件，就得加进表里，也就得有场景走到它。
+- 运行时检查：用一个特殊字符串当问题，15 个场景走遍 17 个事件的每条路径；其中一个场景在前几轮对话里也放了这个字符串。
+  - 日志事件（包括请求上下文里绑定的字段）、渲染出来的日志行和 `print` 输出里都不许出现它。
+  - 每个哈希都要等于 `query_log` 那一行按上面算法算出来的值；`query_log.written` 的行号要等于那一行的 `log_id`。
+  - 场景没走到的路径只有静态检查，比如 `/chat` 的方案捷径、方案课表未核对、流式出错、409 和检索结果为空。
+- 写入或提交失败时只记 `query_log.write_failed`，不记行号。
+- 第三方库的 INFO 日志由 root 过滤器换成固定事件，单独有测试。

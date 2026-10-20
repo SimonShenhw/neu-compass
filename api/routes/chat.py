@@ -59,6 +59,7 @@ from api.dependencies import (
     get_reranker,
 )
 from api.models import ChatRequest
+from api.query_fields import query_fields
 from api.routes.common import (
     BLEND_ALPHA,
     RERANK_POOL_SIZE,
@@ -262,13 +263,13 @@ def chat(
         was_rescued = decision.rescued
         rejection_reason = decision.rejection_reason
         if was_rescued:
-            log.info("chat.hyde_rescued", query=req.query, count=len(hits))
+            log.info("chat.hyde_rescued", **query_fields(req.query), count=len(hits))
         if decision.rejected:
             matched_via = "rejected"
 
     log.info(
         "chat.retrieved",
-        query=req.query,
+        **query_fields(req.query),
         matched_via=matched_via,
         count=len(hits),
         rejection_reason=rejection_reason,
@@ -489,7 +490,7 @@ def _retrieve(
                 ctx_courses[cid] for cid in req.context_course_ids if cid in ctx_courses
             ], hard_filters)
             ctx_hits = [SearchHit(course=course, score=1.0) for course in courses[: req.k]]
-            log.info("chat.context_path", query=req.query[:80], count=len(ctx_hits))
+            log.info("chat.context_path", **query_fields(req.query), count=len(ctx_hits))
             return ctx_hits, ("context" if ctx_hits else "empty"), hard_filters, notices
 
     # Exact references obey filters without becoming unrelated semantic searches.
@@ -508,7 +509,7 @@ def _retrieve(
             # 问的是其他课程 -> 走 hybrid。
             if hits or not (hard_filters and asks_for_alternatives(req.query)):
                 return hits, ("alias" if hits else "empty"), hard_filters, notices
-            log.info("chat.alias_anchor_filtered_fallback", query=req.query[:80])
+            log.info("chat.alias_anchor_filtered_fallback", **query_fields(req.query))
 
     # Layer 2 + Layer 3: extract program prefix from query (regex first).
     # 中文：Layer 2 + Layer 3：从查询中抽取专业前缀（优先走正则）。
@@ -573,7 +574,7 @@ def _retrieve(
         log.info(
             "chat.prefilter_applied",
             program_prefix=extracted.program_prefix,
-            sanitized_query=extracted.sanitized_query[:80],
+            **query_fields(extracted.sanitized_query, "sanitized_query"),
         )
     retrieval_query = (
         extracted.sanitized_query

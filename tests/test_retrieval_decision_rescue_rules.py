@@ -12,6 +12,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from api.dependencies import get_hybrid_retriever
+from api.query_fields import query_fields
 from api.routes import chat, search
 from config import settings
 from tests import test_retrieval_decision_parity as parity
@@ -97,7 +98,7 @@ def test_rejection_log_fields_and_latency(decision_client, fake_clock, route):
     assert body["matched_via"] == "rejected"
     if route == "/search":
         [entry] = [entry for entry in logs if entry["event"] == "search.rejected"]
-        assert entry == {"event": "search.rejected", "log_level": "info", "query": "CS opaque topic",
+        assert entry == {"event": "search.rejected", "log_level": "info", **query_fields("CS opaque topic"),
                          "max_sigmoid": 0.0, "n_candidates": 1, "duration_ms": 1000.0}
         assert body["latency_ms"] == 1000.0 and rows[0]["latency_ms"] == 1000.0
     else:
@@ -106,14 +107,15 @@ def test_rejection_log_fields_and_latency(decision_client, fake_clock, route):
 
 @pytest.mark.parametrize("route", ["/search", "/chat"])
 def test_hyde_rescued_event_fields(decision_client, route):
-    """The hyde_rescued event carries the query and the number of rescued results."""
+    """The hyde_rescued event carries the question's hash and length (not its text) and the number of results."""
     state = decision_client
     state.reranker.scores = [0.0] * 3
     state.enable_rescue()
     body, _, logs = _post(state, route, {"query": "opaque topic", "k": 1})
     event = f"{route[1:]}.hyde_rescued"
     [entry] = [entry for entry in logs if entry["event"] == event]
-    assert entry == {"event": event, "log_level": "info", "query": "opaque topic", "count": len(body["results"])}
+    assert entry == {"event": event, "log_level": "info", **query_fields("opaque topic"),
+                     "count": len(body["results"])}
     assert len(body["results"]) == 1
 
 

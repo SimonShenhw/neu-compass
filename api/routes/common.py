@@ -30,6 +30,7 @@ import structlog
 
 from config import settings
 from api.error_fields import error_frames, safe_error_fields
+from api.query_fields import query_fields
 from llm.gemini_client import GeminiError, error_log_fields
 from rag.filters import filter_course_ids
 from rag.reranker import CrossEncoderReranker, rerank_blend_with_rejection
@@ -261,7 +262,7 @@ def attempt_hyde_rescue(
     # 已经没能命中别名层 —— 该课程根本不存在。实测发现 Gemini 会把
     # "AAI 9999" 判断成一个看似合理的课程查询，并欣然为它编一段假设性描述。
     if query_has_code_pattern(query):
-        log.info("rescue.code_pattern_guard", query=query[:80])
+        log.info("rescue.code_pattern_guard", **query_fields(query))
         return None
 
     # ONE try over the whole rescue (LLM + retry retrieval + rerank): the
@@ -276,13 +277,13 @@ def attempt_hyde_rescue(
     try:
         expansion = rescue_fn(query)
         if expansion is None:
-            log.info("rescue.declined", query=query[:80])
+            log.info("rescue.declined", **query_fields(query))
             return None
 
         combined = f"{query}\n\n{expansion}"
         hits = hybrid.search(combined, hard_filters=hard_filters, k=pool_size)
         if not hits:
-            log.info("rescue.empty_retrieval", query=query[:80])
+            log.info("rescue.empty_retrieval", **query_fields(query))
             return None
 
         texts = fetch_texts(conn, [h.course.course_id for h in hits])
@@ -303,7 +304,7 @@ def attempt_hyde_rescue(
         return None
     if not blended:
         return None
-    log.info("rescue.accepted", query=query[:80], count=len(blended))
+    log.info("rescue.accepted", **query_fields(query), count=len(blended))
     return blended
 
 
@@ -336,10 +337,13 @@ def log_query(
             rejection_reason=rejection_reason, user_id=user_id,
         )
         conn.commit()
-        return log_id
     except Exception as e:  # noqa: BLE001 — telemetry is best-effort / 遥测是尽力而为
         log.warning("query_log.write_failed", **safe_error_fields(e))
         return None
+    # The row id joins this request's log lines to query_log without the hash key; the text stays in the table.
+    # 中文：用行号把这个请求的日志行和 query_log 对上，不需要哈希密钥；原文仍只在表里。
+    log.info("query_log.written", query_log_id=log_id)
+    return log_id
 
 
 __all__ = ["BLEND_ALPHA", "RERANK_POOL_SIZE", "RERANKER_REJECT_THRESHOLD", "RetrievalDecision",
