@@ -25,6 +25,7 @@ from structlog.testing import capture_logs
 from api.dependencies import get_chat_stream_fn, get_hyde_rescue_fn
 from api.logging import _SafeForeignLogs, configure_logging
 from api.query_fields import query_fields
+from api.routes.common import log_query
 from config import settings
 from tests import test_retrieval_decision_parity as parity
 from tests.conftest import build_test_app
@@ -39,8 +40,9 @@ CANARY = "zqx7canary"
 LONG = "graph algorithms " + CANARY + " " + " ".join(f"pad{i}" for i in range(20))
 EXPANSION = "This course covers graph algorithms BFS DFS shortest paths."
 CONTEXT = {"request_id", "method", "path"}  # bound by the request middleware / 请求中间件绑定的字段
-# Every event that carries a question hash, written out: a renamed or dropped event fails the scenario check.
-# 中文：所有带问题哈希的事件，照写一遍：事件改名或消失，场景检查就会失败。
+# Every event that carries a question hash, written out: a renamed or dropped event fails the scenario check, and
+# a new one fails the comparison with the code (test_the_event_table_is_the_codes_list_of_hash_events).
+# 中文：所有带问题哈希的事件，照写一遍：事件改名或消失，场景检查就会失败；新加的事件和代码一比也会失败。
 EVENTS = {
     "search.alias_anchor_filtered_fallback", "search.alias_hit", "search.alias_filtered_empty",
     "search.prefilter_applied", "search.hybrid_empty", "search.rejected", "search.hyde_rescued", "search.hybrid",
@@ -163,14 +165,23 @@ def test_without_a_secret_each_process_has_its_own_random_key(monkeypatch: pytes
     assert len({here, *others}) == 3
 
 
-# --- every log, bind and print call in product code ---------------------------------------------------------
+# --- every log, bind, print, warn and stream-write call in product code -------------------------------------
 
-EVENT_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "msg"}
-BIND_METHODS = {"bind", "new", "bind_contextvars", "bound_contextvars"}
-BARE_CALLS = {"print", "bind_contextvars", "bound_contextvars"}
+_LEVELS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "fatal", "msg", "log"}
+EVENT_METHODS = _LEVELS | {"a" + name for name in _LEVELS}  # and structlog's async forms: ainfo, alog, ...
+LEVEL_FIRST = {"log", "alog"}  # log.log(level, event, ...)
+BIND_METHODS = {"bind", "new", "bind_contextvars", "bound_contextvars", "bind_threadlocal"}
+BARE_CALLS = {"print", "warn", "bind_contextvars", "bound_contextvars", "bind_threadlocal"}
+STREAMS = {"sys.stdout", "sys.stderr", "sys.__stdout__", "sys.__stderr__"}
 TEXT_KEYWORDS = {"query", "sanitized_query", "question", "prompt", "message", "text", "q"}
 TEXT_SOURCES = {"query", "sanitized_query", "question", "prompt", "retrieval_query", "combined", "expansion",
                 "history", "messages", "content", "text"}
+# ** splats with known keys: the hash helper and the error-field helpers, none of which copies a message.
+# 中文：键是已知的 ** 展开：哈希函数和几个错误字段函数，它们都不抄错误消息。
+SAFE_SPLATS = {"query_fields", "safe_error_fields", "error_log_fields", "log_fields"}
+# Two error events splat a dict built just before the call from error fields only (checked by hand).
+# 中文：两个错误事件展开的是调用前刚建好的字典，里面只有错误字段（人工核对过）。
+CHECKED_SPLATS = {("chat.stream_failed", "fields"), ("rescue.failed", "where")}
 
 
 def _is_log_call(node: ast.AST) -> bool:
@@ -178,8 +189,14 @@ def _is_log_call(node: ast.AST) -> bool:
         return False
     if isinstance(node.func, ast.Name):
         return node.func.id in BARE_CALLS
-    return (isinstance(node.func, ast.Attribute) and node.func.attr in EVENT_METHODS | BIND_METHODS
-            and "log" in ast.unparse(node.func.value).lower())
+    if not isinstance(node.func, ast.Attribute):
+        return False
+    owner, method = ast.unparse(node.func.value), node.func.attr
+    if method in {"write", "writelines"}:
+        return owner in STREAMS
+    if owner in {"builtins", "warnings"}:
+        return method in {"print", "warn"}
+    return method in EVENT_METHODS | BIND_METHODS and "log" in owner.lower()
 
 
 def _is_wrapper(node: ast.AST) -> bool:
@@ -207,22 +224,41 @@ def _constant_event(node: ast.AST) -> bool:
     return isinstance(node, ast.IfExp) and _constant_event(node.body) and _constant_event(node.orelse)
 
 
-def problems(call: ast.Call) -> list[str]:
-    """Why this log, bind or print call could carry question text; empty when it cannot.
+def _splat_problems(value: ast.AST, event: ast.AST | None) -> list[str]:
+    """A ** splat needs keys that can be read here: a dict literal or dict(...), a known helper, or a checked dict.
 
-    中文：这个日志、绑定或 print 调用为什么可能带出问题原文；带不出时返回空列表。
+    中文：** 展开的键必须在这里看得出来：字典字面量或 dict(...)、已知的辅助函数，或人工核对过的字典。
     """
-    found, values = [], list(call.args)
-    if getattr(call.func, "attr", None) in EVENT_METHODS:
-        if not (values and _constant_event(values[0])):
+    if isinstance(value, ast.Dict):
+        return [f"**{{{key.value!r}: ...}}" for key in value.keys
+                if isinstance(key, ast.Constant) and key.value in TEXT_KEYWORDS]
+    if (isinstance(value, ast.Call) and getattr(value.func, "id", None) == "dict" and not value.args
+            and all(keyword.arg for keyword in value.keywords)):
+        return [f"**dict({keyword.arg}=...)" for keyword in value.keywords if keyword.arg in TEXT_KEYWORDS]
+    if isinstance(value, ast.Call) and {getattr(value.func, "id", None), getattr(value.func, "attr", None)} & SAFE_SPLATS:
+        return []
+    if isinstance(value, ast.Name) and isinstance(event, ast.Constant) and (event.value, value.id) in CHECKED_SPLATS:
+        return []
+    return [f"**{ast.unparse(value)}: keys unknown"]
+
+
+def problems(call: ast.Call) -> list[str]:
+    """Why this log, bind, print, warn or stream-write call could carry question text; empty when it cannot.
+
+    中文：这个日志、绑定、print、warn 或写 stdout／stderr 的调用为什么可能带出问题原文；带不出时返回空列表。
+    """
+    found, values, event = [], list(call.args), None
+    method = getattr(call.func, "attr", None)
+    if method in EVENT_METHODS:  # warnings.warn too: its message is the event / warnings.warn 的消息也算事件名
+        position = 1 if method in LEVEL_FIRST else 0
+        event = values.pop(position) if len(values) > position else None
+        if not _constant_event(event):
             found.append("event name is not a constant string")
-        values = values[1:]
     for keyword in call.keywords:
         if keyword.arg in TEXT_KEYWORDS:
             found.append(f"{keyword.arg}=")
-        if keyword.arg is None and isinstance(keyword.value, ast.Dict):
-            found += [f"**{{{key.value!r}: ...}}" for key in keyword.value.keys
-                      if isinstance(key, ast.Constant) and key.value in TEXT_KEYWORDS]
+        if keyword.arg is None:
+            found += _splat_problems(keyword.value, event)
         values.append(keyword.value)
     return found + [use for value in values for use in _raw_uses(value)]
 
@@ -253,6 +289,17 @@ def test_no_log_bind_or_print_call_in_product_code_passes_question_text() -> Non
     'structlog.contextvars.bind_contextvars(query=req.query)',
     'bind_contextvars(query=req.query)',
     'print("search.hybrid", req.query[:80])',
+    'log.log(20, "search.debug", detail=req.query)',
+    'log.fatal("x", note=req.query)',
+    'log.ainfo("x", note=req.query)',
+    'warnings.warn(req.query)',
+    'warn(f"slow {query}")',
+    'sys.stderr.write(req.query)',
+    'sys.stdout.write(query[:80])',
+    'builtins.print(req.query)',
+    'log.info("x", **dict(query=q))',
+    'log.info("x", **extra)',
+    'structlog.threadlocal.bind_threadlocal(question=q)',
 ])
 def test_the_guard_catches_the_old_and_the_bound_forms(source: str) -> None:
     calls = [node for node in ast.walk(ast.parse(source)) if _is_log_call(node)]
@@ -264,10 +311,37 @@ def test_the_guard_catches_the_old_and_the_bound_forms(source: str) -> None:
     'log.info("x", **qf.query_fields(extracted.sanitized_query, "sanitized_query"))',
     'structlog.contextvars.bind_contextvars(request_id=request_id, method=request.method, path=request.url.path)',
     'print("fixed text")',
+    'log.log(logging.INFO, "search.hybrid", **query_fields(req.query))',
+    'log.warning("rescue.failed", **error_log_fields(e), **where)',
+    'warnings.warn("fixed text")',
+    'sys.stderr.write("fixed text")',
 ])
 def test_the_guard_lets_text_free_forms_through(source: str) -> None:
     calls = [node for node in ast.walk(ast.parse(source)) if _is_log_call(node)]
     assert calls and not any(problems(call) for call in calls), source
+
+
+def _hash_events() -> set[str]:
+    """Event names of the product log calls that splat `query_fields(...)`, read from the code.
+
+    中文：产品代码里展开 `query_fields(...)` 的日志调用用的事件名，从代码里读出来。
+    """
+    names: set[str] = set()
+    for folder in ("api", "app", "rag", "llm", "db", "schemas", "config"):
+        for path in sorted((ROOT / folder).rglob("*.py")):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if (_is_log_call(node) and getattr(node.func, "attr", None) in EVENT_METHODS
+                        and any(keyword.arg is None and _is_wrapper(keyword.value) for keyword in node.keywords)):
+                    event = node.args[1 if node.func.attr in LEVEL_FIRST else 0]
+                    options = [event] if isinstance(event, ast.Constant) else [event.body, event.orelse]
+                    names |= {option.value for option in options}
+    return names
+
+
+def test_the_event_table_is_the_codes_list_of_hash_events() -> None:
+    # A new event that logs a question hash must join EVENTS, and so a scenario must reach it.
+    # 中文：新加一个记问题哈希的事件，就得加进 EVENTS，也就得有场景走到它。
+    assert _hash_events() == EVENTS
 
 
 # --- the routes, on every branch that logs a question hash ---------------------------------------------------
@@ -303,6 +377,11 @@ SCENARIOS = [
      ["chat.alias_anchor_filtered_fallback", "chat.prefilter_applied", "chat.retrieved"]),
     ("chat-rescued", "/chat", f"CS opaque topic {CANARY}{TAIL}", {}, {"rescue": "expand"},
      ["chat.prefilter_applied", "rescue.accepted", "chat.hyde_rescued", "chat.retrieved"]),
+    # Earlier turns carry the canary too: they go to the prompt, never to a log line.
+    # 中文：前几轮对话里也有标记：它们只进提示词，不进日志。
+    ("chat-history", "/chat", f"opaque topic {CANARY}{TAIL}",
+     {"history": [{"role": "user", "content": f"an earlier question {CANARY}"},
+                  {"role": "assistant", "content": f"an earlier answer {CANARY}"}]}, {}, ["chat.retrieved"]),
 ]
 ARGS = "name, route, query, extra, setup, events"
 
@@ -393,6 +472,27 @@ def test_a_failed_write_logs_no_row_id(app_and_db, monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(QueryLogRepository, "add", broken)
     client, _ = app_and_db
     _, entries = _post(client, "/search", {"query": LONG, "k": 3})
+    _text_free(entries)
+    assert [entry["event"] for entry in entries if entry["event"].startswith("query_log.")] == ["query_log.write_failed"]
+
+
+def test_a_failed_commit_logs_no_row_id(empty_db: sqlite3.Connection) -> None:
+    # A rolled-back row has no id worth reporting, so query_log.written comes only after the commit.
+    # 中文：回滚了的行没有可报的行号，所以 query_log.written 只在 commit 之后记。
+    class CommitFails:
+        def __init__(self, conn: sqlite3.Connection) -> None:
+            self._conn = conn
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self._conn, name)
+
+        def commit(self) -> None:
+            raise sqlite3.OperationalError(f"synthetic commit failure for {CANARY}")
+
+    with _capture() as entries:
+        log_id = log_query(CommitFails(empty_db), route="search", query=LONG, matched_via="hybrid", k=3,
+                           latency_ms=1.0)
+    assert log_id is None
     _text_free(entries)
     assert [entry["event"] for entry in entries if entry["event"].startswith("query_log.")] == ["query_log.write_failed"]
 

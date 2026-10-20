@@ -282,22 +282,24 @@ def auto_redact_pre(text: str) -> str:
 
 **把日志行和 `query_log` 对上：**
 - 最简单的是用 `request_id`：同一个请求的所有日志行带着同一个 `request_id`，其中 `query_log.written` 的 `query_log_id` 就是那一行的 `log_id`。这不用密钥，换 `SESSION_SECRET` 以后也照样能用，本地开发也能用。去掉前缀的 `sanitized_query_hash` 对不上任何一行，也走这条路。
-- 只有哈希的时候（比如手里只有一行日志，找不到同一个请求的其他行），在 API 容器里对 `query_log.query` 算同样的哈希。写入失败的请求（日志里有 `query_log.write_failed`）在表里没有那一行，哪种办法都对不上。只读打开库，只打印行号和时间，不打印原文：
+- 只有哈希的时候（比如手里只有一行日志，找不到同一个请求的其他行），在 API 容器里对 `query_log.query` 算同样的哈希，命令在下面。写入失败的请求（日志里有 `query_log.write_failed`）在表里没有那一行，哪种办法都对不上。
 
-  ```bash
-  docker compose exec -T api python - <<'PY'
-  import sqlite3
-  from api.query_fields import query_fields
-  from config import settings
-  assert settings.session_secret, "没有 SESSION_SECRET：算出来的哈希对不上 query_log"
-  wanted = "<日志里的 16 位 query_hash>"
-  conn = sqlite3.connect(f"file:{settings.sqlite_path}?mode=ro", uri=True)
-  rows = conn.execute("SELECT log_id, created_at, query FROM query_log").fetchall()
-  print([(log_id, created_at) for log_id, created_at, text in rows if query_fields(text)["query_hash"] == wanted])
-  PY
-  ```
+只读打开库，只打印行号和时间，不打印原文。命令顶格写，可以直接从这份文件复制：
 
-  同一句话问过几次，就会对出几行；用 `created_at` 和日志行的时间戳区分。换了 `SESSION_SECRET` 以后，旧日志里的哈希就对不上了。
+```bash
+docker compose exec -T api python - <<'PY'
+import sqlite3
+from api.query_fields import query_fields
+from config import settings
+assert settings.session_secret, "没有 SESSION_SECRET：算出来的哈希对不上 query_log"
+wanted = "<日志里的 16 位 query_hash>"
+conn = sqlite3.connect(f"file:{settings.sqlite_path}?mode=ro", uri=True)
+rows = conn.execute("SELECT log_id, created_at, query FROM query_log").fetchall()
+print([(log_id, created_at) for log_id, created_at, text in rows if query_fields(text)["query_hash"] == wanted])
+PY
+```
+
+同一句话问过几次，就会对出几行；用 `created_at` 和日志行的时间戳区分。换了 `SESSION_SECRET` 以后，旧日志里的哈希就对不上了。
 
 **哈希挡得住什么、挡不住什么：**
 - 哈希是 HMAC-SHA256，取前 16 位十六进制。密钥从 `SESSION_SECRET` 派生（标签 `neu-compass/log-query-hash/v1`），和会话令牌的签名分开。学生的问题往往很短、很好猜，用普通哈希的话，拿到日志的人猜一句、算一下就能确认；用 HMAC，没有密钥就做不到。
@@ -310,6 +312,15 @@ def auto_redact_pre(text: str) -> str:
 - 上线以前写下的日志行还在旧容器的日志里，容器重建以后才会消失；回退到这一版之前的镜像，日志里会重新出现问题原文。
 
 **测试怎么钉住：** `tests/test_log_query_fields.py`
-- 静态检查：扫描产品代码里所有日志调用、`bind`／`new`／`bind_contextvars` 和 `print`。事件名必须是常量；字段值不许直接引用问题文字（`query`、`retrieval_query`、救援拼出来的文字、历史消息等），只能经过 `query_fields(...)`。这是一道绊线：把问题赋给别的名字再记，它看不出来。
-- 运行时检查：用一个特殊字符串当问题，走遍 17 个事件的每条路径。日志事件（包括请求上下文里绑定的字段）、渲染出来的日志行和 `print` 输出里都不许出现它；每个哈希都要等于 `query_log` 那一行按上面算法算出来的值；`query_log.written` 的行号要等于那一行的 `log_id`。
+- 静态检查：扫描产品代码里所有日志调用（包括 `log.log`、`fatal` 和 structlog 的异步写法 `ainfo` 等）、`bind`／`new`／`bind_contextvars`／`bind_threadlocal`、`print`、`warnings.warn`，以及写 `sys.stdout`／`sys.stderr` 的调用。
+  - 事件名必须是常量。
+  - 字段值不许直接引用问题文字（`query`、`retrieval_query`、救援拼出来的文字、历史消息等），只能经过 `query_fields(...)`。
+  - `**` 展开的键必须看得出来：字典字面量、`dict(...)`、几个已知的辅助函数，或人工核对过的两处错误字典。
+  - 这是一道绊线。把问题赋给别的名字再记、给 `log.info` 起个别名、用名字里没有 log 的 logger，它都看不出来。
+- 事件表和代码对照：代码里展开 `query_fields(...)` 的日志事件，必须正好是测试里列的 17 个。新加一个这样的事件，就得加进表里，也就得有场景走到它。
+- 运行时检查：用一个特殊字符串当问题，15 个场景走遍 17 个事件的每条路径；其中一个场景在前几轮对话里也放了这个字符串。
+  - 日志事件（包括请求上下文里绑定的字段）、渲染出来的日志行和 `print` 输出里都不许出现它。
+  - 每个哈希都要等于 `query_log` 那一行按上面算法算出来的值；`query_log.written` 的行号要等于那一行的 `log_id`。
+  - 场景没走到的路径只有静态检查，比如 `/chat` 的方案捷径、方案课表未核对、流式出错、409 和检索结果为空。
+- 写入或提交失败时只记 `query_log.write_failed`，不记行号。
 - 第三方库的 INFO 日志由 root 过滤器换成固定事件，单独有测试。

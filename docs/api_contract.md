@@ -492,8 +492,9 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
   `request.handled` + duration. Uncaught errors before response headers are sent emit
   one `request.unhandled` event and return the fixed 500 below, not a second traceback.
   Console mode also consumes exception information before rendering: no Rich locals.
-  Route events never carry the question text: they log `query_hash` (a keyed HMAC) and `query_len`, and
-  `query_log.written` logs the `query_log` row id. See [PII 脱敏指南 §11](pii_redaction.md).
+  Route events never carry the question text: they log `query_hash` (a keyed HMAC) and `query_len` (the two
+  `prefilter_applied` events log `sanitized_query_hash` and `sanitized_query_len` for the question without its
+  program prefix), and `query_log.written` logs the `query_log` row id. See [PII 脱敏指南 §11](pii_redaction.md).
 - **Versioning**: this is v0.1. Breaking changes go in v0.2 with a
   parallel `/v2/*` prefix; never silent breaks.
 
