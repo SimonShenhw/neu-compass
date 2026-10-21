@@ -143,14 +143,31 @@ def handle_oauth_callback() -> None:
     st.rerun()
 
 
+def _log_out() -> None:
+    """The Log out button's on_click callback. It runs before the next run, so that run renders logged out
+    from the top and every widget renders as usual. The button used to call st.rerun() inside its branch,
+    which ended the run before the page nav existed; Streamlit counts st.rerun() as a finished run, so it
+    dropped the nav's state, and the next run showed the Search page while the browser still marked the old
+    page in the sidebar (10-21).
+    中文：「Log out」按钮的 on_click 回调。它在下一轮运行之前执行，所以那一轮从头就按登出状态渲染，各个
+    组件照常渲染。原来按钮在自己的分支里调用 st.rerun()，这一轮在页面导航出现之前就结束了；Streamlit
+    把 st.rerun() 当作正常跑完，删掉了导航的状态，下一轮显示搜索页，浏览器侧边栏却还标着原来那一页（10-21）。"""
+    import streamlit as st  # noqa: PLC0415
+
+    from app.cookie_session import queue_cookie_clear  # noqa: PLC0415
+    from app.state_manager import logout  # noqa: PLC0415
+
+    queue_cookie_clear(st.session_state)
+    logout(st.session_state)
+
+
 def render_auth_sidebar() -> None:
     """Sidebar block: login link OR logged-in info + logout button.
     侧边栏区块：登录链接 或 已登录信息 + 登出按钮。"""
     import streamlit as st  # noqa: PLC0415
 
     from app.auth import authorize_url  # noqa: PLC0415
-    from app.cookie_session import queue_cookie_clear  # noqa: PLC0415
-    from app.state_manager import is_logged_in, logout  # noqa: PLC0415
+    from app.state_manager import is_logged_in  # noqa: PLC0415
 
     with st.sidebar:
         if is_logged_in(st.session_state):
@@ -161,10 +178,7 @@ def render_auth_sidebar() -> None:
                 "Contributions: "
                 f"{st.session_state.get('user_contribution_count', 0)}"
             )
-            if st.button("Log out", use_container_width=True):
-                queue_cookie_clear(st.session_state)
-                logout(st.session_state)
-                st.rerun()
+            st.button("Log out", use_container_width=True, on_click=_log_out)
         else:
             # CSRF state: stable per tab via session_state (so the link
             # doesn't churn every rerun), persisted to a short-lived cookie
