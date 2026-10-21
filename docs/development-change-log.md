@@ -3738,7 +3738,7 @@ seed 快照只在三个选修组有变化：possible 多了别组的有限候选
 查到的原因：
 - **跨页丢选择：** Streamlit 会删掉一轮里没渲染的组件的状态。搜索页的 `chat_program_id`、`chat_plan_id`，培养方案页的 `program-plan-{program_id}`，都是只在本页渲染的组件键，所以去过别的页再回来就没了（§28 已知第 7 条）。
 - **登出高亮：** 侧栏的「Log out」排在导航单选框前面，点了以后在分支里 `st.rerun()`。Streamlit 1.57 把 `st.rerun()` 当成这一轮正常跑完（`exec_code.py` 里 `premature_stop = False`），后端于是删掉了还没渲染的 `nav_page`，下一轮回到默认的 Search。浏览器却还记着原来的选项：侧栏显示 Compare，正文是 Search；再点任何按钮，浏览器把旧值送回来，正文又跳回 Compare。这一点用一个 30 行、结构相同的本地脚本在内置浏览器里复现了；改成 `on_click` 回调以后侧栏和正文一致。
-- **先修重复：** 目录原文就是这么写的。本地存的 2026-2027 官方快照里，CS 5008 写的是「( CS 5001 with a minimum grade of C- or CS 5001 with a minimum grade of C- ); ( CS 5002 … or CS 5002 … )」。CS、DS、INFO 三份快照里有 6 门课这样写，验收清单里占 3 门：CS 5004、CS 5008、INFO 6205。
+- **先修重复：** 目录原文就是这么写的。本地存的 2026-2027 官方快照里，CS 5008 写的是「( CS 5001 with a minimum grade of C- or CS 5001 with a minimum grade of C- ); ( CS 5002 … or CS 5002 … )」。按解析出的规则数，CS、DS、INFO 三份快照里有 8 门课这样写，验收清单里占 5 门：CS 5004、CS 5008、INFO 6105、INFO 6205、INFO 7405。第一次我用正则数成 6 门、3 门，A23 指出后改用解析器重数。
 
 ### 已实现
 
@@ -3749,15 +3749,19 @@ seed 快照只在三个选修组有变化：possible 多了别组的有限候选
    - 浏览器检查时发现：设成 None 的项目选择框显示的是 Streamlit 的默认占位「Choose an option」。现在 `render_chat_program_selector` 传了 `placeholder="不指定"`，和方案选择框的做法一样。
 3. **L-3 先修树里重复的课。** `app/course_requisite_view.py` 的 `rule_lines` 只改显示：同一组里完全相同的课程叶子（课号、最低成绩、level、能否并修都一样）只显示一次，并在这一组后面写「（目录原文在这一组里把同一门课列了不止一次，这里只显示一次）」。原文展开框、存下的规则树、对比页和交给聊天的数据都不变。
 4. **L-4 草案输入。** `app/plan_draft_view.py` 的 `parse_course_codes`：
-   - 去掉零宽字符（U+200B–U+200D、U+2060、U+FEFF）；
+   - 去掉复制来的隐形字符：U+00AD 软连字符、U+200B–U+200F（零宽字符和左右方向标记）、U+2060、U+FEFF。软连字符和方向标记是 A23 审查时补上的；源码里用 `\N{…}` 字符名写，不写成真字符；
    - 「。」也算分隔符；
    - 课号末尾的「.」不算进课号。
 
    §30 复核第 1 轮的这条 NIT 就此解决：句末的「.」「。」或复制来的零宽空格，原来会让最后一个课号报格式错误。
+5. **A23 审查以后的修复**（第二个提交，见「审查」）：
+   - **cookie 恢复登录不再 `st.rerun()`**（LOW-2，原有问题）。恢复在侧边栏、hero 和任何组件之前，这一轮剩下的部分本来就按已登录渲染。原来的重跑会在页面导航之前结束这一轮；服务器丢掉会话、浏览器还留着页面时（断线超过 120 秒，或者重启、上线），会重现 L-2 那种侧栏和正文不一致，那次点击也会丢。
+   - **补一项用真实 cookie flush 的登出测试**（LOW-3）：别的页面测试都把 `flush_pending_cookie` 换成了空函数，删掉 `render()` 里那次 flush 的变异原来能过全量。
+   - 文档：`docs/view-cache.md` 写明有两处照旧删键（NIT-1）；门数改成 8（NIT-2）。
 
 ### 修改文件
 
-- 产品代码：`app/state_manager.py`、`app/streamlit_app.py`、`app/streamlit_auth_ui.py`、`app/program_plan_view.py`、`app/course_requisite_view.py`、`app/plan_draft_view.py`；`app/cookie_session.py` 只改注释。
+- 产品代码：`app/state_manager.py`、`app/streamlit_app.py`、`app/streamlit_auth_ui.py`、`app/program_plan_view.py`、`app/course_requisite_view.py`、`app/plan_draft_view.py`；`app/cookie_session.py` 第一个提交只改注释，审查修复去掉了恢复登录后的重跑。
 - 文档：`docs/view-cache.md`、`docs/course-requisites.md`、本节。
 - 测试：新建 `tests/test_page_state_l.py`，19 项，大部分走真实页面的 AppTest。
 
@@ -3779,17 +3783,29 @@ API、检索、提示词、数据库和快照都没改。
   - 回到培养方案页：方案选择和草案都还在。
   - 登录后在对比页登出：侧栏和正文都是对比页，cookie 已清除；回到搜索页，项目选择显示「不指定」（修占位文字之前显示的是「Choose an option」）。
 
+- **A23 审查以后的修复：**
+  - 新测试 24 项全过。同样的测试放在 `2fc5cf1` 上跑，恢复登录那项（`[True] == []`，也就是重跑了）和新加的 3 种隐形字符失败；真实 flush 那项在 `2fc5cf1` 上就通过，它钉的是原来就对、只是没测到的行为。
+  - 46 个定向测试文件 **1141 passed**；Ruff F／E9／B 通过。
+  - 变异 **13/13 killed**：`parse_course_codes` 里的新旧变异体重跑一遍，L16、L17 改锚到新字符集；新加 L23 恢复登录又重跑、L24 `render()` 去掉 flush、L25 不去软连字符、L26 不去方向标记。L 全部 26 个新变异体和 29 个旧变异体都被杀，没有只靠超时判定的。
+  - 串行全量 **4884 passed／7 warnings／433.97 秒**，退出码 0，比 4879 多的 5 项就是新测试；全量前后改动文件一致。全量开始以后只补了这个数字。
+
 ### 审查
 
-（待第 22 轮只读审查 A23 回来后补。）
+第 22 轮，一路只读审查 A23，在 `2fc5cf1` 上做（10-21）。没有 CRITICAL、HIGH、MEDIUM，3 LOW、3 NIT，不挡合并。A23 对照 Streamlit 1.57 源码核过：L-1 不报错、不报警告，每一轮都把值送给浏览器，原有的清除都照旧生效；L-2 的回调和原来的分支等价，只少了半路重跑；L-3 只改显示、只合并完全相同的叶子；L-4 拿 43 种输入和 `ca41bdc` 比，没有一个原来能用的输入变了。
+- **LOW-1：** 极快的第二次点击如果在 `keep_choices()` 之前打断这一轮，不在当前页的选择仍会丢（A23 用探针强制做出来了）。没修，记进已知：A23 建议另存一份影子值，但影子值会过时，可能在「方案改版、必须重选」以后把旧选择悄悄带回来，这比偶尔要重选一次更糟。
+- **LOW-2：** cookie 恢复登录的 `st.rerun()`，见「已实现」第 5 条，已修。
+- **LOW-3：** 真实 flush 的登出测试，见「已实现」第 5 条，已补。A23 另提到：跨页时培养方案页的 `drop_changed_choice` 只在同一页内测过，因为 `plan_curricula` 把 `get_curriculum_cached` 换成了替身，记进已知。
+- **NIT：** 「清除都是设成 None」不完全对（NIT-1）；门数是 8 不是 6（NIT-2）；软连字符和方向标记（NIT-3）。都已改。
 
 ### 已知、未处理
 
 - 只保留这三类选择。详情面板里的先修年度和同年度方案的选择框，去过别的页回来仍会复位。草案输入框里还没提交的文字也是。
 - 刷新浏览器以后，选择照样清空：它们只在 Streamlit 会话里。
+- 极快的第二次点击如果在 `keep_choices()` 之前打断这一轮，不在当前页的选择仍会丢（A23 LOW-1）。原因和取舍见「审查」。
+- 培养方案页的「方案有更新」跨页的情况（离开期间重新获取、回来提示一次）只在同一页内有测试（A23 LOW-3 的附带意见）。
 - AppTest 只看得到服务端状态。浏览器那一侧只在本机合成环境里看过，线上要等用户的浏览器验收。
 - 「CS 5001/5003」仍会加入 CS 5001、把「5003」报成格式错误；「CS 5800.CS 5004」这种中间没有空格的写法也仍报错。都只多一条提示。
 
 ### 发布状态
 
-分支 `fix/page-state-l`（worktree `/mnt/h/neu-compass-l`），基底 `ca41bdc`，也就是 10-21 上线的 main。没有使用真实模型、账号、NAS 或生产库。L 只改页面，上线另行授权，可以等下一次上线一起上。
+分支 `fix/page-state-l`（worktree `/mnt/h/neu-compass-l`），基底 `ca41bdc`，也就是 10-21 上线的 main。第一个提交 `2fc5cf1` 是 L 本身，第二个提交是 A23 审查的修复。没有使用真实模型、账号、NAS 或生产库。L 只改页面，上线另行授权，可以等下一次上线一起上。

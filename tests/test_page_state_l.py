@@ -136,6 +136,67 @@ def test_l2_log_out_stays_on_the_page_and_clears_identity_lists_and_choices(monk
     assert not [box for box in app.selectbox if box.key == "chat_plan_id"]
 
 
+def test_l2_log_out_renders_the_cookie_clear_in_the_next_run_with_the_real_flush(monkeypatch):
+    """A23 LOW-3: every other page test stubs flush_pending_cookie; without the flush the next load logs back in."""
+    import app.cookie_session as cookies
+    import app.streamlit_auth_ui as auth
+    from app.cookie_session import COOKIE_NAME
+
+    real_sidebar, real_flush = auth.render_auth_sidebar, cookies.flush_pending_cookie
+    plan_curricula(monkeypatch)
+    monkeypatch.setattr(auth, "render_auth_sidebar", real_sidebar)
+    monkeypatch.setattr(cookies, "flush_pending_cookie", real_flush)
+    app = page(token="synthetic-token")
+    app.session_state["user_email"] = "synthetic@example.test"
+    app.session_state["oauth_state"] = "synthetic-oauth-state"
+    nav(app, "Compare")
+    assert not any(COOKIE_NAME in getattr(el.proto, "srcdoc", "") for el in app.get("iframe"))
+    [button] = [button for button in app.button if button.label == "Log out"]
+    button.click()
+    run(app)
+    assert "_pending_cookie" not in app.session_state
+    assert any(COOKIE_NAME in getattr(el.proto, "srcdoc", "") for el in app.get("iframe"))
+    shown = [m.value for m in app.markdown]
+    assert any("游客模式" in value for value in shown) and not any("Signed in as" in value for value in shown)
+    assert "Compare" in app.radio(key="nav_page").value
+
+
+def test_l2_a_cookie_restore_renders_logged_in_in_the_same_run_without_a_rerun(monkeypatch):
+    """A23 LOW-2: the restore runs before any widget, so it needs no st.rerun(), which would end the run before the
+    page nav (and, in a session the server had dropped, lose the nav's state and the click)."""
+    from types import SimpleNamespace
+
+    import httpx
+    import streamlit as st
+
+    import app.cookie_session as cookies
+    import app.streamlit_auth_ui as auth
+    from app.cookie_session import COOKIE_NAME
+
+    real_restore, real_sidebar = cookies.restore_login_from_cookie, auth.render_auth_sidebar
+    backend, documents, calls = plan_curricula(monkeypatch)
+    original = type(backend).__call__
+
+    def transport(self, request):
+        if request.url.path == "/auth/me":
+            assert request.headers.get("authorization") == "Bearer synthetic-cookie-token"
+            return httpx.Response(200, json={"user_id": "synthetic-user", "email": "synthetic@example.test",
+                                             "contribution_count": 0})
+        return original(self, request)
+
+    monkeypatch.setattr(type(backend), "__call__", transport)
+    monkeypatch.setattr(cookies, "restore_login_from_cookie", real_restore)
+    monkeypatch.setattr(auth, "render_auth_sidebar", real_sidebar)
+    monkeypatch.setattr(st, "context", SimpleNamespace(cookies={COOKIE_NAME: "synthetic-cookie-token"}))
+    reruns, current = [], st.rerun
+    monkeypatch.setattr(st, "rerun", lambda *args, **kwargs: reruns.append(True) or current(*args, **kwargs))
+    app = page()
+    assert reruns == []
+    assert app.session_state["user_id"] == "synthetic-user" and app.session_state["session_token"] == "synthetic-cookie-token"
+    assert [button.label for button in app.button if button.label == "Log out"] == ["Log out"]
+    assert app.radio(key="nav_page").value.startswith("🔍")
+
+
 def test_l2_logout_and_account_switch_clear_choices_but_keep_filters_and_page():
     state = {}
     init_state(state)
@@ -208,6 +269,10 @@ def test_l3_only_identical_sibling_leaves_are_merged():
     ("CS 5800\u200b", ["CS 5800"]),
     ("\ufeffCS\u200c 5800\u2060", ["CS 5800"]),
     ("CS 58\u200d00", ["CS 5800"]),
+    # A23 NIT-3: the soft hyphen and the direction marks are invisible on copy too.
+    ("CS 58\N{SOFT HYPHEN}00", ["CS 5800"]),
+    ("CS 5800\N{LEFT-TO-RIGHT MARK}", ["CS 5800"]),
+    ("\N{RIGHT-TO-LEFT MARK}CS 5800", ["CS 5800"]),
     ("cs5800.", ["CS 5800"]),
     ("ＣＳ　５８００．", ["CS 5800"]),
 ])

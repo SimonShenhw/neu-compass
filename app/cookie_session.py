@@ -330,14 +330,14 @@ def restore_login_from_cookie() -> bool:
         with ApiClient(session_token=token) as api:
             return api.auth_me()
 
-    restored = restore_login(st.session_state, cookie_token, fetch_me)
-    if restored:
-        # A restore changes what the sidebar/hero should show this render;
-        # rerun so the whole page renders logged-in from the top.
-        # 中文:恢复登录会改变本次渲染中侧边栏/hero 应显示的内容；
-        # 重新运行以便整页从头以已登录状态渲染。
-        st.rerun()
-    return restored
+    # No st.rerun() after a restore: this runs before the sidebar, the hero and any widget, so the rest of this
+    # run already renders logged in. A rerun here ended the run before the page nav; in a session the server had
+    # dropped while the browser kept its page (120 s offline, or a restart), that lost the nav's state and the
+    # click, the same mismatch the Log out button had (A23 LOW-2, 10-21).
+    # 中文：恢复登录以后不 st.rerun()：这一步在侧边栏、hero 和任何组件之前，这一轮剩下的部分本来就按已登录
+    # 渲染。原来在这里重跑，这一轮在页面导航之前就结束了；服务器丢掉了会话、浏览器却还留着页面时（断线 120 秒或
+    # 重启），导航的状态和那次点击都会丢，和原来的登出按钮是同一个问题（A23 LOW-2，10-21）。
+    return restore_login(st.session_state, cookie_token, fetch_me)
 
 
 __all__ = [

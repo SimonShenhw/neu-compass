@@ -16,14 +16,15 @@ from schemas.program_plan import ProgramPlan, normalize_code
 
 
 def parse_course_codes(raw: str) -> tuple[list[str], list[str]]:
-    """NFKC folds full-width letters, digits and spaces; `、`, `/` and `。` separate codes too. Zero-width
-    characters copied from a web page are dropped, and a sentence's closing `.` is ignored. A dash or underscore
-    joins subject and number only at the start of a token, so an internal ID such as `neu-cs-6130` stays one
-    invalid token. 中文：全角字母、数字、空格先归一；「、」「/」「。」也能分隔；从网页复制来的零宽字符去掉，
-    句末的「.」不算课号的一部分；内部 ID 只报一条格式错误。
+    """NFKC folds full-width letters, digits and spaces; `、`, `/` and `。` separate codes too. Invisible
+    characters copied from a web page (zero-width ones, the left-to-right and right-to-left marks, the soft hyphen)
+    are dropped, and a sentence's closing `.` is ignored. A dash or underscore joins subject and number only at the
+    start of a token, so an internal ID such as `neu-cs-6130` stays one invalid token. 中文：全角字母、数字、空格
+    先归一；「、」「/」「。」也能分隔；从网页复制来的隐形字符（零宽字符、左右方向标记、软连字符）去掉，句末的「.」
+    不算课号的一部分；内部 ID 只报一条格式错误。
     """
     raw = unicodedata.normalize("NFKC", raw)
-    raw = re.sub(r"[\u200b-\u200d\u2060\ufeff]", "", raw)
+    raw = re.sub(r"[\N{SOFT HYPHEN}\N{ZERO WIDTH SPACE}-\N{RIGHT-TO-LEFT MARK}\N{WORD JOINER}\N{ZERO WIDTH NO-BREAK SPACE}]", "", raw)
     raw = re.sub(r"(?i)(?<![\w-])([a-z]{2,4})[-_](?=\d{4}[a-z]?\b)", r"\1 ", raw)
     tokens = [token.rstrip(".") for token in re.split(r"[,，;；、/。\s]+", raw.strip())]
     codes, invalid = [], []
