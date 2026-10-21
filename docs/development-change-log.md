@@ -3763,7 +3763,7 @@ seed 快照只在三个选修组有变化：possible 多了别组的有限候选
 
 - 产品代码：`app/state_manager.py`、`app/streamlit_app.py`、`app/streamlit_auth_ui.py`、`app/program_plan_view.py`、`app/course_requisite_view.py`、`app/plan_draft_view.py`；`app/cookie_session.py` 第一个提交只改注释，审查修复去掉了恢复登录后的重跑。
 - 文档：`docs/view-cache.md`、`docs/course-requisites.md`、本节。
-- 测试：新建 `tests/test_page_state_l.py`，19 项，大部分走真实页面的 AppTest。
+- 测试：新建 `tests/test_page_state_l.py`，24 项（第一个提交 19 项，审查修复加了 5 项），大部分走真实页面的 AppTest。
 
 API、检索、提示词、数据库和快照都没改。
 
@@ -3797,6 +3797,10 @@ API、检索、提示词、数据库和快照都没改。
 - **LOW-3：** 真实 flush 的登出测试，见「已实现」第 5 条，已补。A23 另提到：跨页时培养方案页的 `drop_changed_choice` 只在同一页内测过，因为 `plan_curricula` 把 `get_curriculum_cached` 换成了替身，记进已知。
 - **NIT：** 「清除都是设成 None」不完全对（NIT-1）；门数是 8 不是 6（NIT-2）；软连字符和方向标记（NIT-3）。都已改。
 
+**复核第 1 轮**（A23，10-21，在 `ab0167a` 的新副本上）：LOW-2、LOW-3 和三条 NIT 都修好了，LOW-1 同意记进已知。没有新的 CRITICAL、HIGH、MEDIUM、LOW。
+- A23 用探针核过恢复登录的三种情况，每种都只跑一轮、不重跑：200 直接显示登录后的侧栏和首页，没有游客横幅；401 是游客页，同一轮清掉 cookie；503 是游客页，cookie 保留。
+- 新 NIT 一条：本节「修改文件」还写着 19 项。已改成 24 项，复核到此结束。
+
 ### 已知、未处理
 
 - 只保留这三类选择。详情面板里的先修年度和同年度方案的选择框，去过别的页回来仍会复位。草案输入框里还没提交的文字也是。
@@ -3808,4 +3812,4 @@ API、检索、提示词、数据库和快照都没改。
 
 ### 发布状态
 
-分支 `fix/page-state-l`（worktree `/mnt/h/neu-compass-l`），基底 `ca41bdc`，也就是 10-21 上线的 main。第一个提交 `2fc5cf1` 是 L 本身，第二个提交是 A23 审查的修复。没有使用真实模型、账号、NAS 或生产库。L 只改页面，上线另行授权，可以等下一次上线一起上。
+分支 `fix/page-state-l`，基底 `ca41bdc`，也就是 10-21 上线的 main。第一个提交 `2fc5cf1` 是 L 本身，第二个提交是 A23 审查的修复，第三个提交只改本节（复核记录和复核的 NIT）。没有使用真实模型、账号、NAS 或生产库。L 只改页面，上线另行授权，可以等下一次上线一起上。
