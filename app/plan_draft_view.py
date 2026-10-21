@@ -67,7 +67,7 @@ def _add(st, raw: str, existing: list[DraftCourse]) -> None:
     if excess > 0:
         st.warning(f"草案最多 20 门，本次尚未核对；请从输入减少 {excess} 门，或从草案移除至少 {excess} 门。")
         return
-    accepted = []
+    accepted, taken, twins = [], set(known), {}  # twins: a code an accepted course's H2 matches named -> that course.
     with st.spinner("正在核对课程…"), ApiClient(session_token=st.session_state.get("session_token")) as api:
         for index, code in enumerate(pending):
             try:
@@ -90,16 +90,24 @@ def _add(st, raw: str, existing: list[DraftCourse]) -> None:
                         continue
                     match = exact[0]
                     others = list(dict.fromkeys(m.code for m in matches if m != match))
+                else:
+                    match, others = matches[0], []
+                twin = twins.get(match.code) or next((other for other in others if other in taken), None)
+                if twin:  # One course under two cross-listed codes counts once.
+                    st.warning(literal_markdown(code + " 和 " + twin + " 可能是同一门交叉列出的课，只按 " + twin
+                        + " 计入；如果是两门不同的课，请向项目核实。"))
+                    continue
+                if others:
                     st.warning(literal_markdown("按输入主课号核对 " + code + "；同一引用也匹配 " + "、".join(others[:10])
                         + "（可能交叉列出）；方案按哪个课号算，请向项目核实。"))
-                else:
-                    match = matches[0]
                 detail = api.get_course(match.course_id)
                 candidate = DraftCourse(course_id=detail["course_id"], code=detail["primary_code"],
                     name=detail["primary_name"], credits=detail.get("credits"))
                 if candidate.course_id != match.course_id or candidate.code != match.code:
                     raise ValueError("Course identity mismatch")
                 accepted.append(candidate.model_dump())
+                taken.add(candidate.code)
+                twins.update({other: candidate.code for other in others if other not in twins})
                 if candidate.code != code:  # A single alias match under another primary code (renumbered, renamed).
                     st.warning(literal_markdown("输入的 " + code + " 对应主课号 " + candidate.code + "，按 " + candidate.code
                         + " 核对；方案按哪个课号算，请向项目核实。"))

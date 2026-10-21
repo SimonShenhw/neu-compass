@@ -4,6 +4,7 @@ another code, log value shapes, exact course links, and the tests the reviewers'
 """
 
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -132,12 +133,13 @@ def test_a22_ld_a22_invalid_token_warnings_are_capped_at_ten(backend):
 
 
 def test_b22_low1_the_api_is_started_at_the_root_path():
-    """Course-read redaction matches request paths as the app sees them; see docs/pii_redaction.md section 10."""
+    """Course-read redaction matches request paths as the app sees them; see docs/pii_redaction.md section 10.
+    uvicorn reads the same setting from UVICORN_ROOT_PATH; the NAS `.env` is outside the repository."""
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     [command] = [line for line in dockerfile.splitlines() if line.startswith("CMD")]
     assert "uvicorn" in command
     for text in [dockerfile, (ROOT / "docker-compose.yml").read_text(encoding="utf-8")]:
-        assert "root-path" not in text and "root_path" not in text
+        assert re.search(r"root[-_]path", text, re.IGNORECASE) is None
 
 
 def test_b22_low2a_course_read_lines_keep_the_template_even_with_an_explicit_path(monkeypatch):
@@ -171,3 +173,86 @@ def test_b22_low3_each_draft_link_is_exactly_its_own_course_link(backend):
     links = [e.value for e in app.markdown if "课程页／年度先修" in e.value]
     assert links == [f"[{code} · 课程页／年度先修]({share_url(settings.public_base_url, course=course_share_ref(code))})"
                      for code in ["CS 5001", "CS 5002"]]
+
+
+@pytest.fixture
+def crosslisted(monkeypatch):
+    """Two course records per cross-listed pair, each matching both refs, as ingest stores them (H2)."""
+    import app.api_client as clients
+
+    original, trace = clients.ApiClient, {"calls": [], "pairs": {"CS 7140": ["CS 7140", "EECE 7397"],
+                                                               "EECE 7397": ["EECE 7397", "CS 7140"]}}
+
+    def handler(request):
+        trace["calls"].append(request.url.path)
+        if request.url.path == "/resolve/course":
+            ref = request.url.params["ref"]
+            return httpx.Response(200, json={"ref": ref, "matches": [
+                {"course_id": code.replace(" ", "-"), "primary_code": code, "primary_name": "Synthetic " + code}
+                for code in trace["pairs"].get(ref, [ref])]})
+        code = request.url.path.rsplit("/", 1)[1].replace("-", " ")
+        return httpx.Response(200, json={"course_id": code.replace(" ", "-"), "primary_code": code,
+                                        "primary_name": "Synthetic " + code, "credits": 4})
+
+    monkeypatch.setattr(clients, "ApiClient", lambda **kwargs: original(
+        base_url="http://synthetic-draft", transport=httpx.MockTransport(handler), **kwargs))
+    return trace
+
+
+def pair_plan():
+    rule = node("all_of", label="root", children=[
+        node("select", label="Two from list", course_codes=["CS 7140", "EECE 7397", "CS 6140"], min_courses=2),
+        node("condition", label="GPA")])
+    return plans()[0].model_copy(update={"requirements": rule})
+
+
+def twin_notices(app):
+    return [e.value for e in app.warning if "可能是同一门交叉列出的课" in e.value]
+
+
+@pytest.mark.parametrize("raw,kept,skipped", [("CS 7140/EECE 7397", "CS 7140", "EECE 7397"),
+                                              ("EECE 7397 CS 7140", "EECE 7397", "CS 7140")])
+def test_recheck1_r1_a_cross_listed_pair_typed_together_counts_once(crosslisted, raw, kept, skipped):
+    app = page(pair_plan())
+    add(app, raw)
+    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == [kept]
+    assert twin_notices(app) == [f"{skipped} 和 {kept} 可能是同一门交叉列出的课，只按 {kept} 计入；如果是两门不同的课，请向项目核实。"]
+    assert crosslisted["calls"].count("/resolve/course") == 2 and len(crosslisted["calls"]) == 3  # No detail GET for the twin.
+    [group] = [line.strip() for e in app.text for line in e.value.splitlines() if "组选（非全部必修） Two from list" in line]
+    assert group.startswith("⬜ 还缺")
+
+
+def test_recheck1_r1_the_twin_of_a_course_already_in_the_draft_is_not_added(crosslisted):
+    app = page(pair_plan())
+    add(app, "CS 7140")
+    add(app, "EECE 7397")
+    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140"]
+    assert twin_notices(app) == ["EECE 7397 和 CS 7140 可能是同一门交叉列出的课，只按 CS 7140 计入；如果是两门不同的课，请向项目核实。"]
+
+
+@pytest.mark.parametrize("listed_by", ["CS 7140", "EECE 7397"])
+def test_recheck1_r1_a_pair_is_caught_when_only_one_record_names_the_other(crosslisted, listed_by):
+    crosslisted["pairs"] = {listed_by: crosslisted["pairs"][listed_by]}
+    app = page(pair_plan())
+    add(app, "CS 7140 EECE 7397")
+    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140"]
+    assert len(twin_notices(app)) == 1
+
+
+def test_recheck1_r1_unrelated_courses_and_a_single_exact_match_are_still_added(crosslisted):
+    app = page(pair_plan())
+    add(app, "CS 7140 CS 6140")
+    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140", "CS 6140"]
+    assert not twin_notices(app) and any("同一引用也匹配 EECE 7397" in e.value for e in app.warning)
+
+
+def test_recheck1_r2_frames_from_frozen_stdlib_modules_are_kept_on_course_reads(monkeypatch):
+    """error_frames() writes basename:line name; Python 3.12 runs os, posixpath and importlib frozen."""
+    frames = ["course.py:41 get_course", "<frozen os>:685 __getitem__", "<frozen importlib._bootstrap_external>:995 exec_module"]
+    with _json_logs(monkeypatch) as stream, structlog.contextvars.bound_contextvars(path="/course/{course_id}"):
+        logger = structlog.get_logger("synthetic.frames")
+        logger.error("synthetic.frozen_frames", exc_type="KeyError", frames=frames)
+        logger.error("synthetic.spaced_frames", exc_type="KeyError", frames=["<frozen private id text>:1 read"])
+    events = rows(stream)
+    assert events["synthetic.frozen_frames"]["frames"] == frames
+    assert "frames" not in events["synthetic.spaced_frames"] and "private id text" not in stream.getvalue()

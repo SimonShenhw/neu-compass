@@ -52,15 +52,16 @@ _COURSE_READ_TOKENS = {"error_type", "exc_type", "cause_type"}
 
 def _course_read_value(key: str, value: Any) -> bool:
     """An allowed key also needs the value shape the code logs, so a list of IDs under `courses` is dropped.
-    中文：白名单字段还要值的形状对：计数只收数字，类型只收标识符，frames 只收 `文件:行 函数`。
+    A frozen stdlib module's frame reads `<frozen os>:685 __getitem__`.
+    中文：白名单字段还要值的形状对：计数只收数字，类型只收标识符，frames 只收 `文件:行 函数`（冻结模块写成 `<frozen os>`）。
     """
     if key in _COURSE_READ_NUMBERS:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if key in _COURSE_READ_TOKENS:
         return isinstance(value, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,63}", value) is not None
     if key == "frames":
-        return isinstance(value, list) and all(
-            isinstance(frame, str) and re.fullmatch(r"[^\s:]{1,200}:\d+ \S{1,200}", frame) for frame in value)
+        return isinstance(value, list) and all(isinstance(frame, str) and re.fullmatch(
+            r"(?:<frozen [\w.]{1,100}>|[^\s:]{1,200}):\d+ \S{1,200}", frame) for frame in value)
     return True
 
 
