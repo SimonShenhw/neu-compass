@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 from pydantic import ValidationError
 
@@ -15,8 +16,13 @@ from schemas.program_plan import ProgramPlan, normalize_code
 
 
 def parse_course_codes(raw: str) -> tuple[list[str], list[str]]:
-    raw = re.sub(r"(?i)\b([a-z]{2,4})[-_](?=\d{4}[a-z]?\b)", r"\1 ", raw)
-    tokens = re.split(r"[,，;；\s]+", raw.strip())
+    """NFKC folds full-width letters, digits and spaces; `、` and `/` separate codes too. A dash or underscore
+    joins subject and number only at the start of a token, so an internal ID such as `neu-cs-6130` stays one
+    invalid token. 中文：全角字母、数字、空格先归一；「、」和「/」也能分隔；内部 ID 只报一条格式错误。
+    """
+    raw = unicodedata.normalize("NFKC", raw)
+    raw = re.sub(r"(?i)(?<![\w-])([a-z]{2,4})[-_](?=\d{4}[a-z]?\b)", r"\1 ", raw)
+    tokens = re.split(r"[,，;；、/\s]+", raw.strip())
     codes, invalid = [], []
     i = 0
     while i < len(tokens):
@@ -94,6 +100,9 @@ def _add(st, raw: str, existing: list[DraftCourse]) -> None:
                 if candidate.course_id != match.course_id or candidate.code != match.code:
                     raise ValueError("Course identity mismatch")
                 accepted.append(candidate.model_dump())
+                if candidate.code != code:  # A single alias match under another primary code (renumbered, renamed).
+                    st.warning(literal_markdown("输入的 " + code + " 对应主课号 " + candidate.code + "，按 " + candidate.code
+                        + " 核对；方案按哪个课号算，请向项目核实。"))
             except ApiError as exc:
                 st.warning(literal_markdown(code + " 暂时无法核对或加载，未加入；请稍后手动重试。"))
                 if exc.error_type in {"transport_error", "transport_timeout"}:

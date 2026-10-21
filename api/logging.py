@@ -46,6 +46,22 @@ _COURSE_READ_FIELDS = {
     "count", "dangling", "courses", "unusable_records", "error_type", "exc_type", "cause_type", "frames",
     "catalog_year",
 }
+_COURSE_READ_NUMBERS = {"status", "duration_ms", "count", "dangling", "courses", "unusable_records"}
+_COURSE_READ_TOKENS = {"error_type", "exc_type", "cause_type"}
+
+
+def _course_read_value(key: str, value: Any) -> bool:
+    """An allowed key also needs the value shape the code logs, so a list of IDs under `courses` is dropped.
+    中文：白名单字段还要值的形状对：计数只收数字，类型只收标识符，frames 只收 `文件:行 函数`。
+    """
+    if key in _COURSE_READ_NUMBERS:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if key in _COURSE_READ_TOKENS:
+        return isinstance(value, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,63}", value) is not None
+    if key == "frames":
+        return isinstance(value, list) and all(
+            isinstance(frame, str) and re.fullmatch(r"[^\s:]{1,200}:\d+ \S{1,200}", frame) for frame in value)
+    return True
 
 
 def _course_read_log_path(path: str) -> str:
@@ -65,7 +81,7 @@ def _course_read_fields(_logger: Any, _name: str, event: dict[str, Any]) -> dict
     """
     path = structlog.contextvars.get_contextvars().get("path")
     if path in _COURSE_READ_PATHS:
-        event = {key: value for key, value in event.items() if key in _COURSE_READ_FIELDS}
+        event = {key: value for key, value in event.items() if key in _COURSE_READ_FIELDS and _course_read_value(key, value)}
         if "catalog_year" in event and (not isinstance(event["catalog_year"], str)
                                        or not re.fullmatch(r"[0-9]{4}-[0-9]{4}", event["catalog_year"])):
             event.pop("catalog_year")

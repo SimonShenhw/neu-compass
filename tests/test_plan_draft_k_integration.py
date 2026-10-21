@@ -1,6 +1,7 @@
 """I course-read privacy and K question metadata coexist in the real JSON pipeline."""
 
 import json
+import threading
 
 import httpx
 import pytest
@@ -116,3 +117,71 @@ def test_question_request_clears_stale_caller_context(api_client, monkeypatch):
     assert CANARY not in stream.getvalue()
     [question] = [item for item in captured if item["event"] == "search.hybrid"]
     assert (question["query_hash"], question["query_len"]) == (documented(SECRET, QUESTION), len(QUESTION))
+
+
+@pytest.mark.parametrize("first", ["course", "chat"])
+def test_overlapping_course_read_and_chat_keep_their_own_scope(api_client, empty_db, monkeypatch, first):
+    """Two requests in flight at once (round 21, B22 LOW-4): the course-read decision belongs to each request.
+
+    The request started first finishes while the second is held before its response, so a process-wide "current
+    path" would misfile the first one's lines: course fields kept under /chat, or /chat's hash lost under a course path.
+    中文：两个请求同时在跑；先开始的那个在另一个还卡着时记日志并结束，判断必须按各自请求。
+    """
+    import api.routes.chat as chat_route
+    from db.course_requisite_repository import CourseRequisiteRepository
+
+    entered = {"course": threading.Event(), "chat": threading.Event()}
+    release = {"course": threading.Event(), "chat": threading.Event()}
+    stalled = []
+    original_list, original_retrieve = CourseRequisiteRepository.list_for_course, chat_route._retrieve
+
+    def hold(name):
+        entered[name].set()
+        if not release[name].wait(10):
+            stalled.append(name)
+
+    def held_list(self, course_id, *args, **kwargs):
+        hold("course")
+        structlog.get_logger("synthetic.integration").warning("synthetic.overlap_course",
+            course_id=course_id, source=CANARY, count=1)
+        return original_list(self, course_id, *args, **kwargs)
+
+    def held_retrieve(*args, **kwargs):
+        hold("chat")
+        return original_retrieve(*args, **kwargs)
+
+    monkeypatch.setattr(CourseRequisiteRepository, "list_for_course", held_list)
+    monkeypatch.setattr(chat_route, "_retrieve", held_retrieve)
+    api_client.app.dependency_overrides[get_chat_stream_fn] = lambda: (lambda prompt: iter(["synthetic answer"]))
+    send = {"course": lambda: api_client.get("/course/" + CID, headers={"x-request-id": "ik-overlap-course"}),
+            "chat": lambda: api_client.post("/chat", json={"query": QUESTION, "k": 1},
+                                            headers={"x-request-id": "ik-overlap-chat"})}
+    responses = {}
+    order = [first, "chat" if first == "course" else "course"]
+    threads = {name: threading.Thread(target=lambda name=name: responses.__setitem__(name, send[name]()), daemon=True)
+               for name in order}
+    with _json_logs(monkeypatch) as stream:
+        for name in order:
+            threads[name].start()
+            assert entered[name].wait(10), name
+        for name in order:  # The first request runs to the end while the second is still held.
+            release[name].set()
+            threads[name].join(20)
+            assert not threads[name].is_alive(), name
+        captured = events(stream)
+    assert not stalled and {name: r.status_code for name, r in responses.items()} == {"course": 200, "chat": 200}
+
+    course_lines = [item for item in captured if item.get("request_id") == "ik-overlap-course"]
+    [overlap] = [item for item in course_lines if item["event"] == "synthetic.overlap_course"]
+    assert not {"course_id", "source"} & overlap.keys() and overlap["count"] == 1
+    assert all(item["path"] == "/course/{course_id}" for item in course_lines) and CID not in repr(course_lines)
+    assert not any({"query_hash", "query_len", "query_log_id"} & item.keys() for item in course_lines)
+    assert CANARY not in stream.getvalue()
+
+    chat_lines = [item for item in captured if item.get("request_id") == "ik-overlap-chat"]
+    [question] = [item for item in chat_lines if item["event"] == "chat.retrieved"]
+    assert question["path"] == "/chat"
+    assert (question["query_hash"], question["query_len"]) == (documented(SECRET, QUESTION), len(QUESTION))
+    [row] = empty_db.execute("SELECT log_id FROM query_log").fetchall()
+    [written] = [item for item in chat_lines if item["event"] == "query_log.written"]
+    assert written["query_log_id"] == row["log_id"]

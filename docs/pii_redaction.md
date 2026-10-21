@@ -282,6 +282,8 @@ def auto_redact_pre(text: str) -> str:
 
 独立 UI 的 HTTPX 源 logger 去掉这些课程读 URL 的查询串、具体路径及 fragment。API 的 uvicorn.access 有自己的 handler、不会经过 root 过滤器，因此 configure_logging 也在该源 logger 上幂等安装过滤器：课程读路径改成模板并去掉查询串，方法、协议和状态照常，其他访问记录不变。已用默认 uvicorn 配置经本地 Unix socket 的合成请求核对，不是部署或线上日志验收。
 
+是不是课程读，按 API 看到的请求路径判断：路径模板、白名单和 uvicorn.access 过滤器都假定 API 挂在根路径上。生产 Dockerfile 的 uvicorn 命令没有 `--root-path`，有一条测试核对这一点。以后要是加上 `--root-path`，或者把 API 挂到子路径下，课程 ID 和 ref 会重新出现在访问日志和 `request.handled` 里，要先改成按路由路径判断。白名单除了字段名，也检查值的形状：计数只收数字，异常类型只收标识符，栈帧只收 `文件:行 函数`；如果把课程 ID 列表放进计数字段，这个字段会被整条丢掉。判断以每个请求自己的 context 为准，两个请求同时在跑也不会串（有并发测试）。
+
 本次不改 Docker 启动命令，不停用全部访问日志；不清理历史 docker／NAS／代理／隧道日志，不改变 query_log 留存，也不声称基础设施日志都已脱敏。聊天／搜索问题原文由独立 K 批次处理；流头之后的 traceback、warnings 与 UI 未捕获错误仍按本节已有边界单独看待。
 
 ## 11. 运行日志里的学生问题（K／Z5，2026-10-19）

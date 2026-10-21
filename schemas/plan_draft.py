@@ -55,8 +55,10 @@ def _selection(node: RequirementNode, certain: list[DraftCourse], opened: list[D
     """Lower bound: explicit known values; upper bound: unknown credits at schema cap 12.
     `elsewhere`: pool courses already counted by another group; the caller names them in their own reason.
     中文：开放池不成为确定候选，未知学分不变成零；某维已足够时不被无关未知拖低。已算进别组的开放池课程由调用方另写原因。
+    The range line appears once, at the first unmet count or credit target. 中文：范围那一行每组只写一次。
     """
     statuses, reasons, gaps = [], [], {}
+    pool = [c.code for c in opened if c.code not in elsewhere]
     for dimension, target, known, upper in (
         ("courses", node.min_courses, len(certain), len(certain) + len(opened)),
         ("credits", node.min_credits, sum(c.credits or 0 for c in certain),
@@ -79,9 +81,9 @@ def _selection(node: RequirementNode, certain: list[DraftCourse], opened: list[D
                                f"确定计入 {known} 门，其余要靠范围内可能计入的课，需项目确认。")
             else:
                 reasons.append(f"还差 {target-known} 个领域。")
-            pool = [c.code for c in opened if c.code not in elsewhere]
             if pool and dimension != "areas":
                 reasons.append("范围内可能计入：" + "、".join(pool) + "；是否能算，要项目确认。")
+                pool = []
     status = "missing" if "missing" in statuses else "unknown" if "unknown" in statuses else "met"
     return status, gaps, reasons
 
