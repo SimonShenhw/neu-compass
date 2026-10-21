@@ -21,6 +21,7 @@ Usage from a Streamlit page:
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Iterator
 from typing import Any
@@ -29,6 +30,27 @@ from urllib.parse import quote
 import httpx
 
 from config import settings
+
+
+class _CourseReadTransportFilter(logging.Filter):
+    """HTTPX logs on its own in the UI process, without the API logging setup.
+    中文：在源 logger 处替换课程读请求 URL，现有 handler 和传播行为不变。
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            args = list(record.args)
+            for index, value in enumerate(args):
+                if not isinstance(value, httpx.URL):
+                    continue
+                path = value.path
+                if path.rstrip("/") == "/resolve/course" or path.startswith("/course/"):
+                    safe_path = "/resolve/course" if path.rstrip("/") == "/resolve/course" else "/course/[redacted]"
+                    args[index] = str(value.copy_with(path=safe_path, query=None, fragment=None))
+            record.args = tuple(args)
+        return True
+
+
+_COURSE_READ_TRANSPORT_FILTER = _CourseReadTransportFilter()
 
 
 def _retry_seconds(value):
@@ -88,6 +110,7 @@ class ApiClient:
         # 但 ONNX-CPU 兜底路径要 7-10 秒 —— 旧的 10 秒默认值会让降级中
         # 的后端在 Streamlit UI 里直接抛出原始的 ReadTimeout 堆栈跟踪。
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
+        logging.getLogger("httpx").addFilter(_COURSE_READ_TRANSPORT_FILTER)
         headers: dict[str, str] = {}
         if session_token:
             headers["Authorization"] = f"Bearer {session_token}"

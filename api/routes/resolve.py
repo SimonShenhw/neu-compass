@@ -138,7 +138,6 @@ def resolve_course(
 
     log.info(
         "resolve.course",
-        ref=ref[:80],
         count=len(matches),
         dangling=len(course_ids) - len(matches),
     )
