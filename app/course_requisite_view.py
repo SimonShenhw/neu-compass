@@ -149,8 +149,14 @@ def rule_lines(node: RequisiteNode, depth: int = 0) -> list[str]:
         suffix = f"（{'；'.join(details)}）" if details else ""
         return [f"{indent}- {node.course_code}{suffix}"]
     operator = "全部分支（AND）" if node.kind == "all_of" else "任一分支（OR）"
-    lines = [f"{indent}- {operator}"]
-    for child in node.children:
+    # The catalog sometimes names the same course twice in one group (CS 5008: "CS 5001 with a minimum grade of
+    # C- or CS 5001 with a minimum grade of C-"). An identical leaf is shown once and the group says so; the
+    # source text and the stored rule keep both. 中文：目录有时在同一组里把同一门课写两遍（CS 5008）。完全相同
+    # 的叶子只显示一次，并在这一组注明；原文和存下的规则都不变。
+    children = [child for i, child in enumerate(node.children) if child.kind != "course" or child not in node.children[:i]]
+    repeated = "（目录原文在这一组里把同一门课列了不止一次，这里只显示一次）" if len(children) < len(node.children) else ""
+    lines = [f"{indent}- {operator}{repeated}"]
+    for child in children:
         lines.extend(rule_lines(child, depth + 1))
     return lines
 

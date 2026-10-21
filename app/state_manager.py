@@ -108,6 +108,7 @@ def login(
 ) -> None:
     if state.get("user_id") != user_id:
         clear_draft(state)
+        clear_choices(state)
     state["user_id"] = user_id
     state["user_email"] = user_email
     state["user_contribution_count"] = contribution_count
@@ -117,13 +118,17 @@ def login(
 def logout(state: SessionState) -> None:
     """Clear identity + conversation + the Co-op teaser fetched for this
     account (app.view_cache.COOP_TEASER_KEY: the API redacts it by tier; the
-    view cache also never serves it to another scope). Search filters keep —
+    view cache also never serves it to another scope). The comparison list,
+    the draft and the program / plan choices go too. Search filters keep —
     nothing private in them, and the user shouldn't have to retype after
-    logout/login.
+    logout/login. The page stays where it was: the sidebar button runs this
+    as its on_click callback, before the next run.
 
     清空身份 + 对话 + 替这个账号获取的 Co-op 预览（app.view_cache.COOP_TEASER_KEY：
-    API 按等级裁剪它；页面缓存本身也绝不会把它给另一个范围用）。搜索过滤器
-    保留 —— 里面没有任何隐私信息，用户也不该在登出/登录之后还要重新输入一遍。"""
+    API 按等级裁剪它；页面缓存本身也绝不会把它给另一个范围用）。对比列表、草案
+    和项目／方案选择也一起清空。搜索过滤器保留 —— 里面没有任何隐私信息，用户也
+    不该在登出/登录之后还要重新输入一遍。页面停在原来那一页：侧边栏按钮把它当作
+    on_click 回调，在下一轮运行之前执行。"""
     state["user_id"] = None
     state["user_email"] = None
     state["user_display_name"] = None
@@ -134,6 +139,7 @@ def logout(state: SessionState) -> None:
     state["selected_course_id"] = None
     clear_compare(state)
     clear_draft(state)
+    clear_choices(state)
     for key in ['last_chat_feedback','last_chat_meta','last_chat_error','answer_feedback_capture_opt_in',
                 '_coop_teaser_cache']:
         state.pop(key, None)
@@ -272,20 +278,58 @@ def clear_draft(state: SessionState) -> None:
         state["plan-draft-input"] = ""
 
 
+# === Choices kept across pages ===
+# 中文:跨页保留的选择
+
+# Streamlit deletes the state of every widget a run did not render, so these choices were gone after a visit to
+# another page (10-21). keep_choices() assigns each one to itself at the top of every run, before any widget, and
+# Streamlit keeps a value set that way (its documented multipage pattern). Code that clears a choice sets it to
+# None, so a cleared choice stays cleared.
+# 中文：Streamlit 会删掉一轮里没渲染的组件的状态，所以去过别的页面再回来，这些选择就没了（10-21）。
+# keep_choices() 在每一轮开头、任何组件之前把它们原样赋值一次，这样设的值 Streamlit 会保留（官方的多页面
+# 写法）。清除选择的地方都设成 None，所以清掉的选择不会回来。
+CHOICE_KEYS = ("chat_program_id", "chat_plan_id")
+PLAN_CHOICE_PREFIX = "program-plan-"  # The Programs page, one per family. 中文：培养方案页，每个项目一个。
+
+
+def _choice_keys(state: SessionState) -> list[str]:
+    return [key for key in list(state.keys())
+            if key in CHOICE_KEYS or (isinstance(key, str) and key.startswith(PLAN_CHOICE_PREFIX))]
+
+
+def keep_choices(state: SessionState) -> None:
+    for key in _choice_keys(state):
+        state[key] = state[key]
+
+
+def clear_choices(state: SessionState) -> None:
+    """Set to None, not popped: a popped key leaves the browser showing the old option, which it sends back with
+    the next rerun (docs/view-cache.md). Callers run before the choice widgets exist in the run: a button
+    callback, the OAuth callback or the cookie restore.
+    中文：设成 None 而不是删掉：删掉的键会让浏览器继续显示旧选项，下一次 rerun 时又送回来
+    （docs/view-cache.md）。调用时这一轮的选择组件都还没创建：在按钮回调、OAuth 回调或 cookie 恢复里。"""
+    for key in _choice_keys(state):
+        state[key] = None
+
+
 __all__ = [
+    "CHOICE_KEYS",
     "DEFAULTS",
     "MAX_COMPARE_COURSES",
+    "PLAN_CHOICE_PREFIX",
     "SessionState",
     "add_to_compare",
     "add_message",
     "clear_compare",
     "add_draft_courses",
     "remove_draft_course",
+    "clear_choices",
     "clear_draft",
     "clear_conversation",
     "get_messages",
     "init_state",
     "is_logged_in",
+    "keep_choices",
     "login",
     "logout",
     "record_search",

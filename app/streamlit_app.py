@@ -396,6 +396,7 @@ def render() -> None:
         get_messages,
         init_state,
         is_logged_in,
+        keep_choices,
         record_search,
     )
     from app.streamlit_auth_ui import (  # noqa: PLC0415
@@ -417,6 +418,7 @@ def render() -> None:
     )
     inject_theme(st)
     init_state(st.session_state)
+    keep_choices(st.session_state)  # Before any widget of this run. 中文：在这一轮的任何组件之前。
     from app import view_cache  # noqa: PLC0415
 
     view_cache.begin_run(st.session_state)  # Before any cached read of this run.
@@ -427,10 +429,11 @@ def render() -> None:
 
     # Cookie session (refresh-survival): restore first so a failed restore
     # can queue a cookie clear, then flush — the flush also renders writes
-    # queued by the OAuth callback / logout on the previous pass.
+    # queued by the OAuth callback on the previous pass, or by the logout
+    # button's callback just before this run.
     # Cookie 会话（刷新不掉线）：先恢复登录，这样失败的恢复能把「清 cookie」
-    # 排入队列；随后统一 flush —— flush 同时会把上一轮 OAuth 回调 / 登出
-    # 排队的写操作真正下发给浏览器。
+    # 排入队列；随后统一 flush —— flush 同时会把上一轮 OAuth 回调、或者
+    # 这一轮之前登出按钮回调排队的写操作真正下发给浏览器。
     from app.cookie_session import (  # noqa: PLC0415
         flush_pending_cookie,
         restore_login_from_cookie,

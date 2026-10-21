@@ -157,15 +157,18 @@ def oauth_state_matches(expected: str | None, returned: str | None) -> bool:
 # 中文:状态机（纯字典操作）
 #
 # Why queue-then-flush instead of rendering the JS inline at the call site:
-# both login (OAuth callback) and logout immediately st.rerun(), which can
-# tear down the current render before the browser executes the component
-# iframe. The queue survives the rerun in session_state; flush runs early
-# in the NEXT render, which completes normally.
+# login (OAuth callback) immediately st.rerun()s, which can tear down the
+# current render before the browser executes the component iframe. The
+# queue survives the rerun in session_state; flush runs early in the NEXT
+# render, which completes normally. Logout queues too: it runs as the
+# button's on_click callback, so its flush lands early in the run right
+# after the click.
 #
 # 中文:为什么用"先排队、后统一 flush"而不是在调用处直接内联渲染 JS：
-# 登录（OAuth 回调）和登出都会立刻 st.rerun()，这可能在浏览器执行组件
-# iframe 之前就把当前这次渲染撕毁。队列在 session_state 中能挺过 rerun；
-# flush 在下一次渲染的早期运行，那一次能正常跑完。
+# 登录（OAuth 回调）会立刻 st.rerun()，这可能在浏览器执行组件 iframe
+# 之前就把当前这次渲染撕毁。队列在 session_state 中能挺过 rerun；flush
+# 在下一次渲染的早期运行，那一次能正常跑完。登出也排队：它是按钮的
+# on_click 回调，flush 落在点击之后那一轮的早期。
 #
 # The queue is a LIST of ops (a successful OAuth callback needs two:
 # clear the state cookie + set the session cookie). Ops on the same

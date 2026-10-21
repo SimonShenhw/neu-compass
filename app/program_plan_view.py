@@ -28,6 +28,10 @@ def render_chat_program_selector(st, programs: list[dict]) -> str | None:
     selected = st.selectbox(
         SELECTOR_LABEL, [None, *by_id], key=key,
         format_func=lambda value: "不指定" if value is None else f"{by_id[value]['full_name']} · {value}",
+        # A None set through session state (logging out clears the choice that way) shows the placeholder,
+        # not the None option's label. 中文：通过 session state 设成 None（登出就是这样清掉选择的）时，
+        # 显示的是 placeholder，不是 None 选项的文字。
+        placeholder="不指定",
         help="选了以后，回答会按这个项目理解你的问题，比如「第一学期上什么」。问题对应好几个项目时，"
              "系统会请你在这里选一个。它不替你选校区或 Catalog 年份。",
     )
