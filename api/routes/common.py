@@ -30,6 +30,7 @@ import structlog
 
 from config import settings
 from api.error_fields import error_frames, safe_error_fields
+from api.model_budget import ModelBudgetExhausted
 from api.query_fields import query_fields
 from llm.gemini_client import GeminiError, error_log_fields
 from rag.filters import filter_course_ids
@@ -294,6 +295,11 @@ def attempt_hyde_rescue(
             reject_threshold=0.0,  # LLM verdict already vouched answerability / LLM 判决已担保可答性
             top_k=top_k,
         )
+    except ModelBudgetExhausted:
+        # Today's model places are used up (batch T): the original rejection stands, and this is not a verdict.
+        # 中文：今天的模型名额用完了（T 批）：保留原来的拒答；这不是模型的判断。
+        log.info("rescue.skipped", reason="model_daily_limit")
+        return None
     except Exception as e:  # noqa: BLE001 — rescue must never 500 a request / 救援绝不能让请求 500
         # Types, kind and status only: a GeminiError message carries upstream text. Other errors
         # (database, reranker) also record where they were raised.

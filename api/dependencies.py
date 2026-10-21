@@ -26,6 +26,7 @@ sharing a connection across threads would require `check_same_thread=False`
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
@@ -125,7 +126,45 @@ def get_hyde_rescue_fn() -> Callable[[str], str | None] | None:
         return None
     from rag.hyde import rescue_expand  # noqa: PLC0415
 
-    return rescue_expand
+    budget = get_model_budget()
+    if budget is None:
+        return rescue_expand
+
+    # Only reached when the course-code guard let the query through, so a place is taken only for a real call.
+    # 中文：只有通过了课号规则才会走到这里，所以只为真正的调用占名额。
+    def budgeted_rescue(query: str) -> str | None:
+        if not budget.acquire():
+            from api.model_budget import ModelBudgetExhausted  # noqa: PLC0415
+
+            raise ModelBudgetExhausted
+        return rescue_expand(query)
+
+    return budgeted_rescue
+
+
+# Daily cap on Gemini calls (batch T, P5). None when MODEL_DAILY_CALL_LIMIT is 0. One object per process, so
+# every request counts against the same file. 中文：Gemini 调用的每日上限（T 批，P5）；MODEL_DAILY_CALL_LIMIT 为 0
+# 时返回 None。每个进程一个对象，所有请求都记在同一个文件上。
+def get_model_budget() -> Any:
+    limit = settings.model_daily_call_limit
+    if not limit:
+        return None
+    from api.model_budget import FILENAME  # noqa: PLC0415
+
+    return _model_budget(str(Path(settings.sqlite_path).expanduser().resolve().parent / FILENAME), limit)
+
+
+_BUDGETS: dict[tuple[str, int], Any] = {}
+_BUDGETS_LOCK = threading.Lock()  # Two first requests must not build two counters. 中文：别让两个首个请求建出两个计数器。
+
+
+def _model_budget(path: str, limit: int) -> Any:
+    from api.model_budget import ModelBudget  # noqa: PLC0415
+
+    with _BUDGETS_LOCK:
+        if (path, limit) not in _BUDGETS:
+            _BUDGETS[(path, limit)] = ModelBudget(Path(path), limit)
+        return _BUDGETS[(path, limit)]
 
 
 # === Session auth (ADR-0021) ===
@@ -250,6 +289,7 @@ __all__ = [
     "get_faiss_index",
     "get_hybrid_retriever",
     "get_hyde_rescue_fn",
+    "get_model_budget",
     "get_oauth_exchange_fn",
     "get_program_repo",
     "get_program_policy_reader",

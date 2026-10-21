@@ -477,7 +477,10 @@ def render() -> None:
     # search page, which tabs would break. Pages: search / programs / co-op.
     # 侧边栏导航（不用 st.tabs）：搜索页的 chat_input 必须固定在页面底部，
     # tabs 会破坏这一点。页面：搜索 / 培养方案 / Co-op。
-    pages = ["🔍 课程搜索 · Search", "🎓 培养方案 · Programs", "💼 Co-op 经验", "⚖️ 课程对比 · Compare"]
+    # New pages go at the end so the earlier indices (deep links, pending_nav_*) keep their meaning.
+    # 中文：新页面加在末尾，前面页面的序号（深链、pending_nav_*）不变。
+    pages = ["🔍 课程搜索 · Search", "🎓 培养方案 · Programs", "💼 Co-op 经验", "⚖️ 课程对比 · Compare",
+             "🔒 数据与隐私 · Privacy"]
 
     # Cross-page hand-offs (discover chips, curriculum 查看 buttons) queue
     # a pending_nav_* flag + st.rerun(); we consume it HERE, before the
@@ -537,6 +540,13 @@ def render() -> None:
         from app.compare_view import render_compare_page  # noqa: PLC0415
 
         render_compare_page(st)
+        _end_page(st, fallback_slot)
+        return
+
+    if nav.startswith("🔒"):
+        from app.privacy_view import render_privacy_page  # noqa: PLC0415
+
+        render_privacy_page(st)
         _end_page(st, fallback_slot)
         return
 

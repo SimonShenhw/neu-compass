@@ -86,6 +86,8 @@
 | `scripts/export_query_log.py` | query_log 的私有导出，默认只出计数 | `--db-path --out --origin --since --until --limit` | 读库、写文件 | 在用 |
 | `scripts/export_answer_feedback.py` | 回答反馈候选的私有导出，默认只出计数 | `--db-path --out --origin --since --until --limit` | 读库、写文件 | 在用 |
 | `scripts/private_export.py` | 两个导出共用的规则 | 模块 | 读库、写文件、删除自己写坏的输出 | 在用 |
+| `scripts/redact_query_log.py` | 手动跑一次到期清理：query_log 原文换成带密钥的哈希，保存的回答连同评价删除（API 平时自己做） | `--db-path --days --dry-run` | 写库（`--dry-run` 只读） | 在用 |
+| `scripts/weekly_stats.py` | 试用期每周的只读计数：提问量、检索方式、评价、账号、Co-op 队列、今天的模型调用；不输出原文、邮箱或 ID | `--db-path --days --today` | 只读 | 在用 |
 | `scripts/review_coop.py` | 审核员离线审核 Co-op 投稿 | `--db-path --list --show --approve --reject --commit` | 写库（默认 dry-run） | 在用 |
 
 ## 5. 评测和测量

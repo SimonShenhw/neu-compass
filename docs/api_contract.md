@@ -35,9 +35,11 @@
 | GET    | `/coop`               | List Co-op visible to user             |
 | POST   | `/chat`               | Streamed grounded chat (NDJSON)        |
 | POST   | `/auth/callback`      | OAuth code exchange                    |
+| POST   | `/auth/delete-account`| Delete own account + Co-op (batch T)   |
 
 Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}`,
-`/chat`, and `GET /coop` (degraded view). `POST /coop` requires `Authorization: Bearer <session_token>`.
+`/chat`, and `GET /coop` (degraded view). `POST /coop` and `POST /auth/delete-account` require
+`Authorization: Bearer <session_token>`.
 `POST /auth/callback` issues identity but takes no header itself.
 
 ---
@@ -411,7 +413,9 @@ One JSON object per line. Order of object types:
    - `upstream_error`: the Gemini call or stream failed;
    - `no_answer`: Gemini returned no text (a safety block or an empty
      completion), so asking the same way again rarely helps;
-   - `internal_error`: anything else.
+   - `internal_error`: anything else;
+   - `daily_limit` (batch T): today's Gemini calls are used up (`MODEL_DAILY_CALL_LIMIT`, per UTC day). It comes
+     right after meta, instead of any token; retrieval still ran and the courses are in meta. No model call is made.
 
    `detail` is fixed text per `error_type` that the UI appends to the partial
    answer; it never carries the exception message, which can hold upstream URLs
@@ -477,6 +481,39 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
   - the email domain isn't whitelisted (PLAN §3.5: split-on-`@` exact match
     for `husky.neu.edu` / `northeastern.edu`; `attacker@husky.neu.edu.evil.com`
     is rejected)
+
+---
+
+## POST /auth/delete-account
+
+Batch T (10-21, policy P4): a logged-in student deletes their own account and Co-op contributions from the
+数据与隐私 page. Needs `Authorization: Bearer <session_token>` and exactly `{"confirm": "delete"}`.
+
+In one transaction (`db/account_deletion.py`):
+1. the Co-op experiences this account published, and every unlock of them;
+2. the `users` row, which cascades to its unlocks, planned courses, Co-op submissions (any review state) and
+   contribution credits;
+3. a group (company, role, term) this account helped publish that is left with only one contributor is withdrawn:
+   the others' items go back to `approved` and leave the public list (with their unlocks) until another approval in
+   the group publishes them again. Credits already given are kept, and none is given twice. The user chose this
+   on 10-21 so that the last item cannot point at its author (k=2).
+
+`query_log` and saved answers never record an account (a real user's `user_id` is NULL) and are not touched. Daily
+backups keep a copy for up to 14 days. Afterwards the same token gets 401 from `GET /auth/me` and from this route.
+
+### Success (HTTP 200)
+
+```json
+{"deleted": true, "published_experiences": 1, "unlocks_of_those": 0, "own_unlocks": 2,
+ "submissions": 3, "credits": 1, "planned_courses": 0, "withdrawn_from_groups": 1}
+```
+
+Counts only; the log line `account.deleted` carries the same counts and no identity.
+
+### Error responses
+
+- **401**: missing, invalid or expired token, or the account no longer exists.
+- **422**: the body is not exactly `{"confirm": "delete"}`.
 
 ---
 

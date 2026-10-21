@@ -216,6 +216,11 @@ class ApiClient:
         过期时抛出 ApiError 401。"""
         return self._get("/auth/me")
 
+    def delete_account(self) -> dict[str, Any]:
+        """Delete the session's account and its Co-op contributions (POST /auth/delete-account, batch T).
+        中文：删除当前会话的账号和它的 Co-op 投稿（T 批）。"""
+        return self._post("/auth/delete-account", {"confirm": "delete"})
+
     # === OAuth callback ===
     # 中文:OAuth 回调
 

@@ -10,7 +10,7 @@ CAPTURE_OPT_IN_KEY = 'answer_feedback_capture_opt_in'
 # Shown before the input on every render (06C-1). The query log has no answer column, so with
 # capture off no answer text is kept. 中文：每次渲染都显示在输入框之前（06C-1）。查询日志没有
 # 回答列，所以关闭保存时不会留下回答内容。
-QUERY_LOG_NOTICE = '你的提问原文会记进不公开的查询日志。请不要输入个人信息或密码之类的秘密。'
+QUERY_LOG_NOTICE = '你的提问原文会记进不公开的查询日志。请不要输入个人信息或密码之类的秘密。留多久、怎么删，见左侧「🔒 数据与隐私」。'
 CAPTURE_OFF_NOTICE = '回答内容不会保存（回答反馈功能目前关闭）。'
 CAPTURE_NOTICE = (
     '勾不勾选都不影响上面的查询日志。'
