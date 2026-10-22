@@ -320,6 +320,42 @@ cases.push(
     'src/pages/pages.test.tsx',
     'comparison focus is not stolen by an unrelated row-filter update',
   ],
+  [
+    'M26',
+    'static route case agreement',
+    'src/layout/routePresentation.ts',
+    'matchPath(path, pathname)',
+    'matchPath({ path, caseSensitive: true }, pathname)',
+    'src/pages/pages.test.tsx',
+    'route chrome agrees with the rendered page at /COMPARE',
+  ],
+  [
+    'M27',
+    'static route must match to the end',
+    'src/layout/routePresentation.ts',
+    'matchPath(path, pathname)',
+    'matchPath({ path, end: false }, pathname)',
+    'src/pages/pages.test.tsx',
+    'invalid path /compare/details stays a genuine 404',
+  ],
+  [
+    'M28',
+    'course route is not a prefix test',
+    'src/layout/routePresentation.ts',
+    "matchPath('/course/:code', pathname)",
+    "pathname.startsWith('/course/')",
+    'src/pages/pages.test.tsx',
+    'invalid path /course/CS-6140/extra stays a genuine 404',
+  ],
+  [
+    'M29',
+    'navigation follows the matched route',
+    'src/layout/Sidebar.tsx',
+    'const active = path === navigationPath;',
+    'const active = path === pathname;',
+    'src/pages/pages.test.tsx',
+    'route chrome agrees with the rendered page at /compare/',
+  ],
 );
 for (const [id, label, file, from, to, test, expected] of cases) {
   const path = snapshot(id);

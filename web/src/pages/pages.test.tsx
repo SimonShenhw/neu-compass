@@ -45,6 +45,9 @@ describe('page accessibility', () => {
     '/privacy',
     '/not-found',
     '/course/UNKNOWN',
+    '/compare/',
+    '/COURSE/CS-6140',
+    '/course/CS-6140/extra',
   ])('has no DOM axe violations at %s', async (path) => {
     const { container } = page(path);
     const result = await axe(container, {
@@ -53,6 +56,66 @@ describe('page accessibility', () => {
     expect(result.violations).toEqual([]);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
+});
+
+it.each([
+  ['/compare/', '课程对比'],
+  ['/COMPARE', '课程对比'],
+  ['/programs/', '培养方案'],
+  ['/PROGRAMS', '培养方案'],
+  ['/coop/', 'Co-op 经验'],
+  ['/COOP', 'Co-op 经验'],
+  ['/privacy/', '数据与隐私'],
+  ['/PRIVACY', '数据与隐私'],
+  ['/course/CS-6140/', '课程搜索'],
+  ['/COURSE/CS-6140', '课程搜索'],
+])('route chrome agrees with the rendered page at %s', (path, title) => {
+  page(path);
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(title);
+  expect(document.title).toBe(`${title} · NEU-Compass`);
+  const nav = screen.getByRole('navigation', { name: '主导航' });
+  expect(
+    within(nav).getByRole('link', { name: new RegExp(title) }),
+  ).toHaveAttribute('aria-current', 'page');
+  expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+  expect(screen.queryByText('404 · 找不到这个页面')).not.toBeInTheDocument();
+  expect(screen.queryByRole('form', { name: '提问' }) !== null).toBe(
+    title === '课程搜索',
+  );
+});
+it.each([
+  '/course/',
+  '/course/CS-6140/extra',
+  '/COURSE/CS-6140/extra',
+  '/compare/details',
+  '/privacy-policy',
+])(
+  'invalid path %s stays a genuine 404 without search controls or current navigation',
+  (path) => {
+    page(path);
+    expect(screen.getByText('404 · 找不到这个页面')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      '找不到页面',
+    );
+    expect(document.title).toBe('找不到页面 · NEU-Compass');
+    expect(
+      screen.queryByRole('form', { name: '提问' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('navigation', { name: '主导航' })
+        .querySelector('[aria-current]'),
+    ).toBeNull();
+  },
+);
+it('a matched but unknown course remains a search-page empty state rather than a route 404', () => {
+  page('/COURSE/UNKNOWN/');
+  expect(screen.getByText('找不到这门演示课程：UNKNOWN')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+    '课程搜索',
+  );
+  expect(screen.getByRole('form', { name: '提问' })).toBeInTheDocument();
+  expect(screen.queryByText('404 · 找不到这个页面')).not.toBeInTheDocument();
 });
 
 it('search shows four courses in answer order, and opens an inline detail', async () => {

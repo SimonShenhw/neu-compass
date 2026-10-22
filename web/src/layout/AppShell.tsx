@@ -4,21 +4,14 @@ import { AskBar } from './AskBar';
 import { usePrototype } from './PrototypeContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { pagePresentation } from './routePresentation';
 import styles from './AppShell.module.css';
 
 export function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const state = usePrototype();
-  const isSearch = pathname === '/' || pathname.startsWith('/course/');
-  const titles: Record<string, string> = {
-    '/': '课程搜索',
-    '/compare': '课程对比',
-    '/programs': '培养方案',
-    '/coop': 'Co-op 经验',
-    '/privacy': '数据与隐私',
-  };
-  const title = isSearch ? '课程搜索' : (titles[pathname] ?? '找不到页面');
+  const { title, isSearch } = pagePresentation(pathname);
   useEffect(() => {
     document.title = `${title} · NEU-Compass`;
     document.getElementById('main-content')?.focus({ preventScroll: true });

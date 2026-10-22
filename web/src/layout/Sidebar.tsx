@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../components/Button';
+import { pagePresentation } from './routePresentation';
 import styles from './Sidebar.module.css';
 
 export type SessionView =
@@ -25,6 +26,7 @@ export function Sidebar({
   onRefresh?: () => void;
 }) {
   const { pathname } = useLocation();
+  const { navigationPath } = pagePresentation(pathname);
   const links = [
     { path: '/', label: '课程搜索', icon: Search },
     { path: '/programs', label: '培养方案', icon: BookOpen },
@@ -61,10 +63,7 @@ export function Sidebar({
       </div>
       <nav aria-label="主导航" className={styles.navigation}>
         {links.map(({ path, label, icon: Icon }) => {
-          const active =
-            path === '/'
-              ? pathname === '/' || pathname.startsWith('/course/')
-              : pathname === path;
+          const active = path === navigationPath;
           return (
             <Link
               to={path}

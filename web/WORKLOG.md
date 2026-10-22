@@ -1,6 +1,6 @@
 # R1 修改记录
 
-最新状态见文末「R1 补验 1」：71 项测试、25 项具名变异。前面的初次交付数字保留为 `dfe5f3d` 的历史结果，不代表补验后的代码。
+最新状态见文末最新的 R1 补验记录。前面的数字按各自提交保留为历史结果，不代表补验后的代码。
 
 ## 2026-10-21 · 开工
 
@@ -173,3 +173,31 @@ R2 的接口、认证、聊天流，R3 的旧深链，以及真实数据 / 登�
 这批是原范围内的键盘缺陷修复，不是独立验收通过；完整网络面板、所有页面人工键盘 / 读屏检查、远端 CI 和 ESLint 9 兼容例外仍按前述边界处理。没有进入 R2，没有 push、PR、合并或部署。
 
 收尾：补齐文档后再次 `npm run format:check`、`npm run check`，均 exit 0，仍为 71 passed / 124,773 gzip bytes，日志 `artifacts/r1-followup-final-check.log`。当前实现与本批 25 项变异冻结哈希差异 0；改动仅上述 8 个 web 文件，未改 CI 或 Python，主 checkout 干净。临时视口已重置，独占预览进程已停止。保留初次提交，在其后追加独立本地修复提交，提交号更新到评审目录 R1_HANDOFF。
+
+## 2026-10-21 · R1 补验 2：路径匹配与页面状态一致
+
+### 复现与 RED
+
+基于 `d73e727`、干净工作树继续 R1 自验，没有新的审查文件或分工变更，未接手 R2。冻结基线 `npm run check` 为 71 passed，日志 `artifacts/r1-route-baseline-check.log`。
+
+浏览器复现：`/compare/` 和 `/COMPARE` 已渲染对比表，但页面标题是「找不到页面」，导航无当前项；`/course/CS-6140/extra` 正文是 404，却保留「课程搜索」标题、搜索导航高亮和输入框。原因是页面使用 Router 匹配，外壳 / 导航却各用字符串相等或 startsWith 判断。
+
+先增加页面回归用例再改实现：页面测试 **37 passed / 12 failed（共 49）**，失败均命中标题 / 页面状态断言；已有正确行为仍保留。证据 `artifacts/r1-route-red.json`、`r1-route-red.log`。
+
+### 修改
+
+- 新增 `src/layout/routePresentation.ts`：使用已安装 Router 的 `matchPath`，统一得到标题、当前导航目的地和是否显示搜索输入。`AppShell.tsx` 与 `Sidebar.tsx` 共用结果，移除各自不一致的字符串判断；没有改 App 的路由定义。
+- 规则对照 [React Router 7.18.4 官方说明](https://reactrouter.com/7.18.4/api/utils/matchPath)。主路径按 Router 已有的大小写 / 尾斜杠规则匹配，课程路由匹配到末尾；不改 URL、不重定向、不新增课号参数归一化，也不做 R3 的旧深链兼容。
+- 新增 19 项测试：10 个已匹配路径变体、5 个无效路径、1 个「路由存在但课程未知」保护用例，以及 3 个 axe 状态。未知课程仍是原有课程空状态，不误当成不存在的页面。
+- 新增 M26 大小写规则、M27 匹配到末尾、M28 课程不能只匹配前缀、M29 导航不能退回原始路径相等判断；原 25 项一并重跑。
+
+### 验证
+
+- 完整检查 **90 passed**，6 个测试文件，包含 **12 个页面 / 状态 axe**；strict、零警告 lint 和构建通过。日志 `artifacts/r1-route-green-check.log`。
+- 最终变异 `artifacts/mutations-2026-10-22T01-50-10-422Z/summary.json`：baseline passed，**29 / 29 KILLED，sourceUnchanged: true**；当前实现与冻结 SHA-256 差异 0，没有复用前两批数字。
+- 首屏 JS **124,771 gzip bytes / 250,000 bytes**，入口 `index-C394UCVY.js`。没有新增依赖或改 lockfile。
+- 1440×900 桌面复验 `/compare/`：对比表、标题和当前导航一致；无效课程子路径保持客户端 404，无搜索表单、无当前导航项。
+- 390×844 手机复验 `/PRIVACY/`：隐私标题与可见抽屉导航一致，Escape 关闭回焦点；`/COURSE/CS-6140` 显示详情和搜索输入框。长页有原生滚动条时内容宽 375px，短页 390px，scrollWidth 都等于 clientWidth。
+- 证据位于评审目录 `frontend_react/r1-routes-2026-10-21/`：`desktop-compare-slash.jpg`、`mobile-privacy-navigation.jpg`、`route-observations.json`。JSON 的原始 DOM 查询包含 CSS 隐藏的桌面导航，手机开抽屉时会记录两个相同标签；可见 / 可访问导航以截图和 AX 状态为准，并非两个可见当前项。
+
+本批客户端 404 不等于服务器 HTTP 状态码检查。完整网络面板、全页人工键盘 / 读屏、远端 CI 和 ESLint 9 兼容例外仍待独立验收。临时视口已重置，独占预览进程已停止；未改后端、CI、部署或真实账号，不进入 R2。
