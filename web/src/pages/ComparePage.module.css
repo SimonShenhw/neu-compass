@@ -1,0 +1,107 @@
+.compare {
+  min-width: 0;
+}
+.controls {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.count {
+  display: none;
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--ink3);
+}
+.same {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ok);
+  padding-top: var(--space-3);
+  font-size: var(--text-md);
+}
+.scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-top: var(--space-3);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.table {
+  width: 100%;
+  min-width: calc(
+    var(--row-label-width) + var(--compare-column-width) * var(--columns)
+  );
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-md);
+}
+.table th,
+.table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+  border-top: var(--border) solid var(--line2);
+  overflow-wrap: anywhere;
+}
+.table thead th {
+  border-top: var(--space-0);
+}
+.table tr > :first-child {
+  position: sticky;
+  left: 0;
+  width: var(--row-label-width);
+  background: var(--surface);
+  color: var(--ink2);
+  z-index: var(--z-sticky);
+}
+.table tbody th {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+}
+.columnHead {
+  display: grid;
+  gap: var(--space-2);
+  font-weight: var(--weight-normal);
+}
+.columnHead strong {
+  font-weight: var(--weight-bold);
+  line-height: 1.35;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-sm);
+  font-size: var(--text-sm);
+}
+.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink2);
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--ink3);
+  padding-block: var(--space-3);
+}
+@media (max-width: 767px) {
+  .count {
+    display: block;
+    margin-left: var(--space-0);
+    width: 100%;
+  }
+  .actions a {
+    min-height: var(--touch);
+  }
+}

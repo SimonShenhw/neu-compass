@@ -1,0 +1,23 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  z-index: var(--z-dialog);
+}
+.drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(var(--drawer-width), calc(100vw - var(--space-8)));
+  background: var(--side);
+  z-index: var(--z-dialog-content);
+  overflow-y: auto;
+}
+.close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+.drawer > div:last-child {
+  padding-top: var(--space-12);
+  min-height: 100%;
+}

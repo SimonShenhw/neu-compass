@@ -1,0 +1,37 @@
+import { Compass } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MobileNav } from './MobileNav';
+import styles from './TopBar.module.css';
+
+export function TopBar({
+  title,
+  count,
+  onRefresh,
+}: {
+  title: string;
+  count: number;
+  onRefresh: () => void;
+}) {
+  return (
+    <header
+      className={`${styles.topbar} ${title === '课程搜索' ? styles.searchHeader : ''}`}
+    >
+      <div className={styles.mobile}>
+        <MobileNav compareCount={count} onRefresh={onRefresh} />
+        <Link to="/" className={styles.brand}>
+          <Compass aria-hidden="true" />
+          NEU-Compass
+        </Link>
+      </div>
+      <h1>{title}</h1>
+      <div className={styles.status}>
+        <span className={styles.catalog}>
+          {title === '课程对比'
+            ? `已选 ${count} / 4 门 · 按加入的顺序`
+            : '6,469 门课 · 目录 2026–2027'}
+        </span>
+        <span className={styles.tag}>游客</span>
+      </div>
+    </header>
+  );
+}

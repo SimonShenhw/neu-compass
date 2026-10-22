@@ -1,0 +1,71 @@
+.askBar {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-4) var(--space-5);
+  margin-top: var(--space-5);
+  border-top: var(--border) solid var(--line);
+}
+.privacy {
+  display: flex;
+  align-items: start;
+  gap: var(--space-2);
+  color: var(--ink3);
+  font-size: var(--text-sm);
+}
+.privacy svg {
+  margin-top: var(--space-1);
+}
+.input {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  padding: var(--space-2);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.input:focus-within {
+  border-color: var(--accent);
+}
+.input textarea {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: var(--control);
+  max-height: var(--space-16);
+  resize: vertical;
+  border: var(--space-0);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.input textarea::placeholder {
+  color: var(--ink3);
+}
+.optin {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink2);
+  font-size: var(--text-sm);
+}
+.optin input {
+  accent-color: var(--accent);
+}
+@media (max-width: 767px) {
+  .optin {
+    min-height: var(--touch);
+  }
+  .optin input {
+    width: var(--space-5);
+    height: var(--space-5);
+  }
+  .privacy a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+  }
+}
