@@ -11,7 +11,7 @@ export function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const state = usePrototype();
-  const { title, isSearch } = pagePresentation(pathname);
+  const { title, isSearch, navigationPath } = pagePresentation(pathname);
   useEffect(() => {
     document.title = `${title} · NEU-Compass`;
     document.getElementById('main-content')?.focus({ preventScroll: true });
@@ -28,6 +28,7 @@ export function AppShell() {
       </aside>
       <div className={styles.mainColumn}>
         <TopBar
+          showGuest={navigationPath !== '/coop'}
           title={title}
           count={state.comparison.length}
           onRefresh={refresh}

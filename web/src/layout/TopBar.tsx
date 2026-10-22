@@ -7,10 +7,12 @@ export function TopBar({
   title,
   count,
   onRefresh,
+  showGuest = true,
 }: {
   title: string;
   count: number;
   onRefresh: () => void;
+  showGuest?: boolean;
 }) {
   return (
     <header
@@ -30,7 +32,7 @@ export function TopBar({
             ? `已选 ${count} / 4 门 · 按加入的顺序`
             : '6,469 门课 · 目录 2026–2027'}
         </span>
-        <span className={styles.tag}>游客</span>
+        {showGuest && <span className={styles.tag}>游客</span>}
       </div>
     </header>
   );

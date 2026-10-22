@@ -1,0 +1,27 @@
+{
+  "case": "upload-503-no-moderation",
+  "request": {
+    "method": "POST",
+    "path": "/coop",
+    "viewer": "u-zero",
+    "body": {
+      "company": "Example Fintech Co.",
+      "role": "Data Engineer Co-op",
+      "coop_term": "Fall 2026",
+      "industry": "quant_fintech",
+      "duration_months": 6,
+      "related_courses": [
+        "DS 5220"
+      ],
+      "interview_summary": "一轮技术面，聊了 SQL 和数据管道。",
+      "technical_questions": null,
+      "salary_range_usd": null
+    }
+  },
+  "status": 503,
+  "body": {
+    "detail": "Co-op moderation schema unavailable; apply the v1.3 migration",
+    "error_type": "service_unavailable",
+    "status_code": 503
+  }
+}

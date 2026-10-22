@@ -1,0 +1,72 @@
+{
+  "case": "list-guest-without-moderation",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "guest",
+    "body": null
+  },
+  "status": 200,
+  "body": [
+    {
+      "coop_id": "coop-seed-quant",
+      "company": "Example Quant LLC",
+      "role": "Quant Developer Co-op",
+      "industry": "quant_fintech",
+      "coop_term": "Spring 2026",
+      "duration_months": 6,
+      "related_courses": [
+        "CS 5800",
+        "DS 5220"
+      ],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 2
+    },
+    {
+      "coop_id": "coop-seed-health",
+      "company": "Sample Health Inc.",
+      "role": "Data Science Co-op",
+      "industry": "biotech_health",
+      "coop_term": "Fall 2025",
+      "duration_months": 4,
+      "related_courses": [
+        "CS 6140"
+      ],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 1
+    },
+    {
+      "coop_id": "coop-seed-robotics",
+      "company": "Demo Robotics",
+      "role": "Software Engineer Co-op",
+      "industry": "startup",
+      "coop_term": "Summer 2026",
+      "duration_months": 6,
+      "related_courses": [],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 0
+    },
+    {
+      "coop_id": "coop-seed-cloud",
+      "company": "Example Cloud Co.",
+      "role": "ML Engineer Co-op",
+      "industry": "big_tech",
+      "coop_term": null,
+      "duration_months": 8,
+      "related_courses": [
+        "CS 6140",
+        "CS 5100"
+      ],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 2
+    }
+  ]
+}

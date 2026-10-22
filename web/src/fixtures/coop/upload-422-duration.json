@@ -1,0 +1,27 @@
+{
+  "case": "upload-422-duration",
+  "request": {
+    "method": "POST",
+    "path": "/coop",
+    "viewer": "u-zero",
+    "body": {
+      "company": "Example Fintech Co.",
+      "role": "Data Engineer Co-op",
+      "coop_term": "Fall 2026",
+      "industry": "quant_fintech",
+      "duration_months": 9,
+      "related_courses": [
+        "DS 5220"
+      ],
+      "interview_summary": "一轮技术面，聊了 SQL 和数据管道。",
+      "technical_questions": null,
+      "salary_range_usd": null
+    }
+  },
+  "status": 422,
+  "body": {
+    "detail": "duration_months: Input should be less than or equal to 8",
+    "error_type": "invalid_input",
+    "status_code": 422
+  }
+}
