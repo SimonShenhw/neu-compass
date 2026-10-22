@@ -1,0 +1,19 @@
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chips span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  color: var(--ink2);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-0) var(--space-2);
+  background: var(--surface);
+}
+.chips .more {
+  color: var(--ink3);
+  border-style: dashed;
+}

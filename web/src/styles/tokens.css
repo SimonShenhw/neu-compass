@@ -1,0 +1,87 @@
+:root {
+  color-scheme: light;
+  --canvas: #f4f6f9;
+  --surface: #ffffff;
+  --side: #fafbfc;
+  --ink: #141c28;
+  --ink2: #44505f;
+  /* Darker than the mockup's #727e90 so small text meets AA on canvas. */
+  --ink3: #596678;
+  --line: #e0e5ec;
+  --line2: #eceff3;
+  --accent: #2b56c9;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9eefa;
+  --code: #edf1f6;
+  --ok: #2b7650;
+  --ok-soft: #e4f1e9;
+  --overlay: #141c2866;
+  --transparent: transparent;
+  --font-sans:
+    'IBM Plex Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans SC', sans-serif;
+  --font-mono:
+    'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-body: 0.875rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 1.25rem;
+  --text-title: 1.375rem;
+  --text-hero: 1.75rem;
+  --leading: 1.6;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-bold: 600;
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-round: 50%;
+  --border: 1px;
+  --focus-width: 2px;
+  --focus-offset: 3px;
+  --control-sm: 1.75rem;
+  --control: 2.125rem;
+  --touch: 2.75rem;
+  --icon: 1.125rem;
+  --icon-sm: 1rem;
+  --brand-size: 1.75rem;
+  --sidebar-width: 15.5rem;
+  --drawer-width: 19rem;
+  --header-height: 3.5rem;
+  --code-width: 5rem;
+  --row-label-width: 8rem;
+  --compare-column-width: 12.75rem;
+  --content-max: 100rem;
+  --empty-width: 36rem;
+  --toggle-width: 2.125rem;
+  --toggle-height: 1.25rem;
+  --toggle-knob: 0.875rem;
+  --toggle-inset: 0.1875rem;
+  --shadow-popover: 0 8px 24px #141c281a;
+  --z-sticky: 10;
+  --z-popover: 30;
+  --z-dialog: 40;
+  --z-dialog-content: 41;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --text-body: 0.9375rem;
+    --control: 2.75rem;
+    --control-sm: 2.75rem;
+  }
+}

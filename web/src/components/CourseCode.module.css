@@ -1,0 +1,16 @@
+.code {
+  display: inline-block;
+  align-self: start;
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  background: var(--code);
+  color: var(--ink);
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.lg {
+  font-size: var(--text-md);
+  padding-block: var(--space-1);
+}

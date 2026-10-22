@@ -1,0 +1,14 @@
+.empty {
+  display: grid;
+  gap: var(--space-3);
+  color: var(--ink3);
+  font-size: var(--text-md);
+}
+
+@media (max-width: 767px) {
+  .empty a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+  }
+}

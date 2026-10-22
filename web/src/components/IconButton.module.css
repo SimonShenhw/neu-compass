@@ -1,0 +1,5 @@
+.iconButton {
+  width: var(--control);
+  padding: var(--space-1);
+  flex: none;
+}

@@ -1,0 +1,115 @@
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: var(--space-0);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading);
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a,
+input,
+textarea,
+summary {
+  -webkit-tap-highlight-color: var(--transparent);
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: var(--space-0);
+}
+h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+h3,
+h4 {
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+svg {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+}
+:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--focus-offset);
+}
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.visually-hidden {
+  position: absolute;
+  width: var(--border);
+  height: var(--border);
+  padding: var(--space-0);
+  margin: calc(-1 * var(--border));
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: var(--space-0);
+}
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: var(--border) solid var(--accent);
+  z-index: var(--z-dialog-content);
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+}
+@media (max-width: 767px) {
+  summary {
+    min-height: var(--touch);
+    display: flex;
+    align-items: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
