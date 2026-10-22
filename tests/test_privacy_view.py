@@ -50,7 +50,11 @@ def test_the_page_says_how_google_treats_the_paid_api():
     中文：用户 10-21 确认是付费的 key；这句照 Gemini API 条款里付费服务的做法写。"""
     text = page_text()
     assert "本站用的是付费的 Gemini API" in text and "不会被拿去改进 Google 的产品" in text
-    assert "只用来发现和防止滥用" in text and "具体以 Google 的条款为准" in text
+    assert "保留一段有限的时间，只用来发现和防止违规使用、维护安全，以及法律或监管要求的披露" in text
+    # Not tied to the retention period, and Google's agents count too (A24 recheck 2, NIT-G). 中文：存放地点不绑在保留期上。
+    gemini = next(line for line in text.splitlines() if "付费的 Gemini API" in line)
+    assert "可能临时存放或缓存在 Google 或其代理设有设施的任何国家" in gemini and "期间" not in gemini
+    assert "具体以 Google 的条款为准" in text
 
 
 def test_a_switched_off_cleanup_or_feedback_is_never_promised():
@@ -98,6 +102,7 @@ def test_the_consent_notice_says_the_same_retention_as_the_page(monkeypatch, day
     if days:
         assert f"保存的回答和评价 {days} 天后删除" in notice and "不会自动删除" not in notice.split("已经导出")[0]
         assert "每日备份里最多再留大约两周" in notice and "在备份里最多再多留大约两周" in page
+        assert "已经导出的文件不会自动删除" in notice  # B24: the clause is pinned too. 中文：这一句也钉住。
         assert f"保存的回答和评价：{days} 天后删除。" in page
     else:
         assert "数据、备份和导出不会自动删除" in notice and "保存的回答和评价：目前没有自动清理" in page

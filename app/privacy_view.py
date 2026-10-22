@@ -31,8 +31,8 @@ def privacy_sections(settings: Any) -> list[tuple[str, list[str]]]:
          "个别搜索在判断要不要放弃时，也会把问题发给 Gemini 再确认一次。"
          # The user confirmed a paid key on 10-21; the Gemini API terms say how Google treats paid traffic. A free key
          # would need this sentence changed. 中文：用户 10-21 确认是付费的 key；换成免费档要改这句。
-         "本站用的是付费的 Gemini API：按 Google 的条款，这些内容不会被拿去改进 Google 的产品，但 Google 会保留一段时间，"
-         "只用来发现和防止滥用、维护服务安全，以及应对法律要求，期间可能存放在 Google 设施所在的任何国家。"
+         "本站用的是付费的 Gemini API：按 Google 的条款，这些内容不会被拿去改进 Google 的产品；Google 会把它们保留一段有限的时间，"
+         "只用来发现和防止违规使用、维护安全，以及法律或监管要求的披露。这些内容可能临时存放或缓存在 Google 或其代理设有设施的任何国家。"
          "具体以 Google 的条款为准。"),
         "用 Google 账号登录时，记下你的邮箱、名字、学校域名，以及第一次和最近一次登录的时间，用来识别你，并计算 Co-op 贡献等级。",
         "Co-op 投稿先私下保存、人工审核；同一公司、职位、学期至少有两个不同投稿人的投稿通过审核，才一起公开，公开时不显示投稿人。",

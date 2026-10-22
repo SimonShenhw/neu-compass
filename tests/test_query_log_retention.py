@@ -375,6 +375,22 @@ def test_after_a_run_the_old_text_is_gone_from_the_files_on_disk(tmp_path, check
     setup.close()
 
 
+def test_a_run_that_only_deletes_answers_still_clears_them_from_disk(tmp_path):
+    """Without the secret nothing is hashed, but the deleted answers must still leave the files (B24 G07).
+    中文：没有密钥时不换哈希，但删掉的回答也要离开磁盘上的文件。"""
+    from api import query_log_retention_task as task
+    from db.connection import connect
+
+    path = file_db(tmp_path, answers=True)
+    other = connect(path)  # as in the API: closing the run's connection does not checkpoint. 中文：另有连接开着。
+    other.execute("SELECT count(*) FROM query_log").fetchall()
+    assert task.run_once(connect=connect, db_path=str(path), key=None, days=90, now=NOW) == (None, 1, 1)
+    wal = path.with_name(path.name + "-wal")
+    on_disk = path.read_bytes() + (wal.read_bytes() if wal.exists() else b"")
+    assert b"synthetic answer 1" not in on_disk and b"synthetic answer 2" in on_disk
+    other.close()
+
+
 class NoCheckpoint:
     """A connection whose WAL checkpoint fails, after the run's own work has committed. 中文：checkpoint 失败的连接。"""
 
@@ -435,7 +451,9 @@ def test_a_checkpoint_behind_an_old_reader_gives_up_quickly_and_lets_writers_thr
     assert done.wait(10)
     took = time.monotonic() - started
     thread.join(5)
-    assert took < 2 and write_took < 2
+    # The wait is 100 ms; 0.75 s leaves room for a loaded machine and still fails a 1-second wait (B24).
+    # 中文：等 100 毫秒；0.75 秒给机器忙的时候留余地，等 1 秒的话照样失败。
+    assert took < 0.75 and write_took < 0.75
     assert runner.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
     reader.rollback()
     retention.checkpoint(runner)  # no reader left: the WAL is truncated. 中文：没有读者了，WAL 截成 0。
@@ -569,7 +587,7 @@ def test_cli_missing_database_fails_without_creating_it(tmp_path):
 def test_cli_clears_the_old_text_from_disk_while_another_connection_is_open(tmp_path):
     """As when the API is running: closing the command's connection does not checkpoint, so it checkpoints itself
     (A24 L3). 中文：和 API 开着库时一样，关掉命令的连接不会 checkpoint，所以命令自己做。"""
-    path = file_db(tmp_path)
+    path = file_db(tmp_path, answers=True)  # with a saved answer, so the checkpoint must come after its deletion (B24)
     other = sqlite3.connect(path)
     other.execute("SELECT count(*) FROM query_log").fetchall()
     result = run_cli("--db-path", str(path), "--days", "90")
@@ -577,6 +595,7 @@ def test_cli_clears_the_old_text_from_disk_while_another_connection_is_open(tmp_
     wal = path.with_name(path.name + "-wal")
     on_disk = path.read_bytes() + (wal.read_bytes() if wal.exists() else b"")
     assert b"synthetic question old-search" not in on_disk and b"synthetic eval question" not in on_disk
+    assert b"synthetic answer 1" not in on_disk
     other.close()
 
 

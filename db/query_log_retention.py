@@ -99,10 +99,12 @@ def checkpoint(conn: sqlite3.Connection) -> None:
     export), SQLite holds back every new writer. So it waits at most CHECKPOINT_WAIT_MS, not the connection's 5 seconds,
     and the API's writes go through (A24 recheck LOW-R1). If it gives up, the WAL keeps the old frames until the next
     run truncates it, or until the last connection closes: SQLite's own automatic checkpoints never truncate the file.
+    If giving the timeout back fails, the connection keeps the short one; both callers close it right after.
     中文：跑完以后尽量把 WAL 写回库文件并截断。secure_delete 打开时（db.connection.connect），换掉的原文和删掉的回答就
     从磁盘上的文件里消失了。TRUNCATE 在等旧快照上的读者（备份边车的复制、每周统计、导出）时，SQLite 会挡住所有新的写入，
     所以最多只等 CHECKPOINT_WAIT_MS，不等连接默认的 5 秒，API 的写入就不会被挡住。等不到就放弃，WAL 里的旧帧留到下一次
-    运行截断，或者最后一个连接关闭；SQLite 自己的自动 checkpoint 从来不截断文件。"""
+    运行截断，或者最后一个连接关闭；SQLite 自己的自动 checkpoint 从来不截断文件。还原等待时间失败的话，这个连接就留着短的那个；
+    两个调用方用完马上关掉连接。"""
     try:
         previous = conn.execute("PRAGMA busy_timeout").fetchone()[0]
         conn.execute(f"PRAGMA busy_timeout = {CHECKPOINT_WAIT_MS}")

@@ -489,14 +489,14 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 Batch T (10-21, policy P4): a logged-in student deletes their own account and Co-op contributions from the
 数据与隐私 page. Needs `Authorization: Bearer <session_token>` and exactly `{"confirm": "delete"}`.
 
-In one transaction (`db/account_deletion.py`):
+In one transaction (`db/account_deletion.py`), in this order:
 1. the Co-op experiences this account published, and every unlock of them;
-2. the `users` row, which cascades to its unlocks, planned courses, Co-op submissions (any review state) and
-   contribution credits;
-3. a group (company, role, term) this account helped publish that is left with only one contributor is withdrawn:
+2. a group (company, role, term) this account helped publish that is left with only one contributor is withdrawn:
    the others' items go back to `approved` and leave the public list (with their unlocks) until another approval in
    the group publishes them again. Credits already given are kept, and none is given twice. The user chose this
-   on 10-21 so that the last item cannot point at its author (k=2).
+   on 10-21 so that the last item cannot point at its author (k=2);
+3. the `users` row, which cascades to its unlocks, planned courses, Co-op submissions (any review state) and
+   contribution credits.
 
 `query_log` and saved answers never record an account (a real user's `user_id` is NULL) and are not touched. Daily
 backups keep a copy for up to 14 days. Afterwards the same token gets 401 from `GET /auth/me` and from this route.
