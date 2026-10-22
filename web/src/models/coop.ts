@@ -67,7 +67,10 @@ const longFields = [
   'technical_questions',
   'salary_range_usd',
 ] as const;
-export function prepareSubmission(draft: CoopDraft): {
+export function prepareSubmission(
+  draft: CoopDraft,
+  durationBadInput = false,
+): {
   errors: FieldErrors;
   request: CoopUploadRequest | null;
 } {
@@ -77,8 +80,9 @@ export function prepareSubmission(draft: CoopDraft): {
   const duration =
     draft.duration_months.trim() === '' ? null : Number(draft.duration_months);
   if (
-    duration !== null &&
-    (!Number.isInteger(duration) || duration < 1 || duration > 8)
+    durationBadInput ||
+    (duration !== null &&
+      (!Number.isInteger(duration) || duration < 1 || duration > 8))
   )
     errors.duration_months = '时长只能是 1–8 的整数，或留空。';
   for (const name of longFields)

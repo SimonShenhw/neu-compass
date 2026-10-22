@@ -52,9 +52,9 @@ export function CoopForm({
       return next;
     });
   }
-  async function submit() {
+  async function submit(durationBadInput: boolean) {
     if (locked.current) return;
-    const prepared = prepareSubmission(draft);
+    const prepared = prepareSubmission(draft, durationBadInput);
     setErrors(prepared.errors);
     if (!prepared.request) {
       setNotice({ message: '请检查标出的字段后再提交。' });
@@ -119,7 +119,13 @@ export function CoopForm({
         autoComplete="off"
         onSubmit={(event) => {
           event.preventDefault();
-          void submit();
+          // An incomplete number such as "1e" has value="" but is not blank.
+          // Read at submit time; React state alone loses that editing buffer.
+          const duration =
+            event.currentTarget.elements.namedItem('duration_months');
+          void submit(
+            duration instanceof HTMLInputElement && duration.validity.badInput,
+          );
         }}
       >
         <fieldset disabled={pending} className={styles.fields}>

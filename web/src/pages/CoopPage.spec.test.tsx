@@ -44,6 +44,41 @@ function form() {
 function field(label: RegExp) {
   return within(form()).getByLabelText(label);
 }
+it('native badInput with an empty DOM value is invalid, not an omitted duration', async () => {
+  const { input } = page();
+  await required();
+  const duration = field(/^时长/);
+  if (!(duration instanceof HTMLInputElement))
+    throw new Error('Expected the native duration input');
+  expect(duration).toHaveValue(null);
+  // jsdom sanitizes incomplete numeric strings without emulating the browser's
+  // editing buffer. Model the badInput flag observed with real keyboard input.
+  const validity = vi.spyOn(duration, 'validity', 'get').mockReturnValue({
+    badInput: true,
+    customError: false,
+    patternMismatch: false,
+    rangeOverflow: false,
+    rangeUnderflow: false,
+    stepMismatch: false,
+    tooLong: false,
+    tooShort: false,
+    typeMismatch: false,
+    valid: false,
+    valueMissing: false,
+  });
+  try {
+    await userEvent.click(screen.getByRole('button', { name: '提交经验' }));
+    expect(input.onSubmit).not.toHaveBeenCalled();
+    expect(duration).toHaveAccessibleDescription(
+      '时长只能是 1–8 的整数，或留空。',
+    );
+    expect(duration).toHaveAttribute('aria-invalid', 'true');
+    expect(field(/^公司/)).toHaveValue('  Example Co.  ');
+    expect(screen.getByRole('status', { name: '投稿结果' })).toHaveFocus();
+  } finally {
+    validity.mockRestore();
+  }
+});
 async function required() {
   const user = userEvent.setup();
   await user.type(field(/^公司/), '  Example Co.  ');

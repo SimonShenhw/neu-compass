@@ -636,6 +636,26 @@ cases.push(
     'error is separate from empty',
   ],
 );
+cases.push(
+  [
+    'M61',
+    'native number badInput is validated',
+    'src/models/coop.ts',
+    'durationBadInput ||',
+    'false ||',
+    'src/pages/CoopPage.spec.test.tsx',
+    'native badInput with an empty DOM value',
+  ],
+  [
+    'M62',
+    'form forwards native badInput',
+    'src/components/CoopForm.tsx',
+    'duration.validity.badInput',
+    'false',
+    'src/pages/CoopPage.spec.test.tsx',
+    'native badInput with an empty DOM value',
+  ],
+);
 for (const [id, label, file, from, to, test, expected] of cases) {
   const path = snapshot(id);
   const target = join(path, file);

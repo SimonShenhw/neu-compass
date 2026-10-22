@@ -1,5 +1,20 @@
 # Co-op 页面修改记录
 
+## R5a 补充复验：数字框非法输入（2026-10-22）
+
+- 从已交付 `812bd42` 继续；计划中没有新的 Co-op 审查文件，R2b 仍由另一边负责，本批不接 API、不扩展到对比 / 隐私页。
+- 真实浏览器键盘输入时长 `1e`：控件可见值是未完成数字，DOM `value` 为 `''`、`validity.badInput=true`。旧表单启用 `noValidate` 且只检查 React 字符串，误把它当作未填写，实际进入“提交中”并返回模拟成功；不是只从代码推测。
+- 先增加具名回归 `native badInput with an empty DOM value is invalid, not an omitted duration`，在旧代码得到 **1 个真实断言失败**：`onSubmit` 被调用且 `duration_months=null`。日志 `artifacts/coop-bad-input-red-2026-10-22.json` / `.log`。
+- 修复：在表单提交时读取数字框当下的原生 `badInput`，传入现有校验函数；非法输入走同一字段错误和结果焦点，保留其他字段；真正留空仍为 null。没有更换控件、添加校验库或改变 API / 页面 props。
+- jsdom 不模拟浏览器的数字编辑缓冲区，因此单测只注入已实测的 `badInput` 状态，浏览器另用真实按键验证修前 / 修后。首轮 strict 指出测试元素需收窄到 `HTMLInputElement`，已用运行时类型检查收窄，不放宽类型；失败日志保留。
+- 增加 M61 / M62：分别取消模型对原生非法状态的判断、取消表单向模型传递该状态；整批重新冻结执行，**62/62 KILLED，sourceUnchanged=true**，与最终源码再次比对零漂移。结果 `artifacts/mutations-2026-10-22T15-52-20-471Z/summary.json`，日志 `coop-bad-input-mutations-2026-10-22.log`；旧 60 项也全部重新命中，不只验证新增两项。
+- 完整 `npm run check` 已通过 **163 tests / 10 files**，包括原有留空 / 1–8 整数、防连点、成功清空及新增原生非法状态回归；strict、零警告 lint、构建通过。日志 `artifacts/coop-bad-input-check-2-2026-10-22.log`；首屏 `index-B-nC6bq3.js` 累计 **131,339 gzip bytes / 250,000 bytes**。依赖未变，本批未重复安装。
+- 浏览器在 1440×900 对 `1e`、390×844 对 `-` 使用真实按键复验：均标出时长错误并聚焦结果，其他字段保留。用键盘真正清空后 `badInput=false`，可按可空规则提交；手机把非法输入纠正为 `6` 后也能提交并清空表单，没有残留非法标记。这里的手机是响应式 viewport，不等同于实机软键盘验收。
+- 新证据在评审区 `frontend_react/coop-r5a-followup-2026-10-22/`：修前错误接受、修后拒绝截图，`desktop-duration-error.jpg`、`mobile-duration-error.jpg`、`browser-observations.json`。截图已查看，恢复默认 viewport；真实 API / 登录及完整网络面板验收仍未执行。
+- 收尾：格式检查通过，18 份 fixture 与来源再次逐字节比对零差异。只改本 worktree 的六个 `web/` 文件，未改依赖 / lockfile / 后端 / 其他页面；临时复验标签已关闭，核实命令行后停止本轮预览服务。不 push、PR、合并、rebase 或部署；补修本地提交号由最终回复交付，下一步仍是 R5a 独立验收，不接管 R2b。
+
+---
+
 ## 当前基准：R5a 说明书（2026-10-22）
 
 用户随后提供并指定按 `frontend_react/R5_COOP_SPEC.md` 继续推进。本文件前半段保留最初浏览原型的历史证据；“投稿等 R2 再做”“先只验收浏览”的旧分工已被本节覆盖，不能当作本轮剩余计划。
