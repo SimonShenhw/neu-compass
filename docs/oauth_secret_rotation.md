@@ -117,7 +117,8 @@ curl -i -X POST https://oauth2.googleapis.com/token \
 后端 log 看:
 ```bash
 # WSL terminal 1 uvicorn 输出里应该看到:
-# {"event": "auth.callback.success", "user_sub": "...", ...}
+# {"event": "auth.callback.success", "domain": "husky.neu.edu", "contribution_count": 0, ...}
+# (T 批起这一行不记账号 ID,只有学校域名和贡献数)
 ```
 
 ### 2.3 失败回滚

@@ -115,6 +115,29 @@ def test_a_row_changed_between_the_read_and_the_write_is_redacted_from_its_new_t
     assert rows(empty_db)[ids["old-search"]]["query"] == retention.marker(changed, key)
 
 
+class AlwaysChanged(Interleaved):
+    """Another writer changes every row before each write batch, so no UPDATE ever matches what was read.
+    中文：每一批写入之前，另一个写入方都把行改掉，UPDATE 一行也对不上。"""
+
+    def __init__(self, conn):
+        self.conn, self.batches = conn, 0
+
+    def executemany(self, sql, params):
+        self.batches += 1
+        assert self.batches <= 3, "the run kept retrying rows that keep changing"
+        params = list(params)
+        self.conn.executemany("UPDATE query_log SET query = query || ' again' WHERE log_id = ?", [(p[1],) for p in params])
+        return self.conn.executemany(sql, params)
+
+
+def test_a_batch_that_changes_nothing_ends_the_run(empty_db):
+    """Rows that keep changing are left for the next run instead of looping (B24). 中文：留给下一次，不打转。"""
+    seeded(empty_db)
+    busy = AlwaysChanged(empty_db)
+    assert retention.redact_expired(busy, key=derive_key(SECRET), now=NOW, days=90) == 0
+    assert busy.batches == 1 and retention.count_expired(empty_db, now=NOW, days=90) == 5
+
+
 def test_small_batches_cover_every_row(empty_db, monkeypatch):
     monkeypatch.setattr(retention, "BATCH", 2)
     for i in range(7):
@@ -137,7 +160,9 @@ def test_the_redaction_alone_leaves_saved_answers_and_votes(empty_db):
 
 
 @pytest.mark.parametrize("text", ["redacted:" + "0" * 16 + ":x", "redacted:" + "G" * 16 + ":5", "redacted:" + "0" * 16 + ":",
-                                  "redacted:" + "0" * 15 + ":12", "xredacted:" + "0" * 16 + ":3"])
+                                  "redacted:" + "0" * 15 + ":12", "xredacted:" + "0" * 16 + ":3",
+                                  # A24 L2: SQLite's text functions stop at a NUL. 中文：SQLite 的文字函数遇 NUL 就停。
+                                  "redacted:" + "0" * 16 + ":12" + chr(0) + "synthetic hidden question"])
 def test_only_the_exact_marker_shape_counts_as_already_redacted(empty_db, text):
     log_id = add(empty_db, text, "2026-05-01 00:00:00")
     assert retention.redact_expired(empty_db, key=derive_key(SECRET), now=NOW, days=90) == 1
@@ -266,7 +291,7 @@ def wait_for(predicate, seconds=10):
     return True
 
 
-def test_task_is_off_without_days_and_skipped_without_a_secret():
+def test_task_is_off_without_days():
     from api import query_log_retention_task as task
 
     log, calls = Log(), []
@@ -275,12 +300,118 @@ def test_task_is_off_without_days_and_skipped_without_a_secret():
         calls.append(path)
         return sqlite3.connect(":memory:")
 
-    for secret, days in ((SECRET, 0), ("", 90)):
-        stop = task.start(connect=connect, db_path="unused", secret=secret, days=days, log=log, interval=0.01)
-        time.sleep(0.2)  # long enough for a thread that should not exist to have run. 中文：不该有的线程也该跑过了。
+    stop = task.start(connect=connect, db_path="unused", secret=SECRET, days=0, log=log, interval=0.01)
+    time.sleep(0.2)  # long enough for a thread that should not exist to have run. 中文：不该有的线程也该跑过了。
+    stop()
+    assert calls == [] and log.events == [] and not [t for t in threading.enumerate() if t.name == "query-log-retention"]
+
+
+def test_without_a_secret_the_task_keeps_the_text_but_still_deletes_expired_answers(tmp_path):
+    """A24 L4: hashing needs the key, deleting answers does not. 中文：换哈希要密钥，删回答不要。"""
+    from api import query_log_retention_task as task
+    from db.connection import connect
+
+    path, log = file_db(tmp_path, answers=True), Log()
+    stop = task.start(connect=connect, db_path=str(path), secret="", days=90, log=log, clock=lambda: NOW, interval=0.05)
+    try:
+        assert wait_for(lambda: len([1 for _, event, _ in log.events if event == "query_log.retention"]) >= 2)
+    finally:
         stop()
-    assert calls == [] and not [t for t in threading.enumerate() if t.name == "query-log-retention"]
-    assert log.events == [("warning", "query_log.retention_skipped", {"reason": "no_session_secret", "days": 90})]
+    assert [e for e in log.events if e[1] == "query_log.retention_skipped"] == [
+        ("warning", "query_log.retention_skipped", {"reason": "no_session_secret", "days": 90})]  # once, at start
+    runs = [fields for _, event, fields in log.events if event == "query_log.retention"]
+    assert runs[0] == {"replaced": None, "answers_deleted": 1, "votes_deleted": 1, "days": 90}
+    conn = sqlite3.connect(path)
+    assert [text for (text,) in conn.execute("SELECT query FROM query_log") if text.startswith("synthetic question old")]
+    assert answer_ids(conn, "chat_answers") == answer_ids(conn, "answer_feedback") == [f"{2:032x}"]
+    conn.close()
+
+
+def test_connections_overwrite_what_they_delete(monkeypatch):
+    """A24 L3: secure_delete is on even where SQLite's build default is off (simulated here).
+    中文：即使 SQLite 编译默认关着（这里模拟），连接也打开 secure_delete。"""
+    import db.connection as connection
+
+    real = sqlite3.connect
+
+    def default_off(*args, **kwargs):
+        conn = real(*args, **kwargs)
+        conn.execute("PRAGMA secure_delete = OFF")
+        return conn
+
+    monkeypatch.setattr(connection.sqlite3, "connect", default_off)
+    conn = connection.connect(":memory:")
+    assert conn.execute("PRAGMA secure_delete").fetchone()[0] == 1
+    conn.close()
+
+
+@pytest.mark.parametrize("checkpointed_first", [True, False])
+def test_after_a_run_the_old_text_is_gone_from_the_files_on_disk(tmp_path, checkpointed_first):
+    """A24 L3: with another connection open, as in the API, closing the run's connection does not checkpoint, so the
+    run checkpoints itself. The old text can be in the database file or still in WAL frames, which stay in the WAL
+    file until it is truncated, so the run truncates it. 中文：和 API 里一样另有连接开着，关掉这次的连接不会
+    checkpoint，所以要自己做。旧文字可能在库文件里，也可能还在 WAL 的旧帧里（WAL 文件不截断，旧帧就一直在），所以要截断。"""
+    from api import query_log_retention_task as task
+    from db.connection import connect
+
+    path = tmp_path / "synthetic.sqlite3"
+    setup = connect(path)
+    setup.executescript(INIT_SQL_PATH.read_text(encoding="utf-8"))
+    texts = [f"synthetic private question number {i:04d}" for i in range(40)]
+    for text in texts:
+        add(setup, text, "2026-05-01 00:00:00")
+    add_answer(setup, add(setup, "synthetic question with a saved answer", "2026-05-01 00:00:00"), "2026-05-01 00:00:00",
+               7, "up")
+    if checkpointed_first:  # the text is in the database file. 中文：原文在库文件里。
+        setup.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+    other = connect(path)
+    other.execute("SELECT count(*) FROM query_log").fetchall()
+    replaced, answers, votes = task.run_once(connect=connect, db_path=str(path), key=derive_key(SECRET), days=90, now=NOW)
+    assert (replaced, answers, votes) == (41, 1, 1)
+    wal = path.with_name(path.name + "-wal")
+    on_disk = path.read_bytes() + (wal.read_bytes() if wal.exists() else b"")
+    assert not [text for text in texts if text.encode() in on_disk] and b"synthetic answer 7" not in on_disk
+    other.close()
+    setup.close()
+
+
+class NoCheckpoint:
+    """A connection whose WAL checkpoint fails, after the run's own work has committed. 中文：checkpoint 失败的连接。"""
+
+    def __init__(self, conn):
+        self.conn = conn
+
+    def execute(self, sql, *args):
+        if "wal_checkpoint" in sql:
+            raise sqlite3.OperationalError("synthetic checkpoint failure")
+        return self.conn.execute(sql, *args)
+
+    def executemany(self, *args):
+        return self.conn.executemany(*args)
+
+    def close(self):
+        self.conn.close()
+
+    def __enter__(self):
+        return self.conn.__enter__()
+
+    def __exit__(self, *exc):
+        return self.conn.__exit__(*exc)
+
+
+def test_a_failed_checkpoint_does_not_turn_a_finished_run_into_a_failed_one(tmp_path):
+    """The checkpoint is best effort: the replaced text and deleted answers are committed before it (A24 L3).
+    中文：checkpoint 只是尽力而为；换哈希和删回答在它之前已经提交。"""
+    from api import query_log_retention_task as task
+    from db.connection import connect
+
+    path = file_db(tmp_path, answers=True)
+    result = task.run_once(connect=lambda p: NoCheckpoint(connect(p)), db_path=str(path), key=derive_key(SECRET),
+                           days=90, now=NOW)
+    assert result == (5, 1, 1)
+    conn = sqlite3.connect(path)
+    assert retention.count_expired(conn, now=NOW, days=90) == 0 and answer_ids(conn, "chat_answers") == [f"{2:032x}"]
+    conn.close()
 
 
 def test_task_runs_at_start_then_every_interval_and_stops(tmp_path):
@@ -291,12 +422,13 @@ def test_task_runs_at_start_then_every_interval_and_stops(tmp_path):
     stop = task.start(connect=connect, db_path=str(path), secret=SECRET, days=90, log=log, clock=lambda: NOW,
                       interval=0.05)
     try:
-        assert wait_for(lambda: len(log.events) >= 2)
+        assert wait_for(lambda: len([1 for _, event, _ in log.events if event == "query_log.retention"]) >= 2)
     finally:
         stop()
     runs = [fields for _, event, fields in log.events if event == "query_log.retention"]
     assert runs[0] == {"replaced": 5, "answers_deleted": 1, "votes_deleted": 1, "days": 90}
     assert runs[1] == {"replaced": 0, "answers_deleted": 0, "votes_deleted": 0, "days": 90}
+    assert not [event for _, event, _ in log.events if event == "query_log.retention_skipped"]  # it has the key
     assert not [name for name in threading.enumerate() if name.name == "query-log-retention"]
     conn = sqlite3.connect(path)
     assert not [text for (text,) in conn.execute("SELECT query FROM query_log") if text.startswith("synthetic question old")]
@@ -384,6 +516,7 @@ def test_cli_dry_run_counts_and_a_real_run_replaces_and_deletes(tmp_path):
     (("--days", "90"), "", None, 2),       # a real run needs the key
     ((), SECRET, None, 2),                 # retention off and no --days
     (("--days", "0"), SECRET, None, 2),
+    (("--days", "0"), SECRET, 90, 2),      # an explicit 0 is not "use the setting" (B24)
     (("--days", "ninety"), SECRET, None, 2),
 ])
 def test_cli_refuses_without_a_key_or_days_and_changes_nothing(tmp_path, args, secret, days, code):
@@ -400,6 +533,32 @@ def test_cli_missing_database_fails_without_creating_it(tmp_path):
     missing = tmp_path / "missing.sqlite3"
     result = run_cli("--db-path", str(missing), "--days", "90")
     assert result.returncode == 1 and not missing.exists()
+
+
+def test_cli_clears_the_old_text_from_disk_while_another_connection_is_open(tmp_path):
+    """As when the API is running: closing the command's connection does not checkpoint, so it checkpoints itself
+    (A24 L3). 中文：和 API 开着库时一样，关掉命令的连接不会 checkpoint，所以命令自己做。"""
+    path = file_db(tmp_path)
+    other = sqlite3.connect(path)
+    other.execute("SELECT count(*) FROM query_log").fetchall()
+    result = run_cli("--db-path", str(path), "--days", "90")
+    assert result.returncode == 0, result.stderr
+    wal = path.with_name(path.name + "-wal")
+    on_disk = path.read_bytes() + (wal.read_bytes() if wal.exists() else b"")
+    assert b"synthetic question old-search" not in on_disk and b"synthetic eval question" not in on_disk
+    other.close()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_cli_storage_error_fails_with_the_fixed_line_only(tmp_path, dry_run):
+    """A file that is not a database: exit 1, one fixed line, no exception text (B24). 中文：固定一行，不带异常原文。"""
+    path = tmp_path / "synthetic.sqlite3"
+    path.write_bytes(b"synthetic bytes that are not a database" * 4)
+    before = path.read_bytes()
+    result = run_cli("--db-path", str(path), "--days", "90", *(["--dry-run"] if dry_run else []))
+    assert result.returncode == 1 and result.stdout == ""
+    assert result.stderr == "Query log retention failed (input/storage); a partial run keeps every finished batch.\n"
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("value", ["true", "-1", "3651", "1.5"])

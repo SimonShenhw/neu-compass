@@ -33,10 +33,20 @@ def test_the_configured_policy_is_what_the_page_says():
     assert f"留多久: 每日备份保留 {BACKUP_COPIES} 份，所以到期清理掉的内容，在备份里最多再多留大约两周。" in lines
 
 
+def test_the_page_says_what_a_redacted_row_keeps_and_who_else_sees_what():
+    """A24 L6 and its NITs: the row keeps more than a count, k=2 counts contributors, published Co-op is shown to
+    visitors, and Cloudflare sees the traffic. 中文：换过的那一行还留着什么、k=2 数的是投稿人、谁还能看到。"""
+    text = page_text()
+    assert "那一行还留着时间、搜到的课程和检索方式，用来统计。" in text
+    assert "至少有两个不同投稿人的投稿通过审核，才一起公开" in text
+    assert "公开的 Co-op 经验按贡献等级给访客看" in text and "Cloudflare 能看到传输的内容" in text
+    assert "登录只记学校域名，不记是谁。" in text  # A24 L1, pinned in test_api_auth_route.py. 中文：A24 L1。
+
+
 def test_a_switched_off_cleanup_or_feedback_is_never_promised():
     off = page_text(days=0, feedback=False, contact=None)
     assert "目前没有自动清理提问原文" in off and "提问原文：目前没有自动清理。" in off
-    assert "到期" not in off and "哈希，那一行还在" not in off
+    assert "到期" not in off and "那一行还留着" not in off
     assert f"留多久: 每日备份保留 {BACKUP_COPIES} 份，大约两周。" in off.splitlines()
     assert "回答反馈功能目前关闭：回答不保存。" in off and "保存的回答" not in off
     assert "写邮件" not in off and "@" not in off
@@ -61,6 +71,26 @@ def test_the_saved_answer_line_follows_the_retention_and_the_contact(days, conta
 ])
 def test_the_delete_section_says_what_carries_no_account(days, feedback, line):
     assert f"怎么删: {line}" in page_text(days=days, feedback=feedback).splitlines()
+
+
+@pytest.mark.parametrize("days", [90, 30, 0])
+def test_the_consent_notice_says_the_same_retention_as_the_page(monkeypatch, days):
+    """A24 M1: the notice next to the opt-in and the page read the same setting. 中文：勾选旁的说明和页面读同一个设置。"""
+    from app.answer_feedback_view import render_feedback_capture_control
+    from config import settings
+
+    monkeypatch.setattr(settings, "answer_feedback_enabled", True)
+    monkeypatch.setattr(settings, "query_log_retention_days", days)
+    captions = []
+    surface = SimpleNamespace(session_state={}, caption=captions.append, checkbox=lambda label, **kwargs: False)
+    render_feedback_capture_control(surface)
+    notice, page = captions[1], page_text(days=days)
+    if days:
+        assert f"保存的回答和评价 {days} 天后删除" in notice and "不会自动删除" not in notice.split("已经导出")[0]
+        assert "每日备份里最多再留大约两周" in notice and "在备份里最多再多留大约两周" in page
+        assert f"保存的回答和评价：{days} 天后删除。" in page
+    else:
+        assert "数据、备份和导出不会自动删除" in notice and "保存的回答和评价：目前没有自动清理" in page
 
 
 def test_the_deletion_warning_names_the_withdrawal_and_what_it_cannot_reach():
@@ -133,3 +163,13 @@ def test_contact_setting_rejects_values_that_are_not_a_plain_address(monkeypatch
         Settings()
     monkeypatch.setenv("PRIVACY_CONTACT_EMAIL", CONTACT)
     assert Settings().privacy_contact_email == CONTACT
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_a_blank_contact_setting_is_unset_and_still_starts(monkeypatch, value):
+    """The .env.example line uncommented as written (B24): unset, so the page hides the line. 中文：空值就是没设。"""
+    from config.settings import Settings
+
+    monkeypatch.setenv("PRIVACY_CONTACT_EMAIL", value)
+    assert Settings().privacy_contact_email is None
+    assert "写邮件" not in page_text(contact=Settings().privacy_contact_email)

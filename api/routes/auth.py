@@ -123,9 +123,11 @@ def oauth_callback(
     )
     conn.commit()
 
+    # No account id: the API log rotates by size, not by time, and deleting an account cannot reach it, so a login line
+    # names only the school domain (batch T, A24 L1). 中文：不记账号 ID：API 日志按大小轮转、没有时限，删账号也删不到，
+    # 所以登录这一行只写学校域名。
     log.info(
         "auth.callback.success",
-        user_id=user.user_id,
         domain=user.domain,
         contribution_count=user.contribution_count,
     )

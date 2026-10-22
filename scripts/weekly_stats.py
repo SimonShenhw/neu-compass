@@ -6,13 +6,16 @@ Opens the database read-only in one snapshot (the same helper as the exports) an
 - answer votes (up / down) by the day they were last changed, and saved answers created in the window;
 - accounts in total and created in the window; Co-op submissions waiting for review and published;
 - today's model calls from `model_budget.json` next to the database, when the file exists.
-Nothing is written. Running it on the NAS is still touching the NAS: ask the user first (P7).
+Nothing in the database changes, but like the exports, SQLite may leave `-wal` / `-shm` files next to a WAL database
+even when it is opened read-only (docs/query-log-export.md). Running it on the NAS is still touching the NAS: ask the
+user first (P7).
 
 中文：每周试用检查用的只读计数（T 批，政策 P7）：不输出问题原文、邮箱或 ID。以只读方式在一次快照里打开数据库（和导出
 用同一个工具），输出一个 JSON：窗口内每个 UTC 日的提问数（按路由和流量分：unmarked＝没带 X-Eval-Run，不能证明是真人；
 eval；unknown），unmarked 提问的检索方式；按最后修改日期计的 👍／👎，窗口内新保存的回答；账号总数和窗口内新建的；
-等审核和已公开的 Co-op 投稿；如果有 `model_budget.json`，今天的模型调用次数。不写任何东西。在 NAS 上跑仍然算碰 NAS，
-要先问用户（P7）。
+等审核和已公开的 Co-op 投稿；如果有 `model_budget.json`，今天的模型调用次数。数据库里什么也不改；但和导出一样，WAL 模式
+的库即使只读打开，SQLite 也可能在旁边留下 `-wal`／`-shm` 文件（见 docs/query-log-export.md）。在 NAS 上跑仍然算碰
+NAS，要先问用户（P7）。
 """
 
 from collections import Counter

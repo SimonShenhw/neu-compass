@@ -170,14 +170,17 @@ class CaptureSurface:
 
 @pytest.mark.parametrize('enabled,chosen,expected', [(False, True, False), (True, False, False), (True, True, True), (True, 'true', False)])
 def test_capture_control_shows_notice_and_fails_closed(monkeypatch, enabled, chosen, expected):
-    from app.answer_feedback_view import CAPTURE_NOTICE, CAPTURE_OPT_IN_KEY, QUERY_LOG_NOTICE, render_feedback_capture_control
+    from app.answer_feedback_view import CAPTURE_OPT_IN_KEY, QUERY_LOG_NOTICE, capture_notice, render_feedback_capture_control
+    from config import settings
     enable(monkeypatch, enabled)
+    monkeypatch.setattr(settings, 'query_log_retention_days', 0)  # retention off; batch T tests the 90-day wording
     st = CaptureSurface(chosen=chosen, state={CAPTURE_OPT_IN_KEY: True})
     assert render_feedback_capture_control(st) is expected
     assert st.captions[0] == QUERY_LOG_NOTICE
     if enabled:
-        assert CAPTURE_NOTICE in st.captions and st.checkboxes[0][1]['value'] is False
-        assert '不点击' in CAPTURE_NOTICE and '不会自动删除' in CAPTURE_NOTICE
+        notice = capture_notice(0)
+        assert notice in st.captions and st.checkboxes[0][1]['value'] is False
+        assert '不点击' in notice and '不会自动删除' in notice
     else:
         assert not st.checkboxes and CAPTURE_OPT_IN_KEY not in st.session_state
         from app.answer_feedback_view import CAPTURE_OFF_NOTICE  # noqa: PLC0415

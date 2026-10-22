@@ -24,19 +24,20 @@ def privacy_sections(settings: Any) -> list[tuple[str, list[str]]]:
     contact = settings.privacy_contact_email
     kept = [
         "你每次搜索和提问的原文，会存进不公开的查询日志。日志不和你的账号关联：登录了也不记是谁问的。",
-        (f"原文保存 {days} 天，到期以后换成一段带密钥的哈希，那一行还在，只用来统计提问量。" if days
+        (f"原文保存 {days} 天，到期以后换成一段带密钥的哈希；那一行还留着时间、搜到的课程和检索方式，用来统计。" if days
          else "目前没有自动清理提问原文。"),
-        "运行日志里只记问题的带密钥哈希和长度，不记原文。",
+        "运行日志里，提问只记带密钥的哈希和长度，不记原文；登录只记学校域名，不记是谁。",
         ("回答由 Google 的 Gemini 生成：你的问题、这次对话最近几轮和检索到的课程信息会发给 Gemini。"
          "个别搜索在判断要不要放弃时，也会把问题发给 Gemini 再确认一次。Google 怎样处理这些数据，以 Google 的条款为准。"),
         "用 Google 账号登录时，记下你的邮箱、名字和学校域名，用来识别你，并计算 Co-op 贡献等级。",
-        "Co-op 投稿先私下保存、人工审核；同一公司、职位、学期至少有两份通过审核的投稿时才一起公开，公开时不显示投稿人。",
+        "Co-op 投稿先私下保存、人工审核；同一公司、职位、学期至少有两个不同投稿人的投稿通过审核，才一起公开，公开时不显示投稿人。",
         ("只有你勾选「允许保存」以后，回答和你的 👍／👎 才会保存，同样不记是谁；不勾选时只有上面的查询日志。" if feedback
          else "回答反馈功能目前关闭：回答不保存。"),
         "选课草案和课程对比只在这次会话里，刷新或登出就清空，不写数据库。",
     ]
-    who = ["服务器上的数据只有维护者能看，不卖、也不交给第三方；生成回答要把问题发给 Google Gemini，见上。",
-           "网站的访问经 Cloudflare 的加密隧道转发到服务器。"]
+    who = ["服务器上的数据只有维护者能看，不卖、也不交给第三方；公开的 Co-op 经验按贡献等级给访客看；"
+           "生成回答要把问题发给 Google Gemini，见上。",
+           "网站经 Cloudflare 转发到服务器：连接在 Cloudflare 那里解密再转发，所以 Cloudflare 能看到传输的内容。"]
     keep_for = [
         f"提问原文：{days} 天，到期换成哈希。" if days else "提问原文：目前没有自动清理。",
         (f"每日备份保留 {BACKUP_COPIES} 份，所以到期清理掉的内容，在备份里最多再多留大约两周。" if days
@@ -85,6 +86,11 @@ def _delete_account() -> None:
             queue_cookie_clear(state)
             logout(state)
             state[DELETE_RESULT_KEY] = ("error", "这个登录已经失效，本页已登出。如果账号还在，请重新登录以后再删除。")
+        elif e.status_code in (502, 503, 504):
+            # No answer, or a gateway's: the server may have finished, so "nothing deleted" would not be known (A24 L5;
+            # docs/request-admission.md). 中文：没收到回复，服务器可能已经删完了，不能说「什么也没删」。
+            state[DELETE_RESULT_KEY] = ("error", "这次没收到服务器的确认，不确定删除有没有完成。请刷新页面：变成游客了，"
+                                                 "就是已经删掉了；还是登录状态的话，可以再删一次。")
         else:
             state[DELETE_RESULT_KEY] = ("error", "删除没有完成，什么也没删。请稍后再试；一直不行的话，请写邮件联系。")
         return

@@ -122,7 +122,8 @@ STREAM_ERROR_DETAIL = {
     "internal_error": "服务内部出错，这条回答没有完成。请稍后再问一次。",
     # Batch T (P5): today's model places are used up; retrieval still ran and its results are in meta.
     # 中文：T 批（P5）：今天的模型名额用完了；检索照常做了，结果在 meta 里。
-    "daily_limit": "今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。明天可以再来提问。",
+    "daily_limit": ("今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。"
+                    "次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"),
 }
 _NO_ANSWER_KINDS = frozenset({"empty_stream", "empty_response"})
 

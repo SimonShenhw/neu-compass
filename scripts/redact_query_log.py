@@ -34,7 +34,7 @@ def cli(argv=None, *, now=None):
     from config import settings  # noqa: PLC0415
     from db.connection import connect  # noqa: PLC0415
     from db.query_log_retention import (  # noqa: PLC0415
-        count_expired, count_expired_answers, delete_expired_answers, redact_expired)
+        checkpoint, count_expired, count_expired_answers, delete_expired_answers, redact_expired)
 
     parser = RetentionArgumentParser(description=__doc__)
     parser.add_argument('--db-path', help='Default: the configured SQLITE_PATH')
@@ -65,6 +65,7 @@ def cli(argv=None, *, now=None):
             else:
                 replaced = redact_expired(conn, key=derive_key(settings.session_secret), now=now, days=days)
                 answers, votes = delete_expired_answers(conn, now=now, days=days)
+                checkpoint(conn)
                 report = {'dry_run': False, 'days': days, 'replaced': replaced, 'answers_deleted': answers,
                           'votes_deleted': votes}
         finally:

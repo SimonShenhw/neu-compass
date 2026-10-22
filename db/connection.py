@@ -18,7 +18,10 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
+
+if TYPE_CHECKING:  # For the annotation only; the runtime import stays deferred below. 中文：只给类型注解用。
+    from db.repository import CourseRepository
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -64,6 +67,12 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     # 由此带来的唯一耐久性(durability)风险,是"commit 之后立刻断电"这一种
     # 情况 —— 对于可重建的数据(ADR-0013)来说,这个代价可以接受。
     conn.execute("PRAGMA synchronous = NORMAL")
+    # secure_delete overwrites deleted and replaced content with zeros instead of leaving it in free space. The
+    # query_log retention and account deletion (batch T) promise the text is gone, and the backup sidecar's page copy
+    # would otherwise carry the old bytes into every new backup. Many builds default it on; this does not rely on that.
+    # 中文：secure_delete 把删掉和换掉的内容用零覆盖，而不是留在空闲空间里。T 批的到期清理和删账号承诺原文没了；
+    # 不打开的话，备份边车按页复制，会把旧字节带进之后的每一份备份。很多编译默认就开着，这里不依赖默认值。
+    conn.execute("PRAGMA secure_delete = ON")
     conn.row_factory = sqlite3.Row
     return conn
 

@@ -97,6 +97,49 @@ def test_concurrent_calls_never_take_more_places_than_the_limit(tmp_path):
     assert sorted(os.listdir(tmp_path)) == [mb.FILENAME]  # no temporary files left
 
 
+class Held(Day):
+    """A clock that keeps its first caller inside acquire() until released. 中文：让第一个调用停在 acquire() 里。"""
+
+    def __init__(self):
+        super().__init__()
+        self.entered, self.release, self.calls = threading.Event(), threading.Event(), 0
+
+    def __call__(self):
+        self.calls += 1
+        if self.calls == 1:
+            self.entered.set()
+            self.release.wait(5)
+        return self.value
+
+
+def test_a_second_call_waits_while_the_first_is_counting(tmp_path):
+    """The lock keeps the count right, not the GIL: the test above passes without it (B24). 中文：靠的是锁。"""
+    clock, results = Held(), {}
+    b = budget(tmp_path, 1, clock)
+    first = threading.Thread(target=lambda: results.setdefault("first", b.acquire()))
+    first.start()
+    assert clock.entered.wait(5)
+    second = threading.Thread(target=lambda: results.setdefault("second", b.acquire()))
+    second.start()
+    second.join(1.0)
+    clock.release.set()
+    first.join(5)
+    second.join(5)
+    assert results == {"first": True, "second": False} and b.used() == 1
+
+
+def test_a_failed_rename_leaves_no_temporary_file(monkeypatch, tmp_path):
+    """B24: the temporary file goes even when the last step fails. 中文：最后一步失败时，临时文件也删掉。"""
+    def refuse(src, dst):
+        raise PermissionError("synthetic")
+
+    monkeypatch.setattr(mb.os, "replace", refuse)
+    b = budget(tmp_path, 2)
+    with capture_logs() as logs:
+        assert b.acquire() is True and b.used() == 1
+    assert os.listdir(tmp_path) == [] and [entry["event"] for entry in logs] == ["model_budget.write_failed"]
+
+
 @pytest.mark.parametrize("limit", [0, -1, True, 2.0])
 def test_a_budget_needs_a_whole_limit_of_at_least_one(tmp_path, limit):
     with pytest.raises(ValueError):
@@ -112,6 +155,36 @@ def test_dependency_is_off_at_zero_and_shared_per_database(monkeypatch, tmp_path
     monkeypatch.setattr(settings, "model_daily_call_limit", 200)
     first, second = get_model_budget(), get_model_budget()
     assert first is second and first.limit == 200 and first.path == (tmp_path / mb.FILENAME).resolve()
+
+
+def test_two_first_requests_build_one_counter(monkeypatch, tmp_path):
+    """The registry lock (B24): a second first request waits instead of building a counter of its own.
+    中文：第二个首个请求等着，不另建一个计数器。"""
+    import api.dependencies as deps
+
+    entered, release, built, got = threading.Event(), threading.Event(), [], []
+
+    class Slow(mb.ModelBudget):
+        def __init__(self, *args, **kwargs):
+            built.append(self)
+            if len(built) == 1:
+                entered.set()
+                release.wait(5)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(mb, "ModelBudget", Slow)
+    monkeypatch.setattr(deps, "_BUDGETS", {})
+    path = str(tmp_path / mb.FILENAME)
+    first = threading.Thread(target=lambda: got.append(deps._model_budget(path, 5)))
+    first.start()
+    assert entered.wait(5)
+    second = threading.Thread(target=lambda: got.append(deps._model_budget(path, 5)))
+    second.start()
+    second.join(1.0)
+    release.set()
+    first.join(5)
+    second.join(5)
+    assert len(built) == 1 and len(got) == 2 and got[0] is got[1]
 
 
 @pytest.mark.parametrize("value", ["true", "-1", "100001", "1.5"])
@@ -185,6 +258,14 @@ def test_chat_without_a_place_streams_meta_then_the_fixed_notice_and_never_calls
     assert [e["type"] for e in stream] == ["meta", "error", "done"]
     assert stream[1] == {"type": "error", "error_type": "daily_limit", "detail": chat_route.STREAM_ERROR_DETAIL["daily_limit"]}
     assert stream[2] == {"type": "done"} and called == []
+
+
+def test_the_daily_limit_notice_says_when_the_places_come_back():
+    """The UTC day ends in the Boston evening, so "tomorrow" was wrong (A24 NIT). 中文：恢复是在波士顿的晚上。"""
+    from api.routes import chat as chat_route
+
+    notice = chat_route.STREAM_ERROR_DETAIL["daily_limit"]
+    assert "UTC 零点" in notice and "晚上 8 点" in notice and "冬令时晚上 7 点" in notice and "明天" not in notice
 
 
 def test_chat_with_a_place_answers_as_before_and_takes_exactly_one(api_client, tmp_path):

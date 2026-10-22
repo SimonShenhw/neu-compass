@@ -29,9 +29,13 @@ from api.query_hash import HASH_CHARS, keyed_hash
 PREFIX = "redacted:"
 MARKER = re.compile(rf"redacted:[0-9a-f]{{{HASH_CHARS}}}:[0-9]+")
 BATCH = 500
-# Already redacted: the prefix, 16 lowercase hex characters, a colon, then only digits (at least one).
-# 中文：已经换过的行：前缀、16 位小写十六进制、冒号，后面全是数字（至少一位）。
-_ALREADY = ("length(query) > 26 AND substr(query, 1, 9) = 'redacted:' AND substr(query, 26, 1) = ':' "
+# Already redacted: the prefix, 16 lowercase hex characters, a colon, then only digits (at least one). SQLite's
+# length(), substr() and GLOB stop at a NUL, so the byte length must equal the character length too: a marker is pure
+# ASCII, and a crafted "marker + NUL + text" would otherwise pass and keep its text forever (A24 L2).
+# 中文：已经换过的行：前缀、16 位小写十六进制、冒号，后面全是数字（至少一位）。SQLite 的 length()、substr()、GLOB
+# 遇到 NUL 就停，所以还要求字节数等于字符数：标记全是 ASCII，否则「标记＋NUL＋原文」会被当成已经换过，原文永远留着。
+_ALREADY = ("length(query) > 26 AND length(CAST(query AS BLOB)) = length(query) "
+            "AND substr(query, 1, 9) = 'redacted:' AND substr(query, 26, 1) = ':' "
             "AND substr(query, 10, 16) NOT GLOB '*[^0-9a-f]*' AND substr(query, 27) NOT GLOB '*[^0-9]*'")
 
 
@@ -86,6 +90,18 @@ def delete_expired_answers(conn: sqlite3.Connection, *, now: datetime, days: int
     return answers, votes
 
 
+def checkpoint(conn: sqlite3.Connection) -> None:
+    """Move the WAL into the database file and empty it, best effort, after a run. With secure_delete on
+    (db.connection.connect), the replaced text and the deleted answers are then gone from the files on disk instead of
+    waiting for SQLite's next automatic checkpoint; a busy database just leaves it to that one (A24 L3).
+    中文：跑完以后尽量把 WAL 写回库文件并清空。secure_delete 打开时（db.connection.connect），换掉的原文和删掉的回答
+    就从磁盘上的文件里消失了，不用等 SQLite 下一次自动 checkpoint；库忙的时候留给那一次。"""
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+    except sqlite3.Error:
+        pass
+
+
 def redact_expired(conn: sqlite3.Connection, *, key: bytes, now: datetime, days: int) -> int:
     """Replace the text of every expired row, in short write transactions of at most BATCH rows; returns the count.
 
@@ -110,5 +126,5 @@ def redact_expired(conn: sqlite3.Connection, *, key: bytes, now: datetime, days:
             return total
 
 
-__all__ = ["BATCH", "MARKER", "PREFIX", "count_expired", "count_expired_answers", "delete_expired_answers", "marker",
-           "redact_expired"]
+__all__ = ["BATCH", "MARKER", "PREFIX", "checkpoint", "count_expired", "count_expired_answers", "delete_expired_answers",
+           "marker", "redact_expired"]

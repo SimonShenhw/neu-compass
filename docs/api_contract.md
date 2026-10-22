@@ -578,9 +578,10 @@ Malformed identity shapes (OAuth callback and cookie restore) fail without modif
 login state; a malformed restore keeps the cookie, like an outage. Streamlit defaults to
 `client.showErrorDetails="type"`; full details are opt-in for local development only.
 
-Boundaries: this does not remove successful query text logs or query_log contents, the
-Google sub in `auth.callback.success`, or potential sensitive data in request paths/access
-query strings. Exceptions after response headers are sent cannot be converted to this
+Boundaries: this does not remove successful query text logs or query_log contents, or
+potential sensitive data in request paths/access query strings. (The Google sub that
+`auth.callback.success` used to carry was dropped in batch T: the line keeps only the
+domain and the contribution count.) Exceptions after response headers are sent cannot be converted to this
 500 body: they are logged once as a safe `unhandled_exception`, but uvicorn's own
 `Exception in ASGI application` traceback (its handler bypasses the root filter) still
 prints the message. `/chat` builds its first (meta) line before the response starts and

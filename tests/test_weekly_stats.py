@@ -64,6 +64,17 @@ def test_counts_for_the_window_by_day_route_traffic_and_mode(tmp_path):
     assert report["model_calls_today"] == 17
 
 
+def test_an_old_database_without_saved_answers_still_reports_the_rest(tmp_path):
+    """A database from before the v1.7 tables (B24). 中文：没有 v1.7 表的旧库。"""
+    path = seeded_db(tmp_path)
+    conn = sqlite3.connect(path)
+    conn.executescript("DROP TABLE answer_feedback; DROP TABLE chat_answers;")
+    conn.close()
+    report = weekly_stats(path, days=7, today=TODAY)
+    assert "votes" not in report and "saved_answers" not in report
+    assert report["accounts"] == {"total": 2, "created_in_window": 1} and report["model_calls_today"] == 17
+
+
 def test_a_stale_or_missing_budget_file_is_left_out(tmp_path):
     path = seeded_db(tmp_path)
     (tmp_path / "model_budget.json").write_text(json.dumps({"day": "2026-10-20", "calls": 5}), encoding="utf-8")

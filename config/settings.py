@@ -70,6 +70,15 @@ class Settings(BaseSettings):
     # 中文：「数据与隐私」页上用于提问和删除请求的联系邮箱（T 批，P4）；不设就不显示这一行。
     privacy_contact_email: str | None = Field(default=None, pattern=r"^[^@\s<>()\[\]`*_]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 
+    @field_validator('privacy_contact_email', mode='before')
+    @classmethod
+    def a_blank_contact_is_unset(cls, value):
+        # `PRIVACY_CONTACT_EMAIL=` (the .env.example line uncommented as written) means unset, not a bad address that
+        # stops the app from starting. 中文：照 .env.example 原样取消注释的空值是没设，不是写错的地址，不能让程序起不来。
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator('query_log_retention_days', 'model_daily_call_limit', mode='before')
     @classmethod
     def days_and_limits_are_not_booleans(cls, value):

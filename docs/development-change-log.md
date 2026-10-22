@@ -3834,27 +3834,30 @@ API、检索、提示词、数据库和快照都没改。
 1. **「数据与隐私」页**（`app/privacy_view.py`）：导航末尾加第 5 页「🔒 数据与隐私 · Privacy」，前四页的位置和深链序号不变。
    - 分四段：记了什么、谁能看、留多久、怎么删。每句话都对应代码现在的做法。
    - 天数、反馈开关和联系邮箱取自 UI 的设置（`QUERY_LOG_RETENTION_DAYS`、`ANSWER_FEEDBACK_ENABLED`、`PRIVACY_CONTACT_EMAIL`），所以清理关着时页面不会承诺清理。
-   - 写明问题、这次对话最近几轮和检索到的课程信息会发给 Google Gemini，网站的访问经 Cloudflare 隧道转发。
+   - 写明问题、这次对话最近几轮和检索到的课程信息会发给 Google Gemini；网站经 Cloudflare 转发，连接在 Cloudflare 那里解密，所以 Cloudflare 能看到传输的内容；公开的 Co-op 经验按贡献等级给访客看。
+   - 换过哈希的那一行还留着时间、搜到的课程和检索方式；Co-op 要两个不同投稿人的投稿通过审核才一起公开；运行日志里登录只记学校域名。这几句是 A24 审查以后改准的。
    - 提问和保存的回答都不记账号（真实用户的 `user_id` 本来就是空），页面照实写：删账号删不到它们，只能等到期。
+   - 聊天里勾选「允许保存」旁边的说明（`capture_notice`）也读 `QUERY_LOG_RETENTION_DAYS`：设了天数就写「保存的回答和评价 N 天后删除，每日备份里最多再留大约两周」，和隐私页一致；设成 0 时照旧说不会自动删除（A24 M1）。
    - 聊天顶部的提示后面加了一句「留多久、怎么删，见左侧「🔒 数据与隐私」。」。九个页面快照重新生成，逐个核对过，只有这一句变了。
    - 只用纯文字，每句经过 `literal_markdown`。
 2. **提问原文到期换哈希**（`db/query_log_retention.py`）：`created_at` 早于期限、还没换过的行，`query` 换成 `redacted:<16 位十六进制>:<字符数>`，别的列都不动。
    - 哈希就是 K 的 `query_hash`。派生和计算拆进新的 `api/query_hash.py`，它不读设置；`api/query_fields.py` 改成调用它，哈希值不变，K 的测试照过。
-   - 只有完全符合这个形状的文字才算已经换过，所以第二遍不会再改。
-   - 分批处理，每批一个短的写事务；每条 UPDATE 都核对读到的原文，中间被改过的行留给下一批，按改过的原文换。
-   - 没有 `SESSION_SECRET` 时不跑：随机密钥会毁掉原文，留下的哈希又什么也对不上。
+   - 只有完全符合这个形状的文字才算已经换过，所以第二遍不会再改。SQLite 的 `length()`、`substr()`、`GLOB` 遇到 NUL 就停，所以还要求字节数等于字符数，「标记＋NUL＋原文」骗不过去（A24 L2）。
+   - 分批处理，每批一个短的写事务；每条 UPDATE 都核对读到的原文，中间被改过的行留给下一批，按改过的原文换。一整批一行也没换成时，这次就停，留给下一次。
+   - 没有 `SESSION_SECRET` 时不换：随机密钥会毁掉原文，留下的哈希又什么也对不上。
+   - 磁盘上的旧字节：`db/connection.py` 的每个连接都打开 `secure_delete`，换掉和删掉的内容用零覆盖；不然备份边车按页复制，会把旧字节带进之后的每一份备份（A24 L3：编译默认关闭时，40 条里有 39 条原文还在库文件里）。跑完以后做一次 WAL checkpoint（`TRUNCATE`），失败了不算这次失败。
 3. **保存的回答到期删除**（同一模块的 `delete_expired_answers`）：`chat_answers` 里超过同一期限的回答，连同评价一起删除。
    - 先删评价再删回答，所以不靠外键级联也不会留下孤立的评价。
    - 没有 v1.7 表的旧库跳过这一步。
-4. **在哪里跑**（`api/query_log_retention_task.py`，接在 `api/main.py` 的 lifespan 上）：API 进程里的一个后台线程，启动时一次，之后每 24 小时一次。每次先换哈希，再删回答。
+4. **在哪里跑**（`api/query_log_retention_task.py`，接在 `api/main.py` 的 lifespan 上）：API 进程里的一个后台线程，启动时一次，之后每 24 小时一次。每次先换哈希，再删回答，最后 checkpoint。
    - 原先的设计是放在备份边车里，那样要把能伪造登录的 `SESSION_SECRET` 交给备份容器，所以改在 API 里跑。
-   - `QUERY_LOG_RETENTION_DAYS` 为 0（代码默认）时关闭。没有密钥时整个跳过，记一条 `query_log.retention_skipped`。
+   - `QUERY_LOG_RETENTION_DAYS` 为 0（代码默认）时关闭。没有密钥时只跳过换哈希，删回答照跑（它不需要密钥）：启动时记一条 `query_log.retention_skipped`，之后每次的日志里 `replaced` 是 null（A24 L4）。
    - 某一次失败只记 `query_log.retention_failed` 和异常类型，下一次再试，不会让 API 停下。日志里只有计数。
-   - 手动命令 `scripts/redact_query_log.py`：`--dry-run` 只数，不要密钥；真跑要 `SESSION_SECRET`；只输出计数。
-5. **每天的模型调用上限**（`api/model_budget.py`；设置 `MODEL_DAILY_CALL_LIMIT`，代码默认 0，不限）：每次真正调 Gemini 之前占一个名额。回答生成算一次；HyDE 救援只有过了课号规则、真去调模型才算；评测流量也算。
+   - 手动命令 `scripts/redact_query_log.py`：`--dry-run` 只数，不要密钥；真跑要 `SESSION_SECRET`（没有时整个拒绝），跑完也 checkpoint；只输出计数。
+5. **每天的模型调用上限**（`api/model_budget.py`；设置 `MODEL_DAILY_CALL_LIMIT`，代码默认 0，不限）：API 每次真正调 Gemini 之前占一个名额。回答生成算一次；HyDE 救援只有过了课号规则、真去调模型才算；经过 API 的评测流量也算。`scripts/` 里的离线脚本直接调模型，不占名额（A24 L7）。
    - 按 UTC 日期计数，存在数据库同目录的 `model_budget.json`，原子写入，有进程锁，重启不归零。
    - 文件读不了就从 0 开始；写不了照样在内存里限制，只警告一次。
-   - 用完以后，`/chat` 在 meta 后面发固定的 `daily_limit` 错误事件和 done，不调模型；UI 把这句提示当作回答显示。救援抛 `ModelBudgetExhausted`，`attempt_hyde_rescue` 保留原来的拒答，记 `rescue.skipped reason=model_daily_limit`。
+   - 用完以后，`/chat` 在 meta 后面发固定的 `daily_limit` 错误事件和 done，不调模型；UI 把这句提示当作回答显示。提示写了恢复时间：UTC 零点，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）；原来写的「明天」不对。救援抛 `ModelBudgetExhausted`，`attempt_hyde_rescue` 保留原来的拒答，记 `rescue.skipped reason=model_daily_limit`。
    - 只有一个 API 进程，所以用进程锁就够了；这不是多进程或按用户的配额。
 6. **删除账号和投稿**（`POST /auth/delete-account`，`db/account_deletion.py`）：要 Bearer，body 正好是 `{"confirm": "delete"}`。一个事务里做完：
    - 先删这个账号公开的 Co-op 经验，以及任何人对它们的解锁记录（外键只会把投稿人置空，内容会匿名留在公开列表里）；
@@ -3862,7 +3865,7 @@ API、检索、提示词、数据库和快照都没改。
    - **k=2：** 同一组（公司、职位、学期）公开的投稿如果因此只剩一个投稿人，剩下那份撤回到 `approved`，从公开列表撤下（连同解锁记录）。之后同组再有通过审核的投稿，会一起重新公开，不重复记功；已经给的记功不收回。这是用户 10-21 选的。
    - 要求外键打开、调用方不在事务里；任何一步失败都整体回滚。返回各表删了几行，日志 `account.deleted` 只有这些计数。
    - 删完以后，同一个 token 调 `/auth/me` 或再删一次都是 401。
-   - 页面上只有登录用户看得到：先勾选「我知道删除以后不能恢复」，按钮才能点。按钮用 `on_click` 回调：删完清 cookie、登出，并提示已删除；401 时也登出，提示登录已经失效；别的错误提示什么也没删。
+   - 页面上只有登录用户看得到：先勾选「我知道删除以后不能恢复」，按钮才能点。按钮用 `on_click` 回调：删完清 cookie、登出，并提示已删除；401 时也登出，提示登录已经失效。没收到服务器的回复（超时、连不上、网关错误，也就是 502／503／504）时，服务器可能已经删完了，所以只说不确定删没删，请刷新看看：变成游客就是删掉了（A24 L5）；别的错误才说什么也没删。
 7. **compose：**
    - api：保留 90 天，每天 200 次，打开反馈，打开限流（容量 20，每秒补 0.5，同时最多 4 个；没在 NAS 上量过，估算写在 `docs/request-admission.md`）；
    - ui：保留 90 天，打开反馈，联系邮箱是用户的 NEU 邮箱；
@@ -3875,17 +3878,19 @@ API、检索、提示词、数据库和快照都没改。
    - 今天的模型调用次数。
 
    不输出原文、邮箱或 ID。在 NAS 上跑也算碰 NAS，要先问用户。
-9. **设置的校验：** 两个整数设置不收布尔值（在代码里传 True 会被当成 1）；保留天数是 0–3650，上限是 0–100000；联系邮箱只收不含 Markdown 符号的普通地址。
+9. **设置的校验：** 两个整数设置不收布尔值（在代码里传 True 会被当成 1）；保留天数是 0–3650，上限是 0–100000；联系邮箱只收不含 Markdown 符号的普通地址。联系邮箱留空（照 `.env.example` 原样取消注释）等于没设，原来会让设置加载失败、程序起不来（B24 的笔记）。
+10. **登录日志**（`api/routes/auth.py`）：`auth.callback.success` 原来记 Google 账号 ID（sub）。API 日志按大小轮转、没有时限，删账号也删不到，所以现在只记学校域名和贡献数（A24 L1）。`docs/oauth_secret_rotation.md`、`docs/api_contract.md` 和 `pii_redaction.md` 第 12 节跟着改了。
 
 ### 修改文件
 
 - 新建：`api/query_hash.py`、`api/query_log_retention_task.py`、`api/model_budget.py`、`db/query_log_retention.py`、`db/account_deletion.py`、`app/privacy_view.py`、`scripts/redact_query_log.py`、`scripts/weekly_stats.py`。
-- 改：`api/query_fields.py`、`api/main.py`、`api/dependencies.py`、`api/routes/chat.py`、`api/routes/common.py`、`api/routes/auth.py`、`api/models.py`、`app/streamlit_app.py`、`app/answer_feedback_view.py`、`app/api_client.py`、`config/settings.py`、`docker-compose.yml`、`.env.example`。
-- 文档：`docs/api_contract.md`、`docs/request-admission.md`、`docs/query-log-export.md`、`docs/pii_redaction.md` 第 12 节、`docs/answer-feedback.md`、`scripts/README.md`、本节。
+- 改：`api/query_fields.py`、`api/main.py`、`api/dependencies.py`、`api/routes/chat.py`、`api/routes/common.py`、`api/routes/auth.py`、`api/models.py`、`app/streamlit_app.py`、`app/answer_feedback_view.py`、`app/api_client.py`、`config/settings.py`、`db/connection.py`（审查以后的修复：`secure_delete`，另给一个只有类型注解用到的名字补了 `TYPE_CHECKING` 导入，Ruff 第一次查这个文件时报了 F821）、`docker-compose.yml`、`.env.example`。
+- 文档：`docs/api_contract.md`、`docs/request-admission.md`、`docs/query-log-export.md`、`docs/pii_redaction.md` 第 12 节、`docs/answer-feedback.md`、`docs/oauth_secret_rotation.md`、`scripts/README.md`、本节。
 - 测试：
-  - 新建 `test_query_log_retention.py`、`test_model_budget.py`、`test_privacy_view.py`、`test_account_deletion.py`、`test_weekly_stats.py`，共 111 项；
+  - 新建 `test_query_log_retention.py`、`test_model_budget.py`、`test_privacy_view.py`、`test_account_deletion.py`、`test_weekly_stats.py`，提交 T 时共 111 项，审查以后的修复加到 139 项；
   - `test_compare_view.py` 的导航列表和 `test_page_orchestration.py` 的页面结尾数加上了隐私页；
-  - 九个页面快照只改了聊天提示那一句。
+  - 审查以后的修复：`test_api_auth_route.py` 加了 1 项（登录日志）；`test_feedback_release_gate.py` 改成用 `capture_notice`；
+  - 九个页面快照只改了聊天提示那一句。快照用的保留天数是 0，所以勾选说明在快照里还是原来那句。
 
 数据库结构、检索和提示词都没改。
 
@@ -3905,21 +3910,54 @@ API、检索、提示词、数据库和快照都没改。
     - K 的 B17（问题文字里的孤立代理字符用 replace 编码）：照 K 当时的结论算等价，因为带孤立代理字符的请求在校验时就是 422。
 - **串行全量：** **4995 passed／7 warnings／550.40 秒**，退出码 0。比 main 的 4884 多出的 111 项就是新测试；全量前后 44 个改动文件一致。全量开始以后只补了本节的数字，没有测试读本文件。
 
+- **第 23 轮审查以后的修复**（A24 的报告，加上 B24 停下时笔记里的发现）：
+  - 改过的 7 个测试文件 **197 passed**。同样的测试放在 T 的提交 `86dae4e` 上跑，22 项失败，原因都对：删除没收到回复的五种情况、登录日志、勾选说明跟着天数走（90 天和 30 天两项；0 天那项在 `86dae4e` 上本来就过）、`test_feedback_release_gate.py` 的 4 项（改成调用新函数）、每日上限提示的恢复时间、空的联系邮箱 2 项、隐私页的措辞、带 NUL 的标记、没有密钥时也删回答、`secure_delete`、跑完以后磁盘上的旧文字（任务 2 项：原文在库文件里，或者还在 WAL 的旧帧里；手动命令 1 项）。其余新加的测试在 `86dae4e` 上就通过，它们钉的是原来就对、只是没测到的行为，是给 B24 存活的变异体补的（见下）。
+  - 定向测试 **1002 passed**；Ruff F／E9／B 在 29 个改过的 Python 文件上通过，没有 CR；隐形字符只有 `docs/api_contract.md` 开头基底就有的 BOM。快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+  - **变异 72/72 killed**，被杀的都是对口的测试，没有只靠超时判定的。第一遍 71/72：F09（checkpoint 用 `PASSIVE` 代替 `TRUNCATE`）存活，因为那条测试先把库 checkpoint 干净了，WAL 里本来就没有旧文字；生产上 WAL 文件不截断，很久以前的旧帧会一直留着，补了「原文还在 WAL 的旧帧里」那一种以后被杀。F15 第一遍是因为多出来的警告让等待提前结束、报 IndexError 才失败的；等待条件改成只数 `query_log.retention` 以后，用这条测试的三个变异体（F15、T33、T35）重跑，都由对口的断言杀掉。
+    - 新写 32 个：F01–F31，以及 T76b（T76 改锚到新的那句）；
+    - B24 的 14 个：它定向跑时存活的 11 个里，B12 不跑，算等价（`query_log.route` 从建表那次提交 `ac9d246` 起就有 `CHECK (route IN ('search', 'chat'))`，走不到那个分支），其余 10 个都补了测试；另外是 sim03 的 P02／P05／P09（B24 改锚成 B14–B16；sim03 的工具加载不了，T 第一遍变异漏了它们，本节原来也没写）和改锚的 IK11（B17：第一遍记成杀掉，其实是因为 `data` 这个名字没了、报 NameError 才失败的）；
+    - 锚点落在这次改过的代码里的旧变异体 26 个（T 自己的 24 个，加上 batch15 和 safe02 各 1 个）。这次收集把模块级和类里的语句也算进来，T 第一遍的收集只看函数（B24 指出 `query_fields.py` 模块级的 IK12、H3、H6 因此既没算受影响也没算被顶替；它们测的行为由 T02、T03 覆盖）。T28、T76 的锚点这次改掉了，由 F13 和 T76b 顶替。三个加载不了的旧工具（fix_a、sim03、k3）在这次改过的文件里没有变异体。
+  - 串行全量 **5024 passed／7 warnings／466.11 秒**，退出码 0。比 4995 多出的 29 项就是这次新加的测试；相对 `6395ee5` 的 48 个改动文件在全量前后一致。全量开始以后只补了这个数字。
+
 ### 审查
 
-提交时还没有审查。
+第 23 轮，两路只读审查，在 `86dae4e` 上做（10-21 夜），都不派子 agent：A24 看隐私和正确性，B24 看测试、变异和文档。
+
+A24 交了报告：没有 CRITICAL、HIGH，1 MEDIUM、8 LOW、若干 NIT。A24 在自己的副本里用合成库和真实代码做了三组探针，核过：K 的哈希逐字节没变；换哈希分批、核对原文、不会重复换；先删评价再删回答；API 只有两处调 Gemini，都先占名额；删账号覆盖了所有带用户 ID 的列，k=2 撤回在它试过的边界情况里都对。
+- **MEDIUM-1：** 勾选「允许保存」旁边的说明还写着「数据、备份和导出不会自动删除」，和隐私页、90 天删除矛盾，而且就在同意的地方。已修，见「已实现」第 1 条。
+- **LOW-1：** 登录日志记 Google 账号 ID，删账号删不到。已修，见第 10 条。
+- **LOW-2：** 「标记＋NUL＋原文」会被当成已经换过。已修，见第 2 条。
+- **LOW-3：** 旧字节还留不留在库文件里，取决于 SQLite 的 `secure_delete` 编译默认值。已修，见第 2 条；上线时还要在容器里核对一次。
+- **LOW-4：** 没有密钥时，连不需要密钥的删回答也跳过了。已修，见第 4 条。
+- **LOW-5：** 删除超时被说成「什么也没删」。已修，见第 6 条。
+- **LOW-6：** 页面把换过哈希的那一行说窄了。已修，见第 1 条。
+- **LOW-7：** 离线脚本直接调模型、不占名额；匿名请求大约六分钟就能用完全站一天的 200 次。写进了 `docs/request-admission.md` 和 `api/model_budget.py`，没改代码，见「已知」。
+- **LOW-8：** 联系邮箱写在 compose 里，push 以后就进了公开仓库。要用户定，见「已知」。
+- **NIT：** 「两份投稿」应该是两个不同投稿人；谁能看、Cloudflare 能看到内容；名额在调用之前就占掉；`model_budget.json` 没有 fsync；换了 `SESSION_SECRET` 以后标记就对不上；`daily_limit` 说「明天」不对。都改了文字。Gemini key 是哪一档要问用户，见「已知」。
+
+B24 中途停下了（用户 10-21 夜叫停了所有审查），还没有报告。它停下时的笔记里已经有下面这些，修复一并处理了：
+- 空的联系邮箱让设置加载失败（第 9 条）；
+- 它自己写的变异体有 11 个在定向测试上存活，都补了测试，或者说明了为什么等价（见「验证记录」）；
+- 变异收集的三处缺口：IK11 是因为 NameError 才失败的；sim03 的工具加载不了，它的三个变异体没跑；`query_fields.py` 模块级的锚点漏掉了（见「验证记录」）；
+- 每周统计只读打开 WAL 库也会留下 `-wal`／`-shm` 文件，写进了它的文档字符串和 `docs/query-log-export.md`。
+
+修复提交以后，B24 接着审，A24 做复核第 1 轮。
 
 ### 已知、未处理
 
 - **上线后第一次启动就会清理：** 90 天以前的提问原文当场换成哈希，换了就改不回来，只有每日备份里还留大约两周。依赖旧原文的导出或评测，要在上线前做完。
-- 评测流量也占每天的名额：跑一次真实评测（几十个问题）会用掉当天的一部分。
+- 经过 API 的评测流量也占每天的名额：跑一次真实评测（几十个问题）会用掉当天的一部分。`scripts/` 里的离线脚本直接调模型，不占名额，也不受这个上限管。
+- 名额全站共用：匿名请求连着发，最快大约六分钟就能用完一天的 200 次，之后到 UTC 零点之前所有人都只拿到 `daily_limit`（A24 L7）。要防，得先有按身份的配额。
 - 限流的数值是估的，没在 NAS 上量过。被挡下的请求不写 query_log，所以每周统计看不到；要看就得数 API 日志里的 429／503。
 - 每天的上限只在一个 API 进程里有效；开多个 worker 或多个实例时会各算各的。
-- 清理只碰数据库。备份里的原文和回答最多再多留大约两周；已经写进 Docker、代理或隧道日志的内容不受影响。
-- 没有 `SESSION_SECRET` 时整个清理都不跑，删回答也不跑。生产一定有它（登录要用），上线时要核对。
+- 清理只碰数据库。备份里的原文和回答最多再多留大约两周；已经写进 Docker、代理或隧道日志的内容不受影响。上线以前写下的登录日志行还记着账号 ID，要等轮转掉或者容器重建才会消失。
+- 没有 `SESSION_SECRET` 时不换哈希（删回答照跑）。生产一定有它（登录要用），上线时要核对。
+- `secure_delete` 现在由每个连接自己打开，不依赖编译默认值；上线时在容器里核对一次它真的生效（`PRAGMA secure_delete` 返回 1）。
 - 提问和保存的回答不记账号，所以想删某一条时挑不出是哪一条，只能等到期，或者写邮件说明。
+- **要用户定（A24 L8）：** 联系邮箱现在写在 compose 里，push 以后就进了公开仓库（每个提交的作者信息里本来就有这个邮箱）。放 compose，还是改放 NAS 的 `.env`。
+- **要问用户：** Gemini 的 key 是哪一档。有的档位 Google 会拿提示内容改进它的产品；页面现在只说以 Google 的条款为准。
 - 隐私页写的是实际做法，不是法律意义上的承诺。上线前要请用户读一遍。
 
 ### 发布状态
 
-分支 `feat/trial-readiness`，基底是合并 L（#23）以后的 main `6395ee5`：先在 L 的第一个提交 `2fc5cf1` 上写，L 合并以后快进过来，两边没有重叠的文件。没有使用真实模型、账号、NAS 或生产库。上线要另外授权；上线时要在容器里核对这些设置（只数不打印），并重新问 P6、P7 跑不跑。
+分支 `feat/trial-readiness`，基底是合并 L（#23）以后的 main `6395ee5`：先在 L 的第一个提交 `2fc5cf1` 上写，L 合并以后快进过来，两边没有重叠的文件。第一个提交 `86dae4e` 是 T 本身，第二个提交是第 23 轮审查的修复。没有使用真实模型、账号、NAS 或生产库。上线要另外授权；上线时要在容器里核对这些设置（只数不打印），并重新问 P6、P7 跑不跑。
