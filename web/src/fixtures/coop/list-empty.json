@@ -1,0 +1,11 @@
+{
+  "case": "list-empty",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "guest",
+    "body": null
+  },
+  "status": 200,
+  "body": []
+}

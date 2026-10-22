@@ -1,0 +1,31 @@
+{
+  "case": "upload-duplicate-published",
+  "request": {
+    "method": "POST",
+    "path": "/coop",
+    "viewer": "u-a",
+    "body": {
+      "company": "Example Fintech Co.",
+      "role": "Data Engineer Co-op",
+      "coop_term": "Fall 2026",
+      "industry": "quant_fintech",
+      "duration_months": 6,
+      "related_courses": [
+        "DS 5220"
+      ],
+      "interview_summary": "一轮技术面，聊了 SQL 和数据管道。",
+      "technical_questions": null,
+      "salary_range_usd": null
+    }
+  },
+  "status": 201,
+  "body": {
+    "coop_id": "coop-bfed186366cf",
+    "accepted": true,
+    "visibility_level": 1,
+    "status": "published",
+    "duplicate": true,
+    "contribution_credited": true,
+    "contribution_count": 1
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "case": "upload-duplicate-rejected",
+  "request": {
+    "method": "POST",
+    "path": "/coop",
+    "viewer": "u-c",
+    "body": {
+      "company": "Sample Consulting Group",
+      "role": "Analytics Co-op",
+      "coop_term": "Spring 2026",
+      "industry": "consulting",
+      "duration_months": 4,
+      "related_courses": [],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null
+    }
+  },
+  "status": 201,
+  "body": {
+    "coop_id": "coop-97f75283c5ae",
+    "accepted": true,
+    "visibility_level": 0,
+    "status": "rejected",
+    "duplicate": true,
+    "contribution_credited": false,
+    "contribution_count": 0
+  }
+}

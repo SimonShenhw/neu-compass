@@ -1,0 +1,28 @@
+{
+  "case": "upload-422-extra-field",
+  "request": {
+    "method": "POST",
+    "path": "/coop",
+    "viewer": "u-zero",
+    "body": {
+      "company": "Example Fintech Co.",
+      "role": "Data Engineer Co-op",
+      "coop_term": "Fall 2026",
+      "industry": "quant_fintech",
+      "duration_months": 6,
+      "related_courses": [
+        "DS 5220"
+      ],
+      "interview_summary": "一轮技术面，聊了 SQL 和数据管道。",
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 2
+    }
+  },
+  "status": 422,
+  "body": {
+    "detail": "visibility_level: Extra inputs are not permitted",
+    "error_type": "invalid_input",
+    "status_code": 422
+  }
+}
