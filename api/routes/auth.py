@@ -46,6 +46,8 @@ from api.dependencies import (
 )
 from api.models import (
     AuthMeResponse,
+    DeleteAccountRequest,
+    DeleteAccountResponse,
     OAuthCallbackRequest,
     OAuthCallbackResponse,
 )
@@ -121,9 +123,11 @@ def oauth_callback(
     )
     conn.commit()
 
+    # No account id: the API log rotates by size, not by time, and deleting an account cannot reach it, so a login line
+    # names only the school domain (batch T, A24 L1). 中文：不记账号 ID：API 日志按大小轮转、没有时限，删账号也删不到，
+    # 所以登录这一行只写学校域名。
     log.info(
         "auth.callback.success",
-        user_id=user.user_id,
         domain=user.domain,
         contribution_count=user.contribution_count,
     )
@@ -193,3 +197,44 @@ def auth_me(
         display_name=user.display_name,
         contribution_count=user.contribution_count,
     )
+
+
+@router.post(
+    "/delete-account",
+    response_model=DeleteAccountResponse,
+    summary="Delete the caller's account and Co-op contributions (batch T)",
+    description=(
+        "Requires `Authorization: Bearer <session_token>` and the body `{\"confirm\": \"delete\"}`. In one "
+        "transaction removes the Co-op experiences this account published (and every unlock of them), then the "
+        "users row, which cascades to its unlocks, planned courses, Co-op submissions and credits. A group it helped "
+        "publish that is left with one contributor goes back to approved (k=2; no credit is taken back). query_log and "
+        "saved answers never record an account and are not touched; daily backups keep a copy for up to 14 days. "
+        "Afterwards the same token gets 401 from `/auth/me`. Returns per-table counts only."
+    ),
+    responses={
+        200: {"description": "Deleted; counts of the rows removed."},
+        401: {"description": "Missing, invalid or expired token, or the account no longer exists."},
+        422: {"description": "The body is not exactly `{\"confirm\": \"delete\"}`."},
+    },
+)
+def delete_account(
+    req: DeleteAccountRequest,
+    user_id: Annotated[str | None, Depends(get_current_user_id)],
+    conn: DbConn,
+) -> DeleteAccountResponse:
+    from db.account_deletion import AccountNotFound  # noqa: PLC0415
+    from db.account_deletion import delete_account as delete_rows  # noqa: PLC0415
+
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token.")
+    try:
+        counts = delete_rows(conn, user_id)
+    except AccountNotFound:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown user.") from None
+    # Counts only, named so the log check can see every key: never the account, its email or what it wrote.
+    # 中文：只记计数，逐个写出键名，日志检查才看得见：不记账号、邮箱或内容。
+    log.info("account.deleted", published_experiences=counts["published_experiences"],
+             unlocks_of_those=counts["unlocks_of_those"], own_unlocks=counts["own_unlocks"],
+             submissions=counts["submissions"], credits=counts["credits"], planned_courses=counts["planned_courses"],
+             withdrawn_from_groups=counts["withdrawn_from_groups"])
+    return DeleteAccountResponse(**counts)

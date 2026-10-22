@@ -133,9 +133,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.ready = True
     log.info("api.startup.ready")
 
+    # 4) query_log retention (batch T, P3): once now, then daily; off unless QUERY_LOG_RETENTION_DAYS is set.
+    # 中文：4）query_log 到期清理（T 批，P3）：现在跑一次，之后每天一次；没设 QUERY_LOG_RETENTION_DAYS 就不跑。
+    from api import query_log_retention_task  # noqa: PLC0415
+
+    stop_retention = query_log_retention_task.start(
+        connect=connect, db_path=settings.sqlite_path, secret=settings.session_secret,
+        days=settings.query_log_retention_days, log=log,
+    )
+
     try:
         yield
     finally:
+        stop_retention()
         log.info("api.shutdown")
 
 

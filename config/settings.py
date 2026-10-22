@@ -56,6 +56,36 @@ class Settings(BaseSettings):
     # 中文：默认关闭；启用前确认告知、留存／备份与访问控制，重启 API/UI。
     answer_feedback_enabled: bool = False
 
+    # query_log text older than this many days becomes its keyed hash, and saved answers that old are deleted
+    # with their votes (batch T, P3; 0 = off, the code default; compose sets 90). Needs SESSION_SECRET.
+    # 中文：超过这么多天的 query_log 原文换成带密钥的哈希，同样天数的保存回答连同评价删除（T 批，P3；0 为关闭，
+    # 是代码默认；compose 设 90）。需要 SESSION_SECRET。
+    query_log_retention_days: int = Field(default=0, ge=0, le=3650)
+    # Gemini calls (chat answers and HyDE rescues) allowed per UTC day (batch T, P5; 0 = no cap, the code
+    # default; compose sets 200). 中文：每个 UTC 日允许的 Gemini 调用次数（聊天回答和 HyDE 救援；T 批，P5；
+    # 0 为不限，是代码默认；compose 设 200）。
+    model_daily_call_limit: int = Field(default=0, ge=0, le=100_000)
+
+    # Shown on the 数据与隐私 page for questions and deletion requests (batch T, P4); unset hides the line.
+    # 中文：「数据与隐私」页上用于提问和删除请求的联系邮箱（T 批，P4）；不设就不显示这一行。
+    privacy_contact_email: str | None = Field(default=None, pattern=r"^[^@\s<>()\[\]`*_]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
+
+    @field_validator('privacy_contact_email', mode='before')
+    @classmethod
+    def a_blank_contact_is_unset(cls, value):
+        # `PRIVACY_CONTACT_EMAIL=` (the .env.example line uncommented as written) means unset, not a bad address that
+        # stops the app from starting. 中文：照 .env.example 原样取消注释的空值是没设，不是写错的地址，不能让程序起不来。
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator('query_log_retention_days', 'model_daily_call_limit', mode='before')
+    @classmethod
+    def days_and_limits_are_not_booleans(cls, value):
+        if isinstance(value, bool):  # True would mean one. 中文：True 会被当成 1。
+            raise ValueError('invalid_whole_number_setting')
+        return value
+
     # Single-process search/chat admission, OFF until target/capacity review.
     # 中文：仅单进程总量保护，默认关闭；不是身份／多 worker／费用配额。
     request_guard_enabled: bool = False

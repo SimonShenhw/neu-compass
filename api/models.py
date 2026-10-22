@@ -306,6 +306,29 @@ class OAuthCallbackResponse(BaseModel):
     session_token: str | None = None
 
 
+class DeleteAccountRequest(BaseModel):
+    """The word `delete`, so a stray POST never deletes an account (batch T, P4). 中文：要写明 `delete`。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    confirm: Literal["delete"]
+
+
+class DeleteAccountResponse(BaseModel):
+    """Rows removed per kind; no identity. 中文：各类删了几行，不带身份。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    deleted: Literal[True] = True
+    published_experiences: int
+    unlocks_of_those: int
+    own_unlocks: int
+    submissions: int
+    credits: int
+    planned_courses: int
+    withdrawn_from_groups: int  # Others' items taken back so no group stays public alone. 中文：撤回的别人的内容。
+
+
 class AuthMeResponse(BaseModel):
     """Identity behind a Bearer session token (GET /auth/me). Lets the UI
     restore login state from a persisted cookie without re-running OAuth —

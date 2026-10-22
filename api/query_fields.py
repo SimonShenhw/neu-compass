@@ -19,14 +19,11 @@ within one process but cannot be matched against `query_log`.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import secrets
 
+from api.query_hash import HASH_CHARS, derive_key, keyed_hash
 from config import settings
 
-HASH_CHARS = 16
-_LABEL = b"neu-compass/log-query-hash/v1"
 _PROCESS_KEY = secrets.token_bytes(32)
 
 
@@ -34,12 +31,7 @@ def _key() -> bytes:
     secret = settings.session_secret
     if not secret:
         return _PROCESS_KEY
-    # A label-derived subkey: the session-token signer never sees this key, and this never signs tokens.
-    # os.environ turns a stray byte into a surrogate; surrogatepass encodes any surrogate, so such a secret still
-    # works and every valid secret gives the same bytes as before.
-    # 中文：用标签派生的子密钥：会话令牌的签名不用它，它也不签令牌。环境变量里的坏字节会变成代理字符；
-    # surrogatepass 能编码任何代理字符，所以这样的密钥也不会让请求失败，正常密钥的结果不变。
-    return hmac.new(secret.encode("utf-8", "surrogatepass"), _LABEL, hashlib.sha256).digest()
+    return derive_key(secret)  # The derivation lives in api.query_hash. 中文：派生方法在 api.query_hash。
 
 
 def query_fields(text: str, name: str = "query") -> dict[str, object]:
@@ -47,8 +39,7 @@ def query_fields(text: str, name: str = "query") -> dict[str, object]:
 
     中文：返回 `{name}_hash`（16 位十六进制）和 `{name}_len`（字符数）；遇到奇怪的文字或密钥也不抛异常。
     """
-    data = text.encode("utf-8", "surrogatepass")
-    return {f"{name}_hash": hmac.new(_key(), data, hashlib.sha256).hexdigest()[:HASH_CHARS], f"{name}_len": len(text)}
+    return {f"{name}_hash": keyed_hash(text, _key()), f"{name}_len": len(text)}
 
 
 __all__ = ["HASH_CHARS", "query_fields"]

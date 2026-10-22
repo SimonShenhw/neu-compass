@@ -189,5 +189,5 @@ def test_orchestration_order_and_chat_column_ownership_remain_explicit():
             ancestors.append(node)
         assert any(isinstance(item, ast.With) and any(isinstance(entry.context_expr, ast.Name)
             and entry.context_expr.id == "chat_col" for entry in item.items) for item in ancestors)
-    # Search, Programs, Co-op and Compare each retain the common page ending.
-    assert sum(node.func.id == "_end_page" for node in calls) == 4
+    # Search, Programs, Co-op, Compare and Privacy (batch T) each retain the common page ending.
+    assert sum(node.func.id == "_end_page" for node in calls) == 5

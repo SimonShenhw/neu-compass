@@ -91,6 +91,25 @@ def test_callback_passes_redirect_uri_through(
     assert captured["redirect_uri"] == "https://compass.example.com/oauth/cb"
 
 
+def test_the_login_log_line_names_no_account(
+    api_client: TestClient, empty_db: sqlite3.Connection,
+) -> None:
+    """Deleting an account cannot reach the API log, so a login line names only the domain (batch T, A24 L1)."""
+    from structlog.testing import capture_logs  # noqa: PLC0415
+
+    def fake_exchange(code: str, *, redirect_uri: str | None = None) -> dict:
+        return {"user_id": "synthetic-sub-7", "email": "carol@husky.neu.edu", "name": "Carol"}
+
+    _override_exchange(api_client, fake_exchange)
+    with capture_logs() as logs:
+        assert api_client.post("/auth/callback", json={"code": "c"}).status_code == 200
+    events = [entry for entry in logs if entry["event"] == "auth.callback.success"]
+    assert len(events) == 1
+    assert {k: v for k, v in events[0].items() if k not in ("event", "log_level")} == {
+        "domain": "husky.neu.edu", "contribution_count": 0}
+    assert "synthetic-sub-7" not in repr(logs) and "carol" not in repr(logs).lower()
+
+
 # === GET /auth/me (cookie-restore path) ===
 
 
