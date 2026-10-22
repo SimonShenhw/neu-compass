@@ -40,7 +40,17 @@ def test_the_page_says_what_a_redacted_row_keeps_and_who_else_sees_what():
     assert "那一行还留着时间、搜到的课程和检索方式，用来统计。" in text
     assert "至少有两个不同投稿人的投稿通过审核，才一起公开" in text
     assert "公开的 Co-op 经验按贡献等级给访客看" in text and "Cloudflare 能看到传输的内容" in text
-    assert "登录只记学校域名，不记是谁。" in text  # A24 L1, pinned in test_api_auth_route.py. 中文：A24 L1。
+    # A24 L1 (pinned in test_api_auth_route.py) and the recheck's NIT-R3. 中文：A24 L1 和复核的 NIT-R3。
+    assert "登录只记学校域名和贡献数，不记是谁。" in text and "以及第一次和最近一次登录的时间" in text
+    assert "贡献数和登录时间" in DELETE_WHAT
+
+
+def test_the_page_says_how_google_treats_the_paid_api():
+    """The user confirmed a paid key on 10-21; the sentence follows the Gemini API terms for paid services.
+    中文：用户 10-21 确认是付费的 key；这句照 Gemini API 条款里付费服务的做法写。"""
+    text = page_text()
+    assert "本站用的是付费的 Gemini API" in text and "不会被拿去改进 Google 的产品" in text
+    assert "只用来发现和防止滥用" in text and "具体以 Google 的条款为准" in text
 
 
 def test_a_switched_off_cleanup_or_feedback_is_never_promised():

@@ -414,6 +414,37 @@ def test_a_failed_checkpoint_does_not_turn_a_finished_run_into_a_failed_one(tmp_
     conn.close()
 
 
+def test_a_checkpoint_behind_an_old_reader_gives_up_quickly_and_lets_writers_through(tmp_path):
+    """A24 recheck LOW-R1: while TRUNCATE waits for a reader on an older snapshot, SQLite holds back new writers, so the
+    checkpoint waits only CHECKPOINT_WAIT_MS, not the connection's 5 s, and then gives the connection its timeout back.
+    中文：TRUNCATE 等旧快照上的读者时会挡住新的写入，所以只等很短，之后把连接原来的等待时间还回去。"""
+    from db.connection import connect
+
+    path = file_db(tmp_path)
+    writer, reader, runner = connect(path), connect(path), connect(path)
+    reader.execute("BEGIN")
+    reader.execute("SELECT count(*) FROM query_log").fetchall()  # holds a snapshot. 中文：拿着一个快照。
+    add(writer, "synthetic question after the snapshot", "2026-10-21 10:00:00")
+    done, started = threading.Event(), time.monotonic()
+    thread = threading.Thread(target=lambda: (retention.checkpoint(runner), done.set()))
+    thread.start()
+    time.sleep(0.02)
+    write_started = time.monotonic()
+    add(writer, "synthetic question during the checkpoint", "2026-10-21 10:00:01")
+    write_took = time.monotonic() - write_started
+    assert done.wait(10)
+    took = time.monotonic() - started
+    thread.join(5)
+    assert took < 2 and write_took < 2
+    assert runner.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+    reader.rollback()
+    retention.checkpoint(runner)  # no reader left: the WAL is truncated. 中文：没有读者了，WAL 截成 0。
+    wal = path.with_name(path.name + "-wal")
+    assert not wal.exists() or wal.stat().st_size == 0
+    for conn in (writer, reader, runner):
+        conn.close()
+
+
 def test_task_runs_at_start_then_every_interval_and_stops(tmp_path):
     from api import query_log_retention_task as task
     from db.connection import connect

@@ -29,6 +29,7 @@ from api.query_hash import HASH_CHARS, keyed_hash
 PREFIX = "redacted:"
 MARKER = re.compile(rf"redacted:[0-9a-f]{{{HASH_CHARS}}}:[0-9]+")
 BATCH = 500
+CHECKPOINT_WAIT_MS = 100  # see checkpoint(). 中文：见 checkpoint()。
 # Already redacted: the prefix, 16 lowercase hex characters, a colon, then only digits (at least one). SQLite's
 # length(), substr() and GLOB stop at a NUL, so the byte length must equal the character length too: a marker is pure
 # ASCII, and a crafted "marker + NUL + text" would otherwise pass and keep its text forever (A24 L2).
@@ -91,15 +92,31 @@ def delete_expired_answers(conn: sqlite3.Connection, *, now: datetime, days: int
 
 
 def checkpoint(conn: sqlite3.Connection) -> None:
-    """Move the WAL into the database file and empty it, best effort, after a run. With secure_delete on
-    (db.connection.connect), the replaced text and the deleted answers are then gone from the files on disk instead of
-    waiting for SQLite's next automatic checkpoint; a busy database just leaves it to that one (A24 L3).
-    中文：跑完以后尽量把 WAL 写回库文件并清空。secure_delete 打开时（db.connection.connect），换掉的原文和删掉的回答
-    就从磁盘上的文件里消失了，不用等 SQLite 下一次自动 checkpoint；库忙的时候留给那一次。"""
+    """Move the WAL into the database file and truncate it, best effort, after a run (A24 L3). With secure_delete on
+    (db.connection.connect), the replaced text and the deleted answers are then gone from the files on disk.
+
+    While a TRUNCATE checkpoint waits for a reader on an older snapshot (the backup sidecar's copy, the weekly stats, an
+    export), SQLite holds back every new writer. So it waits at most CHECKPOINT_WAIT_MS, not the connection's 5 seconds,
+    and the API's writes go through (A24 recheck LOW-R1). If it gives up, the WAL keeps the old frames until the next
+    run truncates it, or until the last connection closes: SQLite's own automatic checkpoints never truncate the file.
+    中文：跑完以后尽量把 WAL 写回库文件并截断。secure_delete 打开时（db.connection.connect），换掉的原文和删掉的回答就
+    从磁盘上的文件里消失了。TRUNCATE 在等旧快照上的读者（备份边车的复制、每周统计、导出）时，SQLite 会挡住所有新的写入，
+    所以最多只等 CHECKPOINT_WAIT_MS，不等连接默认的 5 秒，API 的写入就不会被挡住。等不到就放弃，WAL 里的旧帧留到下一次
+    运行截断，或者最后一个连接关闭；SQLite 自己的自动 checkpoint 从来不截断文件。"""
+    try:
+        previous = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+        conn.execute(f"PRAGMA busy_timeout = {CHECKPOINT_WAIT_MS}")
+    except sqlite3.Error:
+        return
     try:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
     except sqlite3.Error:
         pass
+    finally:
+        try:
+            conn.execute(f"PRAGMA busy_timeout = {int(previous)}")
+        except sqlite3.Error:
+            pass
 
 
 def redact_expired(conn: sqlite3.Connection, *, key: bytes, now: datetime, days: int) -> int:
@@ -126,5 +143,5 @@ def redact_expired(conn: sqlite3.Connection, *, key: bytes, now: datetime, days:
             return total
 
 
-__all__ = ["BATCH", "MARKER", "PREFIX", "checkpoint", "count_expired", "count_expired_answers", "delete_expired_answers",
-           "marker", "redact_expired"]
+__all__ = ["BATCH", "CHECKPOINT_WAIT_MS", "MARKER", "PREFIX", "checkpoint", "count_expired", "count_expired_answers",
+           "delete_expired_answers", "marker", "redact_expired"]

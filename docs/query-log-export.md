@@ -113,11 +113,13 @@ WSL 重启时会清空 `/tmp`，上面两个 `/tmp` 下的文件只是临时的�
   - 先删评价，再删回答，在一个事务里，所以不靠外键级联也不会留下孤立的评价；
   - 回答可能复述问题，所以不能只换问题、不删回答；
   - 没有 v1.7 表的旧库跳过这一步。
-- **谁来做：** API 进程自己做，启动时一次，之后每 24 小时一次（`api/query_log_retention_task.py`）。每次先换哈希，再删回答，最后做一次 WAL checkpoint（`TRUNCATE`；库忙时留给 SQLite 下一次自动 checkpoint）。
+- **谁来做：** API 进程自己做，启动时一次，之后每 24 小时一次（`api/query_log_retention_task.py`）。每次先换哈希，再删回答，最后做一次 WAL checkpoint（`TRUNCATE`）。
+  - checkpoint 最多等 100 毫秒（`CHECKPOINT_WAIT_MS`）：它等旧快照上的读者（备份边车的复制、每周统计、导出）时，SQLite 会挡住所有新的写入，按连接默认的 5 秒等，API 的写入就会失败（A24 复核 LOW-R1）。
+  - 等不到就放弃：WAL 里的旧帧留到下一次运行截断，或者最后一个连接关闭。SQLite 自己的自动 checkpoint 不截断文件，清不掉这些旧帧。在线备份复制的是库里最新的页，不受影响；
   - `QUERY_LOG_RETENTION_DAYS` 为 0（代码默认）时两样都关闭，compose 设为 90；
   - 没有 `SESSION_SECRET` 时只跳过换哈希：随机密钥算出的哈希什么也对不上，不能拿它毁掉原文。删回答不需要密钥，照常跑。启动时记一条 `query_log.retention_skipped` 警告，之后每次的 `query_log.retention` 里 `replaced` 是 null。生产一定有它（登录要用），上线时要核对；
   - 每次运行只记 `query_log.retention`（替换了几行、删了几条回答和几个评价、多少天），失败只记 `query_log.retention_failed` 和异常类型，下一次再试。
-- **磁盘上的旧字节：** API 和手动脚本的连接（都走 `db/connection.py` 的 `connect`）都打开 `secure_delete`，删掉和换掉的内容用零覆盖，不留在空闲页里。不打开的话，备份边车按页复制，会把旧字节带进之后的每一份备份，「备份里最多再留约 14 天」就不成立了。很多 SQLite 的编译默认就打开，这里不依赖默认值。跑完的 checkpoint 让 WAL 里的旧版本也离开磁盘。
+- **磁盘上的旧字节：** API 和手动脚本的连接（都走 `db/connection.py` 的 `connect`）都打开 `secure_delete`，删掉和换掉的内容用零覆盖，不留在空闲页里。不打开的话，备份边车按页复制，会把旧字节带进之后的每一份备份，「备份里最多再留约 14 天」就不成立了。很多 SQLite 的编译默认就打开，这里不依赖默认值。跑完的 checkpoint 让 WAL 里的旧版本也离开磁盘。代价：删改的时候多花一点 CPU 填零，离线脚本批量删除会多写一些 WAL；读和锁不受影响。
 - **手动：** 在 API 所在的环境里运行 `scripts/redact_query_log.py`。
   - `--dry-run` 只数会换几行、会删几条回答和几个评价，不需要密钥；
   - 真跑需要 `SESSION_SECRET`（没有时整个拒绝，不像 API 那样只删回答），换哈希、删回答，最后 checkpoint；
