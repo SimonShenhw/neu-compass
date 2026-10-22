@@ -7,7 +7,7 @@
 在 Windows PowerShell 中使用 Node 24，进入这个 worktree 的 `web/`：
 
 ```powershell
-cd H:\neu-compass-web\web
+cd <你的 worktree>\web
 npm.cmd ci
 npm.cmd run dev
 ```
