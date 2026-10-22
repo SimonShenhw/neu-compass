@@ -19,19 +19,17 @@ it('route focus does not scroll the heading out of view', () => {
   expect(focus).toHaveBeenCalledWith({ preventScroll: true });
 });
 
-it('choosing a comparison plan keeps its fixture project consistent on return', async () => {
+it('comparison view does not invent a program selection before R4', async () => {
   const user = userEvent.setup();
   page('/compare');
-  screen.getByRole('combobox', { name: /按方案看/ }).focus();
-  await user.keyboard('{ArrowDown}{End}{Enter}');
+  expect(
+    screen.queryByRole('combobox', { name: /按方案看/ }),
+  ).not.toBeInTheDocument();
   await user.click(screen.getByRole('link', { name: '查看 CS 6140' }));
   expect(screen.getByRole('combobox', { name: /项目/ })).toHaveTextContent(
-    'MSCS',
+    '不指定',
   );
-  expect(screen.getByRole('combobox', { name: /^方案/ })).toHaveTextContent(
-    'Boston',
-  );
-  expect(screen.getByRole('combobox', { name: /^方案/ })).toBeEnabled();
+  expect(screen.getByRole('combobox', { name: /^方案/ })).toBeDisabled();
 });
 
 describe('page accessibility', () => {
@@ -187,21 +185,19 @@ it('detail leaf navigation opens the exact prerequisite and resets expansion', a
     'false',
   );
 });
-it('compare switch restores shared rows and removal keeps other columns', async () => {
+it('all seven comparison rows remain visible and removal keeps other columns', async () => {
   const user = userEvent.setup();
   page('/compare');
-  expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-  expect(
-    screen.queryByRole('rowheader', { name: '学分' }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole('rowheader', { name: '目录年份' }),
-  ).not.toBeInTheDocument();
-  await user.click(screen.getByRole('switch'));
-  expect(screen.getByRole('rowheader', { name: '学分' })).toBeInTheDocument();
-  expect(
-    screen.getByRole('rowheader', { name: '目录年份' }),
-  ).toBeInTheDocument();
+  expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  expect(screen.getAllByRole('rowheader').map((el) => el.textContent)).toEqual([
+    '官方目录描述',
+    '学生评价里的估计',
+    '先修／共修',
+    '主题',
+    '考核构成',
+    '在培养方案里的位置',
+    '缺的数据',
+  ]);
   await user.click(screen.getByRole('button', { name: '移出 CS 6140' }));
   expect(
     screen.queryByRole('link', { name: '查看 CS 6140' }),
@@ -211,7 +207,7 @@ it('compare switch restores shared rows and removal keeps other columns', async 
   ).toBeInTheDocument();
   expect(
     within(screen.getByRole('region', { name: '课程对比内容' })).getByText(
-      '已选 3 / 4 门 · 按加入的顺序',
+      '已选择 3/4 门；按加入顺序展示，不排名、不判断选课或毕业资格。',
     ),
   ).toBeInTheDocument();
 });
@@ -262,15 +258,22 @@ it('clearing comparison focuses its remaining keyboard action', async () => {
   await user.keyboard('{Enter}');
   expect(screen.getByRole('link', { name: '回到课程搜索' })).toHaveFocus();
 });
-it('comparison focus is not stolen by an unrelated row-filter update', async () => {
+it('comparison sidebar count follows the external store through removal and clear', async () => {
   const user = userEvent.setup();
   page('/compare');
+  const nav = screen.getByRole('navigation', { name: '主导航' });
+  expect(within(nav).getByRole('link', { name: /课程对比/ })).toHaveTextContent(
+    '4',
+  );
   await user.click(screen.getByRole('button', { name: '移出 CS 6140' }));
-  const toggle = screen.getByRole('switch');
-  toggle.focus();
-  await user.keyboard(' ');
-  expect(screen.getByRole('rowheader', { name: '学分' })).toBeInTheDocument();
-  expect(toggle).toHaveFocus();
+  expect(within(nav).getByRole('link', { name: /课程对比/ })).toHaveTextContent(
+    '3',
+  );
+  await user.click(screen.getByRole('button', { name: '清空对比' }));
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  expect(
+    within(nav).getByRole('link', { name: /课程对比/ }),
+  ).not.toHaveTextContent(/[1-4]/);
 });
 it.each([
   'CS 5800 讲什么？',
@@ -299,7 +302,7 @@ it('compare removal survives route navigation within the prototype', async () =>
   ).not.toBeInTheDocument();
   expect(
     within(screen.getByRole('region', { name: '课程对比内容' })).getByText(
-      '已选 3 / 4 门 · 按加入的顺序',
+      '已选择 3/4 门；按加入顺序展示，不排名、不判断选课或毕业资格。',
     ),
   ).toBeInTheDocument();
 });

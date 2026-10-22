@@ -1,0 +1,116 @@
+{
+  "case": "course-cs-5800-requisites-unavailable",
+  "header": {
+    "code": "CS 5800",
+    "name": "Algorithms",
+    "chips": [
+      [
+        "Term",
+        "Spring 2026"
+      ],
+      [
+        "Credits",
+        "4"
+      ],
+      [
+        "Mode",
+        "in person"
+      ]
+    ],
+    "notice": null,
+    "credit_range_note": null
+  },
+  "rows": {
+    "官方目录描述": [
+      [
+        "main",
+        "Covers the design and analysis of algorithms: divide and conquer, dynamic programming, graph search and shortest paths, and NP-completeness. (Synthetic text for interface tests.)"
+      ],
+      [
+        "note",
+        "课程描述来自 NEU 官方课程目录 的存档副本，不是实时核对。"
+      ],
+      [
+        "note",
+        "工作量、难度等是根据评价的估计，不是官方信息；培养方案关系没有核实，不是正式的 Plan of Study。"
+      ],
+      [
+        "main",
+        "目录抓取：2026-09-28 14:07 UTC。"
+      ]
+    ],
+    "学生评价里的估计": [
+      [
+        "main",
+        "每周约 12 小时 · 难度 4/5"
+      ],
+      [
+        "note",
+        "来自学生评价的估计，不是官方信息；缺失不等于零或简单。"
+      ]
+    ],
+    "先修／共修": [
+      [
+        "main",
+        "结构化先修规则暂时不可用；不表示没有先修或共修要求。"
+      ],
+      [
+        "note",
+        "在详情里看完整规则"
+      ]
+    ],
+    "主题": [
+      [
+        "main",
+        "dynamic programming graph algorithms NP-completeness"
+      ]
+    ],
+    "考核构成": [
+      [
+        "main",
+        "Homework 40% · Midterm 25% · Final exam 35%"
+      ]
+    ],
+    "在培养方案里的位置": [
+      [
+        "main",
+        "MS in Computer Science (synthetic) 核心 · core 第 1 学期推荐"
+      ],
+      [
+        "note",
+        "旧 seed 关系，未核验；不是正式方案，不判断注册或毕业资格。"
+      ]
+    ],
+    "缺的数据": [
+      [
+        "main",
+        "缺失：教师、结构化先修信息、技能标签、职业方向"
+      ],
+      [
+        "note",
+        "缺失不等于零、简单或无要求。"
+      ]
+    ]
+  },
+  "links": [
+    [
+      "NEU 官方课程目录",
+      "https://catalog.northeastern.edu/course-descriptions/cs/"
+    ]
+  ],
+  "topics": [
+    "dynamic programming",
+    "graph algorithms",
+    "NP-completeness"
+  ],
+  "program_context": [
+    [
+      "MS in Computer Science (synthetic)",
+      "核心 · core",
+      "第 1 学期推荐"
+    ]
+  ],
+  "requisite_summary": [
+    "结构化先修规则暂时不可用；不表示没有先修或共修要求。"
+  ]
+}

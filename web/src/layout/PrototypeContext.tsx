@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
-import { comparisonCodes, initialQuestion } from '../fixtures/courses';
+import { initialQuestion } from '../fixtures/courses';
 
 type PrototypeState = {
   project: string;
@@ -10,9 +10,6 @@ type PrototypeState = {
   question: string;
   hasSubmitted: boolean;
   submit: (question: string) => void;
-  comparison: string[];
-  remove: (code: string) => void;
-  clear: () => void;
   notice: string;
   announce: (message: string) => void;
 };
@@ -23,7 +20,6 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
   const [plan, setPlanValue] = useState('none');
   const [question, setQuestion] = useState(initialQuestion);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [comparison, setComparison] = useState<string[]>([...comparisonCodes]);
   const [notice, announce] = useState('');
   const setProject = (value: string) => {
     setProjectValue(value);
@@ -31,7 +27,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
   };
   const setPlan = (value: string) => {
     setPlanValue(value);
-    // The only fixture plan belongs to MSCS, including the compare selector.
+    // The only R1 search fixture plan belongs to MSCS.
     if (value !== 'none') setProjectValue('cs-ms');
   };
   const submit = (value: string) => {
@@ -49,10 +45,6 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
         question,
         hasSubmitted,
         submit,
-        comparison,
-        remove: (code) =>
-          setComparison((previous) => previous.filter((item) => item !== code)),
-        clear: () => setComparison([]),
         notice,
         announce,
       }}
