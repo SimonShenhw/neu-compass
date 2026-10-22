@@ -10,18 +10,34 @@ import { Toggle } from '../components/Toggle';
 import { coursePath, findCourse, planOptions } from '../fixtures/courses';
 import type { Course } from '../fixtures/courses';
 import { usePrototype } from '../layout/PrototypeContext';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import styles from './ComparePage.module.css';
 
 export function ComparePage() {
   const state = usePrototype();
   const [onlyDifferent, setOnlyDifferent] = useState(true);
+  const removeButtons = useRef(new Map<string, HTMLButtonElement>());
+  const emptyAction = useRef<HTMLAnchorElement>(null);
+  const pendingFocus = useRef<{ code: string } | 'empty' | null>(null);
   const selected = state.comparison
     .map(findCourse)
     .filter((course): course is Course => course !== undefined);
+  useLayoutEffect(() => {
+    const target = pendingFocus.current;
+    if (target === null) return;
+    pendingFocus.current = null;
+    if (target === 'empty') emptyAction.current?.focus();
+    else removeButtons.current.get(target.code)?.focus();
+  }, [state.comparison]);
   if (!selected.length)
     return (
-      <EmptyState action={<Link to="/">回到课程搜索</Link>}>
+      <EmptyState
+        action={
+          <Link ref={emptyAction} to="/">
+            回到课程搜索
+          </Link>
+        }
+      >
         对比列表为空。在课程搜索页打开课程详情，最多选择 4 门课。
       </EmptyState>
     );
@@ -92,7 +108,14 @@ export function ComparePage() {
           onChange={setOnlyDifferent}
           label="只看不同的行"
         />
-        <Button size="sm" variant="ghost" onClick={state.clear}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            pendingFocus.current = 'empty';
+            state.clear();
+          }}
+        >
           清空对比
         </Button>
         <span className={styles.count}>
@@ -118,7 +141,7 @@ export function ComparePage() {
           <thead>
             <tr>
               <th scope="col">{selected.length} 门课</th>
-              {selected.map((course) => (
+              {selected.map((course, index) => (
                 <th scope="col" key={course.code}>
                   <div className={styles.columnHead}>
                     <span>
@@ -133,10 +156,22 @@ export function ComparePage() {
                         查看
                       </Link>
                       <Button
+                        ref={(element) => {
+                          if (element)
+                            removeButtons.current.set(course.code, element);
+                          else removeButtons.current.delete(course.code);
+                        }}
                         variant="ghost"
                         size="sm"
                         aria-label={`移出 ${course.code}`}
-                        onClick={() => state.remove(course.code)}
+                        onClick={() => {
+                          const neighbor =
+                            selected[index + 1] ?? selected[index - 1];
+                          pendingFocus.current = neighbor
+                            ? { code: neighbor.code }
+                            : 'empty';
+                          state.remove(course.code);
+                        }}
                       >
                         移出
                       </Button>

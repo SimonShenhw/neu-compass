@@ -1,4 +1,5 @@
 import { Info, Plus } from 'lucide-react';
+import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/Button';
@@ -22,6 +23,13 @@ function Conversation() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const empty = params.get('demo') === 'empty' && !state.hasSubmitted;
+  const answer = useRef<HTMLElement>(null);
+  const pendingAnswerFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (!pendingAnswerFocus.current || empty) return;
+    pendingAnswerFocus.current = false;
+    answer.current?.focus({ preventScroll: true });
+  }, [empty]);
   return (
     <section className={styles.chat} aria-label="课程问答">
       <div className={styles.context}>
@@ -49,7 +57,13 @@ function Conversation() {
           <p>课程信息来自 NEU 课程目录的存档（2026–2027），6,469 门课。</p>
           <div className={styles.examples}>
             {exampleQuestions.map((question) => (
-              <Button key={question} onClick={() => state.submit(question)}>
+              <Button
+                key={question}
+                onClick={() => {
+                  pendingAnswerFocus.current = true;
+                  state.submit(question);
+                }}
+              >
                 {question}
               </Button>
             ))}
@@ -63,7 +77,12 @@ function Conversation() {
           <p className={styles.question} aria-label="演示问题">
             {state.question}
           </p>
-          <article className={styles.answer} aria-label="示例回答">
+          <article
+            ref={answer}
+            tabIndex={-1}
+            className={styles.answer}
+            aria-label="示例回答"
+          >
             <p>按 2026–2027 目录，课名就是机器学习的有两门：</p>
             <ul>
               <li>

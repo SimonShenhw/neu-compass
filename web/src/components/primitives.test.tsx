@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Plus } from 'lucide-react';
+import { createRef } from 'react';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { CourseCode } from './CourseCode';
@@ -29,6 +30,13 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveClass('sm');
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
   });
+  it('forwards its DOM ref for keyboard focus recovery', () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>操作</Button>);
+    expect(ref.current).toBe(screen.getByRole('button'));
+    ref.current?.focus();
+    expect(screen.getByRole('button')).toHaveFocus();
+  });
   it('does not fire when disabled', async () => {
     const click = vi.fn();
     render(
@@ -51,6 +59,15 @@ it('IconButton has an accessible name and forwards its action', async () => {
   );
   await userEvent.click(screen.getByRole('button', { name: '加入对比' }));
   expect(click).toHaveBeenCalledOnce();
+});
+it('IconButton forwards its DOM ref without losing its accessible name', () => {
+  const ref = createRef<HTMLButtonElement>();
+  render(
+    <IconButton ref={ref} aria-label="加入对比">
+      +
+    </IconButton>,
+  );
+  expect(ref.current).toBe(screen.getByRole('button', { name: '加入对比' }));
 });
 
 it('CourseCode renders literal text, never HTML', () => {

@@ -1,5 +1,7 @@
 # R1 修改记录
 
+最新状态见文末「R1 补验 1」：71 项测试、25 项具名变异。前面的初次交付数字保留为 `dfe5f3d` 的历史结果，不代表补验后的代码。
+
 ## 2026-10-21 · 开工
 
 - 按 `frontend_react/R1_SPEC.md` 和 `mockup_v1/neu-compass-redesign.html` 实施；用户确认沿用设计稿、中文导航、对比默认只看不同的行；首版只做浅色，保留主题 tokens。
@@ -133,3 +135,41 @@ R2 的接口、认证、聊天流，R3 的旧深链，以及真实数据 / 登�
 - 暂存 67 个文件，仅 `web/` 与 CI；越界文件 0、禁止提交目录 0、含 CR 文件 0；`git diff --cached --check` 通过。
 - `node_modules/`、`dist/`、`artifacts/` 确认被忽略。主 checkout 工作树仍干净。本地预览已停止，不留下后台服务。
 - 交付为 `feat/web-skeleton` 上的本地提交；提交号另交评审目录的 R1_HANDOFF，避免在本提交内自引用哈希。没有 push、PR、合并或部署。
+
+## 2026-10-21 · R1 补验 1：控件移除后的键盘焦点
+
+### 范围与复现
+
+用户继续推进后，核对到本分支仍是 `dfe5f3d`，工作树干净；没有新的 R1 审查文件，计划仍把 R2 分给另一边。因此仅推进 R1 的自验 / 修复，不改接口、登录或后端。
+
+先跑冻结基线 `npm run check`：59 passed。浏览器用 Enter 实测三个路径，操作后 `document.activeElement` 都变成 BODY：移出某个对比列、清空对比、空首页选择示例问题。原控件消失后没有焦点接续，不只是样式问题。
+
+新增测试后、修改实现前，页面测试 30 项中 21 passed / 9 failed；九个失败全部是 `toHaveFocus()` 断言，覆盖首 / 中 / 尾列、最后一门、清空和四个示例。另一个「无关更新不抢焦点」保护测试保持绿色。证据在 `artifacts/r1-followup-red.json` 与 `.log`，没有改坏生产源码来伪造 RED。
+
+### 修改位置
+
+| 文件                                 | 修改                                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `src/pages/ComparePage.tsx`          | 操作前记录后继目标，DOM 更新后聚焦下一列移出按钮，末列则上一列；清空 / 末门转到空状态返回链接。只处理显式操作，不为普通渲染抢焦点 |
+| `src/pages/SearchPage.tsx`           | 空首页示例按钮消失后，把焦点交给新回答；`tabIndex=-1` 不增加普通 Tab 停靠点；`preventScroll` 保留位置                             |
+| `src/components/Button.tsx`          | props 类型使用带 DOM ref 的按钮类型，允许焦点管理拿到真实按钮；外观、默认 type 和 disabled 行为不变                               |
+| `src/pages/pages.test.tsx`           | 新增 10 项焦点流程 / 保护测试                                                                                                     |
+| `src/components/primitives.test.tsx` | 新增 Button / IconButton 两项 DOM ref 转交测试，仍保留 IconButton 必填 label 的编译断言                                           |
+| `scripts/mutations.mjs`              | 新增 M20–M25，原 19 项全部重跑，不借用上次结果                                                                                    |
+| `README.md`、本文件                  | 更新键盘策略、变异数量和本批证据                                                                                                  |
+
+实现中首遍 strict 编译抓到了 Button 旧 props 没有 ref，以及 RTL 的角色查询不接受浏览器接口的 exact 选项，均按类型契约修正，没有放宽 strict 或引入 any。React 19 的 ref-as-prop 用法已对照 [React 官方说明](https://react.dev/reference/react/forwardRef)，并由真实 DOM ref 测试验证。
+
+### 结果与证据
+
+- 完整 `npm run check`：71 passed（6 个测试文件，仍含 9 个页面 / 状态 axe）；strict 类型检查、零警告 lint、生产构建通过。日志：`artifacts/r1-followup-green-check-2.log`。首遍未通过的编译日志保留为 `r1-followup-green-check.log`，不记成绿色。
+- 首屏 JS 为 **124,773 gzip bytes / 250,000 bytes**，入口 `index-BaZzBYXt.js`。依赖和 lockfile 未改，未增加包。
+- 最终变异 `artifacts/mutations-2026-10-22T01-43-42-265Z/summary.json`：baseline passed，**25 / 25 KILLED，sourceUnchanged: true**。目录使用 UTC 时间，执行日按用户时区仍是 10-21。
+- M20 错选上一列，M21 丢失末门空状态焦点，M22 清空不发焦点请求，M23 新回答不接焦点，M24 Button 丢弃 ref，M25 筛选更新强抢焦点，均命中具名行为断言；没有把编译或导入失败算成杀死。
+- 桌面 1440×900 实测移出 CS 6140 后焦点在 DS 5220 的移出按钮，清空后在返回搜索链接，可直接 Enter 返回。手机 390×844 实测示例问题后聚焦 ARTICLE「示例回答」，连续移出到最后一门后聚焦返回搜索链接。
+- 手机长页存在原生滚动条时 DOM clientWidth 为 375px，短页为 390px；两种情况下 scrollWidth 均等于 clientWidth。手机邻列焦点边界为 314–358px，位于可视内容中，没有整页横溢。
+- 本批浏览器证据在评审目录 `frontend_react/r1-followup-2026-10-21/`：`desktop-neighbor-focus.jpg`、`mobile-answer-focus.jpg`、`mobile-last-course-focus.jpg`、`focus-observations.json`。截图和日志不提交。
+
+这批是原范围内的键盘缺陷修复，不是独立验收通过；完整网络面板、所有页面人工键盘 / 读屏检查、远端 CI 和 ESLint 9 兼容例外仍按前述边界处理。没有进入 R2，没有 push、PR、合并或部署。
+
+收尾：补齐文档后再次 `npm run format:check`、`npm run check`，均 exit 0，仍为 71 passed / 124,773 gzip bytes，日志 `artifacts/r1-followup-final-check.log`。当前实现与本批 25 项变异冻结哈希差异 0；改动仅上述 8 个 web 文件，未改 CI 或 Python，主 checkout 干净。临时视口已重置，独占预览进程已停止。保留初次提交，在其后追加独立本地修复提交，提交号更新到评审目录 R1_HANDOFF。

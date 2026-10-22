@@ -161,6 +161,70 @@ it('clearing comparison produces a usable empty state', async () => {
     '/',
   );
 });
+it.each([
+  ['CS 5800', 'CS 6140'],
+  ['CS 6140', 'DS 5220'],
+  ['CS 5100', 'DS 5220'],
+])(
+  'removing %s moves keyboard focus to the neighboring %s control',
+  async (code, neighbor) => {
+    const user = userEvent.setup();
+    page('/compare');
+    screen.getByRole('button', { name: `移出 ${code}` }).focus();
+    await user.keyboard('{Enter}');
+    expect(
+      screen.queryByRole('button', { name: `移出 ${code}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: `移出 ${neighbor}` }),
+    ).toHaveFocus();
+  },
+);
+it('removing the last comparison course focuses the empty-state action', async () => {
+  const user = userEvent.setup();
+  page('/compare');
+  for (const code of ['CS 5800', 'CS 6140', 'DS 5220', 'CS 5100']) {
+    screen.getByRole('button', { name: `移出 ${code}` }).focus();
+    await user.keyboard('{Enter}');
+  }
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '回到课程搜索' })).toHaveFocus();
+  await user.keyboard('{Enter}');
+  expect(screen.getByRole('heading', { name: '课程搜索' })).toBeInTheDocument();
+});
+it('clearing comparison focuses its remaining keyboard action', async () => {
+  const user = userEvent.setup();
+  page('/compare');
+  screen.getByRole('button', { name: '清空对比' }).focus();
+  await user.keyboard('{Enter}');
+  expect(screen.getByRole('link', { name: '回到课程搜索' })).toHaveFocus();
+});
+it('comparison focus is not stolen by an unrelated row-filter update', async () => {
+  const user = userEvent.setup();
+  page('/compare');
+  await user.click(screen.getByRole('button', { name: '移出 CS 6140' }));
+  const toggle = screen.getByRole('switch');
+  toggle.focus();
+  await user.keyboard(' ');
+  expect(screen.getByRole('rowheader', { name: '学分' })).toBeInTheDocument();
+  expect(toggle).toHaveFocus();
+});
+it.each([
+  'CS 5800 讲什么？',
+  '适合入门的机器学习课',
+  'CS 6140 的先修是什么？',
+  'MSCS 第一学期一般选什么？',
+])(
+  'choosing the empty-page example %s focuses the new answer',
+  async (question) => {
+    const user = userEvent.setup();
+    page('/?demo=empty');
+    screen.getByRole('button', { name: question }).focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByLabelText('演示问题')).toHaveTextContent(question);
+    expect(screen.getByRole('article', { name: '示例回答' })).toHaveFocus();
+  },
+);
 it('compare removal survives route navigation within the prototype', async () => {
   const user = userEvent.setup();
   page('/compare');
