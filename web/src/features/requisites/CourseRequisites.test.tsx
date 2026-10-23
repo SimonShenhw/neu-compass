@@ -301,6 +301,21 @@ it('all untrusted text is literal and only two vetted source anchors are rendere
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   }
 });
+it('a plan without an HTML digest shows no digest line', async () => {
+  const data = listing();
+  data.program_contexts[0]!.plans[0]!.source_html_sha256 = null;
+  const { container } = render(
+    <CourseRequisites {...props()} requisites={data} />,
+  );
+  await choose(YEAR_LABEL, year('2026-2027'));
+  await programDisclosure();
+  await choose(PLAN_LABEL, selectedPlan());
+  await expandAll(container);
+  expect(screen.getByText('partial · 来源片段已对照')).toBeVisible();
+  expect(
+    screen.queryByText((text) => text.startsWith('培养方案 HTML 字节摘要：')),
+  ).not.toBeInTheDocument();
+});
 it('timestamps replace only a terminal Z and preserve every other byte', async () => {
   const data = listing();
   data.documents[0]!.source.captured_at = 'Z-middle+03:00';

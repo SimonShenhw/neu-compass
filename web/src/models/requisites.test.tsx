@@ -210,6 +210,43 @@ it('optional branches require one child and explicit activation text', () => {
     expect(parseRequisites(data).kind).toBe('invalid');
   }
 });
+it('a non-consecutive catalog year alone rejects an otherwise consistent listing', () => {
+  // Rename the year everywhere it must match, so only the "second year is the next one" rule can refuse it.
+  const relabel = (value: string) => {
+    const data = listing();
+    const document = data.documents[0]!;
+    const old = document.catalog_year;
+    document.catalog_year = value;
+    document.source.catalog_year = value;
+    for (const c of data.program_contexts.filter(
+      (c) => c.catalog_year === old,
+    )) {
+      c.catalog_year = value;
+      for (const p of c.plans) p.catalog_year = value;
+    }
+    return parseRequisites(data).kind;
+  };
+  expect(relabel('2027-2028')).toBe('ok');
+  expect(relabel('2026-2028')).toBe('invalid');
+});
+it('one bad document rejects the whole listing even when no program context points at it', () => {
+  const data = listing();
+  data.program_contexts = [];
+  expect(parseRequisites(data).kind).toBe('ok');
+  data.documents[1]!.source.sha256 = 'A'.repeat(64);
+  expect(parseRequisites(data).kind).toBe('invalid');
+});
+it('an optional branch with two valid children is rejected', () => {
+  const data = listing();
+  const optional =
+    data.program_contexts[0]!.plans[1]!.requirements.children[1]!;
+  expect(optional.kind).toBe('optional');
+  optional.children = [
+    optional.children[0]!,
+    structuredClone(optional.children[0]!),
+  ];
+  expect(parseRequisites(data).kind).toBe('invalid');
+});
 const leaf: RequisiteNode = {
   kind: 'course',
   course_code: 'CS 1',
