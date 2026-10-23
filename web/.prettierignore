@@ -6,3 +6,4 @@ artifacts/
 # Reviewer API exports: preserve original bytes; verified by SHA-256 tests.
 src/fixtures/coop/
 src/fixtures/compare/
+src/fixtures/privacy/

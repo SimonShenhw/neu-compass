@@ -1,0 +1,24 @@
+{
+  "case": "delete-401-account-gone",
+  "settings": {
+    "QUERY_LOG_RETENTION_DAYS": 90,
+    "ANSWER_FEEDBACK_ENABLED": true,
+    "PRIVACY_CONTACT_EMAIL": "privacy@example.test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/auth/delete-account",
+    "body": {
+      "confirm": "delete"
+    },
+    "with": "session cookie, Origin and X-NEU-Compass: 1"
+  },
+  "status": 401,
+  "body": {
+    "detail": "Unknown user.",
+    "error_type": "unauthorized",
+    "status_code": 401
+  },
+  "expires_session_cookie": true,
+  "account_left": false
+}

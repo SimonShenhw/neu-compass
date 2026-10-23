@@ -1,0 +1,24 @@
+{
+  "case": "delete-403-cross-site",
+  "settings": {
+    "QUERY_LOG_RETENTION_DAYS": 90,
+    "ANSWER_FEEDBACK_ENABLED": true,
+    "PRIVACY_CONTACT_EMAIL": "privacy@example.test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/auth/delete-account",
+    "body": {
+      "confirm": "delete"
+    },
+    "with": "session cookie, Origin only"
+  },
+  "status": 403,
+  "body": {
+    "detail": "Cross-site request refused.",
+    "error_type": "csrf_rejected",
+    "status_code": 403
+  },
+  "expires_session_cookie": false,
+  "account_left": true
+}

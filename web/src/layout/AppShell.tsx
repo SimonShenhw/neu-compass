@@ -30,7 +30,9 @@ export function AppShell() {
       </aside>
       <div className={styles.mainColumn}>
         <TopBar
-          showGuest={navigationPath !== '/coop'}
+          showGuest={
+            navigationPath !== '/coop' && navigationPath !== '/privacy'
+          }
           title={title}
           count={comparison.length}
           onRefresh={refresh}

@@ -6,7 +6,7 @@ import { CourseDetail } from './pages/CourseDetail';
 import { CompareDemoPage } from './pages/CompareDemoPage';
 import { ProgramsPage } from './pages/ProgramsPage';
 import { CoopDemoPage } from './pages/CoopDemoPage';
-import { PrivacyPage } from './pages/PrivacyPage';
+import { PrivacyDemoPage } from './pages/PrivacyDemoPage';
 import { NotFound } from './pages/NotFound';
 
 export function App() {
@@ -19,7 +19,7 @@ export function App() {
           <Route path="/compare" element={<CompareDemoPage />} />
           <Route path="/programs" element={<ProgramsPage />} />
           <Route path="/coop" element={<CoopDemoPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/privacy" element={<PrivacyDemoPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

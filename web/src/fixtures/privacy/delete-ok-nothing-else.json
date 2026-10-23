@@ -1,0 +1,29 @@
+{
+  "case": "delete-ok-nothing-else",
+  "settings": {
+    "QUERY_LOG_RETENTION_DAYS": 90,
+    "ANSWER_FEEDBACK_ENABLED": true,
+    "PRIVACY_CONTACT_EMAIL": "privacy@example.test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/auth/delete-account",
+    "body": {
+      "confirm": "delete"
+    },
+    "with": "session cookie, Origin and X-NEU-Compass: 1"
+  },
+  "status": 200,
+  "body": {
+    "deleted": true,
+    "published_experiences": 0,
+    "unlocks_of_those": 0,
+    "own_unlocks": 0,
+    "submissions": 0,
+    "credits": 0,
+    "planned_courses": 0,
+    "withdrawn_from_groups": 0
+  },
+  "expires_session_cookie": true,
+  "account_left": false
+}
