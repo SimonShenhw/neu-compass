@@ -623,9 +623,11 @@ For the new web front end, which calls `api.<zone>` from `compass.<zone>` (the s
   `Bearer …`, is a 401, and the cookie is not looked at); an empty header counts as none. Without it, the cookie
   `__Host-nc_api_session` from the cookie mode of `/auth/callback`. A cookie that no longer works (bad, expired,
   account gone) counts as anonymous on public routes; `GET /auth/me` answers 401 and expires it. The 401 `detail`
-  texts (`Missing bearer token.`, `Invalid or expired session token. Log in again.`, `Unknown user.`) predate the
-  cookie and are kept for existing clients; cookie callers get them too, so the web front end goes by the status
-  and must not show them.
+  texts for a missing or failed session predate the cookie and are kept for existing clients: `Unknown user.`,
+  `Missing bearer token.` and `Invalid or expired session token. Log in again.`; `POST /coop` has its own two,
+  `Unknown user. Log in again.` and
+  `Authentication required: log in and send Authorization: Bearer <session_token> (ADR-0021)`. Cookie callers get
+  them too, so the web front end goes by the status and must not show them.
 - **JSON only as JSON:** a JSON body is read only with a JSON `Content-Type` (FastAPI's `strict_content_type`,
   written out in `create_app`); without one, or as `text/plain` or a form, the route answers 422 and reads nothing.
   A page on another origin can send a JSON `Content-Type` only after a CORS preflight, which only `WEB_ORIGINS`
