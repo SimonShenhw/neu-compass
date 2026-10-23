@@ -1,44 +1,20 @@
-// R5a's handwritten contract; R2 will replace it with generated API types.
-export type Industry =
-  | 'quant_fintech'
-  | 'big_tech'
-  | 'biotech_health'
-  | 'startup'
-  | 'consulting'
-  | 'other';
-export interface CoopRecord {
-  coop_id: string;
-  company: string;
-  role: string;
+// R5a's contract. The API shapes come from the generated types (R2b); the rest is the page's own.
+import type { Schemas } from './types';
+
+export type Industry = Schemas['Industry'];
+// A Co-op row as the page shows it: the API's CoopOut, narrowed to what the API puts there (its schema says only
+// "a string" and "an integer"). R5d checks each row against this before the page gets it.
+export type CoopRecord = Omit<
+  Schemas['CoopOut'],
+  'industry' | 'visibility_level'
+> & {
   industry: Industry | null;
-  coop_term: string | null;
-  duration_months: number | null;
-  related_courses: string[];
-  interview_summary: string | null;
-  technical_questions: string | null;
-  salary_range_usd: string | null;
   visibility_level: 0 | 1 | 2;
-}
-export interface CoopUploadRequest {
-  company: string;
-  role: string;
-  coop_term: string | null;
-  industry: Industry | null;
-  duration_months: number | null;
-  related_courses: string[];
-  interview_summary: string | null;
-  technical_questions: string | null;
-  salary_range_usd: string | null;
-}
-export interface CoopUploadResponse {
-  coop_id: string;
-  accepted: boolean;
-  visibility_level: number;
-  status: 'pending' | 'approved' | 'rejected' | 'published';
-  duplicate: boolean;
-  contribution_credited: boolean;
-  contribution_count: number;
-}
+};
+// The form always sends every field, so none is optional here.
+export type CoopUploadRequest = Required<Schemas['CoopUploadRequest']>;
+export type CoopUploadResponse = Schemas['CoopUploadResponse'];
+// The API's error body (api/exceptions.py); OpenAPI does not describe it.
 export interface ApiErrorBody {
   detail: string;
   error_type: string;

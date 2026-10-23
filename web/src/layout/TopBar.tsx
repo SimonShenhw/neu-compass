@@ -1,6 +1,8 @@
 import { Compass, Lock } from 'lucide-react';
+import type { ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 import { MobileNav } from './MobileNav';
+import type { Sidebar } from './Sidebar';
 import styles from './TopBar.module.css';
 
 export function TopBar({
@@ -8,18 +10,24 @@ export function TopBar({
   count,
   onRefresh,
   showGuest = true,
+  account = {},
 }: {
   title: string;
   count: number;
   onRefresh: () => void;
   showGuest?: boolean;
+  // The account box for the mobile menu, the same as the desktop sidebar's (R2b).
+  account?: Pick<
+    ComponentProps<typeof Sidebar>,
+    'session' | 'onLogin' | 'onLogout'
+  >;
 }) {
   return (
     <header
       className={`${styles.topbar} ${title === '课程搜索' ? styles.searchHeader : ''}`}
     >
       <div className={styles.mobile}>
-        <MobileNav compareCount={count} onRefresh={onRefresh} />
+        <MobileNav compareCount={count} onRefresh={onRefresh} {...account} />
         <Link to="/" className={styles.brand}>
           <Compass aria-hidden="true" />
           NEU-Compass

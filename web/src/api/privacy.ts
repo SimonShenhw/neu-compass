@@ -1,25 +1,9 @@
-// Handwritten R5c contract. R2 will replace this with generated API types.
-export interface PrivacySection {
-  heading: string;
-  sentences: string[];
-}
-export interface PrivacyBody {
-  intro: string;
-  sections: PrivacySection[];
-  delete_what: string;
-  query_log_notice: string;
-  capture_notice: string | null;
-}
-export interface DeleteAccountResult {
-  deleted: true;
-  published_experiences: number;
-  unlocks_of_those: number;
-  own_unlocks: number;
-  submissions: number;
-  credits: number;
-  planned_courses: number;
-  withdrawn_from_groups: number;
-}
+// R5c's contract. The API shapes come from the generated types (R2b); the rest is the page's own.
+import type { Schemas } from './types';
+
+export type PrivacySection = Schemas['PrivacySectionOut'];
+export type PrivacyBody = Schemas['PrivacyResponse'];
+export type DeleteAccountResult = Schemas['DeleteAccountResponse'];
 export type PrivacyState =
   | { status: 'loading' }
   | { status: 'error'; httpStatus: number | null }

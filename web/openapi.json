@@ -1,0 +1,4384 @@
+{
+  "components": {
+    "schemas": {
+      "AIPolicy": {
+        "additionalProperties": false,
+        "description": "Course's AI / generative-tool usage policy (v1.1).\n\nStructured fields cover what students actually filter on:\n\"is Copilot OK?\", \"is disclosure required?\". Unstructured penalty/\nnuance text goes in `notes`.\n\n中文:课程的 AI / 生成式工具使用政策(v1.1)。\n\n结构化字段覆盖的是学生实际会用来筛选的问题:\"能不能用 Copilot?\"、\n\"是否要求声明使用了 AI?\"。非结构化的处罚细节 / 微妙之处放在 `notes` 里。",
+        "properties": {
+          "banned_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Banned Tools",
+            "type": "array"
+          },
+          "disclosure_required": {
+            "default": true,
+            "title": "Disclosure Required",
+            "type": "boolean"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "permitted_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permitted Tools",
+            "type": "array"
+          }
+        },
+        "title": "AIPolicy",
+        "type": "object"
+      },
+      "AnswerFeedbackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "answer_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "answer_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Answer Sha256",
+            "type": "string"
+          },
+          "feedback_token": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Feedback Token",
+            "type": "string"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer_id",
+          "answer_sha256",
+          "feedback_token",
+          "rating"
+        ],
+        "title": "AnswerFeedbackRequest",
+        "type": "object"
+      },
+      "AnswerFeedbackResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "answer_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer_id",
+          "rating"
+        ],
+        "title": "AnswerFeedbackResponse",
+        "type": "object"
+      },
+      "AuthMeResponse": {
+        "additionalProperties": false,
+        "description": "Identity behind a Bearer session token (GET /auth/me). Lets the UI\nrestore login state from a persisted cookie without re-running OAuth —\nand re-reads contribution_count from the DB, so it's also the cheap\n\"refresh my profile\" call.\nBearer 会话令牌背后的身份（GET /auth/me）。让 UI 能从持久化的 cookie\n恢复登录状态而无需重新走一遍 OAuth —— 同时会从数据库重读\ncontribution_count，因此它也是一个低成本的\"刷新我的资料\"调用。",
+        "properties": {
+          "contribution_count": {
+            "default": 0,
+            "title": "Contribution Count",
+            "type": "integer"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "title": "AuthMeResponse",
+        "type": "object"
+      },
+      "CatalogCreditHours": {
+        "additionalProperties": false,
+        "properties": {
+          "format_version": {
+            "const": "1",
+            "default": "1",
+            "title": "Format Version",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "fixed",
+              "range"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "maximum": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Maximum",
+            "type": "string"
+          },
+          "minimum": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Minimum",
+            "type": "string"
+          },
+          "raw_text": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Raw Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw_text",
+          "kind",
+          "minimum",
+          "maximum"
+        ],
+        "title": "CatalogCreditHours",
+        "type": "object"
+      },
+      "CatalogRequisites": {
+        "additionalProperties": false,
+        "properties": {
+          "corequisite": {
+            "$ref": "#/components/schemas/RequisiteSection"
+          },
+          "grammar_version": {
+            "const": "1",
+            "default": "1",
+            "title": "Grammar Version",
+            "type": "string"
+          },
+          "prerequisite": {
+            "$ref": "#/components/schemas/RequisiteSection"
+          }
+        },
+        "required": [
+          "prerequisite",
+          "corequisite"
+        ],
+        "title": "CatalogRequisites",
+        "type": "object"
+      },
+      "CatalogSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_url": {
+            "title": "Catalog Url",
+            "type": "string"
+          },
+          "course_code": {
+            "title": "Course Code",
+            "type": "string"
+          },
+          "course_name": {
+            "minLength": 1,
+            "title": "Course Name",
+            "type": "string"
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "imported_at": {
+            "format": "date-time",
+            "title": "Imported At",
+            "type": "string"
+          },
+          "prereq_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prereq Codes",
+            "type": "array"
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "course_code",
+          "course_name",
+          "catalog_url",
+          "snapshot_id",
+          "imported_at"
+        ],
+        "title": "CatalogSnapshot",
+        "type": "object"
+      },
+      "ChatRequest": {
+        "additionalProperties": false,
+        "description": "Body for POST /chat. Filters mirror /search for re-use.\n\nPOST /chat 的请求体。过滤字段与 /search 保持一致，便于复用。\n\nConversation continuity (2026-06): `history` reaches the answer prompt\n(reference resolution + tone); `context_course_ids` are the previous\nturn's evidence — when the new query is a follow-up (\"这门课作业量大吗\"),\nretrieval short-circuits to those courses instead of searching a query\nthat carries no course signal of its own.\n\n对话连续性（2026-06）：`history` 会传到回答用的 prompt 里（用于指代\n消解 + 语气延续）；`context_course_ids` 是上一轮的证据 —— 当新查询是\n追问（如\"这门课作业量大吗\"）时，检索直接短路到这些课程，而不是去\n搜索一个本身不带任何课程信号的查询。",
+        "properties": {
+          "allow_feedback_capture": {
+            "default": false,
+            "title": "Allow Feedback Capture",
+            "type": "boolean"
+          },
+          "context_course_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Context Course Ids",
+            "type": "array"
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits"
+          },
+          "delivery_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Mode"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatTurn"
+            },
+            "maxItems": 12,
+            "title": "History",
+            "type": "array"
+          },
+          "k": {
+            "default": 5,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "professor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professor"
+          },
+          "program_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program Id"
+          },
+          "query": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "ChatRequest",
+        "type": "object"
+      },
+      "ChatTurn": {
+        "additionalProperties": false,
+        "description": "One prior conversation turn (client-supplied — /chat is stateless;\nthe Streamlit session owns the transcript and sends a recent window).\n一轮此前的对话（由客户端提供 —— /chat 本身是无状态的；由 Streamlit\n会话保管完整记录，只发送最近的一段窗口）。",
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatTurn",
+        "type": "object"
+      },
+      "CoopOut": {
+        "additionalProperties": false,
+        "description": "Co-op view returned by GET /coop. Mirrors CoopExperience minus\ncontributor_user_id / redaction_audit (internal audit fields, not for\nend users).\nGET /coop 返回的 Co-op 视图。与 CoopExperience 一致，但去掉了\ncontributor_user_id / redaction_audit（内部审计字段，不面向终端\n用户）。",
+        "properties": {
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "coop_id": {
+            "title": "Coop Id",
+            "type": "string"
+          },
+          "coop_term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coop Term"
+          },
+          "duration_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Months"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "interview_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Summary"
+          },
+          "related_courses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Courses",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "salary_range_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Range Usd"
+          },
+          "technical_questions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technical Questions"
+          },
+          "visibility_level": {
+            "title": "Visibility Level",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "coop_id",
+          "company",
+          "role",
+          "industry",
+          "coop_term",
+          "duration_months",
+          "related_courses",
+          "interview_summary",
+          "technical_questions",
+          "salary_range_usd",
+          "visibility_level"
+        ],
+        "title": "CoopOut",
+        "type": "object"
+      },
+      "CoopUploadRequest": {
+        "additionalProperties": false,
+        "description": "Body for POST /coop. visibility_level is set server-side from content\npresence (interview / technical / salary), so clients don't pick their\nown tier.\nPOST /coop 的请求体。visibility_level 由服务端根据内容是否存在\n（interview / technical / salary）来设定，客户端无法自选分层。",
+        "properties": {
+          "company": {
+            "minLength": 1,
+            "title": "Company",
+            "type": "string"
+          },
+          "coop_term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coop Term"
+          },
+          "duration_months": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Months"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Industry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interview_summary": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Summary"
+          },
+          "related_courses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Courses",
+            "type": "array"
+          },
+          "role": {
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "salary_range_usd": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Range Usd"
+          },
+          "technical_questions": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technical Questions"
+          }
+        },
+        "required": [
+          "company",
+          "role"
+        ],
+        "title": "CoopUploadRequest",
+        "type": "object"
+      },
+      "CoopUploadResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "contribution_count": {
+            "title": "Contribution Count",
+            "type": "integer"
+          },
+          "contribution_credited": {
+            "title": "Contribution Credited",
+            "type": "boolean"
+          },
+          "coop_id": {
+            "title": "Coop Id",
+            "type": "string"
+          },
+          "duplicate": {
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "published"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "visibility_level": {
+            "title": "Visibility Level",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "coop_id",
+          "accepted",
+          "visibility_level",
+          "status",
+          "duplicate",
+          "contribution_credited",
+          "contribution_count"
+        ],
+        "title": "CoopUploadResponse",
+        "type": "object"
+      },
+      "CourseAnswerEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "field_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceSnippet"
+            },
+            "title": "Field Evidence",
+            "type": "array"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Fields",
+            "type": "array"
+          },
+          "requisites": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequisiteEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_review_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Review Ids",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "CourseAnswerEvidence",
+        "type": "object"
+      },
+      "CourseDescriptionEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/DescriptionCandidate"
+            },
+            "maxItems": 30,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "format_version": {
+            "const": "1",
+            "default": "1",
+            "title": "Format Version",
+            "type": "string"
+          },
+          "paragraphs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Paragraphs",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "not_listed",
+              "no_keyword_match",
+              "review_needed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "CourseDescriptionEvidence",
+        "type": "object"
+      },
+      "CourseDetailOut": {
+        "additionalProperties": false,
+        "description": "Course (schema v1.1, unchanged fields) + program-ontology context.\n\nCourse（schema v1.1，字段未变）+ 培养方案本体上下文。\n\nSubclass instead of wrapper so existing /course/{id} consumers keep\ntheir flat field access; the two new lists default to empty for\ncourses outside any seeded program.\n\n用子类而不是包装类，这样 /course/{id} 现有的消费方仍能保持扁平的\n字段访问方式；对不属于任何预置培养方案的课程，这两个新列表默认\n为空。",
+        "properties": {
+          "ai_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answer_evidence": {
+            "$ref": "#/components/schemas/CourseAnswerEvidence"
+          },
+          "career_relevance": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Career Relevance",
+            "type": "array"
+          },
+          "controversial_signals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Controversial Signals",
+            "type": "array"
+          },
+          "course_id": {
+            "description": "Internal stable UUID",
+            "minLength": 1,
+            "title": "Course Id",
+            "type": "string"
+          },
+          "course_requisites": {
+            "$ref": "#/components/schemas/CourseRequisiteListing"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits"
+          },
+          "delivery_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "difficulty_score": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty Score"
+          },
+          "evidence_snippets": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceSnippet"
+            },
+            "title": "Evidence Snippets",
+            "type": "array"
+          },
+          "extraction_confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Confidence"
+          },
+          "grading_components": {
+            "items": {
+              "$ref": "#/components/schemas/GradingComponent"
+            },
+            "title": "Grading Components",
+            "type": "array"
+          },
+          "instructor_contact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstructorContact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meeting_schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MeetingSchedule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prereqs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prereqs",
+            "type": "array"
+          },
+          "prerequisites": {
+            "items": {
+              "$ref": "#/components/schemas/CoursePrereqOut"
+            },
+            "title": "Prerequisites",
+            "type": "array"
+          },
+          "primary_code": {
+            "description": "Canonical code, e.g. 'CS 5800'",
+            "title": "Primary Code",
+            "type": "string"
+          },
+          "primary_name": {
+            "minLength": 1,
+            "title": "Primary Name",
+            "type": "string"
+          },
+          "professor": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Professor",
+            "type": "array"
+          },
+          "program_context": {
+            "items": {
+              "$ref": "#/components/schemas/CourseProgramEdgeOut"
+            },
+            "title": "Program Context",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": "1.1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "skill_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skill Tags",
+            "type": "array"
+          },
+          "source_review_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Review Ids",
+            "type": "array"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          },
+          "textbooks": {
+            "items": {
+              "$ref": "#/components/schemas/Textbook"
+            },
+            "title": "Textbooks",
+            "type": "array"
+          },
+          "topics_covered": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topics Covered",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "workload_hours_per_week": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workload Hours Per Week"
+          }
+        },
+        "required": [
+          "course_id",
+          "primary_code",
+          "primary_name"
+        ],
+        "title": "CourseDetailOut",
+        "type": "object"
+      },
+      "CoursePrereqOut": {
+        "additionalProperties": false,
+        "description": "A prerequisite edge with the prereq's display fields resolved.\ncode/name are None when the prereq course isn't in the catalog\n(dangling seed edge) — the UI then shows the raw course_id.\n一条先修边，先修课程的显示字段已解析。当先修课程不在目录中时\n（悬空的种子边），code/name 为 None —— 此时 UI 会直接显示原始\ncourse_id。",
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "string"
+          },
+          "primary_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Code"
+          },
+          "primary_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Name"
+          },
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "course_id",
+          "requirement"
+        ],
+        "title": "CoursePrereqOut",
+        "type": "object"
+      },
+      "CourseProgramContext": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_year": {
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "course_code": {
+            "title": "Course Code",
+            "type": "string"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/ProgramPlan"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "schema_available": {
+            "default": false,
+            "title": "Schema Available",
+            "type": "boolean"
+          },
+          "unreviewed_records": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unreviewed Records",
+            "type": "integer"
+          },
+          "unusable_records": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unusable Records",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "course_code",
+          "catalog_year"
+        ],
+        "title": "CourseProgramContext",
+        "type": "object"
+      },
+      "CourseProgramEdgeOut": {
+        "additionalProperties": false,
+        "description": "How a course fits into one seeded program (Layer 3 ontology).\n一门课程如何嵌入某个预置培养方案（Layer 3 本体）。",
+        "properties": {
+          "program_id": {
+            "title": "Program Id",
+            "type": "string"
+          },
+          "program_name": {
+            "title": "Program Name",
+            "type": "string"
+          },
+          "requirement_type": {
+            "title": "Requirement Type",
+            "type": "string"
+          },
+          "semester_recommended": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Recommended"
+          }
+        },
+        "required": [
+          "program_id",
+          "program_name",
+          "requirement_type"
+        ],
+        "title": "CourseProgramEdgeOut",
+        "type": "object"
+      },
+      "CourseRange": {
+        "additionalProperties": false,
+        "description": "A catalog code interval, not proof that every number is a real course.",
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "CourseRange",
+        "type": "object"
+      },
+      "CourseRequisiteDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "campus": {
+            "title": "Campus",
+            "type": "null"
+          },
+          "catalog_year": {
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "course_code": {
+            "title": "Course Code",
+            "type": "string"
+          },
+          "course_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Course Id",
+            "type": "string"
+          },
+          "course_name": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Course Name",
+            "type": "string"
+          },
+          "coverage": {
+            "const": "courseblock_clauses_only",
+            "default": "courseblock_clauses_only",
+            "title": "Coverage",
+            "type": "string"
+          },
+          "credit_hours": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogCreditHours"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description_evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourseDescriptionEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "format_version": {
+            "const": "1",
+            "default": "1",
+            "title": "Format Version",
+            "type": "string"
+          },
+          "imported_at": {
+            "format": "date-time",
+            "title": "Imported At",
+            "type": "string"
+          },
+          "requisites": {
+            "$ref": "#/components/schemas/CatalogRequisites"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CourseRequisiteSource"
+          }
+        },
+        "required": [
+          "course_id",
+          "course_code",
+          "course_name",
+          "catalog_year",
+          "source",
+          "requisites"
+        ],
+        "title": "CourseRequisiteDocument",
+        "type": "object"
+      },
+      "CourseRequisiteListing": {
+        "additionalProperties": false,
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/CourseRequisiteDocument"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "has_any_stored_records": {
+            "default": false,
+            "title": "Has Any Stored Records",
+            "type": "boolean"
+          },
+          "program_contexts": {
+            "items": {
+              "$ref": "#/components/schemas/CourseProgramContext"
+            },
+            "title": "Program Contexts",
+            "type": "array"
+          },
+          "schema_available": {
+            "default": false,
+            "title": "Schema Available",
+            "type": "boolean"
+          },
+          "unusable_records": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unusable Records",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "CourseRequisiteListing",
+        "type": "object"
+      },
+      "CourseRequisiteSource": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_count": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2000000.0,
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "captured_at": {
+            "format": "date-time",
+            "title": "Captured At",
+            "type": "string"
+          },
+          "catalog_year": {
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "format_version": {
+            "default": 1,
+            "maximum": 1.0,
+            "minimum": 1.0,
+            "title": "Format Version",
+            "type": "integer"
+          },
+          "page_title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Page Title",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "catalog_year",
+          "captured_at",
+          "sha256",
+          "byte_count",
+          "page_title"
+        ],
+        "title": "CourseRequisiteSource",
+        "type": "object"
+      },
+      "CurriculumCourseOut": {
+        "additionalProperties": false,
+        "description": "One course inside a semester group, display fields resolved from\nthe catalog. Edges whose course_id is missing from `courses` (dangling\nseed edge) are dropped by the route, so code/name are always present.\n某个学期分组内的一门课程，显示字段已从目录解析。course_id 在 `courses`\n中缺失的边（悬空的种子边）会被路由丢弃，因此 code/name 必定存在。",
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "primary_code": {
+            "title": "Primary Code",
+            "type": "string"
+          },
+          "primary_name": {
+            "title": "Primary Name",
+            "type": "string"
+          },
+          "requirement_type": {
+            "title": "Requirement Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "course_id",
+          "primary_code",
+          "primary_name",
+          "requirement_type"
+        ],
+        "title": "CurriculumCourseOut",
+        "type": "object"
+      },
+      "CurriculumSemesterOut": {
+        "additionalProperties": false,
+        "description": "Semester group. semester=None means 'no recorded recommendation', NOT\npermission to enroll in any term, and it always sorts last.\n学期分组。semester=None 表示\"没有记录推荐学期\"，不是任意学期可修，\n并且始终排在最后。",
+        "properties": {
+          "courses": {
+            "items": {
+              "$ref": "#/components/schemas/CurriculumCourseOut"
+            },
+            "title": "Courses",
+            "type": "array"
+          },
+          "semester": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester"
+          }
+        },
+        "required": [
+          "courses"
+        ],
+        "title": "CurriculumSemesterOut",
+        "type": "object"
+      },
+      "DayOfWeek": {
+        "enum": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday"
+        ],
+        "title": "DayOfWeek",
+        "type": "string"
+      },
+      "DeleteAccountRequest": {
+        "additionalProperties": false,
+        "description": "The word `delete`, so a stray POST never deletes an account (batch T, P4). 中文：要写明 `delete`。",
+        "properties": {
+          "confirm": {
+            "const": "delete",
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "DeleteAccountRequest",
+        "type": "object"
+      },
+      "DeleteAccountResponse": {
+        "additionalProperties": false,
+        "description": "Rows removed per kind; no identity. 中文：各类删了几行，不带身份。",
+        "properties": {
+          "credits": {
+            "title": "Credits",
+            "type": "integer"
+          },
+          "deleted": {
+            "const": true,
+            "default": true,
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "own_unlocks": {
+            "title": "Own Unlocks",
+            "type": "integer"
+          },
+          "planned_courses": {
+            "title": "Planned Courses",
+            "type": "integer"
+          },
+          "published_experiences": {
+            "title": "Published Experiences",
+            "type": "integer"
+          },
+          "submissions": {
+            "title": "Submissions",
+            "type": "integer"
+          },
+          "unlocks_of_those": {
+            "title": "Unlocks Of Those",
+            "type": "integer"
+          },
+          "withdrawn_from_groups": {
+            "title": "Withdrawn From Groups",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "published_experiences",
+          "unlocks_of_those",
+          "own_unlocks",
+          "submissions",
+          "credits",
+          "planned_courses",
+          "withdrawn_from_groups"
+        ],
+        "title": "DeleteAccountResponse",
+        "type": "object"
+      },
+      "DeliveryMode": {
+        "enum": [
+          "in_person",
+          "online",
+          "hybrid",
+          "async"
+        ],
+        "title": "DeliveryMode",
+        "type": "string"
+      },
+      "DescriptionCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "markers": {
+            "items": {
+              "enum": [
+                "permission",
+                "approval",
+                "admission",
+                "eligibility",
+                "restriction",
+                "registration",
+                "qualification"
+              ],
+              "type": "string"
+            },
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Markers",
+            "type": "array"
+          },
+          "paragraph_index": {
+            "exclusiveMaximum": 30.0,
+            "minimum": 0.0,
+            "title": "Paragraph Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "paragraph_index",
+          "markers"
+        ],
+        "title": "DescriptionCandidate",
+        "type": "object"
+      },
+      "EvidenceSnippet": {
+        "additionalProperties": false,
+        "description": "One quote backing a soft field value (PLAN §2.3).\n\n中文:支撑某个软字段(soft field)取值的一条引用证据(PLAN §2.3)。",
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "field": {
+            "description": "Soft field this evidence supports, e.g. 'difficulty_score'",
+            "title": "Field",
+            "type": "string"
+          },
+          "quote": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "source_id": {
+            "description": "e.g. 'rmp_review_98765', 'reddit_t1_abc'",
+            "minLength": 1,
+            "title": "Source Id",
+            "type": "string"
+          },
+          "value": {
+            "description": "The supported value (matches the soft field's type)",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field",
+          "value",
+          "source_id",
+          "quote",
+          "confidence"
+        ],
+        "title": "EvidenceSnippet",
+        "type": "object"
+      },
+      "GradingComponent": {
+        "additionalProperties": false,
+        "description": "One row of the grading rubric, e.g. {'name': 'midterm', 'weight': 0.3}.\n\nweight is Optional in v1.1 — most CPS syllabi don't publish exact weights.\nRecording {name: \"discussion board\", weight: None} is preferred to dropping\nthe entry entirely (which loses the fact that this component exists).\n\n中文:评分细则(grading rubric)中的一行,例如\n{'name': 'midterm', 'weight': 0.3}。\n\nweight 在 v1.1 中是 Optional 的 —— 大多数 CPS 课程大纲并不公布具体的\n权重数字。记录 {name: \"discussion board\", weight: None} 比整条丢弃更\n可取(整条丢弃会连\"这个评分项存在\"这个事实一起丢掉)。",
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GradingComponent",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Industry": {
+        "description": "Industry buckets used for analytics + k-anonymity filtering.\n\nPLAN §6.5 Seed Data distribution targets:\n  QUANT_FINTECH: 12  (State Street, Fidelity, Wellington, MFS, Putnam)\n  BIG_TECH:      8   (Amazon, Google, Microsoft Boston offices)\n  BIOTECH_HEALTH: 5  (Moderna, Vertex, IQVIA)\n  STARTUP:       5   (Boston AI startup ecosystem)\n\n中文:用于数据分析 + k-匿名(k-anonymity)过滤的行业分桶。\n\nPLAN §6.5 种子数据(Seed Data)分布目标:\n  QUANT_FINTECH:  12(State Street、Fidelity、Wellington、MFS、Putnam)\n  BIG_TECH:        8(Amazon、Google、Microsoft 波士顿办公室)\n  BIOTECH_HEALTH:  5(Moderna、Vertex、IQVIA)\n  STARTUP:         5(波士顿 AI 创业生态圈)",
+        "enum": [
+          "quant_fintech",
+          "big_tech",
+          "biotech_health",
+          "startup",
+          "consulting",
+          "other"
+        ],
+        "title": "Industry",
+        "type": "string"
+      },
+      "InstructorContact": {
+        "additionalProperties": false,
+        "description": "Instructor contact info (v1.1).\n\nname typically duplicates Course.professor[0] but stays here for\nstandalone use. Email is OK to store: NEU faculty emails are publicly\nlisted on the directory; this is not protected PII like student emails.\n\n中文:授课教师的联系方式(v1.1)。\n\nname 通常与 Course.professor[0] 重复,但仍单独保留在这里以便独立使用。\nEmail 可以放心存储:NEU 教职工邮箱在教职工目录中是公开信息,不像学生\n邮箱那样属于需要保护的 PII。",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "office_hours": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Free-form: 'Tue 3-5 PM @ Snell 410' or 'by appointment via email'",
+            "title": "Office Hours"
+          },
+          "secondary_contact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "e.g. academic lead's name + email",
+            "title": "Secondary Contact"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "InstructorContact",
+        "type": "object"
+      },
+      "LoginUrlResponse": {
+        "additionalProperties": false,
+        "description": "GET /auth/login-url: where to send the browser to log in with Google (R2a). 中文：去 Google 登录的地址。",
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "LoginUrlResponse",
+        "type": "object"
+      },
+      "MeetingSchedule": {
+        "additionalProperties": false,
+        "description": "Full meeting schedule for a course (v1.1).\n\n中文:某门课程完整的上课时间表(v1.1)。",
+        "properties": {
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/MeetingSlot"
+            },
+            "title": "Slots",
+            "type": "array"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "timezone": {
+            "default": "America/New_York",
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "title": "MeetingSchedule",
+        "type": "object"
+      },
+      "MeetingSlot": {
+        "additionalProperties": false,
+        "description": "One day-of-week meeting (v1.1).\n\nA course can have multiple slots (e.g. M+W+F). times use\nPydantic's `time` type — accepts '17:50' string and serializes\nto ISO 'HH:MM:SS'.\n\n中文:每周固定某一天的一次上课时段(v1.1)。\n\n一门课可以有多个时段(例如周一+周三+周五)。时间字段使用 Pydantic 的\n`time` 类型 —— 接受 '17:50' 这样的字符串输入,序列化为 ISO\n'HH:MM:SS' 格式输出。",
+        "properties": {
+          "day_of_week": {
+            "$ref": "#/components/schemas/DayOfWeek"
+          },
+          "end_time": {
+            "format": "time",
+            "title": "End Time",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "e.g. 'Snell Library 119' or 'Online'",
+            "title": "Location"
+          },
+          "start_time": {
+            "format": "time",
+            "title": "Start Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day_of_week",
+          "start_time",
+          "end_time"
+        ],
+        "title": "MeetingSlot",
+        "type": "object"
+      },
+      "OAuthCallbackRequest": {
+        "additionalProperties": false,
+        "description": "Body for POST /auth/callback. The Streamlit page sends the `code`\nquery param Google redirected back with.\nPOST /auth/callback 的请求体。Streamlit 页面发送 Google 重定向带回的\n`code` 查询参数。",
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Uri"
+          },
+          "session": {
+            "default": "token",
+            "enum": [
+              "token",
+              "cookie"
+            ],
+            "title": "Session",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "OAuthCallbackRequest",
+        "type": "object"
+      },
+      "OAuthCallbackResponse": {
+        "additionalProperties": false,
+        "description": "Sanitized identity persisted server-side. Streamlit calls\nstate_manager.login with these fields.\n\n经清洗、已持久化到服务端的身份信息。Streamlit 会用这些字段调用\nstate_manager.login。\n\nsession_token (ADR-0021): signed bearer credential for subsequent API\ncalls (`Authorization: Bearer <token>`). None when the server runs\nwithout SESSION_SECRET (dev degraded mode), and None in the cookie mode\n(R2a), where the token is in the HttpOnly cookie instead.\n\nsession_token（ADR-0021）：供后续 API 调用使用的签名 bearer 凭证\n（`Authorization: Bearer <token>`）。服务端未配置 SESSION_SECRET 时\n（开发降级模式）为 None；cookie 模式（R2a）下也是 None，令牌在 HttpOnly\ncookie 里。",
+        "properties": {
+          "contribution_count": {
+            "default": 0,
+            "title": "Contribution Count",
+            "type": "integer"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "session_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Token"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "title": "OAuthCallbackResponse",
+        "type": "object"
+      },
+      "PlanPolicyLink": {
+        "additionalProperties": false,
+        "properties": {
+          "campus": {
+            "pattern": "^[a-z][a-z0-9-]{0,39}$",
+            "title": "Campus",
+            "type": "string"
+          },
+          "catalog_year": {
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration"
+          },
+          "home_college": {
+            "enum": [
+              "khoury",
+              "camd",
+              "engineering"
+            ],
+            "title": "Home College",
+            "type": "string"
+          },
+          "pathway": {
+            "enum": [
+              "standard",
+              "align",
+              "bridge"
+            ],
+            "title": "Pathway",
+            "type": "string"
+          },
+          "plan_content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Plan Content Sha256",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,99}$",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "policy_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Policy Ids",
+            "type": "array"
+          },
+          "program_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Program Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "program_id",
+          "campus",
+          "catalog_year",
+          "pathway",
+          "plan_content_sha256",
+          "home_college",
+          "policy_ids"
+        ],
+        "title": "PlanPolicyLink",
+        "type": "object"
+      },
+      "PlanSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "campus": {
+            "pattern": "^[a-z][a-z0-9-]{0,39}$",
+            "title": "Campus",
+            "type": "string"
+          },
+          "catalog_year": {
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration"
+          },
+          "pathway": {
+            "enum": [
+              "standard",
+              "align",
+              "bridge"
+            ],
+            "title": "Pathway",
+            "type": "string"
+          },
+          "plan_content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Plan Content Sha256",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,99}$",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "program_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+            "title": "Program Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "program_id",
+          "plan_id",
+          "campus",
+          "catalog_year",
+          "pathway",
+          "plan_content_sha256"
+        ],
+        "title": "PlanSelection",
+        "type": "object"
+      },
+      "PolicyEvidenceOut": {
+        "additionalProperties": false,
+        "properties": {
+          "authority": {
+            "enum": [
+              "university",
+              "khoury",
+              "camd",
+              "engineering"
+            ],
+            "title": "Authority",
+            "type": "string"
+          },
+          "coverage": {
+            "const": "selected_fragments_only",
+            "default": "selected_fragments_only",
+            "title": "Coverage",
+            "type": "string"
+          },
+          "fragments": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyFragmentOut"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Fragments",
+            "type": "array"
+          },
+          "policy_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+            "title": "Policy Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceCapture"
+          }
+        },
+        "required": [
+          "policy_id",
+          "authority",
+          "source",
+          "fragments"
+        ],
+        "title": "PolicyEvidenceOut",
+        "type": "object"
+      },
+      "PolicyFragmentOut": {
+        "additionalProperties": false,
+        "properties": {
+          "fragment_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+            "title": "Fragment Id",
+            "type": "string"
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "limitation": {
+            "maxLength": 1500,
+            "minLength": 1,
+            "title": "Limitation",
+            "type": "string"
+          },
+          "paragraph_index": {
+            "exclusiveMaximum": 300.0,
+            "minimum": 0.0,
+            "title": "Paragraph Index",
+            "type": "integer"
+          },
+          "paragraph_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Paragraph Sha256",
+            "type": "string"
+          },
+          "source_kind": {
+            "default": "paragraph",
+            "enum": [
+              "paragraph",
+              "list"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "source_paragraph": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Source Paragraph",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 1500,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fragment_id",
+          "paragraph_index",
+          "paragraph_sha256",
+          "summary",
+          "limitation",
+          "source_paragraph"
+        ],
+        "title": "PolicyFragmentOut",
+        "type": "object"
+      },
+      "PolicyScope": {
+        "additionalProperties": false,
+        "properties": {
+          "campus": {
+            "pattern": "^[a-z][a-z0-9-]{0,39}$",
+            "title": "Campus",
+            "type": "string"
+          },
+          "catalog_year": {
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration"
+          },
+          "pathway": {
+            "enum": [
+              "standard",
+              "align",
+              "bridge"
+            ],
+            "title": "Pathway",
+            "type": "string"
+          },
+          "program_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Program Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "program_id",
+          "campus",
+          "catalog_year",
+          "pathway"
+        ],
+        "title": "PolicyScope",
+        "type": "object"
+      },
+      "PrivacyResponse": {
+        "additionalProperties": false,
+        "description": "GET /privacy (R2a): the 数据与隐私 page, built from the API's own settings, plus the two notices shown next to\nthe ask box. 中文：「数据与隐私」页，按 API 自己的设置生成，外加提问框旁边的两段说明。",
+        "properties": {
+          "capture_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Notice"
+          },
+          "delete_what": {
+            "title": "Delete What",
+            "type": "string"
+          },
+          "intro": {
+            "title": "Intro",
+            "type": "string"
+          },
+          "query_log_notice": {
+            "title": "Query Log Notice",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PrivacySectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "intro",
+          "sections",
+          "delete_what",
+          "query_log_notice",
+          "capture_notice"
+        ],
+        "title": "PrivacyResponse",
+        "type": "object"
+      },
+      "PrivacySectionOut": {
+        "additionalProperties": false,
+        "properties": {
+          "heading": {
+            "title": "Heading",
+            "type": "string"
+          },
+          "sentences": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sentences",
+            "type": "array"
+          }
+        },
+        "required": [
+          "heading",
+          "sentences"
+        ],
+        "title": "PrivacySectionOut",
+        "type": "object"
+      },
+      "ProgramCurriculumOut": {
+        "additionalProperties": false,
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "plan_schema_available": {
+            "default": false,
+            "title": "Plan Schema Available",
+            "type": "boolean"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/ProgramPlan"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "program_id": {
+            "title": "Program Id",
+            "type": "string"
+          },
+          "semesters": {
+            "items": {
+              "$ref": "#/components/schemas/CurriculumSemesterOut"
+            },
+            "title": "Semesters",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "program_id",
+          "full_name",
+          "prefix",
+          "semesters"
+        ],
+        "title": "ProgramCurriculumOut",
+        "type": "object"
+      },
+      "ProgramPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "campus": {
+            "pattern": "^[a-z][a-z0-9-]{0,39}$",
+            "title": "Campus",
+            "type": "string"
+          },
+          "captured_on": {
+            "format": "date",
+            "title": "Captured On",
+            "type": "string"
+          },
+          "catalog_year": {
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "checked_by": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked By"
+          },
+          "checked_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked On"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration"
+          },
+          "coverage": {
+            "default": "partial",
+            "enum": [
+              "partial",
+              "complete"
+            ],
+            "title": "Coverage",
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 2500,
+            "minLength": 1,
+            "title": "Notes",
+            "type": "string"
+          },
+          "pathway": {
+            "enum": [
+              "standard",
+              "align",
+              "bridge"
+            ],
+            "title": "Pathway",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,99}$",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "program_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Program Id",
+            "type": "string"
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/RequirementNode"
+          },
+          "review_status": {
+            "default": "draft",
+            "enum": [
+              "draft",
+              "source_checked"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "source_catalog_year": {
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Source Catalog Year",
+            "type": "string"
+          },
+          "source_excerpt": {
+            "maxLength": 6000,
+            "minLength": 1,
+            "title": "Source Excerpt",
+            "type": "string"
+          },
+          "source_html_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Html Sha256"
+          },
+          "source_title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Source Title",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "program_id",
+          "campus",
+          "catalog_year",
+          "pathway",
+          "source_url",
+          "source_title",
+          "source_catalog_year",
+          "source_excerpt",
+          "captured_on",
+          "notes",
+          "requirements"
+        ],
+        "title": "ProgramPlan",
+        "type": "object"
+      },
+      "ProgramPlansOut": {
+        "properties": {
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/ProgramPlan"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "program_id": {
+            "title": "Program Id",
+            "type": "string"
+          },
+          "schema_available": {
+            "title": "Schema Available",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "program_id",
+          "schema_available",
+          "plans"
+        ],
+        "title": "ProgramPlansOut",
+        "type": "object"
+      },
+      "ProgramPolicyView": {
+        "additionalProperties": false,
+        "properties": {
+          "checked_by": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked By"
+          },
+          "checked_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked On"
+          },
+          "coverage": {
+            "const": "selected_fragments_only",
+            "default": "selected_fragments_only",
+            "title": "Coverage",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanPolicyLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Plan Content Sha256",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,99}$",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyEvidenceOut"
+            },
+            "maxItems": 20,
+            "title": "Policies",
+            "type": "array"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PolicyScope"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "not_linked",
+              "draft",
+              "stale",
+              "unavailable",
+              "unusable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plan_id",
+          "scope",
+          "plan_content_sha256",
+          "status"
+        ],
+        "title": "ProgramPolicyView",
+        "type": "object"
+      },
+      "ProgramSummaryOut": {
+        "additionalProperties": false,
+        "description": "One row of the /programs listing: Program + its curriculum size.\n/programs 列表里的一行：一个 Program 及其课程表规模。",
+        "properties": {
+          "college": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "College"
+          },
+          "course_count": {
+            "title": "Course Count",
+            "type": "integer"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "plan_count": {
+            "default": 0,
+            "title": "Plan Count",
+            "type": "integer"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "program_id": {
+            "title": "Program Id",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "program_id",
+          "full_name",
+          "prefix",
+          "course_count"
+        ],
+        "title": "ProgramSummaryOut",
+        "type": "object"
+      },
+      "PublicConfigResponse": {
+        "additionalProperties": false,
+        "description": "GET /config (R2a): what the web front end needs to know about this API. 中文：新前端要知道的公开设置。",
+        "properties": {
+          "answer_feedback_enabled": {
+            "title": "Answer Feedback Enabled",
+            "type": "boolean"
+          },
+          "login_available": {
+            "title": "Login Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answer_feedback_enabled",
+          "login_available"
+        ],
+        "title": "PublicConfigResponse",
+        "type": "object"
+      },
+      "ReadyResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "bm25_corpus": {
+            "title": "Bm25 Corpus",
+            "type": "integer"
+          },
+          "courses_indexed": {
+            "title": "Courses Indexed",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "warming"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "courses_indexed",
+          "bm25_corpus"
+        ],
+        "title": "ReadyResponse",
+        "type": "object"
+      },
+      "RequirementNode": {
+        "additionalProperties": false,
+        "properties": {
+          "activate_when": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activate When"
+          },
+          "areas": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Areas",
+            "type": "object"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementNode"
+            },
+            "maxItems": 40,
+            "title": "Children",
+            "type": "array"
+          },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
+          },
+          "course_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Course Codes",
+            "type": "array"
+          },
+          "course_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/CourseRange"
+            },
+            "maxItems": 20,
+            "title": "Course Ranges",
+            "type": "array"
+          },
+          "excluded_course_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Excluded Course Codes",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "course",
+              "all_of",
+              "any_of",
+              "select",
+              "optional",
+              "condition",
+              "unmodeled"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "min_areas": {
+            "anyOf": [
+              {
+                "maximum": 40.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Areas"
+          },
+          "min_courses": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Courses"
+          },
+          "min_credits": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 200.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Credits"
+          },
+          "subject_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Subject Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "RequirementNode",
+        "type": "object"
+      },
+      "RequisiteEdition": {
+        "additionalProperties": false,
+        "description": "One catalog year's course-block rules for a course, with where and when they were captured.",
+        "properties": {
+          "captured_at": {
+            "format": "date-time",
+            "title": "Captured At",
+            "type": "string"
+          },
+          "catalog_url": {
+            "title": "Catalog Url",
+            "type": "string"
+          },
+          "catalog_year": {
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "corequisite": {
+            "$ref": "#/components/schemas/RequisiteSectionEvidence"
+          },
+          "prerequisite": {
+            "$ref": "#/components/schemas/RequisiteSectionEvidence"
+          }
+        },
+        "required": [
+          "catalog_year",
+          "catalog_url",
+          "captured_at",
+          "prerequisite",
+          "corequisite"
+        ],
+        "title": "RequisiteEdition",
+        "type": "object"
+      },
+      "RequisiteEvidence": {
+        "additionalProperties": false,
+        "description": "The year-scoped prerequisite documents an answer may use for one course.\n\nstorage: available, schema_missing (no table) or schema_unusable (the table cannot be read).\neditions: usable documents, newest catalog year first, at most MAX_REQUISITE_EDITIONS;\neditions_omitted counts the other usable ones. unusable_records: stored documents that failed\nthe identity, hash or tree checks, or belong to a year with two passing documents (possible\nonly in a copy without keys; neither is used). A year's one passing row is kept if its twins fail.\n中文：一门课的回答可用的年度先修文档。storage：可用、没有表、表读不了。editions：可用文档，按\nCatalog 年度从新到旧，最多 MAX_REQUISITE_EDITIONS 份，editions_omitted 是其余可用的份数。\nunusable_records：身份、hash 或规则树核对不过的已存文档，以及同年度有两份都通过核对的文档（只有\n缺键的副本里才会有，两份都不用）；同年度只有一份通过核对则保留它，其余计入不可用。",
+        "properties": {
+          "editions": {
+            "items": {
+              "$ref": "#/components/schemas/RequisiteEdition"
+            },
+            "maxItems": 3,
+            "title": "Editions",
+            "type": "array"
+          },
+          "editions_omitted": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Editions Omitted",
+            "type": "integer"
+          },
+          "other_years_recorded": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Other Years Recorded",
+            "type": "integer"
+          },
+          "selected_year": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{4}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Year"
+          },
+          "storage": {
+            "enum": [
+              "available",
+              "schema_missing",
+              "schema_unusable"
+            ],
+            "title": "Storage",
+            "type": "string"
+          },
+          "unusable_records": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unusable Records",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "storage"
+        ],
+        "title": "RequisiteEvidence",
+        "type": "object"
+      },
+      "RequisiteNode": {
+        "additionalProperties": false,
+        "properties": {
+          "academic_level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Graduate",
+                  "Undergraduate"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Level"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/RequisiteNode"
+            },
+            "maxItems": 120,
+            "title": "Children",
+            "type": "array"
+          },
+          "concurrent_allowed": {
+            "default": false,
+            "title": "Concurrent Allowed",
+            "type": "boolean"
+          },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
+          },
+          "kind": {
+            "enum": [
+              "course",
+              "all_of",
+              "any_of"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "minimum_grade": {
+            "anyOf": [
+              {
+                "enum": [
+                  "A+",
+                  "A",
+                  "A-",
+                  "B+",
+                  "B",
+                  "B-",
+                  "C+",
+                  "C",
+                  "C-",
+                  "D+",
+                  "D",
+                  "D-",
+                  "F",
+                  "P",
+                  "S"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Grade"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "RequisiteNode",
+        "type": "object"
+      },
+      "RequisiteSection": {
+        "additionalProperties": false,
+        "properties": {
+          "raw_text": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Text"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequisiteNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "not_listed",
+              "parsed",
+              "unparsed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RequisiteSection",
+        "type": "object"
+      },
+      "RequisiteSectionEvidence": {
+        "additionalProperties": false,
+        "description": "One prerequisite or corequisite section of a stored year document, as an answer sees it:\nthe same status and rule tree, the recorded clause text cut to CLAUSE_LIMIT characters. An\nunparsed section also carries the SHA-256 of its whole recorded text, which years are compared\nby (so texts that differ only after the cut still differ); it never reaches the prompt.\n中文：已存年度文档里的一段先修或共修，回答看到的样子：状态和规则树不变，条款原文截到\nCLAUSE_LIMIT 个字符。未解析的一段另带整段原文的 SHA-256，各年度按它比较（所以截断处以后才\n不同也算不同）；它不进提示词。",
+        "properties": {
+          "clause_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clause Sha256"
+          },
+          "clause_text": {
+            "anyOf": [
+              {
+                "maxLength": 600,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clause Text"
+          },
+          "clause_truncated": {
+            "default": false,
+            "title": "Clause Truncated",
+            "type": "boolean"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequisiteNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "not_listed",
+              "parsed",
+              "unparsed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unparsed_reason": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unparsed Reason"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RequisiteSectionEvidence",
+        "type": "object"
+      },
+      "ResolveCourseResponse": {
+        "additionalProperties": false,
+        "description": "`matches` is empty when nothing resolved — a dead deep link is a\nnormal outcome, not a 404. Clients treat ApiError as \"API is down\",\nso surfacing \"no such course\" as an exception would misreport it.\n没解析出任何结果时 `matches` 为空 —— 失效的深链是正常结果，不是 404。\n客户端把 ApiError 一律理解为「API 挂了」，若把「查无此课」抛成异常\n就会误报。",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedCourseOut"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "matches"
+        ],
+        "title": "ResolveCourseResponse",
+        "type": "object"
+      },
+      "ResolvedCourseOut": {
+        "additionalProperties": false,
+        "description": "One course a deep-link ref resolved to. Code + name ride along with\nthe id so an ambiguous ref can be disambiguated in the UI without N\nfollow-up /course calls.\n深链 ref 解析出的一门课程。code + name 与 id 一起返回，这样 UI 在遇到\n有歧义的 ref 时无需再发 N 次 /course 请求就能做消歧。",
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "string"
+          },
+          "primary_code": {
+            "title": "Primary Code",
+            "type": "string"
+          },
+          "primary_name": {
+            "title": "Primary Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "course_id",
+          "primary_code",
+          "primary_name"
+        ],
+        "title": "ResolvedCourseOut",
+        "type": "object"
+      },
+      "SearchHitOut": {
+        "additionalProperties": false,
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "string"
+          },
+          "matched_via": {
+            "enum": [
+              "alias",
+              "hybrid"
+            ],
+            "title": "Matched Via",
+            "type": "string"
+          },
+          "primary_code": {
+            "title": "Primary Code",
+            "type": "string"
+          },
+          "primary_name": {
+            "title": "Primary Name",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "course_id",
+          "primary_code",
+          "primary_name",
+          "score",
+          "matched_via"
+        ],
+        "title": "SearchHitOut",
+        "type": "object"
+      },
+      "SearchRequest": {
+        "additionalProperties": false,
+        "description": "Search query body. Filters are optional; all combine with AND.\n搜索请求体。过滤条件均为可选，多个条件之间以 AND 组合。",
+        "properties": {
+          "credits": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits"
+          },
+          "delivery_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Mode"
+          },
+          "k": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "professor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professor"
+          },
+          "query": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      },
+      "SearchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "k": {
+            "title": "K",
+            "type": "integer"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "number"
+          },
+          "matched_via": {
+            "enum": [
+              "alias",
+              "hybrid",
+              "empty",
+              "rejected"
+            ],
+            "title": "Matched Via",
+            "type": "string"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitOut"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query",
+          "k",
+          "matched_via",
+          "results",
+          "latency_ms"
+        ],
+        "title": "SearchResponse",
+        "type": "object"
+      },
+      "SourceCapture": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_count": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2000000.0,
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "captured_at": {
+            "format": "date-time",
+            "title": "Captured At",
+            "type": "string"
+          },
+          "catalog_year": {
+            "title": "Catalog Year",
+            "type": "string"
+          },
+          "format_version": {
+            "default": 1,
+            "maximum": 1.0,
+            "minimum": 1.0,
+            "title": "Format Version",
+            "type": "integer"
+          },
+          "page_title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Page Title",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "catalog_year",
+          "captured_at",
+          "sha256",
+          "byte_count",
+          "page_title"
+        ],
+        "title": "SourceCapture",
+        "type": "object"
+      },
+      "Textbook": {
+        "additionalProperties": false,
+        "description": "Required or optional textbook (v1.1).\n\n中文:必读或选读教材(v1.1)。",
+        "properties": {
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "is_required": {
+            "default": true,
+            "title": "Is Required",
+            "type": "boolean"
+          },
+          "isbn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isbn"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "Textbook",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Course RAG + Co-op API. Internal MVP — F1 compliance, not commercial.",
+    "title": "NEU-Compass API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/auth/callback": {
+      "post": {
+        "description": "Exchanges the OAuth `code` (returned by Google's redirect) for an ID token, verifies the JWT signature + claims, and upserts the user row. Returns the sanitized identity for client-side session state.\n\n**Domain whitelist** is enforced inside JWT-claim validation — non-NEU emails get 401 (PLAN §3.5: split-on-`@` exact match, NOT substring; `attacker@husky.neu.edu.evil.com` is rejected).\n\n**F1 compliance**: no payment surface, no commercialization. The Google client must be set up under the developer's personal Google Cloud project — credentials never enter version control.\n\n**Session** (R2a): `\"session\": \"token\"` (the default) returns the signed token as `session_token`, as before. `\"session\": \"cookie\"` sets it instead as the HttpOnly cookie `__Host-nc_api_session` (Secure, Path=/, SameSite=Lax, as long as the token lasts) and returns `session_token: null`; the web front end uses this. The cookie mode must come from an allowed web origin with `X-NEU-Compass: 1`, or it gets the fixed CSRF 403 before the code is exchanged: a page elsewhere must not log the browser into an account of its choosing.\n\n**redirect_uri** (R2b): the address Google sent the browser back to, which Google checks again in the exchange; it defaults to `GOOGLE_OAUTH_REDIRECT_URI`. The cookie mode takes only a web front end's own address, an origin in `WEB_ORIGINS` followed by `/`, and answers 422 to anything else before the code is exchanged.",
+        "operationId": "oauth_callback_auth_callback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCallbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthCallbackResponse"
+                }
+              }
+            },
+            "description": "OAuth round-trip succeeded; user persisted."
+          },
+          "401": {
+            "description": "Code exchange failed, JWT invalid, or email domain not in whitelist (`husky.neu.edu` / `northeastern.edu`). Besides the fixed `detail`, the body has `reason` (R2b): `token_exchange_rejected`, `token_endpoint_unreachable`, `missing_id_token`, `id_token_invalid`, `claims_invalid`, `email_unverified` or `domain_not_allowed`."
+          },
+          "403": {
+            "description": "The cookie mode, not from an allowed web origin with `X-NEU-Compass: 1`."
+          },
+          "422": {
+            "description": "The body is malformed, or the cookie mode's `redirect_uri` is not a web front end's own address."
+          }
+        },
+        "summary": "Google OAuth code → JWT verify → user upsert",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/delete-account": {
+      "post": {
+        "description": "Requires `Authorization: Bearer <session_token>` (or the API's session cookie, R2a) and the body `{\"confirm\": \"delete\"}`. In one transaction removes the Co-op experiences this account published (and every unlock of them); then a group it helped publish that is left with one contributor goes back to approved (k=2; no credit is taken back); then the users row, which cascades to its unlocks, planned courses, Co-op submissions and credits. query_log and saved answers never record an account and are not touched; daily backups keep a copy for up to 14 days. Afterwards the same token gets 401 from `/auth/me`. A session cookie used for the call is expired, and so is one that no longer works (with the 401). Returns per-table counts only.",
+        "operationId": "delete_account_auth_delete_account_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAccountResponse"
+                }
+              }
+            },
+            "description": "Deleted; counts of the rows removed."
+          },
+          "401": {
+            "description": "Missing, invalid or expired token, or the account no longer exists."
+          },
+          "422": {
+            "description": "The body is not exactly `{\"confirm\": \"delete\"}`."
+          }
+        },
+        "summary": "Delete the caller's account and Co-op contributions (batch T)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login-url": {
+      "get": {
+        "description": "Builds the Google OAuth address with the caller's `state`, exactly as the Streamlit login link does (`api.google_oauth.authorize_url`). The front end makes `state`, keeps it, and checks it when Google sends the browser back with `?code=&state=`; then it posts the code to `/auth/callback` with `\"session\": \"cookie\"` and the same `redirect_uri`. Google sends the browser back to `redirect_uri`, which must be a web front end's own address, an origin in `WEB_ORIGINS` followed by `/` (R2b); without it, to `GOOGLE_OAUTH_REDIRECT_URI`. The API stores nothing here.",
+        "operationId": "login_url_auth_login_url_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "State",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Redirect Uri"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginUrlResponse"
+                }
+              }
+            },
+            "description": "The address to send the browser to."
+          },
+          "422": {
+            "description": "`state` is not 16–128 characters of A–Z, a–z, 0–9, `_` or `-`, or `redirect_uri` is not a web front end's own address."
+          },
+          "503": {
+            "description": "Login is not configured here (no Google client ID or secret, or no SESSION_SECRET)."
+          }
+        },
+        "summary": "Google's login address for the web front end (R2a)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "description": "Expires the API's session cookie and answers 204, also when there is none. Bearer tokens are not revoked (they expire on their own; Streamlit logs out by dropping its copy). It must come from an allowed web origin with `X-NEU-Compass: 1`, with or without the cookie, or it gets the fixed CSRF 403 and expires nothing: a page elsewhere must not log the browser out.",
+        "operationId": "logout_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "The session cookie, if any, is expired."
+          },
+          "403": {
+            "description": "Not from an allowed web origin with `X-NEU-Compass: 1`."
+          }
+        },
+        "summary": "Expire the session cookie (R2a)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "description": "Verifies the `Authorization: Bearer <session_token>` credential and returns the current identity from the users table. The UI calls this on page load to restore login state from a persisted cookie — the token signature + max-age are re-checked server-side on every call, so a stale or tampered cookie degrades to 401, never a forged identity.\n\nWithout an Authorization header, the API's own session cookie (`__Host-nc_api_session`, set by the cookie mode of `/auth/callback`) is used instead. When that cookie no longer works (bad, expired, or its account is gone), the 401 also expires it.",
+        "operationId": "auth_me_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMeResponse"
+                }
+              }
+            },
+            "description": "Token valid; identity returned."
+          },
+          "401": {
+            "description": "Missing, invalid, or expired token — or the token's user row no longer exists."
+          }
+        },
+        "summary": "Identity behind the Bearer session token or the session cookie",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/chat": {
+      "post": {
+        "description": "Streams a Gemini-generated answer grounded in the retrieved courses.\n\n**Wire format**: `application/x-ndjson` — one JSON object per newline. Object types in order:\n\n1. `{\"type\": \"meta\", \"matched_via\": \"alias|hybrid|empty\", \"retrieval_ms\": float, \"results\": [{course_id, primary_code, primary_name, score, answer_evidence}, ...], prompt_version, notices?}` — emitted first so the client can render evidence bubbles before tokens land. `notices` appears only when non-empty, e.g. `program_schedule_unverified`: a first-semester/foundational question for a family whose version-scoped rules carry no verified schedule was answered from hybrid retrieval instead of a guessed sequence.\n2. `{\"type\": \"token\", \"text\": \"...\"}` — zero or more, Gemini stream chunks.\n3. `{\"type\": \"error\", \"error_type\": \"upstream_error|no_answer|internal_error|daily_limit\", \"detail\": \"...\"}` — only on stream failure, or `daily_limit` instead of tokens when today's model calls are used up (`MODEL_DAILY_CALL_LIMIT`). `detail` is fixed text, never the exception; the server log line carries the same `x-request-id`.\n4. `{\"type\": \"done\", \"feedback\": {answer_id, answer_sha256, feedback_token}}` — always last; feedback is optional and issued only after a complete, non-empty answer and successful private storage. Never in meta. Receipt authorizes only this answer's latest vote via `POST /feedback`.\n\nContext, exact aliases, and program shortcuts apply explicit filters before top-k. Hybrid candidates use the same reranker/rejection policy as `/search`, including queries with a program prefix. Answer evidence distinguishes archived catalog snapshots, extracted field quotes, unverified provenance and explicit data gaps; it is not a live catalog verification.",
+        "operationId": "chat_chat_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-eval-run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Eval-Run"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/x-ndjson": {}
+            },
+            "description": "NDJSON event stream. See description for shape."
+          },
+          "409": {
+            "description": "Program selection is ambiguous or conflicts with the query's program prefix."
+          },
+          "422": {
+            "description": "Invalid query / k / delivery_mode."
+          }
+        },
+        "summary": "Streamed grounded course advisor (NDJSON)",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/config": {
+      "get": {
+        "description": "`answer_feedback_enabled`: whether to show the opt-in and the votes. `login_available`: Google's client ID and secret and a SESSION_SECRET are all configured, so `/auth/login-url` and the cookie login work (the same condition as login-url's 503).",
+        "operationId": "public_config_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "What the web front end needs to know about this API (R2a)",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/coop": {
+      "get": {
+        "description": "Returns curated seeds and reviewed UGC with at least two distinct contributors; applies tier-gated FIELD redaction server-side (PLAN §6.4):\n\n- tier 0 (anonymous / no contributions): company, role, term, industry, duration visible; interview/technical/salary `null`.\n- tier 1 (contribution_count ≥ 1): + `interview_summary`, `technical_questions`.\n- tier 2 (contribution_count ≥ 2): + `salary_range_usd`.\n\n`visibility_level` reports the row's intrinsic tier (from content presence), so clients can render 'contribute to unlock' hints for redacted fields.\n\nEach row is sanitized: `contributor_user_id` and `redaction_audit` are server-internal and NOT returned.\n\nBefore the v1.3 moderation migration the list degrades to curated seeds (public browsing never 503s); the `X-Coop-Moderation` header reports `available` or `missing` so deploy checks can still detect an unapplied migration. Uploads still require the schema.",
+        "operationId": "list_coop_coop_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CoopOut"
+                  },
+                  "title": "Response List Coop Coop Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Eligible public Co-op records (redacted per tier)."
+          }
+        },
+        "summary": "List Co-op records (give-to-get, field-level redaction)",
+        "tags": [
+          "coop"
+        ]
+      },
+      "post": {
+        "description": "Authenticated uploads are accepted into a PRIVATE pending queue, not published. A curator must supply reviewed/redacted content; publication requires at least two distinct authenticated contributors with the same company/role/term. Seeds and repeat submissions cannot establish this threshold. Contribution credit is awarded only once per contributor/reviewed group at publication. Retries return the existing submission without replacing its content. 'accepted' means stored, NOT publicly visible; 'status' reports the review state. visibility_level is content-derived; contributor identity comes from a signed Bearer session.",
+        "operationId": "upload_coop_coop_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoopUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoopUploadResponse"
+                }
+              }
+            },
+            "description": "Private submission stored, or existing submission returned."
+          },
+          "401": {
+            "description": "Missing, invalid, expired token, or unknown user."
+          },
+          "422": {
+            "description": "Invalid payload."
+          },
+          "503": {
+            "description": "Moderation schema has not been migrated."
+          }
+        },
+        "summary": "Collect a private Co-op submission for review",
+        "tags": [
+          "coop"
+        ]
+      }
+    },
+    "/course/{course_id}": {
+      "get": {
+        "description": "Returns the rehydrated Pydantic Course (schema v1.1, see `schemas/course.py`). Includes soft fields (workload, difficulty, skill_tags, career_relevance, controversial_signals) **with their evidence_snippets** when present — the UI's evidence-bubble component uses these for source-quote display.\n\nAdditionally resolves the Layer 3 ontology context: `program_context` (programs whose curriculum lists this course) and `prerequisites` (prereq edges with display names). Both are `[]` for courses outside any seeded program.\n\nCo-op data is **not** mixed in; call `GET /coop?course_id=...` separately so visibility-tier authorization stays in one place. `answer_evidence` adds recorded catalog provenance, extracted field quotes, missing fields and source/seed warnings; no raw_text is automatically labeled official. `course_requisites` lists year-scoped clause documents separately; literal credit_hours preserve fixed/fractional/range title evidence without choosing section credits or changing the Course integer field. description keyword evidence is not an interpreted enrollment rule. Read-time program_contexts include only same-edition source-checked plans explicitly naming the course, not personal applicability or merged grades. No edition/path is auto-selected and legacy edges remain unverified.",
+        "operationId": "get_course_course__course_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseDetailOut"
+                }
+              }
+            },
+            "description": "Course found and returned."
+          },
+          "404": {
+            "description": "course_id not in `courses` table."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get full Course detail (+ program context)",
+        "tags": [
+          "course"
+        ]
+      }
+    },
+    "/course/{course_id}/requisites": {
+      "get": {
+        "operationId": "get_course_requisites_course__course_id__requisites_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "catalog_year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{4}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Catalog Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseRequisiteListing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read year-scoped prerequisite/corequisite clauses (not eligibility)",
+        "tags": [
+          "course"
+        ]
+      }
+    },
+    "/feedback": {
+      "post": {
+        "operationId": "submit_feedback_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerFeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerFeedbackResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Receipt invalid, expired or unavailable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Feedback schema/storage unavailable"
+          }
+        },
+        "summary": "Submit Feedback",
+        "tags": [
+          "feedback"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Always 200 if the process responds — does **not** check whether the embedder/reranker have warmed. Use `/ready` for that. Suitable for Cloudflare Tunnel / docker / systemd healthcheck.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Process liveness",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/privacy": {
+      "get": {
+        "description": "The sections of the privacy page (heading and plain-text sentences, in page order), the note on what an account deletion removes, and the two notices next to the ask box. Built from this API's QUERY_LOG_RETENTION_DAYS, ANSWER_FEEDBACK_ENABLED and PRIVACY_CONTACT_EMAIL; `capture_notice` is null while answer feedback is off. The front end adds its own pointer to the page after `query_log_notice`.",
+        "operationId": "privacy_privacy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "The 数据与隐私 page, from the API's own settings (R2a)",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/programs": {
+      "get": {
+        "description": "Returns every seeded program with its required-course edge count. Public read, not gated content. Legacy seeds have unverified scope; plan_count counts usable version-scoped documents, not verified full degrees.\n\n`course_count` counts curriculum EDGES (including edges whose course hasn't been scraped yet), so it can exceed the number of rows the curriculum view renders.",
+        "operationId": "list_programs_programs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProgramSummaryOut"
+                  },
+                  "title": "Response List Programs Programs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Program list (possibly empty before seeding)."
+          }
+        },
+        "summary": "List seeded programs (with curriculum size)",
+        "tags": [
+          "programs"
+        ]
+      }
+    },
+    "/programs/{program_id}": {
+      "get": {
+        "description": "Returns one program's required courses grouped by `semester_recommended`, display names resolved from the catalog in a single batched SELECT.\n\nGroups are ordered semester 1, 2, ... with the no-recommendation group (`semester: null` — no semester information, NOT anytime eligibility) last. Edges whose course_id is missing from the `courses` table (dangling seed edge, course not yet scraped) are silently dropped rather than failing the whole curriculum view.",
+        "operationId": "get_program_curriculum_programs__program_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "program_id",
+            "required": true,
+            "schema": {
+              "title": "Program Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramCurriculumOut"
+                }
+              }
+            },
+            "description": "Curriculum found and returned."
+          },
+          "404": {
+            "description": "program_id not in `programs` table."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Program curriculum grouped by recommended semester",
+        "tags": [
+          "programs"
+        ]
+      }
+    },
+    "/programs/{program_id}/plans": {
+      "get": {
+        "operationId": "get_program_plans_programs__program_id__plans_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "program_id",
+            "required": true,
+            "schema": {
+              "title": "Program Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "campus",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9-]{0,39}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "catalog_year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{4}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Catalog Year"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pathway",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(standard|align|bridge)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pathway"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramPlansOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Version-scoped requirement documents (not eligibility decisions)",
+        "tags": [
+          "programs"
+        ]
+      }
+    },
+    "/programs/{program_id}/plans/{plan_id}/policies": {
+      "get": {
+        "description": "Missing, stale or unusable policy sources return explicit states with no usable fragments. No latest-edition fallback, auto-fetch, DB writes or merged policy decisions.",
+        "operationId": "get_selected_program_policies_programs__program_id__plans__plan_id__policies_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "program_id",
+            "required": true,
+            "schema": {
+              "title": "Program Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramPolicyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read-only evidence for one exact current plan, not eligibility",
+        "tags": [
+          "programs"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "description": "Returns `status='ready'` once the lifespan startup hook completed: FAISS index loaded, BM25 corpus built, bge-m3 embedder warmed, optional reranker warmed when enabled. Returns HTTP 503 with `status='warming'` while the retrieval stack is unavailable (~70-100 seconds of cold model load — see [PLAN_v2.0 §2.5](docs/PLAN_v2.0.md)).\n\nHTTP 200 means ready. Orchestrators must not route user traffic on HTTP 503; `/health` remains the process-liveness endpoint.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Retrieval stack not ready."
+          }
+        },
+        "summary": "Lifespan readiness (models warmed, indexes loaded)",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/resolve/course": {
+      "get": {
+        "description": "Turns a shareable course reference into internal `course_id`s so the UI can open a `?course=` deep link.\n\nAccepted forms: internal id (`neu-cs-5800`), canonical code with any URL separator (`CS-5800`, `CS_5800`, `CS+5800`, `CS 5800`), the space-free spelling (`cs5800`), and any **approved** alias (`Algo`) — the same `v_course_lookup` view `/search`'s alias stage uses, so `review_status='pending'` aliases are excluded.\n\nAlways 200. An unresolvable ref returns `matches: []` — a dead link is a normal outcome, not an error. `matches` may hold more than one course when the ref is ambiguous.\n\n**Not** logged to `query_log`: deep-link resolution is machine traffic and must not contaminate organic-query telemetry.",
+        "operationId": "resolve_course_resolve_course_get",
+        "parameters": [
+          {
+            "description": "The raw `?course=` value, e.g. `CS-5800`.",
+            "in": "query",
+            "name": "ref",
+            "required": true,
+            "schema": {
+              "description": "The raw `?course=` value, e.g. `CS-5800`.",
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCourseResponse"
+                }
+              }
+            },
+            "description": "Resolution ran. `matches` is ordered most-specific first and is `[]` when nothing matched."
+          },
+          "422": {
+            "description": "`ref` missing, empty, or absurdly long."
+          }
+        },
+        "summary": "Resolve a deep-link course reference to course_ids",
+        "tags": [
+          "resolve"
+        ]
+      }
+    },
+    "/search": {
+      "post": {
+        "description": "Production search path. Three-stage pipeline:\n\n1. **Alias resolution** — `query_normalizer` strips/lowercases the query and looks it up in `v_course_lookup` (which excludes `review_status='pending'` aliases). On hit, returns immediately with `matched_via='alias'`, score=1.0. Covers `'CS 5800'` / `'cs5800'` / `'Algo'` / `'应用 AI'`.\n2. **Hybrid retrieval** — BM25 (110 stopwords filtered) + bge-m3 vector via Reciprocal Rank Fusion (RRF, k=60). Hard filters apply at SQLite layer; only `status='indexed'` rows surface (ADR-0013).\n3. **Rerank + Z-score blend + reject** (PLAN v2.2 §3.4 + §3.5) — single bge-reranker-v2-m3 pass over the candidate pool. If `max(raw_sigmoid) < 0.05` (ADR-0016): `matched_via='rejected'`, empty results, populated `rejection_reason`. Otherwise α=0.4 Z-score blend (ADR-0015) reorders the top-5 and returns `matched_via='hybrid'`.\n\n**Latency budget**: alias path ~3ms, hybrid+rerank ~50ms p50 post-warmup.",
+        "operationId": "search_search_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-eval-run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Eval-Run"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Search resolved. `matched_via` ∈ {alias, hybrid, empty, rejected}. `results=[]` when matched_via is empty or rejected; `rejection_reason` is non-null only when rejected."
+          },
+          "422": {
+            "description": "Invalid request (empty query, k out of range, unknown delivery_mode, extra unknown fields)."
+          }
+        },
+        "summary": "Course search (alias → hybrid → rerank+blend+reject)",
+        "tags": [
+          "search"
+        ]
+      }
+    }
+  }
+}

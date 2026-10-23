@@ -4,12 +4,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { App } from '../App';
 import { demoOutcome } from '../fixtures/coopDemo';
+import { WithApi } from '../test/withApi';
 
 function page(path = '/coop') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+    <WithApi>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </WithApi>,
   );
 }
 it('unknown demo input safely falls back to guest with no global guest badge or upload form', () => {

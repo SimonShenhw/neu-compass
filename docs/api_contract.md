@@ -448,6 +448,9 @@ One JSON object per line. Order of object types:
    ```json
    {"type": "done"}
    ```
+   With `feedback` (`{"answer_id", "answer_sha256", "feedback_token"}`, the receipt for `POST /feedback`) only when
+   answer feedback is on, the request allowed saving (`allow_feedback_capture`), and the complete, non-empty answer
+   was stored; never in meta.
 
 > **No reranker on the chat path** in v0.1 — first-token latency is the UX
 > currency, and the ~50ms blocking rerank cost would push it over budget.
@@ -455,8 +458,13 @@ One JSON object per line. Order of object types:
 
 ### Error responses
 
-- **422** on invalid request body. The error response is plain JSON, NOT
-  NDJSON — the stream never starts.
+Plain JSON, NOT NDJSON — the stream never starts:
+
+- **422** on invalid request body.
+- **404** for an unknown `program_id`.
+- **409** for a plan selection that does not resolve, a program prefix that matches several programs, or a selected
+  program that conflicts with the prefix in the question. `detail` leads with Chinese, which Streamlit shows.
+- **503** while the service warms up; **429** and **503** from the request guard.
 
 ---
 
@@ -477,7 +485,12 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 ```
 
 `redirect_uri` is optional; defaults to the value configured in
-`config/settings.py` `google_oauth_redirect_uri`.
+`config/settings.py` `google_oauth_redirect_uri`. It is the address Google sent
+the browser back to, which Google checks again in the exchange. In the cookie
+mode (R2b) it may only be a web front end's own address, an origin in
+`WEB_ORIGINS` followed by `/`; anything else gets **422**
+`redirect_uri must be the web front end's own address.` before the code is
+exchanged. The token mode does not check it (Streamlit sends its own).
 
 `session` (R2a) is optional: `"token"` (the default) returns the signed token
 in the body as `session_token`, as before; `"cookie"` sets it instead as the
@@ -510,6 +523,17 @@ the browser into an account of its choosing.
   - the email domain isn't whitelisted (PLAN §3.5: split-on-`@` exact match
     for `husky.neu.edu` / `northeastern.edu`; `attacker@husky.neu.edu.evil.com`
     is rejected)
+
+  The body (R2b) is `{"detail": "<fixed text>", "error_type": "unauthorized",
+  "status_code": 401, "reason": "<reason>"}`, where `reason` is one of the seven
+  stable reasons under *Safe error exits* below, so the web front end can say a
+  wrong domain (`domain_not_allowed`) and an unverified email
+  (`email_unverified`) apart without reading `detail`. An `OAuthError` raised
+  anywhere else gets the same body from the global handler.
+- **403**: the cookie mode, not from an allowed web origin with
+  `X-NEU-Compass: 1` (the fixed CSRF body under *Session cookie, CSRF and CORS*).
+- **422**: a malformed body, or the cookie mode's `redirect_uri` is not a web
+  front end's own address.
 
 ---
 
@@ -568,10 +592,17 @@ checks it when Google sends the browser back to `GOOGLE_OAUTH_REDIRECT_URI` (pro
 `?code=&state=`; then it posts the code to `/auth/callback` with `"session": "cookie"`. The API stores nothing, and
 uvicorn's access log records this path without its query, so the state is not logged either.
 
-- **422**: a missing or malformed `state` (not echoed).
+R2b: an optional `&redirect_uri=` (at most 2048 characters) says where Google sends the browser back instead, and the
+front end posts the same value to `/auth/callback`. It must be a web front end's own address, an origin in
+`WEB_ORIGINS` followed by `/` (the browser's `location.origin + "/"`), and Google's OAuth client must list it as an
+authorized redirect URI. The web front end always sends its own; Streamlit sends none and keeps
+`GOOGLE_OAUTH_REDIRECT_URI`.
+
+- **422**: a missing or malformed `state` (not echoed), or a `redirect_uri` that is not a web front end's own address
+  (`redirect_uri must be the web front end's own address.`).
 - **503** `{"detail": "Login is not configured.", "error_type": "service_unavailable", "status_code": 503}`: no
   Google client ID or client secret, or no `SESSION_SECRET` here (the same condition as `/config`'s
-  `login_available`).
+  `login_available`). It comes before the check of `redirect_uri`.
 
 ---
 

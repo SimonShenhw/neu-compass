@@ -4,12 +4,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { App } from '../App';
+import { WithApi } from '../test/withApi';
 
 function page(path = '/') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+    <WithApi>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </WithApi>,
   );
 }
 

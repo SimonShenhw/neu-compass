@@ -3,6 +3,8 @@ dist/
 package-lock.json
 coverage/
 artifacts/
+# Written by scripts/export_openapi.py, whose --check (CI) owns its bytes.
+openapi.json
 # Reviewer API exports: preserve original bytes; verified by SHA-256 tests.
 src/fixtures/coop/
 src/fixtures/compare/

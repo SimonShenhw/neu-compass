@@ -104,9 +104,9 @@ def test_http_exception_404_has_not_found_type(client: TestClient) -> None:
 def test_oauth_error_maps_to_401_unauthorized(client: TestClient) -> None:
     r = client.get("/raise-oauth")
     assert r.status_code == 401
-    body = r.json()
-    assert body["error_type"] == "unauthorized"
-    assert body["detail"] == OAuthError.MESSAGES["claims_invalid"]
+    # R2b: the stable reason rides along with the fixed detail. 中文：固定 detail 之外带上稳定的原因。
+    assert r.json() == {"detail": OAuthError.MESSAGES["claims_invalid"], "error_type": "unauthorized",
+                        "status_code": 401, "reason": "claims_invalid"}
 
 
 def test_course_not_found_maps_to_404(client: TestClient) -> None:

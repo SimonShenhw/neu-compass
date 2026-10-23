@@ -53,6 +53,7 @@ from api.models import (
     OAuthCallbackResponse,
 )
 from api.csrf import from_web_origin, refusal
+from api.exceptions import oauth_rejection_response
 from api.session_cookie import (
     COOKIE_NAME,
     expire_session_cookie,
@@ -66,6 +67,18 @@ from db.user_repository import UserRepository
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 log = structlog.get_logger("neu_compass.auth")
+
+REDIRECT_URI_REFUSED = "redirect_uri must be the web front end's own address."
+
+
+def web_redirect_uris() -> set[str]:
+    """Where Google may send a browser back for the web front end (R2b): the root of each origin in WEB_ORIGINS. They
+    are plain lowercase origins (config/settings.py), so the browser's `location.origin + "/"` matches exactly.
+    中文：Google 可以把浏览器送回新前端的哪些地址（R2b）：WEB_ORIGINS 里每个来源的根路径。来源都是规整的小写来源，
+    浏览器的 `location.origin + "/"` 正好对得上。"""
+    from config import settings  # noqa: PLC0415
+
+    return {f"{origin}/" for origin in settings.web_origins}
 
 
 @router.post(
@@ -90,17 +103,27 @@ log = structlog.get_logger("neu_compass.auth")
         "`session_token: null`; the web front end uses this. The cookie mode "
         "must come from an allowed web origin with `X-NEU-Compass: 1`, or it "
         "gets the fixed CSRF 403 before the code is exchanged: a page elsewhere "
-        "must not log the browser into an account of its choosing."
+        "must not log the browser into an account of its choosing.\n\n"
+        "**redirect_uri** (R2b): the address Google sent the browser back to, which "
+        "Google checks again in the exchange; it defaults to `GOOGLE_OAUTH_REDIRECT_URI`. "
+        "The cookie mode takes only a web front end's own address, an origin in "
+        "`WEB_ORIGINS` followed by `/`, and answers 422 to anything else before the code "
+        "is exchanged."
     ),
     responses={
         200: {"description": "OAuth round-trip succeeded; user persisted."},
         401: {
             "description": (
                 "Code exchange failed, JWT invalid, or email domain not in "
-                "whitelist (`husky.neu.edu` / `northeastern.edu`)."
+                "whitelist (`husky.neu.edu` / `northeastern.edu`). Besides the fixed "
+                "`detail`, the body has `reason` (R2b): `token_exchange_rejected`, "
+                "`token_endpoint_unreachable`, `missing_id_token`, `id_token_invalid`, "
+                "`claims_invalid`, `email_unverified` or `domain_not_allowed`."
             ),
         },
         403: {"description": "The cookie mode, not from an allowed web origin with `X-NEU-Compass: 1`."},
+        422: {"description": "The body is malformed, or the cookie mode's `redirect_uri` is not a web front end's own "
+                             "address."},
     },
 )
 def oauth_callback(
@@ -126,6 +149,10 @@ def oauth_callback(
     # Google. 中文：R2a：只有新前端能用 cookie 模式登录浏览器，不管原来带没带 cookie；在 code 交给 Google 之前查。
     if req.session == "cookie" and not from_web_origin(request, settings.web_origins):
         return refusal()
+    # R2b: the web front end says where Google sent it back; only its own addresses, before the code reaches Google.
+    # 中文：R2b：新前端告诉我们 Google 把它送回了哪里；只认它自己的地址，在 code 交给 Google 之前查。
+    if req.session == "cookie" and req.redirect_uri is not None and req.redirect_uri not in web_redirect_uris():
+        raise HTTPException(status_code=422, detail=REDIRECT_URI_REFUSED)
     try:
         identity = exchange_fn(
             req.code,
@@ -133,10 +160,8 @@ def oauth_callback(
         )
     except OAuthError as e:
         log.info("auth.callback.rejected", **e.log_fields(), **safe_error_fields(e))
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=e.safe_detail,
-        ) from e
+        # R2b: the 401 says which of the seven reasons, so the front end can tell the student. 中文：401 说出是哪种原因。
+        return oauth_rejection_response(e)
 
     email = identity["email"]
     domain = email.partition("@")[2].lower()
@@ -340,20 +365,26 @@ def login_configured() -> bool:
     description=(
         "Builds the Google OAuth address with the caller's `state`, exactly as the Streamlit login link does "
         "(`api.google_oauth.authorize_url`). The front end makes `state`, keeps it, and checks it when Google sends "
-        "the browser back to `GOOGLE_OAUTH_REDIRECT_URI` with `?code=&state=`; then it posts the code to "
-        "`/auth/callback` with `\"session\": \"cookie\"`. The API stores nothing here."
+        "the browser back with `?code=&state=`; then it posts the code to `/auth/callback` with "
+        "`\"session\": \"cookie\"` and the same `redirect_uri`. Google sends the browser back to `redirect_uri`, which "
+        "must be a web front end's own address, an origin in `WEB_ORIGINS` followed by `/` (R2b); without it, to "
+        "`GOOGLE_OAUTH_REDIRECT_URI`. The API stores nothing here."
     ),
     responses={
         200: {"description": "The address to send the browser to."},
-        422: {"description": "`state` is not 16–128 characters of A–Z, a–z, 0–9, `_` or `-`."},
+        422: {"description": "`state` is not 16–128 characters of A–Z, a–z, 0–9, `_` or `-`, or `redirect_uri` is "
+                             "not a web front end's own address."},
         503: {"description": "Login is not configured here (no Google client ID or secret, or no SESSION_SECRET)."},
     },
 )
 def login_url(
     state: Annotated[str, Query(min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")],
+    redirect_uri: Annotated[str | None, Query(max_length=2048)] = None,
 ) -> LoginUrlResponse:
     from api.google_oauth import authorize_url  # noqa: PLC0415
 
     if not login_configured():
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Login is not configured.")
-    return LoginUrlResponse(url=authorize_url(state_token=state))
+    if redirect_uri is not None and redirect_uri not in web_redirect_uris():
+        raise HTTPException(status_code=422, detail=REDIRECT_URI_REFUSED)
+    return LoginUrlResponse(url=authorize_url(state_token=state, redirect_uri=redirect_uri))
