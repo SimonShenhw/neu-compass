@@ -206,19 +206,23 @@ it.each([
     expect(input.onReload).toHaveBeenCalledExactlyOnceWith();
   },
 );
-it.each([null, [], { course_id: 'c2' }])(
-  'unrecognised ready body %j fails the column, not the page',
-  (body) => {
-    page({ ids: ['bad'], columns: { bad: { status: 'ready', body } } });
-    expect(
-      screen.getByText('课程加载失败（bad）：服务返回了无法识别的内容。'),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText('加载失败')).toHaveLength(7);
-    expect(
-      screen.queryByRole('link', { name: /查看/ }),
-    ).not.toBeInTheDocument();
-  },
-);
+it.each([
+  null,
+  [],
+  { course_id: 'c2' },
+  // Each identity field on its own, so none of the three checks goes unpinned (acceptance).
+  { primary_code: 'CS 5800', primary_name: 'Algorithms' },
+  { course_id: 'c2', primary_name: 'Algorithms' },
+  { course_id: 'c2', primary_code: 'CS 5800' },
+  { course_id: 'c2', primary_code: 'CS 5800', primary_name: 7 },
+])('unrecognised ready body %j fails the column, not the page', (body) => {
+  page({ ids: ['bad'], columns: { bad: { status: 'ready', body } } });
+  expect(
+    screen.getByText('课程加载失败（bad）：服务返回了无法识别的内容。'),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText('加载失败')).toHaveLength(7);
+  expect(screen.queryByRole('link', { name: /查看/ })).not.toBeInTheDocument();
+});
 it('missing columns are loading, independently removable and never show reload', () => {
   page({ ids: ['pending'], columns: {} });
   expect(screen.getAllByText('正在加载')).toHaveLength(8);
