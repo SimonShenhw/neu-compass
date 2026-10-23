@@ -1,0 +1,143 @@
+{
+  "case": "course-cs-5800-requisites-unavailable",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-cs-5800"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-cs-5800",
+    "primary_code": "CS 5800",
+    "primary_name": "Algorithms",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": "Spring 2026",
+    "credits": 4,
+    "prereqs": [],
+    "delivery_mode": "in_person",
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": 12.0,
+    "difficulty_score": 4.0,
+    "grading_components": [
+      {
+        "name": "Homework",
+        "weight": 0.4
+      },
+      {
+        "name": "Midterm",
+        "weight": 0.25
+      },
+      {
+        "name": "Final exam",
+        "weight": 0.35
+      }
+    ],
+    "topics_covered": [
+      "dynamic programming",
+      "graph algorithms",
+      "NP-completeness"
+    ],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [
+      {
+        "field": "workload_hours_per_week",
+        "value": 12.0,
+        "source_id": "rmp_review_synthetic_1",
+        "quote": "About twelve hours a week, mostly problem sets.",
+        "confidence": 0.8
+      },
+      {
+        "field": "difficulty_score",
+        "value": 4.0,
+        "source_id": "rmp_review_synthetic_2",
+        "quote": "Hard but fair.",
+        "confidence": 0.8
+      }
+    ],
+    "extraction_confidence": null,
+    "source_review_ids": [
+      "rmp_review_synthetic_1",
+      "rmp_review_synthetic_2",
+      "syllabus_synthetic_cs5800"
+    ],
+    "created_at": "2026-10-22T21:24:11.928682Z",
+    "updated_at": "2026-10-22T21:24:11.928689Z",
+    "program_context": [
+      {
+        "program_id": "ms-cs-synthetic",
+        "program_name": "MS in Computer Science (synthetic)",
+        "requirement_type": "core",
+        "semester_recommended": 1
+      }
+    ],
+    "prerequisites": [],
+    "answer_evidence": {
+      "catalog": {
+        "course_code": "CS 5800",
+        "course_name": "Algorithms",
+        "description": "Covers the design and analysis of algorithms: divide and conquer, dynamic programming, graph search and shortest paths, and NP-completeness. (Synthetic text for interface tests.)",
+        "credits": 4,
+        "prereq_codes": [],
+        "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+        "snapshot_id": "catalog:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "imported_at": "2026-09-29T03:00:00Z",
+        "retrieved_at": "2026-09-28T14:07:00Z"
+      },
+      "field_evidence": [
+        {
+          "field": "workload_hours_per_week",
+          "value": 12.0,
+          "source_id": "rmp_review_synthetic_1",
+          "quote": "About twelve hours a week, mostly problem sets.",
+          "confidence": 0.8
+        },
+        {
+          "field": "difficulty_score",
+          "value": 4.0,
+          "source_id": "rmp_review_synthetic_2",
+          "quote": "Hard but fair.",
+          "confidence": 0.8
+        }
+      ],
+      "source_review_ids": [
+        "rmp_review_synthetic_1",
+        "rmp_review_synthetic_2",
+        "syllabus_synthetic_cs5800"
+      ],
+      "missing_fields": [
+        "professor",
+        "prereqs",
+        "skill_tags",
+        "career_relevance"
+      ],
+      "warnings": [
+        "extracted_evidence_not_official_facts",
+        "program_seed_unverified"
+      ],
+      "requisites": {
+        "storage": "schema_missing",
+        "editions": [],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": false,
+      "has_any_stored_records": false,
+      "documents": [],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic",
+        "structured_requisite_schema_unavailable"
+      ],
+      "program_contexts": []
+    }
+  }
+}

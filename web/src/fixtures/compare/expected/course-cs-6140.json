@@ -1,0 +1,130 @@
+{
+  "case": "course-cs-6140",
+  "header": {
+    "code": "CS 6140",
+    "name": "Machine Learning",
+    "chips": [
+      [
+        "Term",
+        "Fall 2026"
+      ],
+      [
+        "Credits",
+        "4"
+      ],
+      [
+        "Mode",
+        "hybrid"
+      ]
+    ],
+    "notice": null,
+    "credit_range_note": "2026-2027 目录标题学分：1-4 Hours；实际班次学分未声明。"
+  },
+  "rows": {
+    "官方目录描述": [
+      [
+        "main",
+        "Surveys supervised and unsupervised learning, model selection and evaluation, and the issues that come with using learned models. (Synthetic text for interface tests.)"
+      ],
+      [
+        "note",
+        "课程描述来自 NEU 官方课程目录 的存档副本，不是实时核对。"
+      ],
+      [
+        "note",
+        "目录的抓取日期没有记录；主题列表没有来源；培养方案关系没有核实，不是正式的 Plan of Study。"
+      ],
+      [
+        "main",
+        "目录抓取：没有记录。"
+      ]
+    ],
+    "学生评价里的估计": [
+      [
+        "main",
+        "没有记录"
+      ],
+      [
+        "note",
+        "来自学生评价的估计，不是官方信息；缺失不等于零或简单。"
+      ]
+    ],
+    "先修／共修": [
+      [
+        "main",
+        "已记录 Catalog 年份：2026-2027、2025-2026"
+      ],
+      [
+        "main",
+        "这些年度已记录的条款不同，请按适用年度核对。"
+      ],
+      [
+        "main",
+        "未列出或未解析的条款仍未知；不判断个人适用年度或能否注册。"
+      ],
+      [
+        "note",
+        "在详情里看完整规则"
+      ]
+    ],
+    "主题": [
+      [
+        "main",
+        "supervised learning neural networks reinforcement learning"
+      ],
+      [
+        "note",
+        "主题列表没有来源。"
+      ]
+    ],
+    "考核构成": [
+      [
+        "main",
+        "没有记录"
+      ]
+    ],
+    "在培养方案里的位置": [
+      [
+        "main",
+        "MS in Computer Science (synthetic) 选修池 · elective"
+      ],
+      [
+        "note",
+        "旧 seed 关系，未核验；不是正式方案，不判断注册或毕业资格。"
+      ]
+    ],
+    "缺的数据": [
+      [
+        "main",
+        "缺失：教师、技能标签、每周工作量、难度、考核构成、职业方向"
+      ],
+      [
+        "note",
+        "缺失不等于零、简单或无要求。"
+      ]
+    ]
+  },
+  "links": [
+    [
+      "NEU 官方课程目录",
+      "https://catalog.northeastern.edu/course-descriptions/cs/"
+    ]
+  ],
+  "topics": [
+    "supervised learning",
+    "neural networks",
+    "reinforcement learning"
+  ],
+  "program_context": [
+    [
+      "MS in Computer Science (synthetic)",
+      "选修池 · elective",
+      null
+    ]
+  ],
+  "requisite_summary": [
+    "已记录 Catalog 年份：2026-2027、2025-2026",
+    "这些年度已记录的条款不同，请按适用年度核对。",
+    "未列出或未解析的条款仍未知；不判断个人适用年度或能否注册。"
+  ]
+}

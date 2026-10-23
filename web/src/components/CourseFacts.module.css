@@ -1,0 +1,40 @@
+.header,
+.cell,
+.placement {
+  display: grid;
+  gap: var(--space-2);
+  min-width: var(--space-0);
+  overflow-wrap: anywhere;
+}
+.header strong {
+  font-weight: var(--weight-bold);
+}
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--ink2);
+  font-size: var(--text-sm);
+}
+.metadata span {
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+.main {
+  white-space: pre-wrap;
+}
+.note,
+.notice {
+  color: var(--ink3);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+.notice svg,
+.note svg {
+  vertical-align: text-bottom;
+  margin-right: var(--space-1);
+}
+.placement {
+  padding-bottom: var(--space-2);
+}

@@ -1,0 +1,13 @@
+{
+  "case": "course-404",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-not-in-the-catalog"
+  },
+  "status": 404,
+  "body": {
+    "detail": "Course not found",
+    "error_type": "not_found",
+    "status_code": 404
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "case": "course-ds-5220",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-ds-5220"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-ds-5220",
+    "primary_code": "DS 5220",
+    "primary_name": "Supervised Machine Learning and Learning Theory",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": "Fall 2025",
+    "credits": 3,
+    "prereqs": [],
+    "delivery_mode": "in_person",
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": 9.0,
+    "difficulty_score": null,
+    "grading_components": [
+      {
+        "name": "Projects",
+        "weight": 0.5
+      },
+      {
+        "name": "Quizzes",
+        "weight": 0.125
+      },
+      {
+        "name": "Participation",
+        "weight": null
+      }
+    ],
+    "topics_covered": [],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [
+      {
+        "field": "workload_hours_per_week",
+        "value": 14.0,
+        "source_id": "reddit_synthetic_1",
+        "quote": "Closer to fourteen hours in the project weeks.",
+        "confidence": 0.8
+      }
+    ],
+    "extraction_confidence": null,
+    "source_review_ids": [
+      "reddit_synthetic_1"
+    ],
+    "created_at": "2026-10-22T21:24:11.928715Z",
+    "updated_at": "2026-10-22T21:24:11.928715Z",
+    "program_context": [],
+    "prerequisites": [],
+    "answer_evidence": {
+      "catalog": {
+        "course_code": "DS 5220",
+        "course_name": "Supervised Machine Learning and Learning Theory",
+        "description": null,
+        "credits": 4,
+        "prereq_codes": [],
+        "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+        "snapshot_id": "catalog:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "imported_at": "2026-09-29T03:00:00Z",
+        "retrieved_at": "2026-09-28T14:07:00Z"
+      },
+      "field_evidence": [
+        {
+          "field": "workload_hours_per_week",
+          "value": 14.0,
+          "source_id": "reddit_synthetic_1",
+          "quote": "Closer to fourteen hours in the project weeks.",
+          "confidence": 0.8
+        }
+      ],
+      "source_review_ids": [
+        "reddit_synthetic_1"
+      ],
+      "missing_fields": [
+        "catalog_description",
+        "professor",
+        "topics_covered",
+        "skill_tags",
+        "difficulty_score",
+        "career_relevance"
+      ],
+      "warnings": [
+        "catalog_metadata_conflict",
+        "extracted_evidence_not_official_facts",
+        "field_evidence_value_conflict",
+        "requisite_clause_unparsed"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [
+          {
+            "catalog_year": "2026-2027",
+            "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "prerequisite": {
+              "status": "unparsed",
+              "rule": null,
+              "clause_text": "Graduate standing and permission of the instructor",
+              "clause_truncated": false,
+              "unparsed_reason": "unsupported_syntax",
+              "clause_sha256": "0917bdf22b63d7e9e108d10eac029de88f59f4ea25939bbcaaab5412a11b2a6b"
+            },
+            "corequisite": {
+              "status": "not_listed",
+              "rule": null,
+              "clause_text": null,
+              "clause_truncated": false,
+              "unparsed_reason": null,
+              "clause_sha256": null
+            }
+          }
+        ],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": true,
+      "documents": [
+        {
+          "format_version": "1",
+          "course_id": "c-ds-5220",
+          "course_code": "DS 5220",
+          "course_name": "Supervised Machine Learning and Learning Theory",
+          "catalog_year": "2026-2027",
+          "campus": null,
+          "coverage": "courseblock_clauses_only",
+          "source": {
+            "format_version": 1,
+            "url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+            "catalog_year": "2026-2027",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "byte_count": 1000,
+            "page_title": "Synthetic catalog page (DS)"
+          },
+          "requisites": {
+            "grammar_version": "1",
+            "prerequisite": {
+              "status": "unparsed",
+              "raw_text": "Graduate standing and permission of the instructor",
+              "rule": null,
+              "reason": "unsupported_syntax"
+            },
+            "corequisite": {
+              "status": "not_listed",
+              "raw_text": null,
+              "rule": null,
+              "reason": null
+            }
+          },
+          "description_evidence": null,
+          "credit_hours": {
+            "format_version": "1",
+            "raw_text": "4 Hours",
+            "kind": "fixed",
+            "minimum": "4",
+            "maximum": "4"
+          },
+          "imported_at": "2026-09-29T03:00:00Z"
+        }
+      ],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic"
+      ],
+      "program_contexts": [
+        {
+          "course_code": "DS 5220",
+          "catalog_year": "2026-2027",
+          "schema_available": true,
+          "plans": [],
+          "unusable_records": 0,
+          "unreviewed_records": 0,
+          "warnings": [
+            "explicit_mentions_only_not_personal_applicability",
+            "program_rules_not_merged_with_course_prerequisite_grades",
+            "no_match_is_not_no_program_policy",
+            "program_context_no_explicit_checked_match"
+          ]
+        }
+      ]
+    }
+  }
+}

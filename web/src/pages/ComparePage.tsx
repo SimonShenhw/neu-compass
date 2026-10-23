@@ -1,212 +1,161 @@
-import { Check } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import type { ComparePageProps } from '../api/course';
 import { Button } from '../components/Button';
-import { Chips } from '../components/Chips';
-import { CourseCode } from '../components/CourseCode';
+import { CourseFactCell, CourseHeaderFacts } from '../components/CourseFacts';
 import { EmptyState } from '../components/EmptyState';
-import { Select } from '../components/Select';
-import { Toggle } from '../components/Toggle';
-import { coursePath, findCourse, planOptions } from '../fixtures/courses';
-import type { Course } from '../fixtures/courses';
-import { usePrototype } from '../layout/PrototypeContext';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { resolveColumn, rowLabels } from '../models/compare';
 import styles from './ComparePage.module.css';
 
-export function ComparePage() {
-  const state = usePrototype();
-  const [onlyDifferent, setOnlyDifferent] = useState(true);
+export function ComparePage({
+  ids,
+  columns,
+  onRemove,
+  onClear,
+  onReload,
+}: ComparePageProps) {
+  const selected = ids.slice(0, 4);
+  const views = selected.map((id) => ({
+    id,
+    column: resolveColumn(columns[id]),
+  }));
   const removeButtons = useRef(new Map<string, HTMLButtonElement>());
   const emptyAction = useRef<HTMLAnchorElement>(null);
-  const pendingFocus = useRef<{ code: string } | 'empty' | null>(null);
-  const selected = state.comparison
-    .map(findCourse)
-    .filter((course): course is Course => course !== undefined);
+  const pendingFocus = useRef<{ id: string } | 'empty' | null>(null);
   useLayoutEffect(() => {
     const target = pendingFocus.current;
     if (target === null) return;
     pendingFocus.current = null;
     if (target === 'empty') emptyAction.current?.focus();
-    else removeButtons.current.get(target.code)?.focus();
-  }, [state.comparison]);
-  if (!selected.length)
-    return (
-      <EmptyState
-        action={
-          <Link ref={emptyAction} to="/">
-            回到课程搜索
-          </Link>
-        }
-      >
-        对比列表为空。在课程搜索页打开课程详情，最多选择 4 门课。
-      </EmptyState>
-    );
-  const rows: {
-    label: string;
-    key: (course: Course) => string;
-    cell: (course: Course) => ReactNode;
-  }[] = [
-    {
-      label: '学分',
-      key: (course) => String(course.credits),
-      cell: (course) => `${course.credits} 学分`,
-    },
-    {
-      label: '目录年份',
-      key: (course) => course.year,
-      cell: (course) => course.year,
-    },
-    {
-      label: '先修',
-      key: (course) => course.prerequisiteText,
-      cell: (course) =>
-        course.prerequisite ? (
-          <strong>{course.prerequisiteText}</strong>
-        ) : (
-          course.prerequisiteText
-        ),
-    },
-    {
-      label: '学生评价（估计）',
-      key: (course) => course.review,
-      cell: (course) => course.review,
-    },
-    {
-      label: '讲什么',
-      key: (course) => course.description,
-      cell: (course) => (
-        <p lang="en" className={styles.clamp}>
-          {course.description}
-        </p>
-      ),
-    },
-    {
-      label: '主题',
-      key: (course) => (course.comparisonTopics ?? course.topics).join('|'),
-      cell: (course) => (
-        <Chips items={course.comparisonTopics ?? course.topics} />
-      ),
-    },
-  ];
-  const visibleRows = rows.filter(
-    (row) => !onlyDifferent || new Set(selected.map(row.key)).size > 1,
-  );
+    else removeButtons.current.get(target.id)?.focus();
+  }, [ids]);
   const tableStyle: CSSProperties & { '--columns': number } = {
     '--columns': selected.length,
   };
   return (
     <section className={styles.compare} aria-label="课程对比内容">
-      <div className={styles.controls}>
-        <Select
-          label="按方案看"
-          value={state.plan}
-          onChange={state.setPlan}
-          options={planOptions}
-        />
-        <Toggle
-          checked={onlyDifferent}
-          onChange={setOnlyDifferent}
-          label="只看不同的行"
-        />
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            pendingFocus.current = 'empty';
-            state.clear();
-          }}
+      <p className={styles.status}>
+        已选择 {selected.length}/4
+        门；按加入顺序展示，不排名、不判断选课或毕业资格。
+      </p>
+      <p className={styles.note}>
+        列表只保存在这个页面会话里；刷新浏览器、登录或退出以后要重新加入。
+      </p>
+      {!selected.length ? (
+        <EmptyState
+          action={
+            <Link ref={emptyAction} to="/">
+              回到课程搜索
+            </Link>
+          }
         >
-          清空对比
-        </Button>
-        <span className={styles.count}>
-          已选 {selected.length} / 4 门 · 按加入的顺序
-        </span>
-      </div>
-      {onlyDifferent && (
-        <p className={styles.same}>
-          <Check aria-hidden="true" />这 {selected.length} 门都是 4 学分，都在
-          2026–2027 目录里。
-        </p>
-      )}
-      <div
-        className={styles.scroll}
-        role="region"
-        aria-label="课程对比表，可横向滚动"
-        tabIndex={0}
-      >
-        <table className={styles.table} style={tableStyle}>
-          <caption className="visually-hidden">
-            按字段比较所选课程；本表使用固定演示数据
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">{selected.length} 门课</th>
-              {selected.map((course, index) => (
-                <th scope="col" key={course.code}>
-                  <div className={styles.columnHead}>
-                    <span>
-                      <CourseCode>{course.code}</CourseCode>
-                    </span>
-                    <strong lang="en">{course.title}</strong>
-                    <div className={styles.actions}>
-                      <Link
-                        to={coursePath(course.code)}
-                        aria-label={`查看 ${course.code}`}
-                      >
-                        查看
-                      </Link>
-                      <Button
-                        ref={(element) => {
-                          if (element)
-                            removeButtons.current.set(course.code, element);
-                          else removeButtons.current.delete(course.code);
-                        }}
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`移出 ${course.code}`}
-                        onClick={() => {
-                          const neighbor =
-                            selected[index + 1] ?? selected[index - 1];
-                          pendingFocus.current = neighbor
-                            ? { code: neighbor.code }
-                            : 'empty';
-                          state.remove(course.code);
-                        }}
-                      >
-                        移出
-                      </Button>
-                    </div>
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => (
-              <tr key={row.label}>
-                <th scope="row">{row.label}</th>
-                {selected.map((course) => (
-                  <td key={course.code}>{row.cell(course)}</td>
+          在「课程搜索」页打开一门课的详情，点「加入对比」，最多选择 4 门课。
+        </EmptyState>
+      ) : (
+        <>
+          <div className={styles.controls}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                pendingFocus.current = 'empty';
+                onClear();
+              }}
+            >
+              清空对比
+            </Button>
+            {views.some((v) => v.column.status === 'error') && (
+              <Button onClick={() => onReload()}>重新加载</Button>
+            )}
+          </div>
+          <div
+            className={styles.scroll}
+            role="region"
+            aria-label="课程对比表，可横向滚动"
+            tabIndex={0}
+          >
+            <table className={styles.table} style={tableStyle}>
+              <caption className="visually-hidden">
+                按七项已记录信息比较所选课程，不排名或判断资格
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">{selected.length} 门课</th>
+                  {views.map(({ id, column }, index) => {
+                    const name =
+                      column.status === 'ready'
+                        ? column.identity.primary_code
+                        : id;
+                    return (
+                      <th scope="col" key={id}>
+                        <div className={styles.columnHead}>
+                          {column.status === 'ready' ? (
+                            <CourseHeaderFacts body={column.body} />
+                          ) : (
+                            <p>
+                              {column.status === 'loading'
+                                ? '正在加载'
+                                : `课程加载失败（${id}）：${column.message}`}
+                            </p>
+                          )}
+                          <div className={styles.actions}>
+                            {column.status === 'ready' && (
+                              <Link
+                                to={`/course/${encodeURIComponent(column.identity.primary_code.replaceAll(' ', '-'))}`}
+                                aria-label={`查看 ${name}`}
+                              >
+                                查看
+                              </Link>
+                            )}
+                            <Button
+                              ref={(element) => {
+                                if (element)
+                                  removeButtons.current.set(id, element);
+                                else removeButtons.current.delete(id);
+                              }}
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`移出 ${name}`}
+                              onClick={() => {
+                                const neighbor =
+                                  selected[index + 1] ?? selected[index - 1];
+                                pendingFocus.current = neighbor
+                                  ? { id: neighbor }
+                                  : 'empty';
+                                onRemove(id);
+                              }}
+                            >
+                              移出
+                            </Button>
+                          </div>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {rowLabels.map((row) => (
+                  <tr key={row}>
+                    <th scope="row">{row}</th>
+                    {views.map(({ id, column }) => (
+                      <td key={id}>
+                        {column.status === 'ready' ? (
+                          <CourseFactCell row={row} body={column.body} />
+                        ) : column.status === 'loading' ? (
+                          '正在加载'
+                        ) : (
+                          '加载失败'
+                        )}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-            <tr>
-              <th scope="row">在你的方案里</th>
-              <td colSpan={selected.length} className={styles.note}>
-                {state.plan === 'none'
-                  ? '选了方案以后，这一行显示每门课在哪一组。'
-                  : '已选择方案；R1 尚未接入规则，课程位置仍未知。'}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p className={styles.note}>
-        对比列表只保存在这次会话里；刷新浏览器、登录或登出以后要重新加入。「讲什么」只显示开头几行，点「查看」看全文。
-      </p>
-      <p className={styles.note}>
-        R1 预填四门假数据以便验收，刷新会恢复示例；不模拟真实会话或资格判断。
-      </p>
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   );
 }

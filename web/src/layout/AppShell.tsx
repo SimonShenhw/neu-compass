@@ -5,12 +5,14 @@ import { usePrototype } from './PrototypeContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { pagePresentation } from './routePresentation';
+import { useCompareList } from '../models/compareList';
 import styles from './AppShell.module.css';
 
 export function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const state = usePrototype();
+  const comparison = useCompareList();
   const { title, isSearch, navigationPath } = pagePresentation(pathname);
   useEffect(() => {
     document.title = `${title} · NEU-Compass`;
@@ -24,13 +26,13 @@ export function AppShell() {
         跳到主要内容
       </a>
       <aside className={styles.desktopSidebar}>
-        <Sidebar compareCount={state.comparison.length} onRefresh={refresh} />
+        <Sidebar compareCount={comparison.length} onRefresh={refresh} />
       </aside>
       <div className={styles.mainColumn}>
         <TopBar
           showGuest={navigationPath !== '/coop'}
           title={title}
-          count={state.comparison.length}
+          count={comparison.length}
           onRefresh={refresh}
         />
         <main id="main-content" tabIndex={-1} className={styles.main}>
