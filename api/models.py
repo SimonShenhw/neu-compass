@@ -280,6 +280,47 @@ class OAuthCallbackRequest(BaseModel):
 
     code: str = Field(min_length=1)
     redirect_uri: str | None = None
+    # R2a: "cookie" puts the session token in the API's HttpOnly cookie instead of the body (the new web front end);
+    # "token", the default, is unchanged for Streamlit and scripts. 中文：R2a：cookie 模式把令牌放进 API 的 HttpOnly
+    # cookie，不放在返回体里（新前端用）；默认的 token 模式不变（Streamlit 和脚本用）。
+    session: Literal["token", "cookie"] = "token"
+
+
+class LoginUrlResponse(BaseModel):
+    """GET /auth/login-url: where to send the browser to log in with Google (R2a). 中文：去 Google 登录的地址。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+
+
+class PrivacySectionOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    heading: str
+    sentences: list[str]
+
+
+class PrivacyResponse(BaseModel):
+    """GET /privacy (R2a): the 数据与隐私 page, built from the API's own settings, plus the two notices shown next to
+    the ask box. 中文：「数据与隐私」页，按 API 自己的设置生成，外加提问框旁边的两段说明。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    intro: str
+    sections: list[PrivacySectionOut]
+    delete_what: str
+    query_log_notice: str
+    capture_notice: str | None  # None while answer feedback is off. 中文：回答反馈关着时是 None。
+
+
+class PublicConfigResponse(BaseModel):
+    """GET /config (R2a): what the web front end needs to know about this API. 中文：新前端要知道的公开设置。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    answer_feedback_enabled: bool
+    login_available: bool  # A Google client ID and a SESSION_SECRET are both set. 中文：两样都配了才能登录。
 
 
 class OAuthCallbackResponse(BaseModel):
@@ -291,11 +332,13 @@ class OAuthCallbackResponse(BaseModel):
 
     session_token (ADR-0021): signed bearer credential for subsequent API
     calls (`Authorization: Bearer <token>`). None when the server runs
-    without SESSION_SECRET (dev degraded mode).
+    without SESSION_SECRET (dev degraded mode), and None in the cookie mode
+    (R2a), where the token is in the HttpOnly cookie instead.
 
     session_token（ADR-0021）：供后续 API 调用使用的签名 bearer 凭证
     （`Authorization: Bearer <token>`）。服务端未配置 SESSION_SECRET 时
-    （开发降级模式）为 None。"""
+    （开发降级模式）为 None；cookie 模式（R2a）下也是 None，令牌在 HttpOnly
+    cookie 里。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -374,8 +417,12 @@ __all__ = [
     "CoursePrereqOut",
     "CourseProgramEdgeOut",
     "HealthResponse",
+    "LoginUrlResponse",
     "OAuthCallbackRequest",
     "OAuthCallbackResponse",
+    "PrivacyResponse",
+    "PrivacySectionOut",
+    "PublicConfigResponse",
     "ReadyResponse",
     "ResolveCourseResponse",
     "ResolvedCourseOut",

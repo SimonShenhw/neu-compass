@@ -105,7 +105,10 @@ def _safe_exception(_logger: Any, _name: str, event: dict[str, Any]) -> dict[str
 
 class _CourseReadAccessFilter(logging.Filter):
     """Uvicorn owns non-propagating handlers; sanitize its source record first.
-    中文：只替换课程读的访问路径和查询串，保留方法、协议、状态及其他接口日志。
+    The login address also loses its query: the `state` stays the front end's own until Google sends it back (R2a,
+    A25 N3).
+    中文：只替换课程读的访问路径和查询串，保留方法、协议、状态及其他接口日志。登录地址那条也去掉查询串：`state`
+    在 Google 送回来以前只该前端自己知道（R2a）。
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -114,6 +117,8 @@ class _CourseReadAccessFilter(logging.Filter):
             safe = _course_read_log_path(path)
             if safe in _COURSE_READ_PATHS:
                 record.args = (*record.args[:2], safe, *record.args[3:])
+            elif path.rstrip("/") == "/auth/login-url":
+                record.args = (*record.args[:2], path, *record.args[3:])
         return True
 
 

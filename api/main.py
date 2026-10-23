@@ -37,11 +37,14 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.admission import AdmissionGuard, AdmissionMiddleware, AdmissionPolicy
+from api.csrf import MARKER_HEADER, CsrfMiddleware
 from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
-from api.routes import auth, chat, coop, course, feedback, health, program, resolve, search
+from api.private_cache import PrivateCacheMiddleware
+from api.routes import auth, chat, coop, course, feedback, health, program, public, resolve, search
 from config import settings
 from db.connection import connect
 from rag.embedder import BGEM3Embedder
@@ -384,8 +387,17 @@ def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | No
         version="0.1.0",
         description="Course RAG + Co-op API. Internal MVP — F1 compliance, not commercial.",
         lifespan=lifespan if run_startup else None,
+        # R2a: a JSON body needs a JSON Content-Type, which another origin can only send after a CORS preflight. This is
+        # the first barrier against cross-site writes that ride on the session cookie; api/csrf.py is the second. It is
+        # FastAPI's default, written out so that no upgrade or edit turns it off unnoticed (A25 L2).
+        # 中文：R2a：JSON 请求体要有 JSON 的 Content-Type，别的来源要发它得先过 CORS 预检。这是挡借会话 cookie 的跨站
+        # 写请求的第一道，api/csrf.py 是第二道。FastAPI 默认就是这样，这里明写出来，免得升级或改动时悄悄关掉。
+        strict_content_type=True,
     )
 
+    # R2a, innermost: answers that depend on who is asking get `Cache-Control: private, no-store`.
+    # 中文：R2a，放在最里面：按身份不同的回答加上 `Cache-Control: private, no-store`。
+    app.add_middleware(PrivateCacheMiddleware)
     if admission_guard is None and settings.request_guard_enabled:
         admission_guard = AdmissionGuard(AdmissionPolicy(
             capacity=settings.request_guard_capacity,
@@ -395,9 +407,20 @@ def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | No
     app.state.admission_guard = admission_guard
     if admission_guard is not None:
         app.add_middleware(AdmissionMiddleware, guard=admission_guard)
-    # Access logging is outermost so denied requests also get x-request-id.
+    # R2a: a write that carries the session cookie must come from WEB_ORIGINS. Outside the guard, so a refused request
+    # takes no place. 中文：带会话 cookie 的写请求必须来自 WEB_ORIGINS；放在门禁外面，被拒的请求不占名额。
+    app.add_middleware(CsrfMiddleware, origins=tuple(settings.web_origins))
+    # Access logging wraps both so denied requests also get x-request-id.
     # 中文：日志包住门禁，拒绝响应也有既有 request-id；不新增 query_log。
     app.add_middleware(RequestLogMiddleware)
+    if settings.web_origins:
+        # R2a, outermost: the guard's 429/503, the CSRF 403 and the logging's last-resort 500 all carry CORS headers,
+        # so the web front end can read them. Without WEB_ORIGINS there is no CORS at all, as before.
+        # 中文：R2a，放在最外层：门禁的 429/503、跨站防护的 403、日志兜底的 500 都带 CORS 头，新前端读得到。
+        # 没设 WEB_ORIGINS 就完全不加 CORS，和以前一样。
+        app.add_middleware(CORSMiddleware, allow_origins=list(settings.web_origins), allow_credentials=True,
+                           allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", MARKER_HEADER],
+                           expose_headers=["x-request-id", "Retry-After"], max_age=600)
     register_exception_handlers(app)
 
     app.include_router(health.router)
@@ -409,6 +432,7 @@ def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | No
     app.include_router(auth.router)
     app.include_router(program.router)
     app.include_router(resolve.router)
+    app.include_router(public.router)
 
     return app
 

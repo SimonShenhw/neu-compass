@@ -275,6 +275,9 @@ def test_page_delete_needs_the_tick_then_deletes_logs_out_and_says_so(monkeypatc
 
 
 NOTHING_DELETED, NOT_KNOWN, EXPIRED = "删除没有完成，什么也没删", "不确定删除有没有完成", "这个登录已经失效"
+# Being a guest after a refresh does not prove the deletion (a login can also expire): the web front end's words (R5c).
+# 中文：刷新后变成游客证明不了删掉了（登录也会自己过期），和新前端同一句。
+NOT_KNOWN_WORDS = "这次没收到服务器的确认，不确定删除有没有完成。刷新后若仍是登录状态，可以再试；若已变成游客但需要确认，请联系维护者。"
 
 
 @pytest.mark.parametrize(("status", "message"), [
@@ -298,6 +301,7 @@ def test_page_delete_failure_says_what_is_known(monkeypatch, status, message):
     errors = [item.value for item in app.error]
     assert any(message in value for value in errors) and "synthetic" not in "".join(errors)
     assert not any(other in value for value in errors for other in {NOTHING_DELETED, NOT_KNOWN, EXPIRED} - {message})
+    assert (NOT_KNOWN_WORDS in errors) is (message == NOT_KNOWN)
 
 
 def test_guests_see_no_delete_controls(monkeypatch):

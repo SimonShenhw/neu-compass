@@ -75,7 +75,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.auth import OAuthError
+from api.google_oauth import OAuthError
 from api.error_fields import safe_error_fields
 from db.repository import CourseNotFound
 from llm.gemini_client import GeminiError, error_log_fields
