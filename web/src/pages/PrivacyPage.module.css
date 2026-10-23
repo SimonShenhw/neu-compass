@@ -1,0 +1,109 @@
+.page {
+  min-width: var(--space-0);
+  max-width: var(--content-max);
+  overflow-wrap: anywhere;
+}
+.intro {
+  color: var(--ink3);
+  margin-bottom: var(--space-5);
+  white-space: pre-wrap;
+}
+.sections {
+  display: grid;
+  gap: var(--space-4);
+}
+.policy,
+.deletion,
+.failure {
+  padding: var(--space-5);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  min-width: var(--space-0);
+  overflow-wrap: anywhere;
+}
+.policy h2,
+.deletion h2 {
+  font-size: var(--text-xl);
+  white-space: pre-wrap;
+}
+.policy ul {
+  margin: var(--space-3) var(--space-0) var(--space-0);
+  padding-left: var(--space-5);
+}
+.policy li {
+  margin-block: var(--space-2);
+  white-space: pre-wrap;
+}
+.deletion {
+  margin-top: var(--space-6);
+}
+.deletion p {
+  margin-top: var(--space-3);
+  color: var(--ink2);
+  white-space: pre-wrap;
+}
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  margin-block: var(--space-4);
+  cursor: pointer;
+}
+.confirm input {
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.result {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  background: var(--accent-soft);
+  border: var(--border) solid var(--accent);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+}
+.failure button {
+  margin-top: var(--space-3);
+}
+.demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink3);
+  background: var(--side);
+  font-size: var(--text-sm);
+}
+.demo > p {
+  flex-basis: 100%;
+}
+.demo label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: var(--space-0);
+}
+.demo select {
+  max-width: 100%;
+  min-height: var(--touch);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  color: var(--ink);
+  background: var(--surface);
+}
+.viewer {
+  color: var(--ink3);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+}
+@media (max-width: 767px) {
+  .policy,
+  .deletion,
+  .failure {
+    padding: var(--space-4);
+  }
+}

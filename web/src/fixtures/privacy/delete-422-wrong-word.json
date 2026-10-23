@@ -1,0 +1,24 @@
+{
+  "case": "delete-422-wrong-word",
+  "settings": {
+    "QUERY_LOG_RETENTION_DAYS": 90,
+    "ANSWER_FEEDBACK_ENABLED": true,
+    "PRIVACY_CONTACT_EMAIL": "privacy@example.test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/auth/delete-account",
+    "body": {
+      "confirm": "yes"
+    },
+    "with": "session cookie, Origin and X-NEU-Compass: 1"
+  },
+  "status": 422,
+  "body": {
+    "detail": "confirm: Input should be 'delete'",
+    "error_type": "invalid_input",
+    "status_code": 422
+  },
+  "expires_session_cookie": false,
+  "account_left": true
+}

@@ -1,4 +1,4 @@
-import { Compass } from 'lucide-react';
+import { Compass, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MobileNav } from './MobileNav';
 import styles from './TopBar.module.css';
@@ -25,7 +25,10 @@ export function TopBar({
           NEU-Compass
         </Link>
       </div>
-      <h1>{title}</h1>
+      <h1 className={title === '数据与隐私' ? styles.privacyTitle : undefined}>
+        {title === '数据与隐私' && <Lock aria-hidden="true" />}
+        {title}
+      </h1>
       <div className={styles.status}>
         <span className={styles.catalog}>
           {title === '课程对比'
