@@ -1,0 +1,98 @@
+{
+  "case": "cs-7800-legacy-edges-only",
+  "notes": "No clause documents at all: the old flat edges with their labels (required, recommended, concurrent).",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-cs-7800"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-cs-7800",
+    "primary_code": "CS 7800",
+    "primary_name": "Advanced Algorithms",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": null,
+    "credits": null,
+    "prereqs": [],
+    "delivery_mode": null,
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": null,
+    "difficulty_score": null,
+    "grading_components": [],
+    "topics_covered": [],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [],
+    "extraction_confidence": null,
+    "source_review_ids": [],
+    "created_at": "2026-10-23T10:53:22.650928Z",
+    "updated_at": "2026-10-23T10:53:22.650928Z",
+    "program_context": [],
+    "prerequisites": [
+      {
+        "course_id": "c-cs-5100",
+        "primary_code": "CS 5100",
+        "primary_name": "Foundations of Artificial Intelligence",
+        "requirement": "recommended"
+      },
+      {
+        "course_id": "c-cs-5800",
+        "primary_code": "CS 5800",
+        "primary_name": "Algorithms",
+        "requirement": "required"
+      },
+      {
+        "course_id": "c-cs-6140",
+        "primary_code": "CS 6140",
+        "primary_name": "Machine Learning",
+        "requirement": "concurrent"
+      }
+    ],
+    "answer_evidence": {
+      "catalog": null,
+      "field_evidence": [],
+      "source_review_ids": [],
+      "missing_fields": [
+        "catalog_description",
+        "credits",
+        "term",
+        "delivery_mode",
+        "professor",
+        "prereqs",
+        "topics_covered",
+        "skill_tags",
+        "workload_hours_per_week",
+        "difficulty_score",
+        "grading_components",
+        "career_relevance"
+      ],
+      "warnings": [
+        "catalog_source_unavailable"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": false,
+      "documents": [],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic",
+        "structured_requisites_missing"
+      ],
+      "program_contexts": []
+    }
+  }
+}
