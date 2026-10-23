@@ -1,0 +1,118 @@
+{
+  "case": "synth-cs-9999-test-record",
+  "notes": "A test record (synth- ID, synthetic_seed_ source): 0 credits, an async course, difficulty 1.0, grading without weights, a policy with notes only and no disclosure; a snapshot with retrieval and import times.",
+  "request": {
+    "method": "GET",
+    "path": "/course/synth-cs-9999"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "synth-cs-9999",
+    "primary_code": "CS 9999",
+    "primary_name": "Synthetic Systems Seminar",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": "Summer 2026",
+    "credits": 0,
+    "prereqs": [],
+    "delivery_mode": "async",
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": {
+      "permitted_tools": [],
+      "banned_tools": [],
+      "disclosure_required": false,
+      "notes": "No rules published yet. (Synthetic text for interface tests.)"
+    },
+    "workload_hours_per_week": null,
+    "difficulty_score": 1.0,
+    "grading_components": [
+      {
+        "name": "Weekly reflections",
+        "weight": null
+      },
+      {
+        "name": "Presentation",
+        "weight": null
+      }
+    ],
+    "topics_covered": [],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [
+      {
+        "field": "difficulty_score",
+        "value": 1.0,
+        "source_id": "synthetic_seed_cs9999",
+        "quote": "Very light seminar. (Synthetic text for interface tests.)",
+        "confidence": 0.3
+      }
+    ],
+    "extraction_confidence": null,
+    "source_review_ids": [
+      "synthetic_seed_cs9999"
+    ],
+    "created_at": "2026-09-20T12:00:00Z",
+    "updated_at": "2026-09-20T12:00:00Z",
+    "program_context": [],
+    "prerequisites": [],
+    "answer_evidence": {
+      "catalog": {
+        "course_code": "CS 9999",
+        "course_name": "Synthetic Systems Seminar",
+        "description": "A synthetic seminar used only by tests. (Synthetic text for interface tests.)",
+        "credits": 0,
+        "prereq_codes": [],
+        "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+        "snapshot_id": "catalog:ffff86edd9a31b67d8247618f5c0f8281453354db2babee8db3a79808119f640",
+        "imported_at": "2026-09-29T03:00:15Z",
+        "retrieved_at": "2026-09-28T14:05:30Z"
+      },
+      "field_evidence": [
+        {
+          "field": "difficulty_score",
+          "value": 1.0,
+          "source_id": "synthetic_seed_cs9999",
+          "quote": "Very light seminar. (Synthetic text for interface tests.)",
+          "confidence": 0.3
+        }
+      ],
+      "source_review_ids": [
+        "synthetic_seed_cs9999"
+      ],
+      "missing_fields": [
+        "professor",
+        "prereqs",
+        "topics_covered",
+        "skill_tags",
+        "workload_hours_per_week",
+        "career_relevance"
+      ],
+      "warnings": [
+        "extracted_evidence_not_official_facts",
+        "synthetic_record_not_real_course"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": false,
+      "documents": [],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic",
+        "structured_requisites_missing"
+      ],
+      "program_contexts": []
+    }
+  }
+}
