@@ -7,6 +7,7 @@ import { CompareDemoPage } from './pages/CompareDemoPage';
 import { ProgramsPage } from './pages/ProgramsPage';
 import { CoopDemoPage } from './pages/CoopDemoPage';
 import { PrivacyDemoPage } from './pages/PrivacyDemoPage';
+import { RequisitesDemoPage } from './pages/RequisitesDemoPage';
 import { NotFound } from './pages/NotFound';
 
 export function App() {
@@ -20,6 +21,7 @@ export function App() {
           <Route path="/programs" element={<ProgramsPage />} />
           <Route path="/coop" element={<CoopDemoPage />} />
           <Route path="/privacy" element={<PrivacyDemoPage />} />
+          <Route path="/requisites-demo" element={<RequisitesDemoPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

@@ -1,0 +1,646 @@
+{
+  "case": "derived-invalid-tree",
+  "notes": "In 2026-2027 the first OR of the prerequisite keeps only one child: a tree the schema refuses.",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-cs-6140"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-cs-6140",
+    "primary_code": "CS 6140",
+    "primary_name": "Machine Learning",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": null,
+    "credits": null,
+    "prereqs": [],
+    "delivery_mode": null,
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": null,
+    "difficulty_score": null,
+    "grading_components": [],
+    "topics_covered": [],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [],
+    "extraction_confidence": null,
+    "source_review_ids": [],
+    "created_at": "2026-10-23T10:53:22.650898Z",
+    "updated_at": "2026-10-23T10:53:22.650904Z",
+    "program_context": [],
+    "prerequisites": [
+      {
+        "course_id": "c-cs-5010-missing",
+        "primary_code": null,
+        "primary_name": null,
+        "requirement": "required"
+      },
+      {
+        "course_id": "c-cs-5100",
+        "primary_code": "CS 5100",
+        "primary_name": "Foundations of Artificial Intelligence",
+        "requirement": "recommended"
+      },
+      {
+        "course_id": "c-cs-5800",
+        "primary_code": "CS 5800",
+        "primary_name": "Algorithms",
+        "requirement": "required"
+      }
+    ],
+    "answer_evidence": {
+      "catalog": null,
+      "field_evidence": [],
+      "source_review_ids": [],
+      "missing_fields": [
+        "catalog_description",
+        "credits",
+        "term",
+        "delivery_mode",
+        "professor",
+        "topics_covered",
+        "skill_tags",
+        "workload_hours_per_week",
+        "difficulty_score",
+        "grading_components",
+        "career_relevance"
+      ],
+      "warnings": [
+        "catalog_source_unavailable",
+        "requisites_differ_by_catalog_year"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [
+          {
+            "catalog_year": "2026-2027",
+            "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "prerequisite": {
+              "status": "parsed",
+              "rule": {
+                "kind": "all_of",
+                "course_code": null,
+                "minimum_grade": null,
+                "academic_level": null,
+                "concurrent_allowed": false,
+                "children": [
+                  {
+                    "kind": "any_of",
+                    "course_code": null,
+                    "minimum_grade": null,
+                    "academic_level": null,
+                    "concurrent_allowed": false,
+                    "children": [
+                      {
+                        "kind": "course",
+                        "course_code": "CS 5800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "course_code": "CS 7800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "any_of",
+                    "course_code": null,
+                    "minimum_grade": null,
+                    "academic_level": null,
+                    "concurrent_allowed": false,
+                    "children": [
+                      {
+                        "kind": "course",
+                        "course_code": "DS 5220",
+                        "minimum_grade": "C-",
+                        "academic_level": "Graduate",
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "course_code": "CS 6220",
+                        "minimum_grade": null,
+                        "academic_level": null,
+                        "concurrent_allowed": true,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              "clause_text": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))",
+              "clause_truncated": false,
+              "unparsed_reason": null,
+              "clause_sha256": null
+            },
+            "corequisite": {
+              "status": "parsed",
+              "rule": {
+                "kind": "course",
+                "course_code": "CS 6220",
+                "minimum_grade": null,
+                "academic_level": null,
+                "concurrent_allowed": false,
+                "children": []
+              },
+              "clause_text": "CS 6220",
+              "clause_truncated": false,
+              "unparsed_reason": null,
+              "clause_sha256": null
+            }
+          },
+          {
+            "catalog_year": "2025-2026",
+            "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "prerequisite": {
+              "status": "parsed",
+              "rule": {
+                "kind": "course",
+                "course_code": "CS 5800",
+                "minimum_grade": "C-",
+                "academic_level": null,
+                "concurrent_allowed": false,
+                "children": []
+              },
+              "clause_text": "CS 5800 with a minimum grade of C-",
+              "clause_truncated": false,
+              "unparsed_reason": null,
+              "clause_sha256": null
+            },
+            "corequisite": {
+              "status": "not_listed",
+              "rule": null,
+              "clause_text": null,
+              "clause_truncated": false,
+              "unparsed_reason": null,
+              "clause_sha256": null
+            }
+          }
+        ],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": true,
+      "documents": [
+        {
+          "format_version": "1",
+          "course_id": "c-cs-6140",
+          "course_code": "CS 6140",
+          "course_name": "Machine Learning",
+          "catalog_year": "2026-2027",
+          "campus": null,
+          "coverage": "courseblock_clauses_only",
+          "source": {
+            "format_version": 1,
+            "url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "catalog_year": "2026-2027",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "byte_count": 1000,
+            "page_title": "Synthetic catalog page (CS)"
+          },
+          "requisites": {
+            "grammar_version": "1",
+            "prerequisite": {
+              "status": "parsed",
+              "raw_text": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))",
+              "rule": {
+                "kind": "all_of",
+                "course_code": null,
+                "minimum_grade": null,
+                "academic_level": null,
+                "concurrent_allowed": false,
+                "children": [
+                  {
+                    "kind": "any_of",
+                    "course_code": null,
+                    "minimum_grade": null,
+                    "academic_level": null,
+                    "concurrent_allowed": false,
+                    "children": [
+                      {
+                        "kind": "course",
+                        "course_code": "CS 5800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "any_of",
+                    "course_code": null,
+                    "minimum_grade": null,
+                    "academic_level": null,
+                    "concurrent_allowed": false,
+                    "children": [
+                      {
+                        "kind": "course",
+                        "course_code": "DS 5220",
+                        "minimum_grade": "C-",
+                        "academic_level": "Graduate",
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      {
+                        "kind": "course",
+                        "course_code": "CS 6220",
+                        "minimum_grade": null,
+                        "academic_level": null,
+                        "concurrent_allowed": true,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              "reason": null
+            },
+            "corequisite": {
+              "status": "parsed",
+              "raw_text": "CS 6220",
+              "rule": {
+                "kind": "course",
+                "course_code": "CS 6220",
+                "minimum_grade": null,
+                "academic_level": null,
+                "concurrent_allowed": false,
+                "children": []
+              },
+              "reason": null
+            }
+          },
+          "description_evidence": {
+            "format_version": "1",
+            "status": "review_needed",
+            "paragraphs": [
+              "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)",
+              "Restricted to students in the MS program; permission of the instructor is required for others. (Synthetic text for interface tests.)"
+            ],
+            "candidates": [
+              {
+                "paragraph_index": 1,
+                "markers": [
+                  "permission",
+                  "restriction"
+                ]
+              }
+            ]
+          },
+          "credit_hours": {
+            "format_version": "1",
+            "raw_text": "4 Hours",
+            "kind": "fixed",
+            "minimum": "4",
+            "maximum": "4"
+          },
+          "imported_at": "2026-09-29T03:00:00Z"
+        },
+        {
+          "format_version": "1",
+          "course_id": "c-cs-6140",
+          "course_code": "CS 6140",
+          "course_name": "Machine Learning",
+          "catalog_year": "2025-2026",
+          "campus": null,
+          "coverage": "courseblock_clauses_only",
+          "source": {
+            "format_version": 1,
+            "url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "catalog_year": "2025-2026",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "byte_count": 1000,
+            "page_title": "Synthetic catalog page (CS)"
+          },
+          "requisites": {
+            "grammar_version": "1",
+            "prerequisite": {
+              "status": "parsed",
+              "raw_text": "CS 5800 with a minimum grade of C-",
+              "rule": {
+                "kind": "course",
+                "course_code": "CS 5800",
+                "minimum_grade": "C-",
+                "academic_level": null,
+                "concurrent_allowed": false,
+                "children": []
+              },
+              "reason": null
+            },
+            "corequisite": {
+              "status": "not_listed",
+              "raw_text": null,
+              "rule": null,
+              "reason": null
+            }
+          },
+          "description_evidence": {
+            "format_version": "1",
+            "status": "no_keyword_match",
+            "paragraphs": [
+              "Surveys supervised and unsupervised learning and the issues of using learned models. (Synthetic text for interface tests.)"
+            ],
+            "candidates": []
+          },
+          "credit_hours": {
+            "format_version": "1",
+            "raw_text": "1-4 Hours",
+            "kind": "range",
+            "minimum": "1",
+            "maximum": "4"
+          },
+          "imported_at": "2026-09-29T03:00:00Z"
+        }
+      ],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic"
+      ],
+      "program_contexts": [
+        {
+          "course_code": "CS 6140",
+          "catalog_year": "2026-2027",
+          "schema_available": true,
+          "plans": [
+            {
+              "plan_id": "ms-cs-synthetic-boston-2026-2027-standard",
+              "program_id": "ms-cs-synthetic",
+              "campus": "boston",
+              "catalog_year": "2026-2027",
+              "pathway": "standard",
+              "concentration": null,
+              "coverage": "partial",
+              "review_status": "source_checked",
+              "checked_by": "synthetic-reviewer",
+              "checked_on": "2026-10-01",
+              "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/synthetic-program/",
+              "source_title": "Synthetic program page",
+              "source_catalog_year": "2026-2027",
+              "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+              "source_html_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "captured_on": "2026-09-28",
+              "notes": "Synthetic plan notes: the pool and minimums are invented for interface tests. (Synthetic text for interface tests.)",
+              "requirements": {
+                "kind": "all_of",
+                "label": "Synthetic core and electives",
+                "course_code": null,
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Algorithms core (synthetic)",
+                    "course_code": "CS 5800",
+                    "children": [],
+                    "course_codes": [],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": null,
+                    "min_courses": null,
+                    "min_credits": null,
+                    "min_areas": null,
+                    "areas": {}
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Synthetic elective pool",
+                    "course_code": null,
+                    "children": [],
+                    "course_codes": [
+                      "CS 6140",
+                      "CS 6220",
+                      "CS 7800"
+                    ],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": null,
+                    "min_courses": 2,
+                    "min_credits": null,
+                    "min_areas": null,
+                    "areas": {}
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Synthetic breadth",
+                    "course_code": null,
+                    "children": [],
+                    "course_codes": [],
+                    "subject_codes": [
+                      "DS"
+                    ],
+                    "course_ranges": [
+                      {
+                        "start": "CS 5000",
+                        "end": "CS 5999"
+                      }
+                    ],
+                    "excluded_course_codes": [
+                      "CS 5010"
+                    ],
+                    "activate_when": null,
+                    "min_courses": null,
+                    "min_credits": 8,
+                    "min_areas": null,
+                    "areas": {}
+                  },
+                  {
+                    "kind": "unmodeled",
+                    "label": "Further rules not modeled yet (synthetic)",
+                    "course_code": null,
+                    "children": [],
+                    "course_codes": [],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": null,
+                    "min_courses": null,
+                    "min_credits": null,
+                    "min_areas": null,
+                    "areas": {}
+                  }
+                ],
+                "course_codes": [],
+                "subject_codes": [],
+                "course_ranges": [],
+                "excluded_course_codes": [],
+                "activate_when": null,
+                "min_courses": null,
+                "min_credits": null,
+                "min_areas": null,
+                "areas": {}
+              }
+            },
+            {
+              "plan_id": "ms-ds-synthetic-boston-2026-2027-align-ai",
+              "program_id": "ms-ds-synthetic",
+              "campus": "boston",
+              "catalog_year": "2026-2027",
+              "pathway": "align",
+              "concentration": "Synthetic AI concentration",
+              "coverage": "complete",
+              "review_status": "source_checked",
+              "checked_by": "synthetic-reviewer",
+              "checked_on": "2026-10-01",
+              "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/synthetic-program/",
+              "source_title": "Synthetic program page",
+              "source_catalog_year": "2026-2027",
+              "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+              "source_html_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "captured_on": "2026-09-28",
+              "notes": "Synthetic plan notes: the pool and minimums are invented for interface tests. (Synthetic text for interface tests.)",
+              "requirements": {
+                "kind": "any_of",
+                "label": "Synthetic AI track options",
+                "course_code": null,
+                "children": [
+                  {
+                    "kind": "course",
+                    "label": "Machine learning option (synthetic)",
+                    "course_code": "CS 6140",
+                    "children": [],
+                    "course_codes": [],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": null,
+                    "min_courses": null,
+                    "min_credits": null,
+                    "min_areas": null,
+                    "areas": {}
+                  },
+                  {
+                    "kind": "optional",
+                    "label": "Synthetic thesis branch",
+                    "course_code": null,
+                    "children": [
+                      {
+                        "kind": "course",
+                        "label": "Thesis course (synthetic)",
+                        "course_code": "CS 6220",
+                        "children": [],
+                        "course_codes": [],
+                        "subject_codes": [],
+                        "course_ranges": [],
+                        "excluded_course_codes": [],
+                        "activate_when": null,
+                        "min_courses": null,
+                        "min_credits": null,
+                        "min_areas": null,
+                        "areas": {}
+                      }
+                    ],
+                    "course_codes": [],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": "Only for students who choose the thesis option (synthetic)",
+                    "min_courses": null,
+                    "min_credits": null,
+                    "min_areas": null,
+                    "areas": {}
+                  },
+                  {
+                    "kind": "select",
+                    "label": "Synthetic area electives",
+                    "course_code": null,
+                    "children": [],
+                    "course_codes": [
+                      "CS 6140",
+                      "CS 6220"
+                    ],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": null,
+                    "min_courses": 2,
+                    "min_credits": null,
+                    "min_areas": 2,
+                    "areas": {
+                      "Learning": [
+                        "CS 6140"
+                      ],
+                      "Data": [
+                        "CS 6220"
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "condition",
+                    "label": "A track GPA of at least 3.0 (synthetic)",
+                    "course_code": null,
+                    "children": [],
+                    "course_codes": [],
+                    "subject_codes": [],
+                    "course_ranges": [],
+                    "excluded_course_codes": [],
+                    "activate_when": null,
+                    "min_courses": null,
+                    "min_credits": null,
+                    "min_areas": null,
+                    "areas": {}
+                  }
+                ],
+                "course_codes": [],
+                "subject_codes": [],
+                "course_ranges": [],
+                "excluded_course_codes": [],
+                "activate_when": null,
+                "min_courses": null,
+                "min_credits": null,
+                "min_areas": null,
+                "areas": {}
+              }
+            }
+          ],
+          "unusable_records": 0,
+          "unreviewed_records": 1,
+          "warnings": [
+            "explicit_mentions_only_not_personal_applicability",
+            "program_rules_not_merged_with_course_prerequisite_grades",
+            "no_match_is_not_no_program_policy",
+            "program_context_records_unreviewed"
+          ]
+        },
+        {
+          "course_code": "CS 6140",
+          "catalog_year": "2025-2026",
+          "schema_available": true,
+          "plans": [],
+          "unusable_records": 1,
+          "unreviewed_records": 0,
+          "warnings": [
+            "explicit_mentions_only_not_personal_applicability",
+            "program_rules_not_merged_with_course_prerequisite_grades",
+            "no_match_is_not_no_program_policy",
+            "program_context_records_unusable",
+            "program_context_no_explicit_checked_match"
+          ]
+        }
+      ]
+    }
+  },
+  "derived_from": "cs-6140-two-years",
+  "edit": "In 2026-2027 the first OR of the prerequisite keeps only one child: a tree the schema refuses."
+}

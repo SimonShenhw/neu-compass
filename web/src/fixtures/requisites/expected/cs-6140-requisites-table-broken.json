@@ -1,0 +1,159 @@
+{
+  "case": "cs-6140-requisites-table-broken",
+  "scenarios": [
+    {
+      "name": "default",
+      "year": null,
+      "plan": null,
+      "cleared": false,
+      "raw": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🧩 先修要求**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "warning",
+          "value": "存在无法使用的结构化记录或存储结构；未将它解释成没有要求，也不回退旧图。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "没有可用的年度规则；这不表示没有先修或共修要求。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🔗 去看看这些先修课**"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "caption",
+          "value": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "c-cs-5010-missing",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5100 · Foundations of Artificial Intelligence",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5800 · Algorithms",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5800"
+        }
+      ],
+      "visible": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "warning",
+          "text": "存在无法使用的结构化记录或存储结构；未将它解释成没有要求，也不回退旧图。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "没有可用的年度规则；这不表示没有先修或共修要求。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "heading",
+          "text": "去看看这些先修课"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "note",
+          "text": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "c-cs-5010-missing",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5100 · Foundations of Artificial Intelligence",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5800 · Algorithms",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5800"
+        }
+      ]
+    }
+  ]
+}

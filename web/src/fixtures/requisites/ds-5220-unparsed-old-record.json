@@ -1,0 +1,152 @@
+{
+  "case": "ds-5220-unparsed-old-record",
+  "notes": "One year: both sections unparsed (unsupported_syntax, ambiguous_precedence); an old record with no hours and no description evidence. No legacy edges.",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-ds-5220"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-ds-5220",
+    "primary_code": "DS 5220",
+    "primary_name": "Supervised Machine Learning and Learning Theory",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": null,
+    "credits": null,
+    "prereqs": [],
+    "delivery_mode": null,
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": null,
+    "difficulty_score": null,
+    "grading_components": [],
+    "topics_covered": [],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [],
+    "extraction_confidence": null,
+    "source_review_ids": [],
+    "created_at": "2026-10-23T10:53:22.650925Z",
+    "updated_at": "2026-10-23T10:53:22.650925Z",
+    "program_context": [],
+    "prerequisites": [],
+    "answer_evidence": {
+      "catalog": null,
+      "field_evidence": [],
+      "source_review_ids": [],
+      "missing_fields": [
+        "catalog_description",
+        "credits",
+        "term",
+        "delivery_mode",
+        "professor",
+        "topics_covered",
+        "skill_tags",
+        "workload_hours_per_week",
+        "difficulty_score",
+        "grading_components",
+        "career_relevance"
+      ],
+      "warnings": [
+        "catalog_source_unavailable",
+        "requisite_clause_unparsed"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [
+          {
+            "catalog_year": "2026-2027",
+            "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "prerequisite": {
+              "status": "unparsed",
+              "rule": null,
+              "clause_text": "Graduate standing and permission of the instructor",
+              "clause_truncated": false,
+              "unparsed_reason": "unsupported_syntax",
+              "clause_sha256": "0917bdf22b63d7e9e108d10eac029de88f59f4ea25939bbcaaab5412a11b2a6b"
+            },
+            "corequisite": {
+              "status": "unparsed",
+              "rule": null,
+              "clause_text": "CS 5800 and CS 5100 or CS 6220",
+              "clause_truncated": false,
+              "unparsed_reason": "ambiguous_precedence",
+              "clause_sha256": "5350190e597330292d3d2d11fb145641b13c48996c7b6c0099db167b7903b8f2"
+            }
+          }
+        ],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": true,
+      "documents": [
+        {
+          "format_version": "1",
+          "course_id": "c-ds-5220",
+          "course_code": "DS 5220",
+          "course_name": "Supervised Machine Learning and Learning Theory",
+          "catalog_year": "2026-2027",
+          "campus": null,
+          "coverage": "courseblock_clauses_only",
+          "source": {
+            "format_version": 1,
+            "url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+            "catalog_year": "2026-2027",
+            "captured_at": "2026-09-28T14:05:00Z",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "byte_count": 1000,
+            "page_title": "Synthetic catalog page (DS)"
+          },
+          "requisites": {
+            "grammar_version": "1",
+            "prerequisite": {
+              "status": "unparsed",
+              "raw_text": "Graduate standing and permission of the instructor",
+              "rule": null,
+              "reason": "unsupported_syntax"
+            },
+            "corequisite": {
+              "status": "unparsed",
+              "raw_text": "CS 5800 and CS 5100 or CS 6220",
+              "rule": null,
+              "reason": "ambiguous_precedence"
+            }
+          },
+          "description_evidence": null,
+          "credit_hours": null,
+          "imported_at": "2026-09-29T03:00:00Z"
+        }
+      ],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic"
+      ],
+      "program_contexts": [
+        {
+          "course_code": "DS 5220",
+          "catalog_year": "2026-2027",
+          "schema_available": true,
+          "plans": [],
+          "unusable_records": 0,
+          "unreviewed_records": 0,
+          "warnings": [
+            "explicit_mentions_only_not_personal_applicability",
+            "program_rules_not_merged_with_course_prerequisite_grades",
+            "no_match_is_not_no_program_policy",
+            "program_context_no_explicit_checked_match"
+          ]
+        }
+      ]
+    }
+  }
+}
