@@ -58,14 +58,25 @@ def cookie_client(empty_db: sqlite3.Connection, monkeypatch):
 def test_a_cookie_write_without_both_signs_is_refused_and_does_nothing(cookie_client, empty_db, headers):
     response = cookie_client.post("/coop", json=UPLOAD, headers=headers)
     assert response.status_code == 403 and response.json() == REFUSED
+    assert response.headers["cache-control"] == "no-store"
     assert OTHER not in response.text and "elsewhere" not in response.text
     assert submissions(empty_db) == 0
 
 
-def test_two_origin_headers_are_refused(cookie_client, empty_db):
-    response = cookie_client.post("/coop", json=UPLOAD,
-                                  headers=[("Origin", ORIGIN), ("Origin", ORIGIN), ("X-NEU-Compass", "1")])
+@pytest.mark.parametrize("headers", [
+    [("Origin", ORIGIN), ("Origin", ORIGIN), ("X-NEU-Compass", "1")],
+    [("Origin", ORIGIN), ("X-NEU-Compass", "1"), ("X-NEU-Compass", "1")],
+], ids=["two-origins", "two-markers"])
+def test_two_origin_or_marker_headers_are_refused(cookie_client, empty_db, headers):
+    response = cookie_client.post("/coop", json=UPLOAD, headers=headers)
     assert response.status_code == 403 and submissions(empty_db) == 0
+
+
+@pytest.mark.parametrize("method", ["HEAD", "OPTIONS"])
+def test_head_and_options_are_not_checked(cookie_client, method):
+    """Not writes, so the app answers them itself (405 here: /coop has neither), not the CSRF 403 (B25 N1).
+    中文：不是写请求，由应用自己回答（这里是 405：/coop 两种都没有），不是跨站防护的 403。"""
+    assert cookie_client.request(method, "/coop").status_code == 405
 
 
 def test_an_empty_authorization_header_does_not_exempt_a_cookie_write(cookie_client, empty_db):
@@ -106,8 +117,11 @@ def test_reads_and_cookieless_writes_are_not_checked(empty_db, monkeypatch):
 
 
 def test_an_empty_cookie_value_is_no_session(cookie_client, empty_db):
+    """Not checked, so the route's own 401 for a guest comes back, not the CSRF 403. 中文：不查，所以回的是接口自己
+    给游客的 401，不是跨站防护的 403。"""
     cookie_client.cookies.set(COOKIE_NAME, "", domain="testserver.local")
-    assert cookie_client.post("/auth/logout").status_code == 204
+    response = cookie_client.post("/coop", json=UPLOAD)
+    assert response.status_code == 401 and submissions(empty_db) == 0
 
 
 def test_without_web_origins_every_cookie_write_is_refused(empty_db, monkeypatch):
@@ -132,10 +146,22 @@ def test_a_preflight_from_an_allowed_origin_gets_the_cors_answer(cookie_client):
     assert response.headers["access-control-max-age"] == "600"
 
 
-def test_a_preflight_from_another_origin_is_not_allowed(cookie_client):
+@pytest.mark.parametrize("origin", [OTHER, "null"])
+def test_a_preflight_from_another_origin_is_not_allowed(cookie_client, origin):
     response = cookie_client.options("/coop", headers={
-        "Origin": OTHER, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "x-neu-compass"})
+        "Origin": origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "x-neu-compass"})
     assert response.status_code == 400 and "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.parametrize(("method", "headers"), [("PUT", "x-neu-compass"), ("DELETE", None), ("POST", "authorization")],
+                         ids=["put", "delete", "authorization-header"])
+def test_a_preflight_for_another_method_or_header_is_not_allowed(cookie_client, method, headers):
+    """Only GET, POST and OPTIONS, and only Content-Type and the marker as request headers (B25 N1).
+    中文：方法只放行 GET、POST、OPTIONS，请求头只放行 Content-Type 和标记头。"""
+    request_headers = {"Origin": ORIGIN, "Access-Control-Request-Method": method}
+    if headers:
+        request_headers["Access-Control-Request-Headers"] = headers
+    assert cookie_client.options("/coop", headers=request_headers).status_code == 400
 
 
 def test_responses_to_an_allowed_origin_expose_the_request_id(cookie_client):
@@ -143,7 +169,8 @@ def test_responses_to_an_allowed_origin_expose_the_request_id(cookie_client):
     assert response.headers["access-control-allow-origin"] == ORIGIN
     exposed = {h.strip().lower() for h in response.headers["access-control-expose-headers"].split(",")}
     assert {"x-request-id", "retry-after"} <= exposed and "x-request-id" in response.headers
-    assert "access-control-allow-origin" not in cookie_client.get("/coop", headers={"Origin": OTHER}).headers
+    for origin in (OTHER, "null"):
+        assert "access-control-allow-origin" not in cookie_client.get("/coop", headers={"Origin": origin}).headers
 
 
 def test_the_refusal_itself_carries_cors_headers(cookie_client):

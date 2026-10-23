@@ -15,6 +15,7 @@ from fastapi import APIRouter
 
 from api.models import PrivacyResponse, PrivacySectionOut, PublicConfigResponse
 from api.privacy_text import DELETE_WHAT, INTRO, QUERY_LOG_NOTICE_BASE, capture_notice, privacy_sections
+from api.routes.auth import login_configured
 from config import settings
 
 router = APIRouter(tags=["public"])
@@ -48,12 +49,13 @@ def privacy() -> PrivacyResponse:
     response_model=PublicConfigResponse,
     summary="What the web front end needs to know about this API (R2a)",
     description=(
-        "`answer_feedback_enabled`: whether to show the opt-in and the votes. `login_available`: a Google client ID "
-        "and a SESSION_SECRET are both configured, so `/auth/login-url` and the cookie login work."
+        "`answer_feedback_enabled`: whether to show the opt-in and the votes. `login_available`: Google's client ID "
+        "and secret and a SESSION_SECRET are all configured, so `/auth/login-url` and the cookie login work (the "
+        "same condition as login-url's 503)."
     ),
 )
 def public_config() -> PublicConfigResponse:
     return PublicConfigResponse(
         answer_feedback_enabled=settings.answer_feedback_enabled is True,
-        login_available=bool(settings.google_oauth_client_id and settings.session_secret),
+        login_available=login_configured(),
     )

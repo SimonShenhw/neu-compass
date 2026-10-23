@@ -13,8 +13,13 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# A browser origin as WEB_ORIGINS takes it: lowercase http(s), host labels, optional port. 中文：网页来源的格式。
-_WEB_ORIGIN = re.compile(r"https?://[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::[0-9]{1,5})?")
+# A browser origin as WEB_ORIGINS takes it, exactly as a browser sends it in `Origin`: lowercase http(s), host labels
+# that neither start nor end with "-", and a port only when it is not the scheme's default, 1-65535 without leading
+# zeros (A25 N2). 中文：网页来源的格式，和浏览器在 `Origin` 里发的一模一样：小写的 http(s)，主机的每一段不以「-」开头或
+# 结尾；端口只在不是默认端口时写，1–65535，不带前导零。
+_LABEL = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+_WEB_ORIGIN = re.compile(rf"(https?)://{_LABEL}(?:\.{_LABEL})*(?::([1-9][0-9]{{0,4}}))?")
+_DEFAULT_PORT = {"http": "80", "https": "443"}
 
 
 class Settings(BaseSettings):
@@ -301,19 +306,22 @@ class Settings(BaseSettings):
     # === The new web front end (R2a) ===
     # Browser origins that may call the API with the session cookie: CORS allows them with credentials, and a write that
     # carries the cookie must come from one of them (api/csrf.py). A JSON list, like ALLOWED_EMAIL_DOMAINS:
-    # WEB_ORIGINS='["https://compass.neu-compass.me"]'. Lowercase scheme, host and optional port only; no path, no
-    # trailing slash, no "*". Empty (the default) keeps today's behaviour: no CORS, and every write that carries the
-    # session cookie is refused.
+    # WEB_ORIGINS='["https://compass.neu-compass.me"]'. Lowercase scheme, host and optional port only, as a browser
+    # sends them in `Origin` (no :443 for https or :80 for http); no path, no trailing slash, no "*". Unset or [] (the
+    # default) keeps today's behaviour: no CORS, and every write that carries the session cookie is refused.
+    # `WEB_ORIGINS=` with nothing after it is not a JSON list, and the API does not start.
     # 中文：新前端（R2a）里允许带会话 cookie 调用 API 的网页来源：CORS 只放行它们（允许带凭证），带 cookie 的写请求也
     # 必须来自其中之一（api/csrf.py）。写法和 ALLOWED_EMAIL_DOMAINS 一样是 JSON 列表。只能是小写的协议、主机和可选端口，
-    # 不带路径、结尾斜杠或「*」。默认为空，就是今天的行为：不加 CORS，带会话 cookie 的写请求一律拒绝。
+    # 和浏览器在 `Origin` 里发的一样（https 不写 :443，http 不写 :80），不带路径、结尾斜杠或「*」。不设或 []（默认）
+    # 就是今天的行为：不加 CORS，带会话 cookie 的写请求一律拒绝。`WEB_ORIGINS=` 后面什么都不写不是 JSON 列表，API 起不来。
     web_origins: list[str] = Field(default_factory=list)
 
     @field_validator('web_origins')
     @classmethod
     def web_origins_are_plain_origins(cls, value):
         for origin in value:
-            if not _WEB_ORIGIN.fullmatch(origin):
+            match = _WEB_ORIGIN.fullmatch(origin)
+            if not match or (match[2] and (int(match[2]) > 65535 or match[2] == _DEFAULT_PORT[match[1]])):
                 raise ValueError('invalid_web_origin')
         return value
 

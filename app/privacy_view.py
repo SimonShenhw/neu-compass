@@ -38,9 +38,12 @@ def _delete_account() -> None:
             state[DELETE_RESULT_KEY] = ("error", "这个登录已经失效，本页已登出。如果账号还在，请重新登录以后再删除。")
         elif e.status_code in (502, 503, 504):
             # No answer, or a gateway's: the server may have finished, so "nothing deleted" would not be known (A24 L5;
-            # docs/request-admission.md). 中文：没收到回复，服务器可能已经删完了，不能说「什么也没删」。
-            state[DELETE_RESULT_KEY] = ("error", "这次没收到服务器的确认，不确定删除有没有完成。请刷新页面：变成游客了，"
-                                                 "就是已经删掉了；还是登录状态的话，可以再删一次。")
+            # docs/request-admission.md). Being a guest after a refresh does not prove it either, since a login can
+            # also just expire; the same words as the web front end's (R5c, the user's wording).
+            # 中文：没收到回复，服务器可能已经删完了，不能说「什么也没删」。刷新后变成游客也证明不了删了（登录也会自己
+            # 过期），和新前端用同一句（R5c，用户定的说法）。
+            state[DELETE_RESULT_KEY] = ("error", "这次没收到服务器的确认，不确定删除有没有完成。刷新后若仍是登录状态，"
+                                                 "可以再试；若已变成游客但需要确认，请联系维护者。")
         else:
             state[DELETE_RESULT_KEY] = ("error", "删除没有完成，什么也没删。请稍后再试；一直不行的话，请写邮件联系。")
         return

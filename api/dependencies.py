@@ -181,6 +181,8 @@ def get_current_user_id(request: Request) -> str | None:
     - no header, session cookie (R2a) valid → its user, and `request.state.session_from_cookie` is set; invalid or
       expired → None: the browser sends the cookie by itself, so a stale one must not turn public pages into 401s.
       /auth/me and /auth/delete-account answer 401 and expire it.
+    - every call marks the request (R2a), so its response, the guest's too, is sent `Cache-Control: private,
+      no-store` (api/private_cache.py).
 
     - 没有 Authorization 请求头、也没有会话 cookie → None（匿名 —— 公开路由可以接受）
     - 请求头存在但令牌无效/过期 → 401（显式提供的凭证校验失败属于错误，
@@ -188,12 +190,18 @@ def get_current_user_id(request: Request) -> str | None:
     - 没有请求头、有会话 cookie（R2a）：有效就是它的用户，并记下 `request.state.session_from_cookie`；无效或过期
       就是 None：cookie 是浏览器自己带的，坏 cookie 不能让公开页面都变成 401。/auth/me 和 /auth/delete-account
       会回 401 并让它过期。
+    - 每次调用都给请求做个记号（R2a），它的响应（游客的也算）就带上 `Cache-Control: private, no-store`
+      （api/private_cache.py）。
     """
     from fastapi import HTTPException, status  # noqa: PLC0415
 
+    from api.private_cache import IDENTITY_READ  # noqa: PLC0415
     from api.session_cookie import COOKIE_NAME  # noqa: PLC0415
     from api.session_tokens import verify_session_token  # noqa: PLC0415
 
+    # First, before any 401: the answer depends on who is asking, whatever it turns out to be.
+    # 中文：放在最前面、任何 401 之前：不管结果是什么，回答都取决于是谁在问。
+    setattr(request.state, IDENTITY_READ, True)
     header = request.headers.get("Authorization", "")
     if not header:
         cookie = request.cookies.get(COOKIE_NAME, "")

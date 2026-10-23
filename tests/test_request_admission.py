@@ -501,8 +501,10 @@ def test_unknown_unhashable_stream_type_does_not_crash_main_consumer():
 def test_factory_enabled_builds_policy_without_loading_models(monkeypatch):
     import api.main as module
     from api.admission import AdmissionMiddleware
+    # No WEB_ORIGINS, whatever a developer's .env says, so no CORS layer sits outside the request log (R2a, B25 N6).
+    # 中文：不管开发者的 .env 里写了什么，这里没有 WEB_ORIGINS，请求日志外面就没有 CORS 那一层。
     for key, value in [('request_guard_enabled', True), ('request_guard_capacity', 4),
-                       ('request_guard_refill_per_second', .5), ('request_guard_max_inflight', 1)]:
+                       ('request_guard_refill_per_second', .5), ('request_guard_max_inflight', 1), ('web_origins', [])]:
         monkeypatch.setattr(module.settings, key, value)
     app = module.create_app(run_startup=False)
     policy = app.state.admission_guard.policy

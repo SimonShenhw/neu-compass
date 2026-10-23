@@ -54,6 +54,6 @@ React 前端一起改契约;Streamlit 升级为正式产品 UI 后,改动自包�
 - `app/session_tokens.py` 和 `app/auth.py` 搬进了 `api/`(`api/session_tokens.py`、`api/google_oauth.py`),
   `app/` 里留的是转发同一批对象的壳,给 Streamlit 版用到它退役为止。API 不再从 `app/` 导入。
 - 同一种令牌多了一种带法:新前端用 `/auth/callback` 的 cookie 模式,令牌放进 API 主机上的 HttpOnly cookie
-  `__Host-nc_api_session`,前端脚本读不到。有 `Authorization` 头时照旧只认它;没有时才看 cookie。
+  `__Host-nc_api_session`,前端脚本读不到。有非空的 `Authorization` 头时照旧只认它;没有(或是空的)时才看 cookie。
 - 带着 cookie 的写请求必须来自 `WEB_ORIGINS` 并带 `X-NEU-Compass: 1`(`api/csrf.py`);CORS 也只对
   `WEB_ORIGINS` 放行。细节在 docs/api_contract.md 的「Session cookie, CSRF and CORS」。

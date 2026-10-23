@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import itertools
+import json
+import logging
 import sqlite3
 from urllib.parse import parse_qs, urlparse
 
@@ -12,12 +15,28 @@ from config import settings
 from tests.conftest import build_test_app
 
 STATE = "synthetic-state-0123456789abcdef"
+# Google's client ID and secret and a SESSION_SECRET: login needs all three. 中文：登录三样都要有。
+LOGIN_SETTINGS = {"google_oauth_client_id": "synthetic-client-id",
+                  "google_oauth_client_secret": "synthetic-client-secret", "session_secret": "synthetic-secret"}
+# Every way of leaving at least one of them out. 中文：至少缺一样的每一种组合。
+WITHOUT_LOGIN = [dict(zip(LOGIN_SETTINGS, values))
+                 for values in itertools.product(*[(value, "") for value in LOGIN_SETTINGS.values()]) if not all(values)]
+
+
+def missing_names(missing):
+    return "missing-" + "+".join(name for name, value in missing.items() if not value) if missing else "all-set"
 
 
 @pytest.fixture()
 def client(empty_db: sqlite3.Connection):
     with TestClient(build_test_app(empty_db, seed=False)) as c:
         yield c
+
+
+@pytest.fixture()
+def login_settings(monkeypatch):
+    for name, value in LOGIN_SETTINGS.items():
+        monkeypatch.setattr(settings, name, value)
 
 
 @pytest.mark.parametrize(("days", "feedback", "contact"), [
@@ -58,22 +77,19 @@ def test_streamlit_shows_the_same_words():
                                                     + "留多久、怎么删，见左侧「🔒 数据与隐私」。")
 
 
-@pytest.mark.parametrize(("client_id", "secret", "available"), [
-    ("synthetic-client-id", "synthetic-secret", True), ("", "synthetic-secret", False),
-    ("synthetic-client-id", "", False), ("", "", False),
-])
-def test_config_says_whether_login_works(client, monkeypatch, client_id, secret, available):
-    monkeypatch.setattr(settings, "google_oauth_client_id", client_id)
-    monkeypatch.setattr(settings, "session_secret", secret)
+@pytest.mark.parametrize("missing", [{}, *WITHOUT_LOGIN], ids=missing_names)
+def test_config_says_whether_login_works(client, login_settings, monkeypatch, missing):
+    """Without the client secret every callback would fail at Google, so login is not available (A25 N4).
+    中文：没有 client secret，每次回调都会在 Google 那边失败，所以不算能登录。"""
+    for name, value in missing.items():
+        monkeypatch.setattr(settings, name, value)
     monkeypatch.setattr(settings, "answer_feedback_enabled", True)
-    assert client.get("/config").json() == {"answer_feedback_enabled": True, "login_available": available}
+    assert client.get("/config").json() == {"answer_feedback_enabled": True, "login_available": not missing}
     monkeypatch.setattr(settings, "answer_feedback_enabled", False)
     assert client.get("/config").json()["answer_feedback_enabled"] is False
 
 
-def test_login_url_is_googles_address_with_the_callers_state(client, monkeypatch):
-    monkeypatch.setattr(settings, "google_oauth_client_id", "synthetic-client-id")
-    monkeypatch.setattr(settings, "session_secret", "synthetic-secret")
+def test_login_url_is_googles_address_with_the_callers_state(client, login_settings, monkeypatch):
     monkeypatch.setattr(settings, "google_oauth_redirect_uri", "https://compass.example.test/")
     response = client.get("/auth/login-url", params={"state": STATE})
     assert response.status_code == 200
@@ -82,29 +98,54 @@ def test_login_url_is_googles_address_with_the_callers_state(client, monkeypatch
     assert (url.scheme, url.netloc) == ("https", "accounts.google.com")
     assert query["state"] == [STATE] and query["client_id"] == ["synthetic-client-id"]
     assert query["redirect_uri"] == ["https://compass.example.test/"]
+    assert "synthetic-client-secret" not in response.text and "synthetic-secret" not in response.text
 
 
-@pytest.mark.parametrize("state", ["short", "x" * 129, "synthetic state with spaces", "synthetic/state/0123456789",
-                                   "synthetic-state-<b>-0123456"])
-def test_login_url_refuses_a_bad_state_without_echoing_it(client, monkeypatch, state):
-    monkeypatch.setattr(settings, "google_oauth_client_id", "synthetic-client-id")
-    monkeypatch.setattr(settings, "session_secret", "synthetic-secret")
+@pytest.mark.parametrize("state", ["a" * 16, "Z9" * 64, "synthetic_state_0123456789", "_-" * 8],
+                         ids=["16", "128", "underscore", "only-punctuation"])
+def test_login_url_takes_every_state_the_contract_allows(client, login_settings, state):
+    """16–128 of A–Z, a–z, 0–9, `_` and `-`: R2b makes states to this (base64url uses `_`) (B25 L2).
+    中文：16–128 个 A–Z、a–z、0–9、`_`、`-`：R2b 照这个生成 state（base64url 里有 `_`）。"""
+    response = client.get("/auth/login-url", params={"state": state})
+    assert response.status_code == 200
+    assert parse_qs(urlparse(response.json()["url"]).query)["state"] == [state]
+
+
+@pytest.mark.parametrize("state", ["short", "x" * 15, "x" * 129, "synthetic state with spaces",
+                                   "synthetic/state/0123456789", "synthetic-state-<b>-0123456"])
+def test_login_url_refuses_a_bad_state_without_echoing_it(client, login_settings, state):
     response = client.get("/auth/login-url", params={"state": state})
     assert response.status_code == 422 and state not in response.text
 
 
-def test_login_url_needs_the_state(client, monkeypatch):
-    monkeypatch.setattr(settings, "google_oauth_client_id", "synthetic-client-id")
-    monkeypatch.setattr(settings, "session_secret", "synthetic-secret")
+def test_login_url_needs_the_state(client, login_settings):
     assert client.get("/auth/login-url").status_code == 422
 
 
-@pytest.mark.parametrize(("client_id", "secret"), [("", "synthetic-secret"), ("synthetic-client-id", "")])
-def test_login_url_is_unavailable_without_google_or_a_secret(client, monkeypatch, client_id, secret):
-    monkeypatch.setattr(settings, "google_oauth_client_id", client_id)
-    monkeypatch.setattr(settings, "session_secret", secret)
+@pytest.mark.parametrize("missing", WITHOUT_LOGIN, ids=missing_names)
+def test_login_url_is_unavailable_without_google_or_a_secret(client, monkeypatch, missing):
+    """A public route: the whole body is pinned, so no setting's name or value can slip into it (B25 L3).
+    中文：公开接口：整个返回体都钉住，任何设置的名字或值都混不进去。"""
+    for name, value in missing.items():
+        monkeypatch.setattr(settings, name, value)
     response = client.get("/auth/login-url", params={"state": STATE})
-    assert response.status_code == 503 and response.json()["error_type"] == "service_unavailable"
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Login is not configured.", "error_type": "service_unavailable",
+                               "status_code": 503}
+
+
+@pytest.mark.parametrize(("path", "logged"), [("/auth/login-url?state=" + STATE, "/auth/login-url"),
+                                              ("/auth/login-url/?state=" + STATE, "/auth/login-url/")])
+def test_the_login_state_stays_out_of_the_access_log(path, logged):
+    """Uvicorn's access line would carry the query; the state stays the front end's own until Google sends it back
+    (A25 N3). Other paths keep theirs (tests/test_plan_draft_review.py). 中文：uvicorn 的访问日志本来会带上查询串；
+    state 在 Google 送回来以前只该前端自己知道。别的路径照旧保留查询串。"""
+    from api.logging import _COURSE_READ_ACCESS_FILTER
+
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+                               ("synthetic", "GET", path, "1.1", 200), None)
+    assert _COURSE_READ_ACCESS_FILTER.filter(record)
+    assert record.args == ("synthetic", "GET", logged, "1.1", 200) and STATE not in record.getMessage()
 
 
 def test_the_moved_modules_are_the_same_objects():
@@ -137,7 +178,13 @@ def test_the_api_no_longer_imports_the_ui_auth_modules():
 @pytest.mark.parametrize("value", ['["*"]', '["https://compass.example.test/"]', '["https://compass.example.test/x"]',
                                    '["HTTPS://compass.example.test"]', '["https://Compass.example.test"]',
                                    '["ftp://compass.example.test"]',
-                                   '["https://"]', '["compass.example.test"]', '["https://a.example.test:123456"]'])
+                                   '["https://"]', '["compass.example.test"]', '["https://a.example.test:123456"]',
+                                   # what no browser sends as Origin (A25 N2). 中文：浏览器不会这样发 Origin。
+                                   '["https://compass.example.test:443"]', '["http://compass.example.test:80"]',
+                                   '["https://compass.example.test:0"]', '["https://compass.example.test:65536"]',
+                                   '["https://compass.example.test:99999"]', '["https://compass.example.test:08443"]',
+                                   '["https://-compass.example.test"]', '["https://compass-.example.test"]',
+                                   '["https://compass.-example.test"]', '["https://compass.example.test."]'])
 def test_web_origins_takes_plain_lowercase_origins_only(monkeypatch, value):
     from pydantic import ValidationError
 
@@ -145,13 +192,31 @@ def test_web_origins_takes_plain_lowercase_origins_only(monkeypatch, value):
 
     monkeypatch.setenv("WEB_ORIGINS", value)
     with pytest.raises(ValidationError):
-        Settings()
+        Settings(_env_file=None)
 
 
 def test_web_origins_reads_a_json_list(monkeypatch):
+    """Without the working directory's .env, which a developer may have set (B25 N6). 中文：不读当前目录的 .env。"""
     from config.settings import Settings
 
-    monkeypatch.setenv("WEB_ORIGINS", '["http://127.0.0.1:5173", "https://compass.example.test"]')
-    assert Settings().web_origins == ["http://127.0.0.1:5173", "https://compass.example.test"]
+    origins = ["http://127.0.0.1:5173", "https://compass.example.test", "https://compass.example.test:8443",
+               "http://localhost:65535", "http://localhost:1", "https://a-b.example.test",
+               "http://compass.example.test:443", "https://compass.example.test:80"]
+    monkeypatch.setenv("WEB_ORIGINS", json.dumps(origins))
+    assert Settings(_env_file=None).web_origins == origins
+    monkeypatch.setenv("WEB_ORIGINS", "[]")
+    assert Settings(_env_file=None).web_origins == []
     monkeypatch.delenv("WEB_ORIGINS")
-    assert Settings().web_origins == []
+    assert Settings(_env_file=None).web_origins == []
+
+
+def test_an_empty_web_origins_line_stops_the_api(monkeypatch):
+    """`WEB_ORIGINS=` with nothing after it is not a JSON list: the API does not start, as .env.example says (A25 N2).
+    中文：`WEB_ORIGINS=` 后面什么都不写不是 JSON 列表，API 起不来，和 .env.example 说的一样。"""
+    from pydantic_settings import SettingsError
+
+    from config.settings import Settings
+
+    monkeypatch.setenv("WEB_ORIGINS", "")
+    with pytest.raises(SettingsError):
+        Settings(_env_file=None)

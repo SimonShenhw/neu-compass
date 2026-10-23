@@ -301,15 +301,36 @@ def delete_account(
     summary="Expire the session cookie (R2a)",
     description=(
         "Expires the API's session cookie and answers 204, also when there is none. Bearer tokens are not revoked "
-        "(they expire on their own; Streamlit logs out by dropping its copy). Like every write that carries the "
-        "cookie, it must come from an allowed web origin with `X-NEU-Compass: 1`."
+        "(they expire on their own; Streamlit logs out by dropping its copy). It must come from an allowed web "
+        "origin with `X-NEU-Compass: 1`, with or without the cookie, or it gets the fixed CSRF 403 and expires "
+        "nothing: a page elsewhere must not log the browser out."
     ),
-    responses={204: {"description": "The session cookie, if any, is expired."}},
+    responses={
+        204: {"description": "The session cookie, if any, is expired."},
+        403: {"description": "Not from an allowed web origin with `X-NEU-Compass: 1`."},
+    },
 )
-def logout() -> Response:
+def logout(request: Request) -> Response:
+    from config import settings  # noqa: PLC0415
+
+    # A cross-site form arrives without the SameSite=Lax cookie, so the CSRF middleware lets it by, yet the expiring
+    # header in the answer would still drop the cookie (A25 L1). 中文：跨站表单不带 SameSite=Lax 的 cookie，跨站防护
+    # 中间件不拦它，但回答里让 cookie 过期的头照样会把 cookie 删掉，所以这里自己查，带不带 cookie 都查。
+    if not from_web_origin(request, settings.web_origins):
+        return refusal()
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     expire_session_cookie(response)
     return response
+
+
+def login_configured() -> bool:
+    """Google's client ID and secret and a SESSION_SECRET: without any of them nobody can log in here. `/auth/login-url`
+    answers 503 without it, and `/config` reports it as `login_available`.
+    中文：Google 的 client ID、client secret 和 SESSION_SECRET 都有，这里才能登录；缺一样谁都登录不了。
+    `/auth/login-url` 缺了就回 503，`/config` 用它报 `login_available`。"""
+    from config import settings  # noqa: PLC0415
+
+    return bool(settings.google_oauth_client_id and settings.google_oauth_client_secret and settings.session_secret)
 
 
 @router.get(
@@ -325,15 +346,14 @@ def logout() -> Response:
     responses={
         200: {"description": "The address to send the browser to."},
         422: {"description": "`state` is not 16–128 characters of A–Z, a–z, 0–9, `_` or `-`."},
-        503: {"description": "Login is not configured here (no Google client ID or no SESSION_SECRET)."},
+        503: {"description": "Login is not configured here (no Google client ID or secret, or no SESSION_SECRET)."},
     },
 )
 def login_url(
     state: Annotated[str, Query(min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")],
 ) -> LoginUrlResponse:
     from api.google_oauth import authorize_url  # noqa: PLC0415
-    from config import settings  # noqa: PLC0415
 
-    if not (settings.google_oauth_client_id and settings.session_secret):
+    if not login_configured():
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Login is not configured.")
     return LoginUrlResponse(url=authorize_url(state_token=state))

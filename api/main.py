@@ -43,6 +43,7 @@ from api.admission import AdmissionGuard, AdmissionMiddleware, AdmissionPolicy
 from api.csrf import MARKER_HEADER, CsrfMiddleware
 from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
+from api.private_cache import PrivateCacheMiddleware
 from api.routes import auth, chat, coop, course, feedback, health, program, public, resolve, search
 from config import settings
 from db.connection import connect
@@ -386,8 +387,17 @@ def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | No
         version="0.1.0",
         description="Course RAG + Co-op API. Internal MVP — F1 compliance, not commercial.",
         lifespan=lifespan if run_startup else None,
+        # R2a: a JSON body needs a JSON Content-Type, which another origin can only send after a CORS preflight. This is
+        # the first barrier against cross-site writes that ride on the session cookie; api/csrf.py is the second. It is
+        # FastAPI's default, written out so that no upgrade or edit turns it off unnoticed (A25 L2).
+        # 中文：R2a：JSON 请求体要有 JSON 的 Content-Type，别的来源要发它得先过 CORS 预检。这是挡借会话 cookie 的跨站
+        # 写请求的第一道，api/csrf.py 是第二道。FastAPI 默认就是这样，这里明写出来，免得升级或改动时悄悄关掉。
+        strict_content_type=True,
     )
 
+    # R2a, innermost: answers that depend on who is asking get `Cache-Control: private, no-store`.
+    # 中文：R2a，放在最里面：按身份不同的回答加上 `Cache-Control: private, no-store`。
+    app.add_middleware(PrivateCacheMiddleware)
     if admission_guard is None and settings.request_guard_enabled:
         admission_guard = AdmissionGuard(AdmissionPolicy(
             capacity=settings.request_guard_capacity,
