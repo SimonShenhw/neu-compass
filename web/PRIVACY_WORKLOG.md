@@ -4,7 +4,7 @@
 
 ## 1. 起点和授权边界
 
-- worktree `H:\neu-compass-web`，分支 `feat/web-privacy`，起点 `101775e2a6e5340da5daa8c436fc19410877a4bd`。开工前工作树干净，保留原 `feat/web-compare`。
+- 本机单独的 web worktree（本机路径不写进仓库），分支 `feat/web-privacy`，起点 `101775e2a6e5340da5daa8c436fc19410877a4bd`。开工前工作树干净，保留原 `feat/web-compare`。
 - 依据评审目录 `frontend_react/R5C_PRIVACY_SPEC.md`。用户明确同意修改不确定结果的误导性句子后开工；只改 `web/`，不动另一边后端／Streamlit／外部说明书，不改依赖／lockfile／CI，不 rebase、push、建 PR、合并或部署。
 - 只用合成记录，无真实 HTTP、Cookie、身份或数据库操作；没有真正删除任何账号或数据。未在带 `.env` 的 main checkout 跑测试。
 

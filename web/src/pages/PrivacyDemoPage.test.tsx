@@ -141,26 +141,35 @@ it('demo retry returns the same error after 400ms and cancels on explicit scenar
     vi.useRealTimers();
   }
 });
-it('changing demo scenario discards the old in-flight deletion instead of signing out the new viewer', async () => {
-  vi.useFakeTimers();
-  try {
-    page('/privacy?viewer=member');
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: '删除我的账号和投稿' }));
-    fireEvent.change(screen.getByRole('combobox', { name: '演示隐私说明' }), {
-      target: { value: '30-days' },
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(400);
-    });
-    expect(
-      screen.getByRole('status', { name: '当前演示访客' }),
-    ).toHaveTextContent('已登录（合成）');
-    expect(
-      screen.queryByRole('status', { name: '删除结果' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('checkbox')).not.toBeChecked();
-  } finally {
-    vi.useRealTimers();
-  }
-});
+// Each selector that is not the viewer, so every parameter in the session key is pinned (acceptance).
+it.each([
+  ['演示隐私说明', '30-days'],
+  ['演示删除结果', '403'],
+])(
+  'changing %s discards the old in-flight deletion instead of signing out the new viewer',
+  async (label, value) => {
+    vi.useFakeTimers();
+    try {
+      page('/privacy?viewer=member');
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(
+        screen.getByRole('button', { name: '删除我的账号和投稿' }),
+      );
+      fireEvent.change(screen.getByRole('combobox', { name: label }), {
+        target: { value },
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      expect(
+        screen.getByRole('status', { name: '当前演示访客' }),
+      ).toHaveTextContent('已登录（合成）');
+      expect(
+        screen.queryByRole('status', { name: '删除结果' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('checkbox')).not.toBeChecked();
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
