@@ -41,7 +41,7 @@ from db.coop_submission_repository import CoopSubmissionRepository
 from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
 from db.user_repository import UserRepository
-from app.auth import exchange_code_for_token
+from api.google_oauth import exchange_code_for_token
 from llm.gemini_client import generate_text_stream
 from rag.embedder import EmbedderProtocol
 from rag.hybrid import BM25Corpus, HybridRetriever
@@ -171,25 +171,39 @@ def _model_budget(path: str, limit: int) -> Any:
 
 
 def get_current_user_id(request: Request) -> str | None:
-    """Resolve the caller's identity from `Authorization: Bearer <token>`.
+    """Resolve the caller's identity from `Authorization: Bearer <token>`, or else from the API's session cookie.
 
-    从 `Authorization: Bearer <token>` 解析调用者身份。
+    从 `Authorization: Bearer <token>` 解析调用者身份；没有这个头时，看 API 的会话 cookie。
 
-    - no Authorization header → None (anonymous — fine for public routes)
+    - no Authorization header and no session cookie → None (anonymous — fine for public routes)
     - header present but token invalid/expired → 401 (an explicit credential
-      that fails verification is an error, never silent anonymity)
+      that fails verification is an error, never silent anonymity); the cookie is not looked at
+    - no header, session cookie (R2a) valid → its user, and `request.state.session_from_cookie` is set; invalid or
+      expired → None: the browser sends the cookie by itself, so a stale one must not turn public pages into 401s.
+      /auth/me and /auth/delete-account answer 401 and expire it.
 
-    - 没有 Authorization 请求头 → None（匿名 —— 公开路由可以接受）
+    - 没有 Authorization 请求头、也没有会话 cookie → None（匿名 —— 公开路由可以接受）
     - 请求头存在但令牌无效/过期 → 401（显式提供的凭证校验失败属于错误，
-      绝不能悄悄降级为匿名）
+      绝不能悄悄降级为匿名）；这时不看 cookie
+    - 没有请求头、有会话 cookie（R2a）：有效就是它的用户，并记下 `request.state.session_from_cookie`；无效或过期
+      就是 None：cookie 是浏览器自己带的，坏 cookie 不能让公开页面都变成 401。/auth/me 和 /auth/delete-account
+      会回 401 并让它过期。
     """
     from fastapi import HTTPException, status  # noqa: PLC0415
 
-    from app.session_tokens import verify_session_token  # noqa: PLC0415
+    from api.session_cookie import COOKIE_NAME  # noqa: PLC0415
+    from api.session_tokens import verify_session_token  # noqa: PLC0415
 
     header = request.headers.get("Authorization", "")
     if not header:
-        return None
+        cookie = request.cookies.get(COOKIE_NAME, "")
+        if not cookie:
+            return None
+        payload = verify_session_token(cookie)
+        if payload is None:
+            return None
+        request.state.session_from_cookie = True
+        return str(payload["user_id"])
     token = header.removeprefix("Bearer ").strip()
     payload = verify_session_token(token)
     if payload is None:

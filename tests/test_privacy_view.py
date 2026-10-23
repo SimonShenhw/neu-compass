@@ -161,11 +161,13 @@ def test_compose_gives_the_page_the_same_policy_the_api_runs():
     from config.settings import Settings
 
     api, ui = compose_environment("api"), compose_environment("ui")
-    for name in ("QUERY_LOG_RETENTION_DAYS", "ANSWER_FEEDBACK_ENABLED"):
+    # GET /privacy (R2a) builds the same page from the api's settings, so the contact address is on both.
+    # 中文：GET /privacy（R2a）按 api 的设置生成同一页，所以联系邮箱两边都要有。
+    for name in ("QUERY_LOG_RETENTION_DAYS", "ANSWER_FEEDBACK_ENABLED", "PRIVACY_CONTACT_EMAIL"):
         assert api[name] == ui[name], name
     assert (api["QUERY_LOG_RETENTION_DAYS"], api["MODEL_DAILY_CALL_LIMIT"], api["REQUEST_GUARD_ENABLED"]) == ("90", "200", "true")
     assert Settings(privacy_contact_email=ui["PRIVACY_CONTACT_EMAIL"]).privacy_contact_email == ui["PRIVACY_CONTACT_EMAIL"]
-    assert "PRIVACY_CONTACT_EMAIL" not in api and "MODEL_DAILY_CALL_LIMIT" not in ui
+    assert "MODEL_DAILY_CALL_LIMIT" not in ui
 
 
 @pytest.mark.parametrize("value", ["a@b", "<x>@example.com", "x y@example.com", "x@example", "[x](y)@example.com"])

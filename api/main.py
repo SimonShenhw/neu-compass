@@ -37,11 +37,13 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.admission import AdmissionGuard, AdmissionMiddleware, AdmissionPolicy
+from api.csrf import MARKER_HEADER, CsrfMiddleware
 from api.exceptions import register_exception_handlers
 from api.logging import RequestLogMiddleware, configure_logging
-from api.routes import auth, chat, coop, course, feedback, health, program, resolve, search
+from api.routes import auth, chat, coop, course, feedback, health, program, public, resolve, search
 from config import settings
 from db.connection import connect
 from rag.embedder import BGEM3Embedder
@@ -395,9 +397,20 @@ def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | No
     app.state.admission_guard = admission_guard
     if admission_guard is not None:
         app.add_middleware(AdmissionMiddleware, guard=admission_guard)
-    # Access logging is outermost so denied requests also get x-request-id.
+    # R2a: a write that carries the session cookie must come from WEB_ORIGINS. Outside the guard, so a refused request
+    # takes no place. 中文：带会话 cookie 的写请求必须来自 WEB_ORIGINS；放在门禁外面，被拒的请求不占名额。
+    app.add_middleware(CsrfMiddleware, origins=tuple(settings.web_origins))
+    # Access logging wraps both so denied requests also get x-request-id.
     # 中文：日志包住门禁，拒绝响应也有既有 request-id；不新增 query_log。
     app.add_middleware(RequestLogMiddleware)
+    if settings.web_origins:
+        # R2a, outermost: the guard's 429/503, the CSRF 403 and the logging's last-resort 500 all carry CORS headers,
+        # so the web front end can read them. Without WEB_ORIGINS there is no CORS at all, as before.
+        # 中文：R2a，放在最外层：门禁的 429/503、跨站防护的 403、日志兜底的 500 都带 CORS 头，新前端读得到。
+        # 没设 WEB_ORIGINS 就完全不加 CORS，和以前一样。
+        app.add_middleware(CORSMiddleware, allow_origins=list(settings.web_origins), allow_credentials=True,
+                           allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", MARKER_HEADER],
+                           expose_headers=["x-request-id", "Retry-After"], max_age=600)
     register_exception_handlers(app)
 
     app.include_router(health.router)
@@ -409,6 +422,7 @@ def create_app(*, run_startup: bool = True, admission_guard: AdmissionGuard | No
     app.include_router(auth.router)
     app.include_router(program.router)
     app.include_router(resolve.router)
+    app.include_router(public.router)
 
     return app
 

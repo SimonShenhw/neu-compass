@@ -2,29 +2,17 @@
 
 import hashlib
 
+from api.privacy_text import QUERY_LOG_NOTICE_BASE, capture_notice
 from app.api_client import ApiClient, ApiError
 from config import settings
 from schemas.answer_feedback import AnswerFeedbackReceipt, AnswerFeedbackResponse
 
 CAPTURE_OPT_IN_KEY = 'answer_feedback_capture_opt_in'
-# Shown before the input on every render (06C-1). The query log has no answer column, so with
-# capture off no answer text is kept. 中文：每次渲染都显示在输入框之前（06C-1）。查询日志没有
-# 回答列，所以关闭保存时不会留下回答内容。
-QUERY_LOG_NOTICE = '你的提问原文会记进不公开的查询日志。请不要输入个人信息或密码之类的秘密。留多久、怎么删，见左侧「🔒 数据与隐私」。'
+# Shown before the input on every render (06C-1). The words are shared with GET /privacy (api/privacy_text.py, R2a);
+# the pointer to the page is Streamlit's own. 中文：每次渲染都显示在输入框之前（06C-1）。前半句和 GET /privacy 共用
+# （api/privacy_text.py，R2a）；指向隐私页的后半句是 Streamlit 自己的。
+QUERY_LOG_NOTICE = QUERY_LOG_NOTICE_BASE + '留多久、怎么删，见左侧「🔒 数据与隐私」。'
 CAPTURE_OFF_NOTICE = '回答内容不会保存（回答反馈功能目前关闭）。'
-
-
-def capture_notice(days):
-    """The consent notice next to the opt-in. Its retention sentence follows QUERY_LOG_RETENTION_DAYS, the same setting
-    the 数据与隐私 page reads (batch T), so the two never disagree. 中文：勾选框旁边的说明；保留期那一句跟着
-    QUERY_LOG_RETENTION_DAYS，和「数据与隐私」页读同一个设置，两边不会说得不一样。"""
-    keep = (f'保存的回答和评价 {days} 天后删除，每日备份里最多再留大约两周，已经导出的文件不会自动删除；'
-            '7 天只是投票凭证的有效期；' if days else
-            '7 天只是投票凭证的有效期，数据、备份和导出不会自动删除；')
-    return ('勾不勾选都不影响上面的查询日志。'
-            '勾选后，如果服务可用，本次会话之后正常完成的回答和筛选条件会不公开地保存下来，'
-            '即使你不点击 👍／👎 也会保存；对话历史只多记轮数，不多存完整历史文本。'
-            + keep + '取消勾选、清空对话或登出都不会删除已经保存的数据。')
 
 
 def render_feedback_capture_control(st):

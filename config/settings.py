@@ -6,12 +6,15 @@ Hard rule: everyone uses their own independent API key — never shared.
 """
 
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# A browser origin as WEB_ORIGINS takes it: lowercase http(s), host labels, optional port. 中文：网页来源的格式。
+_WEB_ORIGIN = re.compile(r"https?://[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::[0-9]{1,5})?")
 
 
 class Settings(BaseSettings):
@@ -294,6 +297,25 @@ class Settings(BaseSettings):
     session_secret: str = Field(default="", repr=False)
     session_max_age_seconds: int = 604800  # 7 days
     # 中文:7 天
+
+    # === The new web front end (R2a) ===
+    # Browser origins that may call the API with the session cookie: CORS allows them with credentials, and a write that
+    # carries the cookie must come from one of them (api/csrf.py). A JSON list, like ALLOWED_EMAIL_DOMAINS:
+    # WEB_ORIGINS='["https://compass.neu-compass.me"]'. Lowercase scheme, host and optional port only; no path, no
+    # trailing slash, no "*". Empty (the default) keeps today's behaviour: no CORS, and every write that carries the
+    # session cookie is refused.
+    # 中文：新前端（R2a）里允许带会话 cookie 调用 API 的网页来源：CORS 只放行它们（允许带凭证），带 cookie 的写请求也
+    # 必须来自其中之一（api/csrf.py）。写法和 ALLOWED_EMAIL_DOMAINS 一样是 JSON 列表。只能是小写的协议、主机和可选端口，
+    # 不带路径、结尾斜杠或「*」。默认为空，就是今天的行为：不加 CORS，带会话 cookie 的写请求一律拒绝。
+    web_origins: list[str] = Field(default_factory=list)
+
+    @field_validator('web_origins')
+    @classmethod
+    def web_origins_are_plain_origins(cls, value):
+        for origin in value:
+            if not _WEB_ORIGIN.fullmatch(origin):
+                raise ValueError('invalid_web_origin')
+        return value
 
 
 settings = Settings()

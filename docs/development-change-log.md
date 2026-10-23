@@ -3999,3 +3999,100 @@ B24 还核过这些：每一轮红和绿的原因都对；它读了每个变异�
 ### 发布状态
 
 分支 `feat/trial-readiness`，基底是合并 L（#23）以后的 main `6395ee5`：先在 L 的第一个提交 `2fc5cf1` 上写，L 合并以后快进过来，两边没有重叠的文件。第一个提交 `86dae4e` 是 T 本身，第二个提交 `d06d059` 是第 23 轮审查的修复，第三个提交 `4115247` 是复核第 1 轮的修复和 Gemini 付费档那句，第四个提交是 B24 的报告和复核第 2 轮之后的修补（测试和措辞，没有再审）。没有使用真实模型、账号、NAS 或生产库。上线要另外授权；上线时要在容器里核对这些设置（只数不打印），并重新问 P6、P7 跑不跑。
+
+## 33 — 新前端的后端准备：会话 cookie、跨站防护、CORS 和公开接口（R2a，2026-10-22）
+
+### 范围与原因
+
+10-22 用户定了：前端换成 React；R2（接口层和登录）由协调方来写，分两批，先后端（R2a，本节），再前端（R2b）。新前端的 Google 登录照旧回站点根路径。
+
+新前端是在浏览器里直接调 API 的单页应用：compass 子域名上的页面调 api 子域名，同一个站点、两个来源。这一批给它准备后端：登录态放进 API 自己的 HttpOnly cookie，前端脚本碰不到令牌；带 cookie 的写请求要过跨站检查；CORS 只放行设好的来源；再加三个前端要用的公开接口。
+
+生产没有设 `WEB_ORIGINS`，所以这批代码上线以后，现有的行为都不变：没有 CORS，也没人用 cookie 模式。compose 只给 api 服务加了联系邮箱（见第 9 条）。
+
+### 已实现
+
+1. **搬模块，不改行为：** `app/auth.py` 搬到 `api/google_oauth.py`，`app/session_tokens.py` 搬到 `api/session_tokens.py`，内容照搬。
+   - `app/` 里的这两个文件改成转发同一批对象的壳，给 Streamlit 版用到它退役为止。
+   - `api/` 里原来从 `app/` 导入的三处（`dependencies.py`、`exceptions.py`、`routes/auth.py`）改成从新模块导入。一条测试扫描 `api/` 下的每个文件，钉住不再导入 `app`，切换以后删 `app/` 不会让 API 坏掉。
+2. **会话 cookie**（`api/session_cookie.py`）：`/auth/callback` 的请求体多一个可选字段 `session`。
+   - `"token"`（默认）：和以前一样，令牌在返回体的 `session_token` 里。Streamlit 和脚本照旧用它。
+   - `"cookie"`：令牌放进 cookie `__Host-nc_api_session`（HttpOnly、Secure、SameSite=Lax、Path=/、不带 Domain、Max-Age 等于 `SESSION_MAX_AGE_SECONDS`），返回体里的 `session_token` 是 null。用的是和 Bearer 同一种签名令牌。
+   - `__Host-` 前缀让浏览器强制 Secure、Path=/、不带 Domain，别的子域名设不了同名 cookie。compass 和 api 是同一个站点，所以 SameSite=Lax 的 cookie 在前端的请求里照样会带上。
+   - 没有 `SESSION_SECRET` 时两种模式都签不出令牌，也就不设 cookie。
+   - cookie 模式要来自 `WEB_ORIGINS`、带 `X-NEU-Compass: 1`（和第 5 条同一个判断），不管原来带没带 cookie；不然回同样的固定 403，而且在 code 交给 Google 之前就拒绝。不查的话，别的网站能用一个不带 Content-Type 的 POST（FastAPI 照样按 JSON 解析，也不触发预检）把浏览器登录成它选的账号（登录劫持），原来只靠浏览器不在跨站子请求里保存 SameSite=Lax cookie 挡着。token 模式不查（Streamlit 从服务器端调，没有 Origin）。
+3. **身份**（`get_current_user_id`）：有 `Authorization` 头时和以前完全一样，无效就 401，这时不看 cookie。没有这个头时才看 cookie：有效就是它的用户，无效或过期就当游客。cookie 是浏览器自己带的，坏 cookie 不能让公开接口都变成 401。
+4. **cookie 失效和登出：**
+   - `GET /auth/me`：cookie 坏了、过期了，或者它的账号已经不在了，401 的同时让 cookie 过期，浏览器就不再带它。
+   - `POST /auth/delete-account`：用 cookie 删号成功以后，让 cookie 过期；cookie 坏了、过期了，或者账号已经不在，401 的同时也让它过期，和 `/auth/me` 一样。用 Bearer 删号时不动 cookie。
+   - 让 cookie 过期的那条 `Set-Cookie` 也带着 Secure 和 Path=/、不带 Domain：浏览器对 `__Host-` 的名字只认这样的，不然删不掉。测试逐条核对这几个属性。
+   - 新加 `POST /auth/logout`：回 204，让 cookie 过期；没有 cookie 时也是 204。它只清 cookie，不吊销令牌（见「已知」）。
+5. **跨站防护**（`api/csrf.py`，纯 ASGI 中间件）：只查写请求（GET、HEAD、OPTIONS 以外），而且只查带了会话 cookie、没带 `Authorization` 头的请求。
+   - 要求正好一个 `Origin`，它在 `WEB_ORIGINS` 里，并且正好一个 `X-NEU-Compass: 1`。不满足就回固定的 403 `{"detail": "Cross-site request refused.", "error_type": "csrf_rejected", "status_code": 403}`，不回显 Origin，不缓存。
+   - 别的来源的网页要带这个自定义头，得先过 CORS 预检，而 CORS 只给 `WEB_ORIGINS` 放行，所以它发不出能过检查的请求。
+   - Bearer 请求不查：浏览器从来不会自己带 Bearer。没带 cookie 的请求（比如游客提问）也不查，值是空的 cookie 不算会话。
+   - 带的是哪种凭证，和身份解析一样，用 Starlette 自己的请求头和 cookie 来读，两边不会不一致。空的 `Authorization` 头不算 Bearer（身份解析这时会转而用 cookie），所以照样要查；`=` 两边有空格、放在第二个 Cookie 头里的会话 cookie，Starlette 认得出，这里也认得出。
+   - `WEB_ORIGINS` 为空时，带 cookie 的写请求一律拒绝。
+6. **CORS：** 只有 `WEB_ORIGINS` 不空时才加 Starlette 的 `CORSMiddleware`：只放行这些来源，允许带凭证，方法是 GET、POST、OPTIONS，请求头是 `Content-Type` 和 `X-NEU-Compass`，暴露 `x-request-id` 和 `Retry-After`，预检缓存 600 秒。没设就完全不加，和以前一样。
+7. **中间件的顺序**（从外到内）：CORS → 请求日志 → 跨站防护 → 限流 → 路由。CORS 在最外面，限流的 429 和 503、跨站防护的 403、请求日志兜底的 500 都带 CORS 头，前端读得到；跨站防护在限流外面，被拒的请求不占名额。
+8. **`GET /auth/login-url?state=`：** `state` 要是 16–128 个 `A–Z`、`a–z`、`0–9`、`_`、`-`，不合格就 422，也不回显它。
+   - 用现有的 `authorize_url(state_token=state)` 拼出 Google 的登录地址，和 Streamlit 的登录链接一样。API 不存 state，生成和核对都在前端（R2b）。
+   - 没配 Google client ID，或者没有 `SESSION_SECRET` 时，回 503（`service_unavailable`）：没有密钥就签不出令牌，登录了也没用。
+9. **`GET /privacy`：** 「数据与隐私」页的内容按 API 自己的设置生成：开头一句、四段（标题和纯文字的句子，按页面顺序）、删号会删掉什么，以及提问框旁边的两段说明。回答反馈关着时，勾选说明是 null。
+   - 文字搬进了 `api/privacy_text.py`（`privacy_sections`、`DELETE_WHAT`、`BACKUP_COPIES`、`capture_notice`、开头那句，以及聊天提示的前半句），`app/` 里的两个文件改成从那里导入。搬家前后在 24 种设置组合下逐字节比过，Streamlit 页显示的完全一样。
+   - 聊天提示指向隐私页的后半句（「见左侧「🔒 数据与隐私」」）是 Streamlit 的版面用语，留在 `app/`。接口只返回前半句，指向由前端自己加。
+   - 这样页面上写的就是保存数据的这个 API 实际用的设置。compose 里的联系邮箱原来只给了 ui 服务，现在 api 服务也加上了，不然上线以后接口返回的页面会少「写邮件到 …」那一句；钉住两边一致的那条测试也加上了它。
+10. **`GET /config`：** 返回 `{"answer_feedback_enabled", "login_available"}`。`login_available` 是「配了 Google client ID，而且有 `SESSION_SECRET`」，和 `login-url` 回不回 503 是同一个条件。
+11. **设置 `WEB_ORIGINS`**（`config/settings.py`）：JSON 列表，默认空。
+    - 每一项只能是小写的 `http` 或 `https`、主机和可选的端口（最多 5 位），不带路径、查询或结尾的斜杠，也不能是 `*`（带凭证的 CORS 不许用通配）。不合格的设置起不来。
+    - 浏览器发的 `Origin` 都是小写的，所以大写的写法永远对不上，一律拒绝。
+    - `.env.example` 加了一行注释掉的例子（本机开发用的 `http://127.0.0.1:5173`）。
+
+### 修改文件
+
+- 新建：`api/session_cookie.py`、`api/csrf.py`、`api/privacy_text.py`、`api/routes/public.py`。
+- 搬家：`api/google_oauth.py`（原 `app/auth.py`）、`api/session_tokens.py`（原 `app/session_tokens.py`）；`app/auth.py`、`app/session_tokens.py` 改成转发的壳。
+- 改：`api/dependencies.py`、`api/exceptions.py`、`api/routes/auth.py`、`api/models.py`、`api/main.py`、`app/privacy_view.py`、`app/answer_feedback_view.py`、`config/settings.py`、`.env.example`、`docker-compose.yml`（只加了 api 服务的联系邮箱）。
+- 文档：
+  - `docs/api_contract.md`：路由表、鉴权方式、`/auth/callback` 的 `session` 字段、四个新接口，以及「Session cookie, CSRF and CORS」一节；
+  - `docs/adr/0021-session-token-auth.md` 的补充；
+  - `docs/oauth_secret_rotation.md` 和 `docs/cloudflare_tunnel.md` 里的模块路径；
+  - 本节。
+- 测试：新建 `test_session_cookie.py`、`test_csrf_cors.py`、`test_public_routes.py`，共 79 项；`test_privacy_view.py` 的 compose 测试加上了联系邮箱。
+
+数据库结构、检索、提示词和 Streamlit 版的登录都没改。
+
+### 验证记录
+
+- **新测试：** 三个新测试文件 79 项全过。同样的测试放在基底 `3a08ebd` 的副本上：`test_session_cookie.py` 和 `test_csrf_cors.py` 在收集时就失败，因为新模块还不存在；`test_public_routes.py` 的 30 项全部失败。
+- **定向和静态检查：**
+  - 冒烟 **360 passed**（登录、令牌、Co-op、删号、隐私页、反馈开关、错误出口、日志和限流的测试）；定向 **1081 passed**。
+  - Ruff F／E9／B 在 20 个改过的 Python 文件上通过，没有 CR。隐形字符只有 `docs/api_contract.md` 开头的 BOM，基底里本来就有。
+  - 九个快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+  - 隐私页的文字搬家前后逐字节相同（`same_words.py`）：`privacy_sections` 比了 24 种设置组合（保留天数 0、1、90，反馈开关 true、false、null、1，有没有联系邮箱），勾选说明比了 5 种天数，另外是删号说明、备份说明和查询日志提示。
+- **变异：98 个，全部杀掉**（mut4）。
+  - 新写 60 个：R01–R58，以及 T61b、T91b（T 的 T61、T91 跟着代码搬家以后改锚）。
+    - R36（没设 `WEB_ORIGINS` 也加 CORS）第一次被当成等价拿掉，是错的：一个谁都不放行的 CORS 层照样会加 `access-control-allow-credentials` 和暴露的头，预检也回 400。收紧那条测试以后加回来了。
+    - R32 第一次写错了，把请求日志删掉了；现在是真的把日志挪到 CORS 外面。
+    - 跨站防护改用 Starlette 读凭证、又抽出 `from_web_origin()` 以后，R23–R30 改了锚点；补了 R47–R49（空的 `Authorization` 也免查、按子串找 cookie、只看第一个 Cookie 头）和 R56–R58（cookie 登录不查来源、换完 code 才查、token 模式也查）。
+  - 锚点落在 R2a 改过或搬走的代码里的旧变异体 38 个：`collect_old_mutants_r2a.py` 按 diff 收集，受影响 9 个，跟着代码搬家、改到新位置的 29 个（搬家用 `--no-renames` 加一张搬家表对上）；T 的 T61、T91 由 T61b、T91b 顶替。
+  - 每个变异体日志的第一条错误都逐个看过：除了 R06，都是对口的测试杀的；没有只靠超时判定的，也没有因为时钟跳变失败的。
+    - R04、R32、R33、R35 是测试按名字取那个属性或响应头时报 KeyError，取的正是变异去掉的那个，算对口。
+    - R06（让 cookie 过期的函数什么都不做）两轮都是被 `/auth/me` 的 500 杀的：过期用的那条头 `expired_session_cookie_header()` 就是靠这个函数生成的，它一坏，每次 `/auth/me` 都报 KeyError。这算真杀（谁都登录不了），但不是对口的那条检查；对口的是 R15（登出不让 cookie 过期）和 R55（过期时留下一个空值 cookie），都被对口的测试杀了。
+  - 第一轮 mut1（第一版代码）85/85。mut2 中途停掉，作废；mut3 的基线没过，也作废，原因见下一条。
+- **测试机的时钟：** 10-22 晚这台机器的 Windows 时间服务没开，本机比 NTP 快 2.75 秒，WSL 的时钟每 20–30 秒被来回拨一次。往回拨以后，刚签的令牌会被 itsdangerous 当成「签发时间在未来」（`Signature age -3 < 0 seconds`）而拒绝。mut3 的基线就是这样失败的：同一个令牌 `/auth/me` 刚回 200，下一步删号回 401。同样的测试在 worktree 里重跑全过。这是这台测试机的时钟问题，和本节的代码无关；令牌的这条规则（签发时间在未来就拒绝）也不是 R2a 加的。
+- **串行全量：** **5106 passed／7 warnings／485.35 秒**，退出码 0。比 main `3a08ebd` 的 5027 多出的 79 项就是新测试；27 个改动文件在全量前后一致。全量开始以后只改了本节：补上这些数字，以及「发布状态」里关于 main 的一句。
+
+### 已知、未处理
+
+- **登出不吊销令牌：** 登出只让 cookie 过期，令牌本身到期以前一直有效，和 Bearer 一样没有服务器端吊销。cookie 是 HttpOnly 的，前端脚本偷不到；万一被偷（比如设备被别人拿到），登出也挡不住，只能等 7 天到期，或者换 `SESSION_SECRET`（所有人都要重新登录）。
+- **state 只在前端核对：** `/auth/login-url` 不存 state。别的网站直接调回调已经被来源检查挡住，但它还可以把人引到站点根路径、带上它自己的 `?code=`，让我们自己的前端去提交；挡这一种全靠 R2b 的前端核对 state。
+- 生产没有设 `WEB_ORIGINS`。R7 上线新前端时要设成生产的 compass 子域名，并且核对 compass 和 api 在同一个站点下，不然 SameSite=Lax 的 cookie 不会带上。
+- `eval/route_eval.py`、`scripts/answer_render_check.py` 还从 `app/` 导入 UI 模块（`app.state_manager`、`app.api_client`、`app.chat_view`、`app.answer_evidence_view`），到切换（R7）时再处理。
+- 跨站防护只看 `Origin`，不看 `Referer`：不带 `Origin` 的、带 cookie 的写请求一律拒绝。新前端用 fetch，现代浏览器都会带上它。
+- 被跨站防护拒掉的请求不写 query_log，每周统计看不到；要看就数 API 日志里的 403。
+- 隐私页的文字只有中文。
+
+### 发布状态
+
+分支 `feat/api-cookie-session`，基底是合并 T（#24）以后的 main `3a08ebd`。之后 main 又合并了 R1（#25）和 Co-op 页（#26），现在是 `c8a8b4b`；两次都只改 `web/`（R1 另改了 CI），和本节的文件不重叠。没有使用真实模型、账号、NAS 或生产库，也没有连真实的 Google（测试用现有的替身）。上线要另外授权。

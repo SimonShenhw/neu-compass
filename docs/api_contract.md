@@ -35,11 +35,17 @@
 | GET    | `/coop`               | List Co-op visible to user             |
 | POST   | `/chat`               | Streamed grounded chat (NDJSON)        |
 | POST   | `/auth/callback`      | OAuth code exchange                    |
+| GET    | `/auth/me`            | Identity behind the token or cookie    |
 | POST   | `/auth/delete-account`| Delete own account + Co-op (batch T)   |
+| POST   | `/auth/logout`        | Expire the session cookie (R2a)        |
+| GET    | `/auth/login-url`     | Google login address for a state (R2a) |
+| GET    | `/privacy`            | The privacy page's words (R2a)         |
+| GET    | `/config`             | Public settings for the front end (R2a)|
 
 Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}`,
 `/chat`, and `GET /coop` (degraded view). `POST /coop` and `POST /auth/delete-account` require
-`Authorization: Bearer <session_token>`.
+`Authorization: Bearer <session_token>`, or, without that header, the API's session cookie
+(R2a; see "Session cookie, CSRF and CORS" under Conventions).
 `POST /auth/callback` issues identity but takes no header itself.
 
 ---
@@ -460,7 +466,18 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 ```
 
 `redirect_uri` is optional; defaults to the value configured in
-`config/settings.py` `oauth_redirect_uri`.
+`config/settings.py` `google_oauth_redirect_uri`.
+
+`session` (R2a) is optional: `"token"` (the default) returns the signed token
+in the body as `session_token`, as before; `"cookie"` sets it instead as the
+cookie `__Host-nc_api_session` (HttpOnly, Secure, Path=/, SameSite=Lax, no
+Domain, Max-Age = `SESSION_MAX_AGE_SECONDS`) and returns `session_token: null`.
+The web front end uses the cookie mode; Streamlit and scripts keep the token.
+Without `SESSION_SECRET` there is no token in either mode. The cookie mode must
+come from an allowed web origin with `X-NEU-Compass: 1` (one `Origin` in
+`WEB_ORIGINS`), with or without an existing cookie; otherwise it gets the fixed
+CSRF **403** below before the code is exchanged, so a page elsewhere cannot log
+the browser into an account of its choosing.
 
 ### Success (HTTP 200)
 
@@ -469,7 +486,8 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
   "user_id": "u-google-1234567890",
   "email": "alice@husky.neu.edu",
   "display_name": "Alice Husky",
-  "contribution_count": 0
+  "contribution_count": 0,
+  "session_token": "<signed token, or null in the cookie mode>"
 }
 ```
 
@@ -487,7 +505,8 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 ## POST /auth/delete-account
 
 Batch T (10-21, policy P4): a logged-in student deletes their own account and Co-op contributions from the
-数据与隐私 page. Needs `Authorization: Bearer <session_token>` and exactly `{"confirm": "delete"}`.
+数据与隐私 page. Needs `Authorization: Bearer <session_token>` (or the API's session cookie, R2a) and exactly
+`{"confirm": "delete"}`.
 
 In one transaction (`db/account_deletion.py`), in this order:
 1. the Co-op experiences this account published, and every unlock of them;
@@ -515,6 +534,51 @@ Counts only; the log line `account.deleted` carries the same counts and no ident
 - **401**: missing, invalid or expired token, or the account no longer exists.
 - **422**: the body is not exactly `{"confirm": "delete"}`.
 
+With the session cookie (R2a), a successful deletion also expires the cookie, and so does the 401 for a cookie that no
+longer works (bad, expired, or its account already gone).
+
+---
+
+## POST /auth/logout
+
+R2a. Expires the session cookie and answers **204** with no body, also when there is none. Bearer tokens are not
+revoked: they expire on their own, and Streamlit logs out by dropping its copy. Like every write that carries the
+cookie, it must come from an allowed web origin with `X-NEU-Compass: 1` (403 otherwise).
+
+---
+
+## GET /auth/login-url
+
+R2a. `?state=<16–128 of A–Z, a–z, 0–9, _ or ->` → `{"url": "<Google's OAuth address>"}`, built by
+`api.google_oauth.authorize_url` exactly as the Streamlit login link. The front end makes `state`, keeps it, and
+checks it when Google sends the browser back to `GOOGLE_OAUTH_REDIRECT_URI` (production: the site root) with
+`?code=&state=`; then it posts the code to `/auth/callback` with `"session": "cookie"`. The API stores nothing.
+
+- **422**: a missing or malformed `state` (not echoed).
+- **503**: no Google client ID or no `SESSION_SECRET` here.
+
+---
+
+## GET /privacy
+
+R2a. The 数据与隐私 page, built from this API's own settings (`QUERY_LOG_RETENTION_DAYS`, `ANSWER_FEEDBACK_ENABLED`,
+`PRIVACY_CONTACT_EMAIL`) by `api/privacy_text.py`, the same functions the Streamlit page uses:
+
+```json
+{"intro": "...", "sections": [{"heading": "记了什么", "sentences": ["..."]}, ...],
+ "delete_what": "...", "query_log_notice": "...", "capture_notice": "... or null"}
+```
+
+All plain text. `capture_notice` (next to the opt-in) is null while answer feedback is off. `query_log_notice` has no
+pointer to the page; each front end adds its own.
+
+---
+
+## GET /config
+
+R2a. `{"answer_feedback_enabled": bool, "login_available": bool}`. `login_available` means a Google client ID and a
+`SESSION_SECRET` are both configured, so `/auth/login-url` and the cookie login work.
+
 ---
 
 ## Conventions
@@ -534,6 +598,25 @@ Counts only; the log line `account.deleted` carries the same counts and no ident
   program prefix), and `query_log.written` logs the `query_log` row id. See [PII 脱敏指南 §11](pii_redaction.md).
 - **Versioning**: this is v0.1. Breaking changes go in v0.2 with a
   parallel `/v2/*` prefix; never silent breaks.
+
+### Session cookie, CSRF and CORS (R2a)
+
+For the new web front end, which calls `api.<zone>` from `compass.<zone>` (the same site, two origins):
+
+- **Identity:** `Authorization: Bearer` first, exactly as before (present but bad → 401, and the cookie is not looked
+  at). Without that header, the cookie `__Host-nc_api_session` from the cookie mode of `/auth/callback`. A cookie that
+  no longer works (bad, expired, account gone) counts as anonymous on public routes; `GET /auth/me` answers 401 and
+  expires it.
+- **CSRF** (`api/csrf.py`): a write (any method but GET, HEAD, OPTIONS) that carries the cookie and no non-empty
+  `Authorization` header (both read exactly as for identity) must have one `Origin`, in `WEB_ORIGINS`, and one header
+  `X-NEU-Compass: 1`. Otherwise a fixed
+  **403** `{"detail": "Cross-site request refused.", "error_type": "csrf_rejected", "status_code": 403}`, before
+  the request guard, so it takes no place. The cookie mode of `/auth/callback` makes the same check itself, cookie
+  or not.
+- **CORS:** only when `WEB_ORIGINS` is set (a JSON list of lowercase origins; empty by default, and empty means no
+  CORS at all and every cookie write refused). Allowed origins get credentials, methods GET/POST/OPTIONS, request
+  headers `Content-Type` and `X-NEU-Compass`, exposed `x-request-id` and `Retry-After`, preflight cache 600 s. CORS is
+  the outermost layer, so the guard's 429/503, the CSRF 403 and the logging's 500 are readable by the front end.
 
 ### Safe error exits (SAFE-02)
 

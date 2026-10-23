@@ -159,6 +159,6 @@ curl -i -X POST https://oauth2.googleapis.com/token \
 ## 4. 参考
 
 - Google Cloud OAuth 2.0 client secret rotation 官方:[https://support.google.com/cloud/answer/15549257](https://support.google.com/cloud/answer/15549257)
-- 项目本地实现:[app/auth.py](../app/auth.py) `exchange_code_for_token`
+- 项目本地实现:[api/google_oauth.py](../api/google_oauth.py) `exchange_code_for_token`(R2a 从 app/auth.py 搬来)
 - 配置层:`config.settings.google_oauth_client_secret` (pydantic-settings,lru_cache 单例)
 - F1 合规红线:`PLAN_v2.3.md` §1 + `README.md` §红线
