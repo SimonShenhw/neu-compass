@@ -1,0 +1,384 @@
+{
+  "case": "ds-5220-unparsed-old-record",
+  "scenarios": [
+    {
+      "name": "default",
+      "year": null,
+      "plan": null,
+      "cleared": false,
+      "raw": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🧩 先修要求**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "selectbox",
+          "value": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）"
+          ],
+          "chosen": "Catalog 2026-2027（校区和个人路径未声明）",
+          "key": "course-requisites-c-ds-5220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "目前只记录了这一个 Catalog 年份，已默认显示；它不一定是你适用的年份。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**先修课**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "未解析：unsupported_syntax；保留整段，不展示部分成功树。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "Graduate standing and permission of the instructor"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**共修课（与先修分开）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "未解析：ambiguous_precedence；保留整段，不展示部分成功树。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5800 and CS 5100 or CS 6220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "📎 先修的来源与说明"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "Catalog 2026-2027 · 院系页面未声明校区或个人路径 · 不是完整政策"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**目录标题学分（独立来源证据）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "旧文档未捕获标题学分证据；不从旧整数 credits 补猜范围。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**描述中的批准／资格关键词证据（未解释为规则）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "旧文档未捕获描述证据；不是没有批准或资格条件。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "[官方院系来源](https://catalog.northeastern.edu/course-descriptions/ds/)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "来源捕获 UTC 2026-09-28T14:05:00+00:00 · 导入 UTC 2026-09-29T03:00:00+00:00；不是实时查询"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "来源 HTML 字节摘要：bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb（不证明不可篡改真实性或个人适用性）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。对话回答最多引用最近 3 个已记录年份的这些规则（更早的只计数）；在对话里选了方案、且方案那一年有记录时，只引用那一年。都不判断你能否注册，也不用于生成学期安排。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "🎓 同一年份培养方案里的相关要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**同年度培养方案上下文（与课程先修分开）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "仅关联显式列出本课程的已对照片段；开放前缀/编号范围不用于匹配。各方案条款不一定都约束本课，不代表你的适用路径。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "没有可用的同年度显式关联；不是没有学校或项目政策，也不回退其他年度。"
+        }
+      ],
+      "visible": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "select",
+          "label": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）"
+          ],
+          "chosen": "Catalog 2026-2027（校区和个人路径未声明）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "目前只记录了这一个 Catalog 年份，已默认显示；它不一定是你适用的年份。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修课"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "未解析：unsupported_syntax；保留整段，不展示部分成功树。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "Graduate standing and permission of the instructor"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "共修课（与先修分开）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "未解析：ambiguous_precedence；保留整段，不展示部分成功树。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "CS 5800 and CS 5100 or CS 6220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "先修的来源与说明"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "Catalog 2026-2027 · 院系页面未声明校区或个人路径 · 不是完整政策"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "目录标题学分（独立来源证据）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "旧文档未捕获标题学分证据；不从旧整数 credits 补猜范围。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "描述中的批准／资格关键词证据（未解释为规则）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "旧文档未捕获描述证据；不是没有批准或资格条件。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "link",
+          "text": "官方院系来源",
+          "href": "https://catalog.northeastern.edu/course-descriptions/ds/"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "来源捕获 UTC 2026-09-28T14:05:00+00:00 · 导入 UTC 2026-09-29T03:00:00+00:00；不是实时查询"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "来源 HTML 字节摘要：bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb（不证明不可篡改真实性或个人适用性）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。对话回答最多引用最近 3 个已记录年份的这些规则（更早的只计数）；在对话里选了方案、且方案那一年有记录时，只引用那一年。都不判断你能否注册，也不用于生成学期安排。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "同一年份培养方案里的相关要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "同年度培养方案上下文（与课程先修分开）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "仅关联显式列出本课程的已对照片段；开放前缀/编号范围不用于匹配。各方案条款不一定都约束本课，不代表你的适用路径。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "没有可用的同年度显式关联；不是没有学校或项目政策，也不回退其他年度。"
+        }
+      ]
+    },
+    {
+      "name": "cleared",
+      "year": null,
+      "plan": null,
+      "cleared": true,
+      "raw": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🧩 先修要求**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "selectbox",
+          "value": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）"
+          ],
+          "chosen": "请选择适用的年份",
+          "key": "course-requisites-c-ds-5220"
+        }
+      ],
+      "visible": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "select",
+          "label": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）"
+          ],
+          "chosen": "请选择适用的年份"
+        }
+      ]
+    }
+  ]
+}

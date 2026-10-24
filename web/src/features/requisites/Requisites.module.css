@@ -1,0 +1,135 @@
+.panel {
+  min-width: 0;
+  padding: var(--space-6);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.panel,
+.detailsBody,
+.demo,
+.session {
+  display: grid;
+  gap: var(--space-4);
+}
+.heading {
+  margin-top: var(--space-2);
+  color: var(--ink);
+}
+.note {
+  color: var(--ink3);
+  font-size: var(--text-sm);
+}
+.text {
+  white-space: pre-wrap;
+}
+.warning {
+  padding: var(--space-3) var(--space-4);
+  border-left: var(--focus-width) solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink2);
+}
+.disclosure {
+  min-width: 0;
+  border-top: var(--border) solid var(--line2);
+}
+.disclosure > summary {
+  display: list-item;
+  list-style-position: inside;
+  padding: var(--space-3) var(--space-0);
+  cursor: pointer;
+  color: var(--ink2);
+}
+.detailsBody {
+  padding: var(--space-2) var(--space-0) var(--space-4);
+}
+.select {
+  min-width: 0;
+}
+.select > button {
+  display: flex;
+  flex-wrap: wrap;
+  text-align: left;
+  width: 100%;
+}
+.select > button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tree {
+  margin: var(--space-0);
+  padding-left: var(--space-5);
+}
+.tree ul {
+  padding-left: var(--space-5);
+}
+.tree li {
+  padding: var(--space-1) var(--space-0);
+}
+.courseButton {
+  min-height: var(--control-sm);
+  background: var(--transparent);
+  border: var(--space-0);
+  padding: var(--space-1);
+  color: var(--accent);
+}
+.courseButton:hover {
+  text-decoration: underline;
+}
+.legacy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.legacy > div {
+  min-width: 0;
+}
+.legacy > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.legacyLabel {
+  display: block;
+  color: var(--ink3);
+  font-size: var(--text-sm);
+}
+.mono {
+  font-family: var(--font-mono);
+}
+.demo {
+  padding: var(--space-4);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-width: 0;
+}
+.demo select {
+  width: 100%;
+  max-width: 100%;
+  padding: var(--space-2);
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.session {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.session h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+@media (max-width: 767px) {
+  .panel {
+    padding: var(--space-4);
+  }
+  .tree ul {
+    padding-left: var(--space-4);
+  }
+}

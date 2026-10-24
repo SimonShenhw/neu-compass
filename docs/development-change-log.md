@@ -4231,6 +4231,14 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
     - 项目自己的 `npm run test:mutations` 的副本原来只拷 `src/` 和五个配置文件，这一批的测试要读 `index.html`、`openapi.json` 和生成器的 `package.json`，基线一跑就失败（B26 M4）；现在一起拷，基线的时限放宽到 120 秒。
 14. **CI**（`.github/workflows/ci.yml`）：前端 job 装生成器、查 `schema.ts` 和 `openapi.json` 一致；Python job 跑 `scripts/export_openapi.py --check`。
 15. `api/models.py` 里 `login_available` 的注释改成三样都要（client ID、client secret、`SESSION_SECRET`），R2a 第 24 轮以后漏改的。`tests/test_public_routes.py` 里 R2a 留下的一处 `zip()` 补上 `strict=True`（Ruff B905）。
+16. **合进 main 的 R3a（#30）：**
+    - R3a 的 `web/src/api/requisites.ts` 保留手写。面板要的是按 kind、status 分开的窄类型，生成的类型只有一个扁平的形状，换过去会丢掉这层收窄。文件顶上加了一句说明。
+    - 新文件 `web/src/api/requisites.types.test.ts` 只在类型检查时起作用，对照生成的类型查三样：
+      - 面板读的字段 API 都有；
+      - API 可能给的标量值面板都收，成绩、种类、状态这些固定取值也算在内，null 不算；
+      - 课程详情里放先修列表和旧边的两个字段，类型对得上。
+    - API 删了或改名了面板读的字段，或者给出面板不收的值，`npm run typecheck` 就失败。
+    - R3a 的演示页测试包上 `WithApi`。README 里两节都留，R3a 一节在前。
 
 ### 修改文件
 
@@ -4239,6 +4247,7 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 - CI：`.github/workflows/ci.yml`。根目录 `.gitignore`（第二个提交）。
 - 文档：`docs/api_contract.md`（回调的 `reason` 和 `redirect_uri`、login-url 的 `redirect_uri`，`/chat` 的 done 凭证和流开始前的错误，后两样是原来就落后于代码的），`web/README.md`（R2b 一节，和几句已经不对的话），本节。
 - 测试：新建 `tests/test_export_openapi.py`、`tests/test_dev_api.py`；改 `tests/test_api_auth_route.py`、`test_api_errors.py`、`test_public_routes.py`、`test_session_cookie.py`。前端新建 `apiBase.test.ts`、`client.test.ts`、`queries.test.tsx`、`schema.test.ts`、`login.test.ts`、`chatStream.test.ts`、`layout/session.test.tsx`；改 `layout/navigation.test.tsx`、`test/contracts.test.ts`、`test/setup.ts` 和四个页面测试文件。
+- 合并 main 时：新建 `web/src/api/requisites.types.test.ts`；改 R3a 的 `web/src/api/requisites.ts`（只加注释）、`web/src/pages/RequisitesDemoPage.test.tsx`（包 `WithApi`），`web/README.md`（两边的改动都留）。
 
 数据库结构、检索、提示词和 Streamlit 版都没改。
 
@@ -4261,10 +4270,14 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 - **串行全量：** **5206 passed／7 warnings／515.02 秒**，退出码 0。比 R2a 第二个提交时的 5160 多 46 项，就是这次新加的测试。全量开始以后只加了本节。
 - **第二个提交（第 25 轮审查的修复）：**
   - 前端：check 全过，**454 项**（25 个测试文件）；首屏 JavaScript gzip **158,411 字节**；格式、生成的类型都一致。正式构建配本机的 http API 会停下来，报「A production build needs an https API…」；`build:dev-api` 照常构建。
-  - 后端：Ruff 在改过的 5 个 Python 文件上通过；改动的 30 个文件里没有 CR；改过的 4 个测试文件 163 项都过。
+  - 后端：Ruff 在改过的 5 个 Python 文件上通过；改动的 30 个文件里没有 CR；改过的 3 个测试文件，加上跟着 `auth.py` 一起跑的 `test_api_auth_route.py`，共 163 项都过。
   - 开发 API 在 8000 上短跑一次：访问日志只记了 `/auth/login-url`（不带查询参数）和 `/course/{course_id}`，state 和课程 ID 都不在日志里；停下以后端口空出来。
-  - 变异（都在副本里；判法改成读 Vitest 的 JSON 报告，只撞上超时的不算杀）：前端新写 51 个（W 组 31 个；V 组 20 个，由 B26 存活的变异移植过来），10 个旧变异跟着代码改锚，连同函数改过的旧变异一共 184 个，**183 个由断言杀掉**，C26、C28、C32、Q10 也在内。剩下的 W03（去掉 `refetchOnReconnect: false`）是等价的：探针去掉这一行以后，`networkMode: 'always'` 下网络恢复时也不重取。Python 新写 P01–P12，连同代码改过、要重跑的 A01–A09、D01–D09 和 H01、H02、H14，33／33，都由对口的测试杀掉。项目自己的 `npm run test:mutations` 基线通过，110／110。
+  - 变异（都在副本里；判法改成读 Vitest 的 JSON 报告，只撞上超时的不算杀）：前端新写 50 个（W 组 31 个，W25 这个编号空着；V 组 19 个，由 B26 存活的变异移植过来，它的 B03 随回环判断一起删掉了），10 个旧变异跟着代码改锚，连同函数改过的旧变异一共 184 个，**183 个由断言杀掉**，C26、C28、C32、Q10 也在内。剩下的 W03（去掉 `refetchOnReconnect: false`）是等价的：探针去掉这一行以后，`networkMode: 'always'` 下网络恢复时也不重取。Python 新写 P01–P12，连同代码改过、要重跑的 A01–A09、D01–D09 和 H01、H02、H14，33／33，都由对口的测试杀掉。项目自己的 `npm run test:mutations` 基线通过，110／110。
   - **串行全量：** **5213 passed／7 warnings／545.56 秒**，退出码 0；比第一个提交多 7 项，就是这次新加的 7 个测试。
+- **合并 main（R3a）以后：**
+  - 合并只有 `web/README.md` 冲突；R3a 的 19 项演示页测试没包 `WithApi`，报「No QueryClient set」，包上以后都过。
+  - check 全过，**662 项**（32 个测试文件，多出来的是 R3a 的和这次的类型检查）；首屏 JavaScript gzip **173,177 字节**（R3a 的演示页连同 16 份假数据是静态 import 的，都算在首屏里；预算 250,000）；格式、生成的类型都一致。
+  - 类型检查的检查也试了：在 R3a 的类型上做四处改动，分别是去掉成绩 `S`、文档的 `catalog_year` 改名、列表的 `unusable_records` 改成字符串、方案去掉 `bridge`。每一处都让 `tsc` 在对应的那条检查上失败。把 `minimum` 放宽成 `string | number` 作对照，照样通过。改完文件都原样还原。
 
 ### 审查
 
@@ -4312,4 +4325,4 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 
 ### 发布状态
 
-分支 `feat/web-api-client`，基底是合并 R2a（#29）以后的 main `2aa2327`。第一个提交是 R2b 本身，第二个提交是第 25 轮审查的修复。R3a（#30）10-23 已经合并（main `7363572`）：接着把 main 合进来，R3a 的 `api/requisites.ts` 改用生成的类型、整页测试包上 `WithApi`，复核以后推送、开 PR。没有使用真实模型、账号、NAS 或生产库；登录和聊天都对着本机的开发 API 和合成数据。
+分支 `feat/web-api-client`，基底是合并 R2a（#29）以后的 main `2aa2327`。第一个提交是 R2b 本身，第二个提交是第 25 轮审查的修复。R3a（#30）10-23 已经合并（main `7363572`），第三个提交把 main 合了进来（见第 16 条）。复核以后推送、开 PR。没有使用真实模型、账号、NAS 或生产库；登录和聊天都对着本机的开发 API 和合成数据。

@@ -1,0 +1,1180 @@
+{
+  "case": "cs-6140-program-table-missing",
+  "scenarios": [
+    {
+      "name": "default",
+      "year": null,
+      "plan": null,
+      "cleared": false,
+      "raw": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🧩 先修要求**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "selectbox",
+          "value": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）",
+            "Catalog 2025-2026（校区和个人路径未声明）"
+          ],
+          "chosen": "请选择适用的年份",
+          "key": "course-requisites-c-cs-6140"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🔗 去看看这些先修课**"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "caption",
+          "value": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "c-cs-5010-missing",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5100 · Foundations of Artificial Intelligence",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5800 · Algorithms",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5800"
+        }
+      ],
+      "visible": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "select",
+          "label": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）",
+            "Catalog 2025-2026（校区和个人路径未声明）"
+          ],
+          "chosen": "请选择适用的年份"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "heading",
+          "text": "去看看这些先修课"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "note",
+          "text": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "c-cs-5010-missing",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5100 · Foundations of Artificial Intelligence",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5800 · Algorithms",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5800"
+        }
+      ]
+    },
+    {
+      "name": "year 2026-2027",
+      "year": "2026-2027",
+      "plan": null,
+      "cleared": false,
+      "raw": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🧩 先修要求**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "selectbox",
+          "value": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）",
+            "Catalog 2025-2026（校区和个人路径未声明）"
+          ],
+          "chosen": "Catalog 2026-2027（校区和个人路径未声明）",
+          "key": "course-requisites-c-cs-6140"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**先修课**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "完整段语法已解析；不代表要求已满足。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "- 全部分支（AND）\n  - 任一分支（OR）\n    - CS 5800（最低成绩：C-）\n    - CS 7800（最低成绩：C-）\n  - 任一分支（OR）\n    - DS 5220（最低成绩：C-；原文 level 标记：Graduate（不自动判断适用学生））\n    - CS 6220（原文明示可并修；仍需核实其余条件）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "先修课原文（仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**共修课（与先修分开）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "完整段语法已解析；不代表要求已满足。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "- CS 6220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "共修课（与先修分开）原文（仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "CS 6220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "📎 先修的来源与说明"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "Catalog 2026-2027 · 院系页面未声明校区或个人路径 · 不是完整政策"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**目录标题学分（独立来源证据）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "原标题学分：4 Hours"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "目录固定值：4；不是当期班次或个人学位计入的确认。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "此证据不重写 Course 的整数 credits，不用于范围筛选、学分求和或资格判断。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**描述中的批准／资格关键词证据（未解释为规则）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "关键词候选待人工复核：可能为可选许可、否定或教学内容；不表示强制条件、已获批准或可注册。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "描述段 2 · 关键词：permission, restriction"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "Restricted to students in the MS program; permission of the instructor is required for others. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "expander",
+          "value": "已记录的完整描述（逐段，仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 2,
+          "kind": "text",
+          "value": "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 2,
+          "kind": "text",
+          "value": "Restricted to students in the MS program; permission of the instructor is required for others. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "[官方院系来源](https://catalog.northeastern.edu/course-descriptions/cs/)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "来源捕获 UTC 2026-09-28T14:05:00+00:00 · 导入 UTC 2026-09-29T03:00:00+00:00；不是实时查询"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "来源 HTML 字节摘要：bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb（不证明不可篡改真实性或个人适用性）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。对话回答最多引用最近 3 个已记录年份的这些规则（更早的只计数）；在对话里选了方案、且方案那一年有记录时，只引用那一年。都不判断你能否注册，也不用于生成学期安排。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "🎓 同一年份培养方案里的相关要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**同年度培养方案上下文（与课程先修分开）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "仅关联显式列出本课程的已对照片段；开放前缀/编号范围不用于匹配。各方案条款不一定都约束本课，不代表你的适用路径。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "项目上下文未提供或存储尚不可用；不从旧 seed 猜条件。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🔗 去看看这些先修课**"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "caption",
+          "value": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "c-cs-5010-missing",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5100 · Foundations of Artificial Intelligence",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5800 · Algorithms",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5800"
+        }
+      ],
+      "visible": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "select",
+          "label": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）",
+            "Catalog 2025-2026（校区和个人路径未声明）"
+          ],
+          "chosen": "Catalog 2026-2027（校区和个人路径未声明）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修课"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "完整段语法已解析；不代表要求已满足。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "- 全部分支（AND）\n  - 任一分支（OR）\n    - CS 5800（最低成绩：C-）\n    - CS 7800（最低成绩：C-）\n  - 任一分支（OR）\n    - DS 5220（最低成绩：C-；原文 level 标记：Graduate（不自动判断适用学生））\n    - CS 6220（原文明示可并修；仍需核实其余条件）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "先修课原文（仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "共修课（与先修分开）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "完整段语法已解析；不代表要求已满足。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "- CS 6220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "共修课（与先修分开）原文（仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "CS 6220"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "先修的来源与说明"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "Catalog 2026-2027 · 院系页面未声明校区或个人路径 · 不是完整政策"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "目录标题学分（独立来源证据）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "原标题学分：4 Hours"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "目录固定值：4；不是当期班次或个人学位计入的确认。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "此证据不重写 Course 的整数 credits，不用于范围筛选、学分求和或资格判断。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "描述中的批准／资格关键词证据（未解释为规则）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "关键词候选待人工复核：可能为可选许可、否定或教学内容；不表示强制条件、已获批准或可注册。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "描述段 2 · 关键词：permission, restriction"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "Restricted to students in the MS program; permission of the instructor is required for others. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "disclosure",
+          "text": "已记录的完整描述（逐段，仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 2,
+          "kind": "text",
+          "text": "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 2,
+          "kind": "text",
+          "text": "Restricted to students in the MS program; permission of the instructor is required for others. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "link",
+          "text": "官方院系来源",
+          "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "来源捕获 UTC 2026-09-28T14:05:00+00:00 · 导入 UTC 2026-09-29T03:00:00+00:00；不是实时查询"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "来源 HTML 字节摘要：bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb（不证明不可篡改真实性或个人适用性）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。对话回答最多引用最近 3 个已记录年份的这些规则（更早的只计数）；在对话里选了方案、且方案那一年有记录时，只引用那一年。都不判断你能否注册，也不用于生成学期安排。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "同一年份培养方案里的相关要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "同年度培养方案上下文（与课程先修分开）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "仅关联显式列出本课程的已对照片段；开放前缀/编号范围不用于匹配。各方案条款不一定都约束本课，不代表你的适用路径。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "项目上下文未提供或存储尚不可用；不从旧 seed 猜条件。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "heading",
+          "text": "去看看这些先修课"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "note",
+          "text": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "c-cs-5010-missing",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5100 · Foundations of Artificial Intelligence",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5800 · Algorithms",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5800"
+        }
+      ]
+    },
+    {
+      "name": "year 2025-2026",
+      "year": "2025-2026",
+      "plan": null,
+      "cleared": false,
+      "raw": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🧩 先修要求**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "caption",
+          "value": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "selectbox",
+          "value": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）",
+            "Catalog 2025-2026（校区和个人路径未声明）"
+          ],
+          "chosen": "Catalog 2025-2026（校区和个人路径未声明）",
+          "key": "course-requisites-c-cs-6140"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**先修课**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "完整段语法已解析；不代表要求已满足。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "- CS 5800（最低成绩：C-）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "先修课原文（仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "CS 5800 with a minimum grade of C-"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**共修课（与先修分开）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "value": "课程块未列出这一段；不是已证明没有要求。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "📎 先修的来源与说明"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "Catalog 2025-2026 · 院系页面未声明校区或个人路径 · 不是完整政策"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**目录标题学分（独立来源证据）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "原标题学分：1-4 Hours"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "目录范围：1–4；实际班次学分未声明，不取端点或平均值作为固定学分。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "旧详情若有整数，也不是此范围已选定班次学分的证据。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "此证据不重写 Course 的整数 credits，不用于范围筛选、学分求和或资格判断。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**描述中的批准／资格关键词证据（未解释为规则）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "记录的描述未匹配当前有限关键词；不是已证明没有资格条件。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "expander",
+          "value": "已记录的完整描述（逐段，仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 2,
+          "kind": "text",
+          "value": "Surveys supervised and unsupervised learning and the issues of using learned models. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "[官方院系来源](https://catalog.northeastern.edu/course-descriptions/cs/)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "来源捕获 UTC 2026-09-28T14:05:00+00:00 · 导入 UTC 2026-09-29T03:00:00+00:00；不是实时查询"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "value": "来源 HTML 字节摘要：bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb（不证明不可篡改真实性或个人适用性）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。对话回答最多引用最近 3 个已记录年份的这些规则（更早的只计数）；在对话里选了方案、且方案那一年有记录时，只引用那一年。都不判断你能否注册，也不用于生成学期安排。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "expander",
+          "value": "🎓 同一年份培养方案里的相关要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**同年度培养方案上下文（与课程先修分开）**"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "仅关联显式列出本课程的已对照片段；开放前缀/编号范围不用于匹配。各方案条款不一定都约束本课，不代表你的适用路径。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "caption",
+          "value": "项目上下文未提供或存储尚不可用；不从旧 seed 猜条件。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🔗 去看看这些先修课**"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "caption",
+          "value": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "c-cs-5010-missing",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5100 · Foundations of Artificial Intelligence",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "text",
+          "value": "CS 5800 · Algorithms",
+          "column": 0
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "value": "查看",
+          "column": 1,
+          "key": "prereq-c-cs-5800"
+        }
+      ],
+      "visible": [
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "note",
+          "text": "按目录原文整理，不判断你能不能注册；能否选课以学校系统为准。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "select",
+          "label": "先修规则的 Catalog 年份（不会默认选最新）",
+          "options": [
+            "请选择适用的年份",
+            "Catalog 2026-2027（校区和个人路径未声明）",
+            "Catalog 2025-2026（校区和个人路径未声明）"
+          ],
+          "chosen": "Catalog 2025-2026（校区和个人路径未声明）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "先修课"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "完整段语法已解析；不代表要求已满足。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "- CS 5800（最低成绩：C-）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "先修课原文（仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "CS 5800 with a minimum grade of C-"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "heading",
+          "text": "共修课（与先修分开）"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "text",
+          "text": "课程块未列出这一段；不是已证明没有要求。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "先修的来源与说明"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "展示课程块条款和未解释的描述证据；不判断个人注册、减免、成绩、开课或完整政策。旧平铺边不表达 AND/OR/成绩。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "Catalog 2025-2026 · 院系页面未声明校区或个人路径 · 不是完整政策"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "目录标题学分（独立来源证据）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "原标题学分：1-4 Hours"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "目录范围：1–4；实际班次学分未声明，不取端点或平均值作为固定学分。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "旧详情若有整数，也不是此范围已选定班次学分的证据。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "此证据不重写 Course 的整数 credits，不用于范围筛选、学分求和或资格判断。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "描述中的批准／资格关键词证据（未解释为规则）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "记录的描述未匹配当前有限关键词；不是已证明没有资格条件。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "disclosure",
+          "text": "已记录的完整描述（逐段，仅统一空白）"
+        },
+        {
+          "part": "requisites",
+          "depth": 2,
+          "kind": "text",
+          "text": "Surveys supervised and unsupervised learning and the issues of using learned models. (Synthetic text for interface tests.)"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "link",
+          "text": "官方院系来源",
+          "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "来源捕获 UTC 2026-09-28T14:05:00+00:00 · 导入 UTC 2026-09-29T03:00:00+00:00；不是实时查询"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "text",
+          "text": "来源 HTML 字节摘要：bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb（不证明不可篡改真实性或个人适用性）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "批准/资格证据和项目片段不是完整学校政策；个人成绩与适用性仍需核实。对话回答最多引用最近 3 个已记录年份的这些规则（更早的只计数）；在对话里选了方案、且方案那一年有记录时，只引用那一年。都不判断你能否注册，也不用于生成学期安排。"
+        },
+        {
+          "part": "requisites",
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "同一年份培养方案里的相关要求"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "heading",
+          "text": "同年度培养方案上下文（与课程先修分开）"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "仅关联显式列出本课程的已对照片段；开放前缀/编号范围不用于匹配。各方案条款不一定都约束本课，不代表你的适用路径。"
+        },
+        {
+          "part": "requisites",
+          "depth": 1,
+          "kind": "note",
+          "text": "项目上下文未提供或存储尚不可用；不从旧 seed 猜条件。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "heading",
+          "text": "去看看这些先修课"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "note",
+          "text": "只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "c-cs-5010-missing",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5100 · Foundations of Artificial Intelligence",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5100"
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "legacy_row",
+          "text": "CS 5800 · Algorithms",
+          "label": null
+        },
+        {
+          "part": "legacy",
+          "depth": 0,
+          "kind": "button",
+          "text": "查看",
+          "opens": "CS 5800"
+        }
+      ]
+    }
+  ]
+}

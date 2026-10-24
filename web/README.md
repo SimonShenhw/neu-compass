@@ -34,7 +34,7 @@ npm.cmd run test:mutations
 - `check` 依次做 strict 类型检查、零 lint 警告、Vitest 行为测试和构建。
 - `gen:api:check` 查 `src/api/schema.ts` 和 `openapi.json` 生成的一致（要先装生成器）。
 - `build` 额外读取 Vite manifest，累加首屏入口及其静态 import 的 JavaScript gzip 字节，超过 **250,000 bytes** 就失败。字体和 CSS 不混进 JS 指标，也没有靠延迟加载隐藏首屏依赖。
-- `test:mutations` 在系统临时目录创建隔离副本，先验证未修改副本的完整测试和类型，再执行 110 个具名变异。每项只运行对应名称的行为测试，避免重复执行整份表单用例；原 R1、Co-op、R5b 检查保留，R5c 另加 26 项。副本里除了 `src/` 和配置，还有测试要读的 `index.html`、`openapi.json` 和生成器的 `package.json`（R2b）。完整基线测试最多等 120 秒，单个变异仍为 45 秒。不修改当前源码、不安装额外依赖。只把命中预期测试名称的真实断言失败算作杀死；超时、导入失败不算。类型变异要求命中缺失 label 的编译断言。
+- `test:mutations` 在系统临时目录创建隔离副本，先验证未修改副本的完整测试和类型，再执行 130 个具名变异。每项只运行对应名称的行为测试，避免重复执行整份表单用例；原 R1、Co-op、R5b 检查保留，R5c 另加 26 项，R3a 另加 M111–M130。副本里除了 `src/` 和配置，还有测试要读的 `index.html`、`openapi.json` 和生成器的 `package.json`（R2b）。完整基线测试最多等 120 秒，单个变异仍为 45 秒。不修改当前源码、不安装额外依赖。只把命中预期测试名称的真实断言失败算作杀死；超时、导入失败不算。类型变异要求命中缺失 label 的编译断言。
 - 变异日志、失败测试名、源码 SHA-256 与结果位于 `artifacts/mutations-<UTC timestamp>/`，副本保留以便复核，不自动递归清理。
 - `.github/workflows/ci.yml` 的前端 job：Node 24 → `npm ci` → 装生成器 → `gen:api:check` → 格式 → `check`；Python job 另查 `web/openapi.json` 是最新的（R2b）。远端是否绿色，必须在后续授权 push 后由 GitHub 验证，不能从本地检查推断。
 
@@ -143,6 +143,21 @@ npm.cmd run test:mutations
 
 当前仍是合成演示，**没有执行任何真实删号、登录／退出、请求或数据库操作**。真实 R2b 接入必须负责响应校验（特别是 200 的 deleted）、请求体 `{"confirm":"delete"}`、Cookie／Origin／X-NEU-Compass 及会话边界；不能照搬 URL 演示身份作为鉴权，也不能随 viewer 重建 PrivacyPage 丢掉结果。真实请求瀑布、实际删号、屏幕阅读器语音及上线仍需单独验收。
 
+## R3a 先修要求组件与演示
+
+`/requisites-demo?case=cs-6140-two-years`（不加入导航）只用合成 API 导出。演示数据选择器提供 16 个 case；缺省或未知 case 回到 `cs-6140-two-years`，换 case 清空年份、方案和导航提示。点击规则课号或旧边「查看」只在 status 区显示「演示：这里会打开 …」，不跳转、不取数。
+
+- 目录：`features/requisites/CourseRequisites.tsx` 为公开组件；树、证据、方案上下文分文件以保持职责明确。参数完全由调用方提供；加载、失败和重试 UI 属于未来 R3 取数外壳，本组件不模拟这些状态。
+- 调用方用 `key={course.course_id}` 区分课程。多年份默认空，单年份仅首次挂载默认显示；主动清空、数据移除后的选择均不会自动恢复。换年份重新挂载方案区，返回原年份也要重选。没有把选择写入 URL 或 storage。
+- `api/requisites.ts` 为手写消费类型；`models/requisites.ts` 接收 unknown，只按说明书检查形状和链接，忽略额外字段；不复刻 Python 的原文重解析与候选池语义证明。未使用的方案节点字段不额外收紧，以免越过前端契约。
+- `models/requisiteRules.ts` 导出 `ruleLines`、`programRuleLines`，逐字对齐 Python。课程树只在同组内合并完全相同的叶子；原文不改。方案用可折行、保留缩进的纯文本，不做个人资格或学期规划。
+- `fixtures/requisites/` 的 16 份导出与 `expected/` 的 16 份标准答案逐字节冻结，独立 SHA-256 测试防改动；expected 只供测试，不打包进生产。34 个场景逐项比对 DOM，不从标准答案生成页面。
+- 旧边保留用于未选年份、未解析和非树内课程的导航。R3a 明确覆盖了 R1「删掉下面那排按钮」的决定；原型课程页及旧 `RequisiteTree` 本轮不改。数据无效／存储冲突时旧边不能冒充必修性判断。
+- 所有接口文字均按纯文本显示；两个来源链接须精确通过官方 URL 限制，且新标签页带 `noopener noreferrer`。学分字符串原样，时间只替换末尾 Z；树最深 10 层、方案最深 8 层，各最多 120 节点。
+- 复用 R1 Select、CourseCode、Button 和浅色 tokens；details 默认折叠。测试中 jsdom 不实现原生 summary 的 Enter 默认行为，因此键盘展开另外由真实浏览器验收，不用 jsdom 的绿色结果代替。
+
+过程、验证与边界另见 [REQUISITES_WORKLOG.md](REQUISITES_WORKLOG.md)。真实 R3 接入、线上数据和完整网络瀑布仍需另验。
+
 ## 接口层与登录 R2b（2026-10-23）
 
 从 main 开 `feat/web-api-client`，依据评审目录 `frontend_react/R2B_PLAN.md`。这一批让前端第一次真的请求 API：接口层、登录和登出、聊天流的客户端；各页的内容还是假数据，隐私、Co-op、对比三页在 R5d 接上，搜索和聊天页在 R3。
@@ -155,7 +170,7 @@ npm.cmd run test:mutations
 页面和 API 的主机名必须一样：浏览器按主机名算「站点」，`localhost` 和 `127.0.0.1` 是两个站点，SameSite=Lax 的会话 cookie 就不跟着请求走，登录了也像没登录。Chromium 在 `http://127.0.0.1` 上收 `__Host-` 开头、带 Secure 的 cookie（10-23 在浏览器里验过）。
 
 - **API 地址在构建时定**（`src/api/apiBase.ts`）：`npm run build` 是正式构建，默认 `https://api.neu-compass.me`，`VITE_API_BASE_URL` 可以换成别的 https 地址，本机的 http 一律让构建失败，免得给学生的页面去连他们自己的电脑；`npm run build:dev-api` 和开发服务器默认 `http://127.0.0.1:8000`；别的构建模式（比如 beta）必须写明 `VITE_API_BASE_URL`。测试一律用本机的，不管环境里设了什么。地址只认 https 或本机的 http，不带路径、查询、`#` 或账号密码，坏值让构建失败。`web/.env.local` 这类文件已在 `.gitignore` 里。
-- **接口类型是生成的：** 后端的 `scripts/export_openapi.py` 导出 `web/openapi.json`，`npm run gen:api` 从它生成 `src/api/schema.ts`，`npm run gen:api:check` 和 CI 查两者一致；后端那边 CI 也查 `openapi.json` 是最新的。生成器 openapi-typescript 7.13.0 只声明支持 TypeScript 5，本包用 6，所以它单独放在 `tools/openapi-types/`（自带 TypeScript 5 和 lockfile），没有用 `--legacy-peer-deps`。
+- **接口类型是生成的：** 后端的 `scripts/export_openapi.py` 导出 `web/openapi.json`，`npm run gen:api` 从它生成 `src/api/schema.ts`，`npm run gen:api:check` 和 CI 查两者一致；后端那边 CI 也查 `openapi.json` 是最新的。生成器 openapi-typescript 7.13.0 只声明支持 TypeScript 5，本包用 6，所以它单独放在 `tools/openapi-types/`（自带 TypeScript 5 和 lockfile），没有用 `--legacy-peer-deps`。R3a 的先修类型（`src/api/requisites.ts`）比生成的窄，按 kind、status 分开，所以还是手写；`src/api/requisites.types.test.ts` 在类型检查时把它们和生成的类型对照：面板读的字段 API 得有，API 可能给的值面板得收。
 - **请求只有一个出口：** `src/api/client.ts`。每个请求都带 cookie、不用 HTTP 缓存、不跟重定向；写请求带 `X-NEU-Compass: 1`，有请求体才带 JSON 的 Content-Type。四档超时照 Streamlit（5／8／15／30 秒，读完回答也算在内），什么都不自动重试。失败变成 `ApiError`（状态码、`error_type`、`Retry-After`、422 被拒的字段名、登录被拒的 `reason`），不带后端的英文原文；页面上的中文照 Streamlit。
 - **取数：** TanStack Query，不重试；切回窗口、网络恢复都不重取。断网时请求照样发出、照样失败，不会排队等网络回来再自己发（写请求尤其不能这样）。暂时的失败（超时、429、5xx）继续显示上次的内容，明确的答复（401、404、422…）不留。`/config` 5 分钟内算新鲜；`/auth/me` 的 401 就是游客。
 - **登录：** 点按钮时生成 32 字节的随机 state，和回来的页面一起放进 sessionStorage（本站只在这里存东西，用一次就删），整页去 Google（只认 Google 的登录页；页面连本机开发 API 时也认它的假登录页）。回到站点根路径时先把 code 和 state 从地址栏和历史里去掉，这时还不问 `/config`、`/auth/me`；再核对 state，对了才用 cookie 模式提交回调，然后重读一次 `/auth/me`：浏览器没收下 cookie 就说「这个浏览器没有保存登录状态…」，最后回到原来的页面。state 对不上的返回链接（包括带 `error=` 的）什么都不发、也不显示链接里的字。外校邮箱和没验证的邮箱分开说，别的失败一句话。登录、登出时清掉按身份取的数据，登出时再清课程对比。
@@ -172,7 +187,7 @@ npm.cmd run test:mutations
 - `tokens.css` 只声明变量；产品 token 去掉设计稿的 `a-` 前缀。CSS Modules 使用 tokens，无内联布局样式；唯一内联值是对比列数，用于动态表格最小宽度。
 - 原稿次级文字色 `#727e90` 对小字偏淡，调整为 `--ink3: #596678`，另加 4.5:1 token 对比度测试。其他主色沿用设计稿。
 - 字体由 Fontsource 随包打包，IBM Plex Sans / Mono 仅带所需 Latin 字重，中文用指定系统字体，不使用 Google Fonts。图标只用 Lucide。
-- 先修树的叶子可以直接点击，故删除原稿树下重复的“去看看”按钮。课号和未知要求不会自行推断为可注册。
+- 原 R1 原型先修树的叶子可以直接点击，所以原型曾删掉树下重复的“去看看”按钮；R3a 按新说明书恢复旧边导航，理由见上节。课号和未知要求不会自行推断为可注册。
 - 手机空首页按手机稿省略重复游客行和项目选择器，避免把输入框挤出首屏；回答页仍提供项目选择。手机搜索标题对视觉隐藏但保留可访问标题；比较等页面标题正常显示。
 - 输入框沿用手机稿的短占位文案「问任何课程问题…」；隐私说明保留完整句子。对比页主题复用 Chips，最多八个再显示「+N」；不改变原组件行为。
 - 手机触控至少 44px；勾选框由整行 44px 高的 label 提供点击区域。对比表是独立可聚焦、可横向滚动的区域，首列 sticky，不通过隐藏整页 overflow 掩盖问题。
