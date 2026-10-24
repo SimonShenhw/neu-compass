@@ -142,10 +142,12 @@ export function Sidebar({
       <div className={styles.footer}>
         <Button size="sm" variant="ghost" onClick={onRefresh}>
           <RefreshCw aria-hidden="true" />
-          刷新课程数据
+          刷新页面内容
         </Button>
         <small>非官方学生工具 · 选课以官方目录为准</small>
-        <small>页面内容仍是假数据原型；登录已接真实接口</small>
+        <small>
+          登录、Co-op、课程对比、数据与隐私已接真实接口；搜索、课程详情和培养方案还是假数据原型
+        </small>
       </div>
     </div>
   );

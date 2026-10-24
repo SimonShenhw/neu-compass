@@ -7,8 +7,16 @@
 //   (401, 403, 404...) nothing old (shownData);
 // - what depends on who is asking has the viewer in its key and goes at logout or a change of account (step 2);
 //   policy evidence is never cached and never shown stale (its hook comes with R4).
-// The pages' own hooks come with R3-R5; here are the client and the two hooks every page needs.
-import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+// The pages' own queries sit with their API contracts (R5d: coop.ts, course.ts, privacy.ts); here are the client, the
+// two hooks every page needs, and the shell's refresh and its note on content shown from before.
+import {
+  QueryClient,
+  notifyManager,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useCallback, useSyncExternalStore } from 'react';
 import {
   ApiError,
   apiGet,
@@ -44,6 +52,41 @@ export function shownData<T>(query: {
   return error === null || error === undefined || isTransientError(error)
     ? data
     : undefined;
+}
+
+// Whether a query on screen is showing what it had before because the latest try failed for a moment (shownData keeps
+// it): the page then says so, as Streamlit's FALLBACK_NOTICE does (R0 2, R5d). Cache events can come while a page
+// renders, so they reach React batched, as TanStack's own useIsFetching does.
+export function useShowingOld(): boolean {
+  const cache = useQueryClient().getQueryCache();
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      cache.subscribe(notifyManager.batchCalls(listener)),
+    [cache],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () =>
+      cache
+        .findAll({ type: 'active' })
+        .some(
+          ({ state }) =>
+            state.status === 'error' &&
+            state.data !== undefined &&
+            isTransientError(state.error),
+        ),
+    () => false,
+  );
+}
+
+// The account box's 「刷新页面内容」, as Streamlit's: every read goes stale, and what is on screen is asked again at once
+// (R0 2). Who is looking changes only with a login, a logout, an upload or a reload of the page, so /auth/me is asked
+// again only when it had failed; otherwise there would be no way to try it again short of reloading.
+export function refreshReads(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({
+    predicate: ({ queryKey, state }) =>
+      !(queryKey[0] === meQuery.queryKey[0] && state.status === 'success'),
+  });
 }
 
 export type PublicConfig = Schemas['PublicConfigResponse'];

@@ -4,21 +4,18 @@ import {
   activateCompareCase,
   compareCaseOptions,
   demoColumns,
+  demoList,
   readCompareCase,
 } from '../fixtures/compareDemo';
 import type { CompareDemoCase } from '../fixtures/compareDemo';
 import type { CompareColumn } from '../api/course';
 import { resolveColumn } from '../models/compare';
-import {
-  clearCompare,
-  removeFromCompare,
-  useCompareList,
-} from '../models/compareList';
+import { useList } from '../models/compareList';
 import { ComparePage } from './ComparePage';
 import styles from './ComparePage.module.css';
 
 function DemoContent({ scenario }: { scenario: CompareDemoCase }) {
-  const ids = useCompareList();
+  const ids = useList(demoList);
   const [retrying, setRetrying] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -43,8 +40,8 @@ function DemoContent({ scenario }: { scenario: CompareDemoCase }) {
     <ComparePage
       ids={ids}
       columns={columns}
-      onRemove={removeFromCompare}
-      onClear={clearCompare}
+      onRemove={demoList.remove}
+      onClear={demoList.clear}
       onReload={() => {
         if (timer.current !== null) clearTimeout(timer.current);
         setRetrying(true);
@@ -81,7 +78,7 @@ export function CompareDemoPage() {
         </label>
         <p>
           合成 API
-          数据，不发请求。演示首次进入或切换场景会填入示例课程；刷新也会重新填入，不代表列表持久化。
+          数据，不发请求。演示首次进入或切换场景会填入示例课程；刷新也会重新填入，不代表列表持久化。演示用自己的列表，不动「课程对比」里加的课，侧栏的数字也不跟着变。
         </p>
       </section>
       <DemoContent key={scenario} scenario={scenario} />

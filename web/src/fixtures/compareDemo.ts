@@ -1,5 +1,5 @@
 import type { CompareColumn } from '../api/course';
-import { addToCompare, clearCompare } from '../models/compareList';
+import { createCompareList } from '../models/compareList';
 import cs5800 from './compare/course-cs-5800.json';
 import cs6140 from './compare/course-cs-6140.json';
 import ds5220 from './compare/course-ds-5220.json';
@@ -36,17 +36,20 @@ export function readCompareCase(value: string | null): CompareDemoCase {
     ? (value as CompareDemoCase)
     : 'four';
 }
+// The demo's own list (R5d): a case fills it, and the student's comparison list on /compare stays as it was.
+export const demoList = createCompareList();
 // The demo seeds once per selected case, not on every route remount. It must not
 // resurrect courses the user removed or a list cleared by a future auth adapter.
 let activeCase: CompareDemoCase | null = null;
 export function activateCompareCase(value: CompareDemoCase) {
   if (activeCase === value) return;
   activeCase = value;
-  clearCompare();
-  for (const id of cases[value]) addToCompare(id);
+  demoList.clear();
+  for (const id of cases[value]) demoList.add(id);
 }
 export function resetCompareDemoForTests() {
   activeCase = null;
+  demoList.clear();
 }
 export function demoColumns(
   value: CompareDemoCase,

@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { App } from '../App';
+import privacy from '../fixtures/privacy/privacy-90-days-feedback-contact.json';
 import { WithApi } from '../test/withApi';
 
 function page(path = '/') {
@@ -15,6 +16,22 @@ function page(path = '/') {
     </WithApi>,
   );
 }
+// The live pages ask the API (R5d): here /coop has no rows yet and /privacy answers with a fixture.
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) =>
+      url.endsWith('/coop')
+        ? new Response('[]')
+        : url.endsWith('/privacy')
+          ? new Response(JSON.stringify(privacy.body))
+          : new Response(null, { status: 404 }),
+    ),
+  );
+});
+// Until no live page is loading any more.
+const settled = () =>
+  waitFor(() => expect(screen.queryByText('正在加载')).not.toBeInTheDocument());
 
 it('route focus does not scroll the heading out of view', () => {
   const focus = vi.spyOn(HTMLElement.prototype, 'focus');
@@ -24,7 +41,7 @@ it('route focus does not scroll the heading out of view', () => {
 
 it('comparison view does not invent a program selection before R4', async () => {
   const user = userEvent.setup();
-  page('/compare');
+  page('/compare-demo');
   expect(
     screen.queryByRole('combobox', { name: /按方案看/ }),
   ).not.toBeInTheDocument();
@@ -44,13 +61,18 @@ describe('page accessibility', () => {
     '/programs',
     '/coop',
     '/privacy',
+    '/compare-demo',
+    '/coop-demo',
+    '/privacy-demo',
     '/not-found',
     '/course/UNKNOWN',
     '/compare/',
+    '/compare-demo/',
     '/COURSE/CS-6140',
     '/course/CS-6140/extra',
   ])('has no DOM axe violations at %s', async (path) => {
     const { container } = page(path);
+    await settled();
     const result = await axe(container, {
       rules: { 'color-contrast': { enabled: false } },
     });
@@ -70,8 +92,9 @@ it.each([
   ['/PRIVACY', '数据与隐私'],
   ['/course/CS-6140/', '课程搜索'],
   ['/COURSE/CS-6140', '课程搜索'],
-])('route chrome agrees with the rendered page at %s', (path, title) => {
+])('route chrome agrees with the rendered page at %s', async (path, title) => {
   page(path);
+  await settled();
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(title);
   expect(document.title).toBe(`${title} · NEU-Compass`);
   const nav = screen.getByRole('navigation', { name: '主导航' });
@@ -165,9 +188,10 @@ it('plus only records a demo action without changing the comparison', async () =
   page();
   await user.click(screen.getByRole('button', { name: '加入对比 CS 6140' }));
   expect(log).toHaveBeenCalledExactlyOnceWith('prototype.compare', 'CS 6140');
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'R1 不向对比列表添加数据',
-  );
+  // The shell's notice line (the other status region is the note on content shown from before, R5d).
+  expect(
+    screen.getAllByRole('status').find((node) => node.tagName === 'P'),
+  ).toHaveTextContent('R1 不向对比列表添加数据');
 });
 it('detail leaf navigation opens the exact prerequisite and resets expansion', async () => {
   const user = userEvent.setup();
@@ -190,7 +214,7 @@ it('detail leaf navigation opens the exact prerequisite and resets expansion', a
 });
 it('all seven comparison rows remain visible and removal keeps other columns', async () => {
   const user = userEvent.setup();
-  page('/compare');
+  page('/compare-demo');
   expect(screen.queryByRole('switch')).not.toBeInTheDocument();
   expect(screen.getAllByRole('rowheader').map((el) => el.textContent)).toEqual([
     '官方目录描述',
@@ -215,7 +239,7 @@ it('all seven comparison rows remain visible and removal keeps other columns', a
   ).toBeInTheDocument();
 });
 it('clearing comparison produces a usable empty state', async () => {
-  page('/compare');
+  page('/compare-demo');
   await userEvent.click(screen.getByRole('button', { name: '清空对比' }));
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: '回到课程搜索' })).toHaveAttribute(
@@ -231,7 +255,7 @@ it.each([
   'removing %s moves keyboard focus to the neighboring %s control',
   async (code, neighbor) => {
     const user = userEvent.setup();
-    page('/compare');
+    page('/compare-demo');
     screen.getByRole('button', { name: `移出 ${code}` }).focus();
     await user.keyboard('{Enter}');
     expect(
@@ -244,7 +268,7 @@ it.each([
 );
 it('removing the last comparison course focuses the empty-state action', async () => {
   const user = userEvent.setup();
-  page('/compare');
+  page('/compare-demo');
   for (const code of ['CS 5800', 'CS 6140', 'DS 5220', 'CS 5100']) {
     screen.getByRole('button', { name: `移出 ${code}` }).focus();
     await user.keyboard('{Enter}');
@@ -256,27 +280,10 @@ it('removing the last comparison course focuses the empty-state action', async (
 });
 it('clearing comparison focuses its remaining keyboard action', async () => {
   const user = userEvent.setup();
-  page('/compare');
+  page('/compare-demo');
   screen.getByRole('button', { name: '清空对比' }).focus();
   await user.keyboard('{Enter}');
   expect(screen.getByRole('link', { name: '回到课程搜索' })).toHaveFocus();
-});
-it('comparison sidebar count follows the external store through removal and clear', async () => {
-  const user = userEvent.setup();
-  page('/compare');
-  const nav = screen.getByRole('navigation', { name: '主导航' });
-  expect(within(nav).getByRole('link', { name: /课程对比/ })).toHaveTextContent(
-    '4',
-  );
-  await user.click(screen.getByRole('button', { name: '移出 CS 6140' }));
-  expect(within(nav).getByRole('link', { name: /课程对比/ })).toHaveTextContent(
-    '3',
-  );
-  await user.click(screen.getByRole('button', { name: '清空对比' }));
-  expect(screen.queryByRole('table')).not.toBeInTheDocument();
-  expect(
-    within(nav).getByRole('link', { name: /课程对比/ }),
-  ).not.toHaveTextContent(/[1-4]/);
 });
 it.each([
   'CS 5800 讲什么？',
@@ -294,21 +301,6 @@ it.each([
     expect(screen.getByRole('article', { name: '示例回答' })).toHaveFocus();
   },
 );
-it('compare removal survives route navigation within the prototype', async () => {
-  const user = userEvent.setup();
-  page('/compare');
-  await user.click(screen.getByRole('button', { name: '移出 CS 6140' }));
-  await user.click(screen.getByRole('link', { name: '查看 CS 5800' }));
-  await user.click(screen.getByRole('link', { name: /课程对比/ }));
-  expect(
-    screen.queryByRole('button', { name: '移出 CS 6140' }),
-  ).not.toBeInTheDocument();
-  expect(
-    within(screen.getByRole('region', { name: '课程对比内容' })).getByText(
-      '已选择 3/4 门；按加入顺序展示，不排名、不判断选课或毕业资格。',
-    ),
-  ).toBeInTheDocument();
-});
 it('project and plan choices survive route navigation and a project change clears the plan', async () => {
   const user = userEvent.setup();
   page();

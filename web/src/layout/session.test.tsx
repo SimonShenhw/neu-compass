@@ -251,7 +251,8 @@ describe('coming back from Google', () => {
   );
 
   it('a wrong state is refused before anything is sent', async () => {
-    pendingLogin('/coop');
+    // A page that asks for nothing by itself (an empty comparison), so any request would be the login's.
+    pendingLogin('/compare');
     const fetch = vi.fn<Fetch>();
     vi.stubGlobal('fetch', fetch);
     page('/?code=synthetic-code&state=someone-elses-state-0123456789');
@@ -259,7 +260,7 @@ describe('coming back from Google', () => {
       expect(notice()).toHaveTextContent('登录没有完成，请重新登录。'),
     );
     // React Router commits a navigation in a transition, after the notice.
-    await waitFor(() => expect(where()).toHaveTextContent('/coop'));
+    await waitFor(() => expect(where()).toHaveTextContent('/compare'));
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -624,5 +625,117 @@ describe('the hook', () => {
         unsure: true,
       }),
     );
+  });
+});
+
+describe('the account the pages get (R5d)', () => {
+  function at(path: string, client = seededQueryClient()) {
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return (
+        <WithApi client={client}>
+          <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+        </WithApi>
+      );
+    };
+  }
+
+  it('is the account box’s viewer', () => {
+    const { result } = renderHook(() => useSession(vi.fn(), vi.fn()), {
+      wrapper: at('/', seededQueryClient({ viewer: MEMBER })),
+    });
+    expect(result.current.account).toMatchObject({
+      viewer: MEMBER,
+      unsure: false,
+    });
+    expect(result.current.account.login).toBe(result.current.login);
+  });
+
+  it('knows nobody while the address still carries Google’s code', () => {
+    pendingLogin('/');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>(() => new Promise<Response>(() => {})),
+    );
+    const { result } = renderHook(() => useSession(vi.fn(), vi.fn()), {
+      wrapper: at(
+        `/?code=synthetic-code&state=${STATE}`,
+        seededQueryClient({ viewer: MEMBER }),
+      ),
+    });
+    expect(result.current.session).toEqual({ kind: 'checking' });
+    expect(result.current.account).toMatchObject({
+      viewer: undefined,
+      unsure: false,
+    });
+  });
+
+  it('knows nobody, not even as unsure, while the address carries Google’s code after /auth/me had failed', () => {
+    pendingLogin('/');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>(() => new Promise<Response>(() => {})),
+    );
+    const client = seededQueryClient();
+    const me = client.getQueryCache().find({ queryKey: meQuery.queryKey })!;
+    me.setState({
+      ...me.state,
+      status: 'error',
+      data: undefined,
+      error: new Error('API 503'),
+    });
+    const { result } = renderHook(() => useSession(vi.fn(), vi.fn()), {
+      wrapper: at(`/?code=synthetic-code&state=${STATE}`, client),
+    });
+    expect(result.current.account).toMatchObject({
+      viewer: undefined,
+      unsure: false,
+    });
+  });
+
+  it('a new count from the server goes in as a change of viewer; the same count, or a guest, changes nothing', async () => {
+    const client = seededQueryClient({ viewer: MEMBER });
+    const kept = ['viewer', 'member:u-1:2', 'coop'];
+    client.setQueryData(kept, []);
+    const { result } = renderHook(() => useSession(vi.fn(), vi.fn()), {
+      wrapper: at('/', client),
+    });
+    await act(() => result.current.account.contributed(2));
+    expect(client.getQueryData(kept)).toEqual([]);
+    await act(() => result.current.account.contributed(3));
+    expect(client.getQueryData(meQuery.queryKey)).toEqual({
+      ...MEMBER,
+      contributionCount: 3,
+    });
+    expect(client.getQueryData(kept)).toBeUndefined();
+    await waitFor(() =>
+      expect(result.current.session).toMatchObject({ contributionCount: 3 }),
+    );
+    const guest = seededQueryClient();
+    const { result: asGuest } = renderHook(() => useSession(vi.fn(), vi.fn()), {
+      wrapper: at('/', guest),
+    });
+    await act(() => asGuest.current.account.contributed(3));
+    expect(guest.getQueryData(meQuery.queryKey)).toEqual(GUEST);
+  });
+
+  it('signedOut forgets the viewer, the comparison and what was kept for them, and sends nothing', async () => {
+    const fetch = vi.fn<Fetch>();
+    vi.stubGlobal('fetch', fetch);
+    const client = seededQueryClient({ viewer: MEMBER });
+    client.setQueryData([...VIEWER_KEY, 'member:u-1:2', 'coop'], []);
+    addToCompare('c-cs-5800');
+    const announce = vi.fn();
+    const { result } = renderHook(() => useSession(announce, vi.fn()), {
+      wrapper: at('/', client),
+    });
+    await act(() => result.current.account.signedOut());
+    expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
+    expect(client.getQueriesData({ queryKey: VIEWER_KEY })).toEqual([]);
+    expect(getCompareList()).toEqual([]);
+    await waitFor(() =>
+      expect(result.current.session).toMatchObject({ kind: 'guest' }),
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(announce).not.toHaveBeenCalled();
   });
 });

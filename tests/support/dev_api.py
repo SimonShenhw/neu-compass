@@ -4,7 +4,12 @@ For this machine only: `npm run dev` in web/ talks to it, and the browser accept
 never deployed, production code never imports it, and the API has no test mode; this is the test suite's own
 stand-ins put together:
 
-  - a synthetic database in a temporary file: db/init.sql and the three courses of tests/conftest.py;
+  - a synthetic database in a temporary file: db/init.sql, the three courses of tests/conftest.py and made-up Co-op
+    records (R5d): three curated seeds, one per field tier, and two groups of uploads that went through the real
+    review, each with two different contributors (k=2), so the sign-in page's dev-one and dev-two have one and two
+    contributions credited the way production credits them (a third contributor, who never signs in here, completes
+    the second group). Deleting an account runs the real deletion on this database, so a group left with one
+    contributor is withdrawn; a restart brings everything back;
   - Google replaced: /auth/login-url sends the browser to a sign-in page served here (/__dev/google) whose links
     bring it back to the front end with a code, and /auth/callback exchanges that code with a stand-in; some codes are
     refused the way Google or the claim checks refuse them, one link carries a wrong state, one is "cancel";
@@ -23,7 +28,10 @@ site for the browser, so the SameSite=Lax session cookie goes along.
 Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8000]
 
 中文：给新前端开发和验收用的本机 API，不连 Google、不加载模型、不用真实数据（R2b）。只在本机用，不部署，生产代码不
-import 它，API 里也没有任何测试模式；这里只是把测试套件自己的替身拼在一起：临时文件里的合成数据库；假的 Google 登录页
+import 它，API 里也没有任何测试模式；这里只是把测试套件自己的替身拼在一起：临时文件里的合成数据库，里面还有编出来的
+Co-op 记录（R5d）：三条策展种子，每个字段层级一条；两组照真的审核流程公开的投稿，每组两个不同的投稿人（k=2），所以登录页上
+dev-one、dev-two 的贡献和生产一样记功，一次和两次（第二组的另一个投稿人不在登录页上）；删号在这个库上照真的走，只剩一个
+投稿人的组会撤回，重启就都回来了；假的 Google 登录页
 （/__dev/google），点链接带着 code 回到前端，回调用替身换 code，有几个 code 会像 Google 或身份检查那样被拒，还有一个
 state 不对的链接和一个「取消」；模型换成 tests/conftest.py 的替身；/chat 按脚本回答，从不调用 Gemini，会调用它的 HyDE
 补救也关掉。问题里带上面那几个词，就换成对应的脚本：模型中途出错、没有回答、今天的次数用完、流没有 done 就结束、连接中途
@@ -61,6 +69,10 @@ ACCOUNTS = {
                     "name": "Second Student"}),
     "dev-no-name": ("No display name · husky.neu.edu",
                     {"user_id": "dev-sub-noname", "email": "synthetic.noname@husky.neu.edu", "name": ""}),
+    "dev-one": ("Synthetic One · husky.neu.edu · 1 credited contribution",
+                {"user_id": "dev-sub-one", "email": "synthetic.one@husky.neu.edu", "name": "Synthetic One"}),
+    "dev-two": ("Synthetic Two · northeastern.edu · 2 credited contributions",
+                {"user_id": "dev-sub-two", "email": "synthetic.two@northeastern.edu", "name": "Synthetic Two"}),
 }
 # code -> (what the sign-in page says, the OAuthError reason). 中文：code -> （登录页上的字，拒绝的原因）。
 REFUSALS = {
@@ -70,6 +82,36 @@ REFUSALS = {
 }
 WRONG_STATE = "dev-wrong-state-0123456789abcdef"
 SIGN_IN_PATH = "/__dev/google"
+# The second group's other contributor, never on the sign-in page. 中文：第二组的另一个投稿人，不在登录页上。
+PEER = {"user_id": "dev-sub-peer", "email": "synthetic.peer@husky.neu.edu", "name": "Synthetic Peer"}
+ONE, TWO = ACCOUNTS["dev-one"][1]["user_id"], ACCOUNTS["dev-two"][1]["user_id"]
+ANALYST = {"company": "Example Analytics Co.", "role": "Data Analyst Co-op", "coop_term": "Fall 2025"}
+BACKEND = {"company": "Demo Systems Inc.", "role": "Backend Engineer Co-op", "coop_term": "Spring 2026"}
+# Co-op records, newest first: (who uploaded it, the experience). None is a curated seed; the rest are two groups (the
+# same company, role and term) of two contributors each. Companies, roles and text are made up.
+# 中文：Co-op 记录，最新的在前：（谁投的，经历）。None 是策展种子；其余是两组（公司、职位、学期相同），每组两个投稿人。
+# 公司、职位和文字都是编的。
+COOP = (
+    (None, dict(coop_id="coop-dev-seed-quant", company="Example Quant LLC", role="Quant Developer Co-op",
+                industry="quant_fintech", coop_term="Spring 2026", duration_months=6,
+                related_courses=["CS 5800", "DS 5220"],
+                interview_summary="两轮：先是电话面，问简历和一道概率题；第二轮写一段数据清洗的代码。",
+                technical_questions="期望和方差的推导；一道二分查找。", salary_range_usd="$40-45/hr")),
+    (TWO, dict(coop_id="coop-dev-analyst-two", **ANALYST, industry="consulting", duration_months=4,
+               related_courses=["DS 5220"], technical_questions="写一个按月汇总的 SQL；解释 A/B 测试要多少样本。",
+               salary_range_usd="$30-35/hr")),
+    (ONE, dict(coop_id="coop-dev-analyst-one", **ANALYST, industry="consulting", duration_months=4,
+               related_courses=["AAI 6600"], interview_summary="一轮电话面，问 SQL 和一个分析案例。")),
+    (None, dict(coop_id="coop-dev-seed-health", company="Sample Health Inc.", role="Data Science Co-op",
+                industry="biotech_health", coop_term="Fall 2025", duration_months=4, related_courses=["DS 5220"],
+                interview_summary="一轮行为面加一轮技术面，技术面聊做过的机器学习项目。")),
+    (PEER["user_id"], dict(coop_id="coop-dev-backend-peer", **BACKEND, industry="big_tech", duration_months=6,
+                           technical_questions="设计一个限流器；一道图上的最短路。")),
+    (TWO, dict(coop_id="coop-dev-backend-two", **BACKEND, industry="big_tech", duration_months=6,
+               related_courses=["CS 5800"])),
+    (None, dict(coop_id="coop-dev-seed-robotics", company="Demo Robotics", role="Software Engineer Co-op",
+                industry="startup", coop_term="Summer 2026", duration_months=6)),
+)
 # The scripted answer, in pieces. 中文：脚本里的回答，分成几块。
 ANSWER = ("按合成目录，", "CS 5800 ", "是算法课，", "CS 6140 ", "是机器学习。", "（这是开发用的假回答，", "没有调用模型。）")
 PIECE_SECONDS = 0.05  # Between pieces, so the page shows the answer arriving. 中文：块与块之间停一下，页面上看得出在流。
@@ -117,6 +159,41 @@ def configure(settings, db_path: Path) -> None:
     settings.answer_feedback_enabled = False
 
 
+def seed_coop(conn) -> None:
+    """The Co-op records and their contributors, through production's own code: the accounts are created as a login
+    creates them, and the uploads are submitted and approved as the API and a reviewer do, so the review publishes
+    each group and credits each contributor once. No count is ever set by hand.
+    中文：Co-op 记录和投稿人，都走生产自己的代码：账号照登录那样建，投稿照 API 和审核员那样提交、通过，于是每组由审核公开、
+    每个投稿人记功一次。贡献数从不手写。"""
+    from db.coop_repository import CoopRepository  # noqa: PLC0415
+    from db.coop_submission_repository import CoopSubmissionRepository  # noqa: PLC0415
+    from db.user_repository import UserRepository  # noqa: PLC0415
+    from schemas.coop import CoopExperience, derive_visibility  # noqa: PLC0415
+
+    users = UserRepository(conn)
+    for identity in (ACCOUNTS["dev-one"][1], ACCOUNTS["dev-two"][1], PEER):
+        users.upsert_login(user_id=identity["user_id"], email=identity["email"],
+                           domain=identity["email"].partition("@")[2].lower(), display_name=identity["name"] or None)
+    submissions = CoopSubmissionRepository(conn)
+    for contributor, fields in COOP:
+        level = derive_visibility(interview_summary=fields.get("interview_summary"),
+                                  technical_questions=fields.get("technical_questions"),
+                                  salary_range_usd=fields.get("salary_range_usd"))
+        if contributor is None:
+            CoopRepository(conn).add(CoopExperience(**fields, is_seed_data=True, visibility_level=level))
+        else:
+            submissions.submit(CoopExperience(**fields, contributor_user_id=contributor, visibility_level=level))
+    for contributor, fields in COOP:
+        if contributor is not None:
+            submissions.review(fields["coop_id"], approve=True, reviewer="dev-api",
+                               audit="Synthetic; nothing to redact.", redacted=CoopExperience(**fields))
+    # Fixed times a day apart, so the list (newest first) is in the order above on every start.
+    # 中文：时间固定、相隔一天，列表（最新的在前）每次启动都是上面的顺序。
+    for days, (_, fields) in enumerate(COOP):
+        conn.execute("UPDATE coop_experiences SET created_at = datetime('2026-10-20 12:00:00', ?) WHERE coop_id = ?",
+                     (f"-{days} days", fields["coop_id"]))
+
+
 def make_database(db_path: Path) -> None:
     from db.connection import connect  # noqa: PLC0415
     from tests.conftest import seed_minimal_corpus  # noqa: PLC0415
@@ -125,6 +202,7 @@ def make_database(db_path: Path) -> None:
     try:
         conn.executescript((ROOT / "db" / "init.sql").read_text(encoding="utf-8"))
         seed_minimal_corpus(conn)
+        seed_coop(conn)
         conn.commit()
     finally:
         conn.close()

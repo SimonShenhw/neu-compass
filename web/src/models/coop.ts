@@ -116,9 +116,12 @@ export function prepareSubmission(
     },
   };
 }
-export function errorField(detail: string | undefined): CoopField | null {
-  const name = detail?.split(':', 1)[0];
-  return name && Object.hasOwn(fieldLabels, name) ? (name as CoopField) : null;
+// The form's own fields among those a 422 refused. R2b reads the names from the API's detail; the detail itself never
+// reaches the page (R5d).
+export function errorFields(names: readonly string[]): CoopField[] {
+  return names.filter((name): name is CoopField =>
+    Object.hasOwn(fieldLabels, name),
+  );
 }
 export const outcomeMessages = {
   pending: '已私有收集，等待人工脱敏审核；尚未公开，也未新增贡献奖励。',
@@ -126,10 +129,18 @@ export const outcomeMessages = {
   published: '已审核并公开；贡献奖励以服务端计数为准。',
   rejected: '此提交已被审核拒绝；未公开，请联系审核员处理。',
 };
-export function failureMessage(status: number, hasBody: boolean) {
+// No answer from the API itself: none came (R2b's transport_*), it was not the API's (a proxy's page has no
+// error_type), or it could not be read.
+const NOT_THE_API = new Set<string | null>([
+  null,
+  'transport_error',
+  'transport_timeout',
+  'invalid_response',
+]);
+export function failureMessage(status: number, errorType: string | null) {
   if (status === 401) return '登录已经失效，请重新登录后再提交。';
   if (status === 422) return invalidMessage;
-  if (status === 503 || !hasBody)
+  if (status === 503 || NOT_THE_API.has(errorType))
     return '投稿暂时提交不了，请稍后再试。你填的内容还在。';
   return '提交没有成功，请稍后再试。';
 }

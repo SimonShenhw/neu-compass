@@ -5,6 +5,9 @@ import { MobileNav } from './MobileNav';
 import type { Sidebar } from './Sidebar';
 import styles from './TopBar.module.css';
 
+// The privacy page and its demo carry the lock (R5c, R5d).
+const PRIVACY = new Set(['数据与隐私', '数据与隐私演示']);
+
 export function TopBar({
   title,
   count,
@@ -33,8 +36,8 @@ export function TopBar({
           NEU-Compass
         </Link>
       </div>
-      <h1 className={title === '数据与隐私' ? styles.privacyTitle : undefined}>
-        {title === '数据与隐私' && <Lock aria-hidden="true" />}
+      <h1 className={PRIVACY.has(title) ? styles.privacyTitle : undefined}>
+        {PRIVACY.has(title) && <Lock aria-hidden="true" />}
         {title}
       </h1>
       <div className={styles.status}>

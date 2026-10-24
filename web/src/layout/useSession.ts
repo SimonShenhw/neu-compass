@@ -1,7 +1,7 @@
 // Who is looking, and the login and logout buttons (R2b). AppShell uses this once and hands the result to the
 // desktop sidebar and the mobile menu.
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LOGIN_MESSAGES,
@@ -14,6 +14,7 @@ import {
 import { GUEST, meQuery, shownData, useConfig, useMe } from '../api/queries';
 import type { Viewer } from '../api/queries';
 import { clearCompare } from '../models/compareList';
+import type { Account } from './account';
 import type { SessionView } from './Sidebar';
 
 // The first key of every query whose answer depends on who is asking (R5d's Co-op list and the like): dropped at
@@ -109,23 +110,40 @@ export function useSession(
       });
   }, [announce, busy, go, location]);
 
+  // Forgetting who was looking, at a logout and when the account is gone.
+  const forget = useCallback(async () => {
+    await becomes(GUEST);
+    clearCompare();
+  }, [becomes]);
+
   const signOut = useCallback(() => {
     if (busy) return;
     setBusy('logout');
     logout()
       .then(
         async () => {
-          await becomes(GUEST);
-          clearCompare();
+          await forget();
           announce(LOGIN_MESSAGES.loggedOut);
         },
         // The cookie is HttpOnly: without the API's answer the session may still be alive, so say so.
         () => announce(LOGIN_MESSAGES.logoutFailed),
       )
       .finally(() => setBusy(null));
-  }, [announce, becomes, busy]);
+  }, [announce, busy, forget]);
+
+  // An upload's 201 carries the server's contribution count (R0 8: never one more than before, by inference). A new
+  // count changes what this viewer may see, so it goes in as a change of viewer: what was shown for the old count goes.
+  const contributed = useCallback(
+    async (count: number) => {
+      const current = queryClient.getQueryData(meQuery.queryKey);
+      if (current?.kind === 'member' && current.contributionCount !== count)
+        await becomes({ ...current, contributionCount: count });
+    },
+    [becomes, queryClient],
+  );
 
   const viewer = shownData(me);
+  const unsure = viewer === undefined && me.isError;
   const loginState = shownData(config)?.login_available
     ? 'ready'
     : config.isPending
@@ -144,7 +162,20 @@ export function useSession(
         : {
             kind: 'guest',
             login: busy === 'login' ? 'busy' : loginState,
-            unsure: viewer === undefined && me.isError,
+            unsure,
           };
-  return { session, login, logout: signOut };
+  // For the pages (R5d): the same viewer as the account box. While the address still carries Google's code nobody
+  // is known yet, so a page waits before it asks for anything that depends on who is looking.
+  const settled = busy !== 'returning';
+  const account: Account = useMemo(
+    () => ({
+      viewer: settled ? viewer : undefined,
+      unsure: settled && unsure,
+      login,
+      signedOut: forget,
+      contributed,
+    }),
+    [contributed, forget, login, settled, unsure, viewer],
+  );
+  return { session, login, logout: signOut, account };
 }

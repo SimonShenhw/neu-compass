@@ -1,11 +1,12 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { App } from '../App';
-import { clearCompare, getCompareList } from '../models/compareList';
+import { demoList } from '../fixtures/compareDemo';
+import { addToCompare, getCompareList } from '../models/compareList';
 import { WithApi } from '../test/withApi';
-function page(path = '/compare') {
+function page(path = '/compare-demo') {
   return render(
     <WithApi>
       <MemoryRouter initialEntries={[path]}>
@@ -26,41 +27,52 @@ it.each([
 ] as const)(
   'demo case %s seeds only its intended IDs and columns',
   (name, count) => {
-    page(`/compare?case=${name}`);
-    expect(getCompareList()).toHaveLength(count);
+    page(`/compare-demo?case=${name}`);
+    expect(demoList.get()).toHaveLength(count);
     expect(screen.queryAllByRole('columnheader')).toHaveLength(
       count ? count + 1 : 0,
     );
   },
 );
 it('unknown case safely falls back to four synthetic IDs', () => {
-  page('/COMPARE/?case=unknown');
-  expect(getCompareList()).toEqual([
+  page('/COMPARE-DEMO/?case=unknown');
+  expect(demoList.get()).toEqual([
     'c-cs-5800',
     'c-cs-6140',
     'c-ds-5220',
     'c-cs-5100',
   ]);
 });
-it('returning to a cleared session never resurrects demo IDs', async () => {
+it('returning to a cleared demo never resurrects demo IDs', async () => {
   const user = userEvent.setup();
-  page();
+  const first = page();
   await user.click(screen.getByRole('button', { name: '清空对比' }));
-  await user.click(screen.getByRole('link', { name: '回到课程搜索' }));
-  await user.click(screen.getByRole('link', { name: /课程对比/ }));
-  expect(getCompareList()).toEqual([]);
+  first.unmount();
+  page();
+  expect(demoList.get()).toEqual([]);
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
-it('an external auth-style clear stays cleared without changing the case', () => {
-  page();
-  act(() => clearCompare());
-  expect(getCompareList()).toEqual([]);
-  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+it('the demo keeps its own list: the student’s comparison and the sidebar count stay as they were (R5d)', async () => {
+  const user = userEvent.setup();
+  act(() => {
+    addToCompare('c-student-choice');
+  });
+  page('/compare-demo?case=four');
+  expect(demoList.get()).toHaveLength(4);
+  expect(getCompareList()).toEqual(['c-student-choice']);
+  const nav = screen.getByRole('navigation', { name: '主导航' });
+  expect(within(nav).getByRole('link', { name: /课程对比/ })).toHaveTextContent(
+    '1',
+  );
+  await user.click(screen.getByRole('button', { name: '移出 CS 6140' }));
+  await user.click(screen.getByRole('button', { name: '清空对比' }));
+  expect(demoList.get()).toEqual([]);
+  expect(getCompareList()).toEqual(['c-student-choice']);
 });
 it('failed reload affects only failed columns for 400ms and cancels on case change', async () => {
   vi.useFakeTimers();
   try {
-    page('/compare?case=failed');
+    page('/compare-demo?case=failed');
     expect(screen.getAllByText('加载失败')).toHaveLength(14);
     fireEvent.click(screen.getByRole('button', { name: '重新加载' }));
     expect(screen.getAllByText('正在加载')).toHaveLength(16);
