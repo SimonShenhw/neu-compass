@@ -160,7 +160,7 @@ function notice(body: JsonObject, only?: readonly string[]): DisplayLine[] {
 
 // Round the exact IEEE-754 value to six decimal significant digits, like Python :g.
 // JS toPrecision alone uses the wrong tie rule for exact halves (123456.5).
-function scaledEven(value: number, places: number): bigint {
+export function scaledEven(value: number, places: number): bigint {
   const view = new DataView(new ArrayBuffer(8));
   view.setFloat64(0, value);
   const bits = view.getBigUint64(0);

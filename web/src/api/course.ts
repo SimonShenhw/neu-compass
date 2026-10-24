@@ -30,3 +30,48 @@ export interface ComparePageProps {
   onClear: () => void;
   onReload: () => void;
 }
+
+// Handwritten R3b response contract; runtime parsing is deliberately separate.
+export interface CatalogSnapshot {
+  course_code: string;
+  course_name: string;
+  description: string | null;
+  credits: number | null;
+  prereq_codes: string[];
+  catalog_url: string;
+  snapshot_id: string;
+  imported_at: string;
+  retrieved_at: string | null;
+}
+export interface AnswerEvidence {
+  catalog: CatalogSnapshot | null;
+  source_review_ids: string[];
+  missing_fields: string[];
+  warnings: string[];
+}
+export interface EvidenceSnippet {
+  field: string;
+  value: unknown;
+  source_id: string;
+  quote: string;
+  confidence: number;
+}
+export interface CourseDetailBody extends Omit<
+  CourseDetail,
+  'delivery_mode' | 'answer_evidence' | 'course_requisites'
+> {
+  delivery_mode: 'in_person' | 'online' | 'hybrid' | 'async' | null;
+  professor: string[];
+  skill_tags: string[];
+  career_relevance: string[];
+  ai_policy: null | {
+    permitted_tools: string[];
+    banned_tools: string[];
+    disclosure_required: boolean;
+    notes: string | null;
+  };
+  evidence_snippets: EvidenceSnippet[];
+  answer_evidence?: AnswerEvidence | null;
+  course_requisites?: unknown;
+  prerequisites: unknown;
+}

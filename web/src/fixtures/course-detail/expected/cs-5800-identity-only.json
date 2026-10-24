@@ -1,0 +1,116 @@
+{
+  "case": "cs-5800-identity-only",
+  "scenarios": [
+    {
+      "name": "compare empty",
+      "compare": [],
+      "raw": [
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-card\"><span class=\"nc-card-code\">CS 5800</span><p class=\"nc-card-name\">Algorithms</p></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "button",
+          "value": "➕ 加入对比",
+          "disabled": false
+        },
+        {
+          "depth": 0,
+          "kind": "caption",
+          "value": "没有官方目录描述的存档。",
+          "help": null
+        },
+        {
+          "depth": 0,
+          "kind": "requisites",
+          "value": null
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "📎 来源与说明（数据从哪来、缺了什么）"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "来源：未附可追溯目录快照",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "缺失：官方描述、学分、开课学期、授课方式、教师、结构化先修信息、结构化主题、技能标签、每周工作量、难度、考核构成、职业方向；缺失不等于零/简单/无要求。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "未附可追溯的目录快照，不能将检索文本当作官方描述。",
+          "help": null
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "🔗 分享这门课"
+        },
+        {
+          "depth": 1,
+          "kind": "code",
+          "value": "http://localhost:8501/?course=CS-5800"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "把链接发给同学，他们打开就直接看到这门课。",
+          "help": null
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "header",
+          "code": "CS 5800",
+          "name": "Algorithms",
+          "chips": []
+        },
+        {
+          "depth": 0,
+          "kind": "button",
+          "text": "加入对比",
+          "disabled": false
+        },
+        {
+          "depth": 0,
+          "kind": "note",
+          "text": "没有官方目录描述的存档。"
+        },
+        {
+          "depth": 0,
+          "kind": "requisites_panel"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "来源与说明（数据从哪来、缺了什么）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、学分、开课学期、授课方式、教师、结构化先修信息、结构化主题、技能标签、每周工作量、难度、考核构成、职业方向；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "未附可追溯的目录快照，不能将检索文本当作官方描述。"
+        }
+      ]
+    }
+  ]
+}

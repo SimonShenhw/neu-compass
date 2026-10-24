@@ -1,0 +1,363 @@
+{
+  "case": "ds-5220-conflicts",
+  "scenarios": [
+    {
+      "name": "compare empty",
+      "compare": [],
+      "raw": [
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-card\"><span class=\"nc-card-code\">DS 5220</span><p class=\"nc-card-name\">Supervised Machine Learning and Learning Theory</p><div class=\"nc-meta-row\"><div class=\"nc-meta-chip\"><span class=\"nc-meta-label\">Term</span><span class=\"nc-meta-value\">Spring 2027</span></div><div class=\"nc-meta-chip\"><span class=\"nc-meta-label\">Credits</span><span class=\"nc-meta-value\">4</span></div><div class=\"nc-meta-chip\"><span class=\"nc-meta-label\">Mode</span><span class=\"nc-meta-value\">hybrid</span></div></div></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "button",
+          "value": "➕ 加入对比",
+          "disabled": false
+        },
+        {
+          "depth": 0,
+          "kind": "caption",
+          "value": "课程描述来自 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/ds/) 的存档副本，不是实时核对。",
+          "help": null
+        },
+        {
+          "depth": 0,
+          "kind": "caption",
+          "value": "⚠️ 目录的抓取日期没有记录；目录学分和课程记录不一致，请向学校核实；工作量、难度等是根据评价的估计，不是官方信息；有估计值和评价原文对不上，需要核实；主题列表没有来源；先修课之间是「都要」还是「任选」不清楚；培养方案关系没有核实，不是正式的 Plan of Study。",
+          "help": null
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">学生评价里的估计：</span>⏱️ 每周约 12 小时 · 🎚️ 难度 4.25/5</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "requisites",
+          "value": null
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">📝 考核构成：</span>Problem sets 50% · Exam 50%</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**主题**"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div><span class=\"nc-pill\">Learning theory</span><span class=\"nc-pill\">Regularization</span></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**📋 在培养方案里的位置**"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-prog-row\"><div class=\"nc-prog-name\">🎓 MS in Artificial Intelligence (synthetic)</div><div class=\"nc-prog-meta\"><span class=\"nc-badge\" style=\"background:#E8F1FF;color:#1677FF;\">基础 · foundation</span> <span class=\"nc-pill\">第 1 学期推荐</span></div></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "📎 来源与说明（数据从哪来、缺了什么）"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "来源：已存目录快照（非实时核验）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "缺失：官方描述、教师、技能标签、职业方向；缺失不等于零/简单/无要求。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "目录抓取日期未记录；导入时间不是抓取时间，也不证明当前开课。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "目录快照与课程记录的学分不一致，需向官方核实，不能静默合并。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "软字段是来源支持的抽取/评价，不是官方事实；抽取置信度不等于事实概率。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "结构化主题未附来源，需核实。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "先修代码未保留 AND/OR 语义，不能据此判断所有/任一必需。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "markdown",
+          "value": "[官方目录来源](https://catalog.northeastern.edu/course-descriptions/ds/) · 非实时核验"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "快照：5658f5ae723e… · 导入：2026-09-29 03:00",
+          "help": "完整快照 ID：catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "抓取：未记录",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**评价和大纲原文摘录（2 条）**"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "每周工作量 · 抽取置信度 0.70（不是事实概率）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "value": "支持值：10.0\n来源：课程大纲 · syllabus_ds5220_2027\n引文：Plan for ten hours a week. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "难度 · 抽取置信度 0.65（不是事实概率）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "value": "支持值：4.25\n来源：RateMyProfessors 教师评价 · rmp_review_ds5220_1\n引文：The proofs are tough. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "🔗 分享这门课"
+        },
+        {
+          "depth": 1,
+          "kind": "code",
+          "value": "http://localhost:8501/?course=DS-5220"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "把链接发给同学，他们打开就直接看到这门课。",
+          "help": null
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "header",
+          "code": "DS 5220",
+          "name": "Supervised Machine Learning and Learning Theory",
+          "chips": [
+            {
+              "label": "Term",
+              "value": "Spring 2027"
+            },
+            {
+              "label": "Credits",
+              "value": "4"
+            },
+            {
+              "label": "Mode",
+              "value": "hybrid"
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "button",
+          "text": "加入对比",
+          "disabled": false
+        },
+        {
+          "depth": 0,
+          "kind": "note_link",
+          "before": "课程描述来自 ",
+          "text": "NEU 官方课程目录",
+          "href": "https://catalog.northeastern.edu/course-descriptions/ds/",
+          "after": " 的存档副本，不是实时核对。"
+        },
+        {
+          "depth": 0,
+          "kind": "note",
+          "text": "目录的抓取日期没有记录；目录学分和课程记录不一致，请向学校核实；工作量、难度等是根据评价的估计，不是官方信息；有估计值和评价原文对不上，需要核实；主题列表没有来源；先修课之间是「都要」还是「任选」不清楚；培养方案关系没有核实，不是正式的 Plan of Study。"
+        },
+        {
+          "depth": 0,
+          "kind": "line",
+          "label": "学生评价里的估计",
+          "value": "每周约 12 小时 · 难度 4.25/5"
+        },
+        {
+          "depth": 0,
+          "kind": "requisites_panel"
+        },
+        {
+          "depth": 0,
+          "kind": "line",
+          "label": "考核构成",
+          "value": "Problem sets 50% · Exam 50%"
+        },
+        {
+          "depth": 0,
+          "kind": "heading",
+          "text": "主题"
+        },
+        {
+          "depth": 0,
+          "kind": "pills",
+          "items": [
+            "Learning theory",
+            "Regularization"
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "heading",
+          "text": "在培养方案里的位置"
+        },
+        {
+          "depth": 0,
+          "kind": "program_row",
+          "name": "MS in Artificial Intelligence (synthetic)",
+          "badge": "基础 · foundation",
+          "semester": "第 1 学期推荐"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "来源与说明（数据从哪来、缺了什么）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、教师、技能标签、职业方向；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "目录抓取日期未记录；导入时间不是抓取时间，也不证明当前开课。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "目录快照与课程记录的学分不一致，需向官方核实，不能静默合并。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "软字段是来源支持的抽取/评价，不是官方事实；抽取置信度不等于事实概率。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "数值估计与证据支持值不一致，需核验，不能当作已确定事实。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "结构化主题未附来源，需核实。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修代码未保留 AND/OR 语义，不能据此判断所有/任一必需。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。"
+        },
+        {
+          "depth": 1,
+          "kind": "link",
+          "text": "官方目录来源",
+          "href": "https://catalog.northeastern.edu/course-descriptions/ds/",
+          "after": " · 非实时核验"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "快照：5658f5ae723e… · 导入：2026-09-29 03:00",
+          "help": "完整快照 ID：catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "抓取：未记录"
+        },
+        {
+          "depth": 1,
+          "kind": "heading",
+          "text": "评价和大纲原文摘录（2 条）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "每周工作量 · 抽取置信度 0.70（不是事实概率）"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "支持值：10\n来源：课程大纲 · syllabus_ds5220_2027\n引文：Plan for ten hours a week. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "难度 · 抽取置信度 0.65（不是事实概率）"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "支持值：4.25\n来源：RateMyProfessors 教师评价 · rmp_review_ds5220_1\n引文：The proofs are tough. (Synthetic text for interface tests.)"
+        }
+      ]
+    }
+  ]
+}
