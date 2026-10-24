@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { searchFixture } from '../fixtures/searchDemo';
 import { parseChatMeta, requisiteYearsLine } from './chatMeta';
-import { parsePlanContext } from './planContext';
+import { parsePlanContext, placementText } from './planContext';
 import {
   parseReceipt,
   verifiedReceipt,
@@ -207,6 +207,25 @@ it('requisite selected-year cardinality, omitted count and other-year invariants
     }),
   ).toBe('所选方案 Catalog 2023-2024 没有可用的课程块规则。');
 });
+it('requisite year editions take any YYYY-YYYY pair, while the selected year must be consecutive', () => {
+  expect(
+    requisiteYearsLine({ ...years(), editions: [edition('2024-2026')] }),
+  ).toBe(
+    '先修/共修规则：已存 Catalog 2024-2026 的课程块原文（非实时核验，不判断能否注册）',
+  );
+  // Every other check holds here, so only the selected year's own rule can refuse it.
+  const other = {
+    ...years(),
+    selected_year: '2023-2024',
+    other_years_recorded: 1,
+  };
+  expect(requisiteYearsLine(other)).toBe(
+    '所选方案 Catalog 2023-2024 没有可用的课程块规则；展示的其他年份不能替代。',
+  );
+  expect(
+    requisiteYearsLine({ ...other, selected_year: '2023-2025' }),
+  ).toBeNull();
+});
 it('requisite missing counters and editions default, extras and undisplayed rules do not add validation', () => {
   expect(requisiteYearsLine({ storage: 'available' })).toBeNull();
   expect(
@@ -374,6 +393,36 @@ it('plan entry and collection bounds accept exact limits and optional defaults',
   (plan.placements_omitted as Record<string, unknown>).extra = 0;
   expect(parsePlanContext(plan, [...manyIds, 'extra'])).toBeNull();
 });
+it('placement text puts every piece in the spec order and joins the areas with 、', () => {
+  expect(
+    placementText({
+      path: ['核心', '算法'],
+      relation: 'required',
+      under_any_of: true,
+      activate_when: ['选 Align'],
+      min_courses: 2,
+      min_credits: 8,
+      min_areas: 1,
+      areas: ['系统', '理论'],
+    }),
+  ).toBe(
+    '方案列明的必修课程；核心 > 算法；上层有 OR 分支，不是所有分支共同必修；条件：选 Align；该组至少 2 门；该组至少 8 学分；该组至少 1 领域；所属领域：系统、理论',
+  );
+});
+it('plan catalog year must be consecutive even when the source year agrees', () => {
+  const { plan, ids } = planInput();
+  expect(plan.source_url).not.toContain('/archive/');
+  expect(parsePlanContext(plan, ids)).not.toBeNull();
+  plan.catalog_year = plan.source_catalog_year = '2025-2027';
+  expect(parsePlanContext(plan, ids)).toBeNull();
+});
+it('plan dates must exist even when checked_on is not before captured_on', () => {
+  const { plan, ids } = planInput();
+  plan.checked_on = plan.captured_on = '2024-02-29';
+  expect(parsePlanContext(plan, ids)).not.toBeNull();
+  plan.checked_on = plan.captured_on = '2025-02-29';
+  expect(parsePlanContext(plan, ids)).toBeNull();
+});
 it.each([-1, 0.5, '0'])(
   'plan omitted counts reject %s without key mismatch masking',
   (bad) => {
@@ -430,6 +479,22 @@ it('receipt is bound to exact UTF-8 text, not trimmed text, partial text or a di
     .map((n) => n.toString(16).padStart(2, '0'))
     .join('');
   expect(await verifiedReceipt(unicode, r)).toEqual(r);
+});
+async function sha256(text: string) {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(text),
+  );
+  return [...new Uint8Array(digest)]
+    .map((n) => n.toString(16).padStart(2, '0'))
+    .join('');
+}
+it('receipt never verifies a blank answer, even with the hash of that blank text', async () => {
+  const r = receipt();
+  r.answer_sha256 = await sha256('x');
+  expect(await verifiedReceipt('x', r)).toEqual(r);
+  r.answer_sha256 = await sha256(' \n\t');
+  expect(await verifiedReceipt(' \n\t', r)).toBeNull();
 });
 it('feedback response requires exactly own keys, matching answer ID and clicked rating', () => {
   const vote = { ...parseReceipt(receipt())!, rating: 'up' as const };

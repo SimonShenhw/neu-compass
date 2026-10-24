@@ -20,6 +20,7 @@ import {
 } from '../fixtures/searchDemo';
 import { parseReceipt } from '../models/answerFeedback';
 import { getCompareList } from '../models/compareList';
+import { loadExpected } from '../features/search-answer/searchTestUtils';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -93,6 +94,23 @@ it('search demo view and followup only announce, while replay clears state and n
     screen.getByRole('status', { name: '搜索演示结果' }),
   ).toBeEmptyDOMElement();
   expect(container.querySelectorAll('[data-kind="question"]')).toHaveLength(1);
+});
+it('search demo says exactly which course it would open', async () => {
+  page();
+  await userEvent
+    .setup()
+    .click(await screen.findByRole('button', { name: '查看 CS 6140' }));
+  expect(screen.getByRole('status', { name: '搜索演示结果' }).textContent).toBe(
+    '演示：这里会打开 c-cs-6140',
+  );
+});
+it('search demo plays the four-turn conversation in the reference order', () => {
+  const expected = loadExpected<{ scenarios: { turns: string[] }[] }>(
+    'conversation-four-turns.json',
+  );
+  expect(searchSequence('conversation-four-turns')).toEqual(
+    expected.scenarios[0]!.turns,
+  );
 });
 it.each([
   ['回答反馈', 'on'],

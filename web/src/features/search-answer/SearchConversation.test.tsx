@@ -212,6 +212,110 @@ it('compact evidence excludes noncompact notices, caps missing labels at five an
   expect(container.textContent).not.toContain('主题列表没有来源');
   expect(container.textContent).not.toContain('没有官方目录的存档');
 });
+it('compact evidence calls a snapshot that failed its check untraceable', async () => {
+  const t = fixtureTurn('alias-cs-6140').turn;
+  if (t.meta?.kind !== 'ok') throw Error('fixture');
+  const e = t.meta.results[0]!.evidence;
+  if (!e) throw Error('fixture');
+  e.catalog = { kind: 'invalid' };
+  const { container } = render(<SearchConversation {...props()} turns={[t]} />);
+  await expandSearch(container);
+  expect(screen.getByText('来源：未附可追溯目录快照')).toBeVisible();
+  expect(container.textContent).not.toContain('已存目录快照');
+});
+it('result cards show 没有结果 for an unknown route and fold the course code onto one line', () => {
+  const t = fixtureTurn('alias-cs-6140').turn;
+  if (t.meta?.kind !== 'ok') throw Error('fixture');
+  t.meta.matched_via = 'new-route';
+  t.meta.results[0]!.primary_code = 'CS\f6140\n';
+  const { container } = render(<SearchConversation {...props()} turns={[t]} />);
+  expect(container.querySelector('[data-kind="badge"]')!.textContent).toBe(
+    '没有结果',
+  );
+  expect(container.querySelector('[data-code]')!.textContent).toBe('CS 6140');
+  expect(screen.getByRole('button', { name: '查看 CS 6140' })).toBeVisible();
+});
+it('score bars are measured against the highest score even when it is not listed first', () => {
+  const t = fixtureTurn('hybrid-neural-network').turn;
+  if (t.meta?.kind !== 'ok') throw Error('fixture');
+  const [first, second] = t.meta.results;
+  t.meta.results = [
+    { ...first!, score: 0.5 },
+    { ...second!, score: 1 },
+  ];
+  const { container } = render(<SearchConversation {...props()} turns={[t]} />);
+  expect(
+    [...container.querySelectorAll<HTMLElement>('[data-score-bar]')].map(
+      (bar) => bar.style.width,
+    ),
+  ).toEqual(['50%', '100%']);
+});
+it('plan position says when the plan does not place a course and when places were left out, and its source opens in a new tab', async () => {
+  const t = fixtureTurn('plan-ds-align').turn;
+  if (t.meta?.kind !== 'ok') throw Error('fixture');
+  const plan = t.meta.plan_context as {
+    placements: Record<string, unknown[]>;
+    placements_omitted: Record<string, number>;
+  };
+  plan.placements['c-ds-5220'] = [];
+  plan.placements_omitted['c-ds-5220'] = 2;
+  const { container } = render(<SearchConversation {...props()} turns={[t]} />);
+  await expandSearch(container);
+  expect(
+    screen.getByText(
+      'DS 5220：方案里没有写到这门课；不代表不能算，也不代表能算，请向项目核实。',
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByText('另有 2 处位置未列出，请到培养方案页核对完整规则。'),
+  ).toBeVisible();
+  const source = screen.getByRole('link', { name: '方案官方目录来源' });
+  expect(source).toHaveAttribute('target', '_blank');
+  expect(source).toHaveAttribute('rel', 'noopener noreferrer');
+});
+it('notice codes the page does not know show nothing', () => {
+  const t = fixtureTurn('alias-cs-6140').turn;
+  if (t.meta?.kind !== 'ok') throw Error('fixture');
+  t.meta.notices = ['future_notice', 'program_schedule_unverified'];
+  const { container } = render(<SearchConversation {...props()} turns={[t]} />);
+  expect(container.querySelectorAll('[data-kind="notice"]')).toHaveLength(1);
+});
+it('followups wait until the last turn has ended, and the status line says how it ended', () => {
+  const t = fixtureTurn('alias-cs-6140').turn,
+    p = props();
+  const status = () =>
+    screen.getByRole('status', { name: '回答状态' }).textContent;
+  const { rerender } = render(
+    <SearchConversation {...p} turns={[{ ...t, status: 'answering' }]} busy />,
+  );
+  expect(screen.queryByRole('group', { name: '接着问' })).toBeNull();
+  rerender(<SearchConversation {...p} turns={[t]} />);
+  expect(screen.getByRole('group', { name: '接着问' })).toBeVisible();
+  expect(status()).toBe('回答完成。');
+  const stopped = fixtureTurn('model-error').turn;
+  expect(stopped.status).toBe('stopped');
+  rerender(<SearchConversation {...p} turns={[stopped]} />);
+  expect(status()).toBe('回答没有完成。');
+});
+it('the saved rating is pressed and the other is not', async () => {
+  const p = props();
+  p.onFeedback.mockImplementation((vote) =>
+    Promise.resolve({ answer_id: vote.answer_id, rating: vote.rating }),
+  );
+  render(
+    <SearchConversation
+      {...p}
+      turns={[fixtureTurn('feedback-receipt').turn]}
+      feedbackEnabled
+    />,
+  );
+  const up = await screen.findByRole('button', { name: '有帮助' }),
+    down = screen.getByRole('button', { name: '没帮助' });
+  expect(up).toHaveAttribute('aria-pressed', 'false');
+  await userEvent.setup().click(up);
+  await waitFor(() => expect(up).toHaveAttribute('aria-pressed', 'true'));
+  expect(down).toHaveAttribute('aria-pressed', 'false');
+});
 it.each([
   ['flag off', false, true, 'done'],
   ['save off', true, false, 'done'],

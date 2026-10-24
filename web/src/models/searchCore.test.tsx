@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { expect, it } from 'vitest';
 import { answerBlocks } from './answerText';
-import type { AnswerBlock } from './answerText';
+import type { AnswerBlock, Inline } from './answerText';
 import { AnswerText } from '../features/search-answer/AnswerText';
 import {
   fixtureTurn,
@@ -11,9 +11,10 @@ import {
   settledTurns,
 } from '../features/search-answer/searchTestUtils';
 import { contextCourseIds, recentHistory } from './conversation';
-import { newTurn, turnReducer } from './chatTurn';
+import { incompleteTurn, newTurn, turnReducer } from './chatTurn';
 import { scorePercent, scoreText } from './chatMeta';
 import { chatFailureMessage, UNKNOWN_FAILURE } from './chatFailure';
+import type { ChatFailure } from '../api/chat';
 
 const vectors = loadExpected<
   { name: string; text: string; blocks: AnswerBlock[] }[]
@@ -45,6 +46,85 @@ it('answer parser tolerates long plain lines and delimiter runs without patholog
   expect(answerBlocks(text).length).toBeGreaterThan(0);
   expect(performance.now() - start).toBeLessThan(1500);
 });
+// Each limit next to its first value past it; the blocks come from the same Python reference as the vectors.
+const catalog = 'https://catalog.northeastern.edu/course-descriptions/cs/',
+  anchored = `${catalog}#${'a'.repeat(64)}`,
+  label = 'y'.repeat(200);
+const paragraph = (...inlines: Inline[]): AnswerBlock[] => [
+  { type: 'paragraph', inlines },
+];
+it.each([
+  [
+    'a 64-character anchor is part of the link',
+    `[x](${anchored})`,
+    paragraph({ t: 'link', v: 'x', href: anchored }),
+  ],
+  [
+    'a 65-character anchor is not',
+    `[x](${anchored}a)`,
+    paragraph(
+      { t: 'text', v: '[x](' },
+      { t: 'link', v: anchored, href: anchored },
+      { t: 'text', v: 'a)' },
+    ),
+  ],
+  [
+    'a 200-character label makes a link',
+    `[${label}](${catalog})`,
+    paragraph({ t: 'link', v: label, href: catalog }),
+  ],
+  [
+    'a 201-character label does not',
+    `[${label}y](${catalog})`,
+    paragraph(
+      { t: 'text', v: `[${label}y](` },
+      { t: 'link', v: catalog, href: catalog },
+      { t: 'text', v: ')' },
+    ),
+  ],
+  [
+    'tildes do not close a backtick fence',
+    '```\n~~~\n代码\n```',
+    [{ type: 'code', text: '~~~\n代码' }],
+  ],
+  [
+    'backticks do not close a tilde fence',
+    '~~~\n```\n代码\n~~~',
+    [{ type: 'code', text: '```\n代码' }],
+  ],
+  [
+    'a heading with nothing after the space is a paragraph',
+    '# ',
+    paragraph({ t: 'text', v: '#' }),
+  ],
+  [
+    'a heading with nothing after the tab is a paragraph',
+    '##\t',
+    paragraph({ t: 'text', v: '##' }),
+  ],
+  [
+    'nine digits start a list',
+    '123456789. 九位',
+    [
+      {
+        type: 'list',
+        ordered: true,
+        start: 123456789,
+        items: [[{ t: 'text', v: '九位' }]],
+      },
+    ],
+  ],
+  [
+    'ten digits are a paragraph',
+    '1234567890. 十位',
+    paragraph({ t: 'text', v: '1234567890. 十位' }),
+  ],
+] as [string, string, AnswerBlock[]][])(
+  'answer parser limit: %s',
+  (_name, text, blocks) => {
+    expect(answerBlocks(text)).toEqual(blocks);
+  },
+);
 const formats = loadExpected<
   { scores: number[]; rows: { score: number; text: string; pct: number }[] }[]
 >('format-vectors.json');
@@ -171,3 +251,55 @@ it('unknown failure never exposes raw error detail', () =>
   expect(chatFailureMessage(UNKNOWN_FAILURE)).toBe(
     '请求未完成，请稍后手动重试。',
   ));
+it.each([
+  [
+    '422 naming the question among other fields',
+    { status: 422, invalidFields: ['history', 'query'] },
+    '问题最多 500 个字，这个问题没有发出去。请改短一点再问。',
+  ],
+  [
+    '422 naming only other fields',
+    { status: 422, invalidFields: ['history'] },
+    '这次提问的格式不对，没有发出去。请改一下再问。',
+  ],
+  [
+    '502 that is not an unreadable answer',
+    { status: 502, errorType: 'upstream_error' },
+    '服务暂时出错，请稍后手动重试。',
+  ],
+  [
+    'a wait that is infinite',
+    { status: 429, retryAfter: Infinity },
+    '请求过于频繁，请稍后手动重试。',
+  ],
+  [
+    'a wait that is not a number',
+    { status: 503, retryAfter: NaN },
+    '服务暂不可用，请稍后手动重试。',
+  ],
+] as [string, Partial<ChatFailure>, string][])(
+  'failure message for %s',
+  (_name, failure, text) => {
+    expect(chatFailureMessage({ ...UNKNOWN_FAILURE, ...failure })).toBe(text);
+  },
+);
+it('an unfinished stream stops with the spec sentence word for word', () => {
+  expect(incompleteTurn(newTurn(1, 'q', false))).toMatchObject({
+    status: 'stopped',
+    error: {
+      errorType: 'incomplete_stream',
+      message: '回答流未完整结束；仅保留部分内容，请稍后手动重试。',
+    },
+  });
+});
+it('context course IDs skip a turn that is still running, even once its courses have arrived', () => {
+  const ended = fixtureTurn('alias-cs-6140').turn,
+    later = fixtureTurn('hybrid-neural-network', 2).turn;
+  if (later.meta?.kind !== 'ok') throw Error('fixture');
+  expect(contextCourseIds([ended, later])).toEqual(
+    later.meta.results.map((r) => r.course_id),
+  );
+  expect(contextCourseIds([ended, { ...later, status: 'answering' }])).toEqual([
+    'c-cs-6140',
+  ]);
+});
