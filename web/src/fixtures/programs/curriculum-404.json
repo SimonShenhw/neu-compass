@@ -1,0 +1,21 @@
+{
+  "case": "curriculum-404",
+  "notes": "GET /programs/{id} for a program that is gone: 404.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/gone-ms"
+  },
+  "status": 404,
+  "body": {
+    "detail": "program_id not found",
+    "error_type": "not_found",
+    "status_code": 404
+  },
+  "failure": {
+    "status": 404,
+    "errorType": "not_found",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

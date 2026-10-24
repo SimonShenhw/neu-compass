@@ -1,0 +1,37 @@
+{
+  "name": "list-empty",
+  "notes": "No programs yet.",
+  "props": {
+    "view": "list",
+    "programs": "programs-empty"
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "info",
+      "value": "还没有培养方案数据 — 运行 seed 脚本后刷新。"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "info",
+      "text": "暂时还没有可浏览的培养方案。"
+    }
+  ]
+}

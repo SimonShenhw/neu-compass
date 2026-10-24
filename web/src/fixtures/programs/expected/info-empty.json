@@ -1,0 +1,128 @@
+{
+  "name": "info-empty",
+  "notes": "No plans and no courses.",
+  "props": {
+    "view": "curriculum",
+    "programId": "info-ms",
+    "curriculum": "curriculum-info-ms",
+    "selectedPlanId": null,
+    "policies": null,
+    "planRevised": false,
+    "publicBaseUrl": "https://compass.example.test",
+    "planRevisions": {}
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "← 所有培养方案",
+      "key": "prog-back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "刷新方案及政策证据",
+      "key": "prog-refresh-info-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span class=\"nc-card-code\" style=\"font-size:1.35rem;\">INFO</span><p class=\"nc-card-name\">MS in Information Systems (synthetic)</p></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "尚无可用版本化方案；旧 seed 的校区、目录年度和路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "以下是旧 seed 的课程分类与学期建议，未经官方核验；校区/年度/路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "expander",
+      "value": "🔗 分享这个培养方案 · Share"
+    },
+    {
+      "depth": 1,
+      "kind": "code",
+      "value": "https://compass.example.test/?program=info-ms"
+    },
+    {
+      "depth": 1,
+      "kind": "caption",
+      "value": "这里只分享项目入口，不携带方案年度／路径；对方仍需明确选择版本。"
+    },
+    {
+      "depth": 0,
+      "kind": "info",
+      "value": "该培养方案还没有课程数据。"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "所有培养方案",
+      "action": "back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "刷新方案及政策证据",
+      "action": "refresh"
+    },
+    {
+      "depth": 0,
+      "kind": "header",
+      "prefix": "INFO",
+      "name": "MS in Information Systems (synthetic)"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "尚无可用版本化方案；旧课程表的校区、目录年度和路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "以下是旧课程表的课程分类与学期建议，未经官方核验；校区/年度/路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "disclosure",
+      "text": "分享这个培养方案"
+    },
+    {
+      "depth": 1,
+      "kind": "share_url",
+      "text": "https://compass.example.test/?program=info-ms"
+    },
+    {
+      "depth": 1,
+      "kind": "note",
+      "text": "这里只分享项目入口，不携带方案年度／路径；对方仍需明确选择版本。"
+    },
+    {
+      "depth": 0,
+      "kind": "info",
+      "text": "该培养方案还没有课程数据。"
+    }
+  ]
+}

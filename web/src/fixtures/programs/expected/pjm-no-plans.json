@@ -1,0 +1,188 @@
+{
+  "name": "pjm-no-plans",
+  "notes": "Courses but no version-scoped plan.",
+  "props": {
+    "view": "curriculum",
+    "programId": "pjm-ms",
+    "curriculum": "curriculum-pjm-ms",
+    "selectedPlanId": null,
+    "policies": null,
+    "planRevised": false,
+    "publicBaseUrl": "https://compass.example.test",
+    "planRevisions": {}
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "← 所有培养方案",
+      "key": "prog-back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "刷新方案及政策证据",
+      "key": "prog-refresh-pjm-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span class=\"nc-card-code\" style=\"font-size:1.35rem;\">PJM</span><p class=\"nc-card-name\">MS in Project Management (synthetic)</p></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "尚无可用版本化方案；旧 seed 的校区、目录年度和路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "以下是旧 seed 的课程分类与学期建议，未经官方核验；校区/年度/路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "expander",
+      "value": "🔗 分享这个培养方案 · Share"
+    },
+    {
+      "depth": 1,
+      "kind": "code",
+      "value": "https://compass.example.test/?program=pjm-ms"
+    },
+    {
+      "depth": 1,
+      "kind": "caption",
+      "value": "这里只分享项目入口，不携带方案年度／路径；对方仍需明确选择版本。"
+    },
+    {
+      "depth": 0,
+      "kind": "markdown",
+      "value": "**旧 seed：第 1 学期建议（未核验）**"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">PJM 5900</span> <span class=\"nc-result-name\">Foundations of Project Management</span> <span class=\"nc-badge\" style=\"background:#FFF1E6;color:#E8731A;\">核心 · core</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-pjm-ms-c-pjm-5900"
+    },
+    {
+      "depth": 0,
+      "kind": "markdown",
+      "value": "**旧 seed：第 2 学期建议（未核验）**"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">PJM 6000</span> <span class=\"nc-result-name\">Project Capstone</span> <span class=\"nc-badge\" style=\"background:#F0EBFF;color:#7B61FF;\">毕业项目 · capstone</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-pjm-ms-c-pjm-6000"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "所有培养方案",
+      "action": "back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "刷新方案及政策证据",
+      "action": "refresh"
+    },
+    {
+      "depth": 0,
+      "kind": "header",
+      "prefix": "PJM",
+      "name": "MS in Project Management (synthetic)"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "尚无可用版本化方案；旧课程表的校区、目录年度和路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "以下是旧课程表的课程分类与学期建议，未经官方核验；校区/年度/路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "disclosure",
+      "text": "分享这个培养方案"
+    },
+    {
+      "depth": 1,
+      "kind": "share_url",
+      "text": "https://compass.example.test/?program=pjm-ms"
+    },
+    {
+      "depth": 1,
+      "kind": "note",
+      "text": "这里只分享项目入口，不携带方案年度／路径；对方仍需明确选择版本。"
+    },
+    {
+      "depth": 0,
+      "kind": "heading",
+      "text": "旧课程表：第 1 学期建议（未核验）"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "PJM 5900",
+      "name": "Foundations of Project Management",
+      "badge": "核心 · core",
+      "notes": null
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-pjm-5900"
+    },
+    {
+      "depth": 0,
+      "kind": "heading",
+      "text": "旧课程表：第 2 学期建议（未核验）"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "PJM 6000",
+      "name": "Project Capstone",
+      "badge": "毕业项目 · capstone",
+      "notes": null
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-pjm-6000"
+    }
+  ]
+}

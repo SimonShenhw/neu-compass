@@ -1,0 +1,24 @@
+{
+  "case": "curriculum-info-ms",
+  "notes": "GET /programs/info-ms. No courses and no plans.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/info-ms"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "info-ms",
+    "full_name": "MS in Information Systems (synthetic)",
+    "prefix": "INFO",
+    "notes": null,
+    "semesters": [],
+    "plans": [],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null,
+  "proposed_plan_revisions": {}
+}

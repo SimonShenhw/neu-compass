@@ -1,0 +1,21 @@
+{
+  "name": "list-malformed",
+  "notes": "The list fails the check: one line, nothing else.",
+  "props": {
+    "view": "list",
+    "programs": "programs-malformed"
+  },
+  "raw": null,
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "warning",
+      "text": "培养方案列表的格式不对，没有显示。"
+    }
+  ]
+}

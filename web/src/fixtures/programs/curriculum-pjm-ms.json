@@ -1,0 +1,49 @@
+{
+  "case": "curriculum-pjm-ms",
+  "notes": "GET /programs/pjm-ms. Courses but no version-scoped plan.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/pjm-ms"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "pjm-ms",
+    "full_name": "MS in Project Management (synthetic)",
+    "prefix": "PJM",
+    "notes": null,
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-pjm-5900",
+            "primary_code": "PJM 5900",
+            "primary_name": "Foundations of Project Management",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-pjm-6000",
+            "primary_code": "PJM 6000",
+            "primary_name": "Project Capstone",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null,
+  "proposed_plan_revisions": {}
+}

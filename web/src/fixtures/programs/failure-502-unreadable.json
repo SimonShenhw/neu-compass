@@ -1,0 +1,19 @@
+{
+  "case": "failure-502-unreadable",
+  "notes": "A 200 whose body is not JSON (R2b: 502 invalid_response).",
+  "derived_from": null,
+  "edit": "A 200 whose body is not JSON (R2b: 502 invalid_response).",
+  "request": {
+    "method": "GET",
+    "path": null
+  },
+  "status": 200,
+  "body": null,
+  "failure": {
+    "status": 502,
+    "errorType": "invalid_response",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

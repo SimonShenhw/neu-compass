@@ -1,0 +1,67 @@
+{
+  "name": "cs-503",
+  "notes": "The curriculum could not be fetched.",
+  "props": {
+    "view": "curriculum",
+    "programId": "cs-ms",
+    "curriculum": "failure-503-transport",
+    "selectedPlanId": null,
+    "policies": null,
+    "planRevised": false,
+    "publicBaseUrl": "https://compass.example.test",
+    "planRevisions": {}
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "← 所有培养方案",
+      "key": "prog-back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "刷新方案及政策证据",
+      "key": "prog-refresh-cs-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "error",
+      "value": "无法加载课程表: 服务暂不可用，请稍后手动重试。"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "所有培养方案",
+      "action": "back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "刷新方案及政策证据",
+      "action": "refresh"
+    },
+    {
+      "depth": 0,
+      "kind": "warning",
+      "text": "无法加载课程表。服务暂不可用，请稍后手动重试。"
+    }
+  ]
+}

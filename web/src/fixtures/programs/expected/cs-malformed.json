@@ -1,0 +1,44 @@
+{
+  "name": "cs-malformed",
+  "notes": "The curriculum fails the check.",
+  "props": {
+    "view": "curriculum",
+    "programId": "cs-ms",
+    "curriculum": "curriculum-cs-ms-malformed",
+    "selectedPlanId": null,
+    "policies": null,
+    "planRevised": false,
+    "publicBaseUrl": "https://compass.example.test",
+    "planRevisions": {
+      "cs-ms-boston-2026-2027-align": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+      "cs-ms-boston-2026-2027-bridge": "974b3a8bb7d77e49c1e2933d78e2756d53097feeab8ac5c73c78b779de9376fd",
+      "cs-ms-boston-2026-2027-standard": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "cs-ms-boston-2025-2026-standard": "8d769db5672591d0980041ff4f77764b0a1ab3b9b9c24ee650e1c675438acf71"
+    }
+  },
+  "raw": null,
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "所有培养方案",
+      "action": "back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "刷新方案及政策证据",
+      "action": "refresh"
+    },
+    {
+      "depth": 0,
+      "kind": "warning",
+      "text": "课程表的格式不对，没有显示。"
+    }
+  ]
+}

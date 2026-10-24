@@ -1,0 +1,516 @@
+{
+  "case": "curriculum-cs-ms-duplicate-plan",
+  "notes": "The align plan appears twice: both copies are dropped.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "cs-ms",
+    "full_name": "MS in Computer Science (synthetic)",
+    "prefix": "CS",
+    "notes": "Synthetic program notes: the per-semester list below is an early table, not checked against the catalog.",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-cs-5010",
+            "primary_code": "CS 5010",
+            "primary_name": "Programming Design Paradigm",
+            "requirement_type": "core",
+            "notes": "Synthetic edge note: usually taken first."
+          },
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-5200",
+            "primary_code": "CS 5200",
+            "primary_name": "Database Management Systems",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-cs-7990",
+            "primary_code": "CS 7990",
+            "primary_name": "Thesis",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [
+      {
+        "plan_id": "cs-ms-boston-2026-2027-align",
+        "program_id": "cs-ms",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "align",
+        "concentration": null,
+        "coverage": "complete",
+        "review_status": "source_checked",
+        "checked_by": "synthetic-reviewer",
+        "checked_on": "2026-10-03",
+        "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science-mscs-boston/",
+        "source_title": "Computer Science, MSCS, Boston (synthetic)",
+        "source_catalog_year": "2026-2027",
+        "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+        "source_html_sha256": null,
+        "captured_on": "2026-10-01",
+        "notes": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)",
+        "requirements": {
+          "kind": "any_of",
+          "label": "Synthetic align options",
+          "course_code": null,
+          "children": [
+            {
+              "kind": "course",
+              "label": "Algorithms option (synthetic)",
+              "course_code": "CS 5800",
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "optional",
+              "label": "Synthetic thesis branch",
+              "course_code": null,
+              "children": [
+                {
+                  "kind": "course",
+                  "label": "Thesis (synthetic)",
+                  "course_code": "CS 7990",
+                  "children": [],
+                  "course_codes": [],
+                  "subject_codes": [],
+                  "course_ranges": [],
+                  "excluded_course_codes": [],
+                  "activate_when": null,
+                  "min_courses": null,
+                  "min_credits": null,
+                  "min_areas": null,
+                  "areas": {}
+                }
+              ],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": "Only for students who choose the thesis option (synthetic)",
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "select",
+              "label": "Synthetic area electives",
+              "course_code": null,
+              "children": [],
+              "course_codes": [
+                "CS 5200",
+                "CS 6140"
+              ],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": 2,
+              "min_credits": null,
+              "min_areas": 2,
+              "areas": {
+                "Systems": [
+                  "CS 5200"
+                ],
+                "Learning": [
+                  "CS 6140"
+                ]
+              }
+            },
+            {
+              "kind": "condition",
+              "label": "A program GPA of at least 3.0 (synthetic)",
+              "course_code": null,
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            }
+          ],
+          "course_codes": [],
+          "subject_codes": [],
+          "course_ranges": [],
+          "excluded_course_codes": [],
+          "activate_when": null,
+          "min_courses": null,
+          "min_credits": null,
+          "min_areas": null,
+          "areas": {}
+        }
+      },
+      {
+        "plan_id": "cs-ms-boston-2026-2027-bridge",
+        "program_id": "cs-ms",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "bridge",
+        "concentration": null,
+        "coverage": "partial",
+        "review_status": "draft",
+        "checked_by": null,
+        "checked_on": null,
+        "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science-mscs-boston/",
+        "source_title": "Computer Science, MSCS, Boston (synthetic)",
+        "source_catalog_year": "2026-2027",
+        "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+        "source_html_sha256": null,
+        "captured_on": "2026-10-01",
+        "notes": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)",
+        "requirements": {
+          "kind": "course",
+          "label": "Bridge course (synthetic, unchecked)",
+          "course_code": "CS 5010",
+          "children": [],
+          "course_codes": [],
+          "subject_codes": [],
+          "course_ranges": [],
+          "excluded_course_codes": [],
+          "activate_when": null,
+          "min_courses": null,
+          "min_credits": null,
+          "min_areas": null,
+          "areas": {}
+        }
+      },
+      {
+        "plan_id": "cs-ms-boston-2026-2027-standard",
+        "program_id": "cs-ms",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "standard",
+        "concentration": null,
+        "coverage": "partial",
+        "review_status": "source_checked",
+        "checked_by": "synthetic-reviewer",
+        "checked_on": "2026-10-03",
+        "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science-mscs-boston/",
+        "source_title": "Computer Science, MSCS, Boston (synthetic)",
+        "source_catalog_year": "2026-2027",
+        "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+        "source_html_sha256": "08c62055adf2aca99adb142870d8d51a405050d3ba8b2bd88d7f79ce53af2ddd",
+        "captured_on": "2026-10-01",
+        "notes": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)",
+        "requirements": {
+          "kind": "all_of",
+          "label": "Synthetic core and electives",
+          "course_code": null,
+          "children": [
+            {
+              "kind": "course",
+              "label": "Programming design core (synthetic)",
+              "course_code": "CS 5010",
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "course",
+              "label": "Algorithms core (synthetic)",
+              "course_code": "CS 5800",
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "select",
+              "label": "Synthetic elective pool",
+              "course_code": null,
+              "children": [],
+              "course_codes": [
+                "CS 6140",
+                "CS 5200",
+                "CS 6220"
+              ],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": 2,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "select",
+              "label": "Synthetic breadth",
+              "course_code": null,
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [
+                "DS"
+              ],
+              "course_ranges": [
+                {
+                  "start": "CS 5000",
+                  "end": "CS 5999"
+                }
+              ],
+              "excluded_course_codes": [
+                "CS 5010"
+              ],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": 8,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "unmodeled",
+              "label": "Further rules not modeled yet (synthetic)",
+              "course_code": null,
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            }
+          ],
+          "course_codes": [],
+          "subject_codes": [],
+          "course_ranges": [],
+          "excluded_course_codes": [],
+          "activate_when": null,
+          "min_courses": null,
+          "min_credits": null,
+          "min_areas": null,
+          "areas": {}
+        }
+      },
+      {
+        "plan_id": "cs-ms-boston-2025-2026-standard",
+        "program_id": "cs-ms",
+        "campus": "boston",
+        "catalog_year": "2025-2026",
+        "pathway": "standard",
+        "concentration": null,
+        "coverage": "partial",
+        "review_status": "source_checked",
+        "checked_by": "synthetic-reviewer",
+        "checked_on": "2025-09-20",
+        "source_url": "https://catalog.northeastern.edu/archive/2025-2026/graduate/computer-information-science/computer-science-mscs-boston/",
+        "source_title": "Computer Science, MSCS, Boston (synthetic)",
+        "source_catalog_year": "2025-2026",
+        "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+        "source_html_sha256": null,
+        "captured_on": "2025-09-15",
+        "notes": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)",
+        "requirements": {
+          "kind": "course",
+          "label": "Algorithms (synthetic)",
+          "course_code": "CS 5800",
+          "children": [],
+          "course_codes": [],
+          "subject_codes": [],
+          "course_ranges": [],
+          "excluded_course_codes": [],
+          "activate_when": null,
+          "min_courses": null,
+          "min_credits": null,
+          "min_areas": null,
+          "areas": {}
+        }
+      },
+      {
+        "plan_id": "cs-ms-boston-2026-2027-align",
+        "program_id": "cs-ms",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "align",
+        "concentration": null,
+        "coverage": "complete",
+        "review_status": "source_checked",
+        "checked_by": "synthetic-reviewer",
+        "checked_on": "2026-10-03",
+        "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science-mscs-boston/",
+        "source_title": "Computer Science, MSCS, Boston (synthetic)",
+        "source_catalog_year": "2026-2027",
+        "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+        "source_html_sha256": null,
+        "captured_on": "2026-10-01",
+        "notes": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)",
+        "requirements": {
+          "kind": "any_of",
+          "label": "Synthetic align options",
+          "course_code": null,
+          "children": [
+            {
+              "kind": "course",
+              "label": "Algorithms option (synthetic)",
+              "course_code": "CS 5800",
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "optional",
+              "label": "Synthetic thesis branch",
+              "course_code": null,
+              "children": [
+                {
+                  "kind": "course",
+                  "label": "Thesis (synthetic)",
+                  "course_code": "CS 7990",
+                  "children": [],
+                  "course_codes": [],
+                  "subject_codes": [],
+                  "course_ranges": [],
+                  "excluded_course_codes": [],
+                  "activate_when": null,
+                  "min_courses": null,
+                  "min_credits": null,
+                  "min_areas": null,
+                  "areas": {}
+                }
+              ],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": "Only for students who choose the thesis option (synthetic)",
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "select",
+              "label": "Synthetic area electives",
+              "course_code": null,
+              "children": [],
+              "course_codes": [
+                "CS 5200",
+                "CS 6140"
+              ],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": 2,
+              "min_credits": null,
+              "min_areas": 2,
+              "areas": {
+                "Systems": [
+                  "CS 5200"
+                ],
+                "Learning": [
+                  "CS 6140"
+                ]
+              }
+            },
+            {
+              "kind": "condition",
+              "label": "A program GPA of at least 3.0 (synthetic)",
+              "course_code": null,
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            }
+          ],
+          "course_codes": [],
+          "subject_codes": [],
+          "course_ranges": [],
+          "excluded_course_codes": [],
+          "activate_when": null,
+          "min_courses": null,
+          "min_credits": null,
+          "min_areas": null,
+          "areas": {}
+        }
+      }
+    ],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null,
+  "proposed_plan_revisions": {
+    "cs-ms-boston-2026-2027-align": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+    "cs-ms-boston-2026-2027-bridge": "974b3a8bb7d77e49c1e2933d78e2756d53097feeab8ac5c73c78b779de9376fd",
+    "cs-ms-boston-2026-2027-standard": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "cs-ms-boston-2025-2026-standard": "8d769db5672591d0980041ff4f77764b0a1ab3b9b9c24ee650e1c675438acf71"
+  },
+  "derived_from": "curriculum-cs-ms",
+  "edit": "The align plan appears twice: both copies are dropped."
+}

@@ -1,0 +1,21 @@
+{
+  "case": "policies-404",
+  "notes": "GET .../policies for a plan ID the program does not have: 404.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2030-2031-standard/policies"
+  },
+  "status": 404,
+  "body": {
+    "detail": "No usable current plan with this ID in the selected program",
+    "error_type": "not_found",
+    "status_code": 404
+  },
+  "failure": {
+    "status": 404,
+    "errorType": "not_found",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

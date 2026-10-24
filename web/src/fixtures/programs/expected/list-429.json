@@ -1,0 +1,43 @@
+{
+  "name": "list-429",
+  "notes": "Rate limited, Retry-After 30.",
+  "props": {
+    "view": "list",
+    "programs": "failure-429"
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "error",
+      "value": "无法加载培养方案列表: 请求过于频繁，请稍后手动重试。"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "warning",
+      "text": "无法加载培养方案列表。请求过于频繁，请30 秒后手动重试。"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "重新加载",
+      "action": "retry"
+    }
+  ]
+}

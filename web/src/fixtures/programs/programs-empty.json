@@ -1,0 +1,11 @@
+{
+  "case": "programs-empty",
+  "notes": "GET /programs before any program is seeded.",
+  "request": {
+    "method": "GET",
+    "path": "/programs"
+  },
+  "status": 200,
+  "body": [],
+  "failure": null
+}

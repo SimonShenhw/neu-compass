@@ -285,3 +285,15 @@ Radix Select / Dialog 保留原生键盘和焦点管理；测试不替换这些�
 已知限制：当前浏览器控制接口没有完整请求瀑布读取能力，不把可读到的请求列表等同于完整网络面板验收。R2b 起页面只经 `src/api/client.ts` 请求 API（`contracts.test.ts` 钉住别处不许调 fetch），最终验收仍需确认此外只有同源静态资源。
 
 R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLOG.md](WORKLOG.md)，Co-op 独立记在 [COOP_WORKLOG.md](COOP_WORKLOG.md)，R5b 记在 [COMPARE_WORKLOG.md](COMPARE_WORKLOG.md)，R5c 记在 [PRIVACY_WORKLOG.md](PRIVACY_WORKLOG.md)。本轮不执行 push、PR、合并或部署。
+
+# R4a 培养方案与政策证据演示
+
+入口 `/programs-demo?scenario=cs-standard-ready&speed=instant`；默认 `scenario=list&speed=normal`。37 个场景，速度为 normal（300ms）、slow（1200ms）、instant（0ms 定时器）、forever。未知参数回默认；场景／速度变化重建演示会话。演示页懒加载并复用 R3d 的 OfflineDemoShell，不挂真实 useSession，所有数据来自原字节冻结的 75 份合成 JSON。`/programs` 正式占位页保持原状。
+
+`features/programs/ProgramList` 和 `ProgramCurriculum` 只消费 Load 和回调，项目、方案选择及内容版本由外层控制；只让原生 details 保存展开状态。用 R1 Select 明确选择，单个方案也不默认选中；内部空选项使用不可能成为合法 plan_id 的 `__none__`，避免与真实 ID 冲突。演示的选择／请求计时放在外层，key 隔离旧请求并清理定时器；刷新清掉选择，重试重放同一份失败。
+
+沿用 R3d 项目检查、R3a programTree / programRuleLines 与 R3b oneLine。`models/programGuard` 放日期、官方目录 URL 和范围比较；`programPlans` 做逐份检查与整组去重；`programPolicy` 查来源路径、身份、版本和顺序，忽略未来额外字段。政策 UI 先检查响应再核对所选方案，失败时保留方案规则。版本直接使用 planRevisions，不在 TS 重算 Python JSON 哈希。
+
+`programFormat` 集中 Python 空白集合、范围文字和分享编码。空白集合含 Python 的控制分隔符，所以只对该正则局部关闭 no-control-regex；不使用 JS 的 `\s`。失败对象显式转成 ApiError 复用 R2b 文案。分享文字支持选中复制，只有已检查的官方目录／政策来源成为链接；所有数据文本保持原样，不解析 HTML 或 Markdown。
+
+使用既有浅色 tokens，列表桌面两列／手机一列；规则、摘要、长网址和课程文本折行。组件中的标题、按钮、说明、链接、折叠框带 data-kind，测试读取实际 DOM 与 37 份标准答案比较，不用标准答案生成组件。修改索引与验证记录见 `PROGRAMS_WORKLOG.md`。本批不含草案判断、真实缓存／路由接线或后端 plan_revisions 改动。

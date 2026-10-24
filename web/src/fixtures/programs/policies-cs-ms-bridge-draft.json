@@ -1,0 +1,34 @@
+{
+  "case": "policies-cs-ms-bridge-draft",
+  "notes": "GET /programs/cs-ms/plans/cs-ms-boston-2026-2027-bridge/policies. The plan is a draft: draft.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-bridge/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "cs-ms-boston-2026-2027-bridge",
+    "scope": {
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "bridge",
+      "concentration": null
+    },
+    "plan_content_sha256": "974b3a8bb7d77e49c1e2933d78e2756d53097feeab8ac5c73c78b779de9376fd",
+    "status": "draft",
+    "coverage": "selected_fragments_only",
+    "link": null,
+    "checked_by": null,
+    "checked_on": null,
+    "policies": [],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics",
+      "policy_plan_not_source_checked"
+    ]
+  },
+  "failure": null
+}
