@@ -145,7 +145,7 @@ npm.cmd run test:mutations
 - **演示身份不等于登录：** 删除成功或 401 只改变本地演示身份，不改 URL；选择器显示 URL 中的初始化场景，当前状态另有一行明确显示。显式切换任意参数会开始新的演示场景并清除旧结果；模拟删号导致的身份变化不会重建页面。全站身份、Cookie 和其他页面 store 的清空留给 R2b。
 - **安全／布局：** 所有接口文字都是 React 纯文本，邮箱／网址不自动成链接；不写 storage，不输出 console。删除区始终在四段之后，确认 label 的触控区不小于 44px；结果是可聚焦 status，正文长句换行，两种验收宽度均无整页横向溢出。
 
-当前仍是合成演示，**没有执行任何真实删号、登录／退出、请求或数据库操作**。真实 R2b 接入必须负责响应校验（特别是 200 的 deleted）、请求体 `{"confirm":"delete"}`、Cookie／Origin／X-NEU-Compass 及会话边界；不能照搬 URL 演示身份作为鉴权，也不能随 viewer 重建 PrivacyPage 丢掉结果。真实请求瀑布、实际删号、屏幕阅读器语音及上线仍需单独验收。
+这一节说的是 R5c 的演示页（R5d 起在 `/privacy-demo`），它仍是合成演示，**没有执行任何真实删号、登录／退出、请求或数据库操作**；`/privacy` 接真实接口见「Co-op、对比、隐私接真实接口 R5d」。真实 R2b 接入必须负责响应校验（特别是 200 的 deleted）、请求体 `{"confirm":"delete"}`、Cookie／Origin／X-NEU-Compass 及会话边界；不能照搬 URL 演示身份作为鉴权，也不能随 viewer 重建 PrivacyPage 丢掉结果。真实请求瀑布、实际删号、屏幕阅读器语音及上线仍需单独验收。
 
 ## R3a 先修要求组件与演示
 
@@ -197,7 +197,7 @@ npm.cmd run test:mutations
 - **焦点：** 账号框里按下的按钮忙完以后（登出换成登录按钮、失败恢复原按钮），焦点回到账号框现在的按钮上（桌面侧栏和手机菜单里都一样，和结果同一次渲染完成），用户自己移开了就不动。从 Google 页按「后退」、浏览器原样恢复本页时，登录按钮恢复可用。
 - **聊天流：** `src/api/chatStream.ts` 的 `streamChat(request, { signal })` 边收边读 `/chat` 的 NDJSON，给 R3 的搜索和聊天页用；它是 `client.ts` 以外唯一调 fetch 的文件。先 `meta`，再若干 `token`，最后 `done`（可能带反馈凭证，由页面照 Streamlit 的做法核对）；或者中途一个 `error`，它的 `detail` 是 API 给学生看的固定中文，照样显示。等回答开始、等下一块各最多 30 秒；断线、超时、没有 `done` 就结束、有一行不是这四种事件、或者一行（不算行尾）长过 100 万个字符（API 最长的一行也就几十 KB），都在已经收到的内容后面补一句 Streamlit 的话（「连接中断。…」或「回答流未完整结束；…」）。流开始前的失败和别的请求一样是 `ApiError`。不自动重发（每问一次都算模型次数、写查询日志）；能取消。
 - **开发 API 的聊天：** `/chat` 按脚本回答，不调用模型，HyDE 补救也关着。问题里带 `dev:model-error`（模型中途出错）、`dev:no-answer`（没有回答）、`dev:daily-limit`（今天的次数用完）、`dev:no-done`（流没有 `done` 就结束）、`dev:cut`（连接中途断开）、`dev:stall`（停 35 秒，比前端等的久），就换成对应的情况。
-- **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config` 和游客身份，测试里不发请求（`fetch` 在测试里仍被禁止，要用就 stub）。
+- **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config` 和游客身份，外壳不再发请求（`fetch` 在测试里仍被禁止，要用就 stub；R5d 的接线测试用 `src/test/fakeApi.tsx` 回答页面自己的请求）。
 - **上线前（R7）：** Google OAuth 客户端要把新前端的地址（来源加 `/`）加进 Authorized redirect URI，API 的 `WEB_ORIGINS` 也要设成它，不然 Google 或 API 会拒绝。
 
 ## R3c 搜索回答区与演示（2026-10-24）
@@ -241,13 +241,14 @@ npm.cmd run preview -- --port 4173 --strictPort
 从 main `4797a32` 开 `feat/web-pages-api`，依据评审目录 `frontend_react/R5D_PLAN.md`。`/coop`、`/compare`、`/privacy` 换成接真实接口的外壳（`src/pages/CoopRoute.tsx`、`CompareRoute.tsx`、`PrivacyRoute.tsx`），页面本身还是 R5a、R5b、R5c 的；三个演示外壳挪到 `/coop-demo`、`/compare-demo`、`/privacy-demo`，内容不变。本机对着开发 API 跑，见「接口层与登录 R2b」。
 
 - **外壳给页面的东西**（`src/layout/account.ts`）：页面用 `useAccount()` 读 `viewer`（还在确认时是 undefined）和 `unsure`（`/auth/me` 暂时失败），调 `login()`（侧栏的同一个登录）、`signedOut()`（删号成功或 401 以后：和登出一样丢掉按身份的缓存、清空对比，但不调 `/auth/logout`）、`contributed(count)`（投稿的 201 带着服务端的贡献数，数变了就当作换了访客，旧的按身份缓存一起丢）。
+- **写操作前再问一次是谁**（`src/api/queries.ts` 的 `stillSignedInAs`）：cookie 是所有标签页共用的，别的标签页可能已经登出或换了人。投稿和删号发出去之前先问 `/auth/me`（最多 8 秒），还是这一页显示的那个会员才发；明确是别人或没人，就不发，照「这个登录已经失效」处理；问不到时照发。
 - **刷新按钮**：侧栏的按钮改叫「刷新页面内容」，所有读过的内容都过期，正在显示的马上重取；`/auth/me` 只在失败过时重读（身份只在登录、登出、投稿和整页刷新时变）。
 - **「显示的是上次的版本」**：正在显示的内容因为暂时的失败（408、429、5xx、连不上、读不懂）留着上次的版本时，`<main>` 最上面说一句「有些内容这次没能更新，显示的是上次加载的版本；可以点「刷新页面内容」再试。」（Streamlit 的 `FALLBACK_NOTICE`，后半句改了：新前端不会自己再试）。不在屏幕上的内容不算。
-- **Co-op**：键 `['viewer', 身份, 'coop']`，身份是 `guest`、`member:{user_id}:{贡献数}` 或 `unsure`，还不知道是谁时不发。每次进这一页都重取，中间先显示上次的；`GET /coop` 等 30 秒。列表有一行不对就整份当作读不懂。投稿 `POST /coop`（30 秒，不自动重试）成功以后，用服务端给的贡献数更新侧栏和等级，列表跟着重取，投稿结果那句还在（页面按登录的人给 key，不按等级）。失败只给页面 R2b `ApiError` 的状态码、`error_type` 和被拒的字段名，API 的原文到不了页面；连不上、超时、代理页面、读不懂和 503 都说「投稿暂时提交不了，请稍后再试。你填的内容还在。」。
+- **Co-op**：键 `['viewer', 身份, 'coop']`，身份是 `guest`、`member:{user_id}:{贡献数}` 或 `unsure`，还不知道是谁时不发；`unsure` 时页面按游客显示，API 照 cookie 给出的面试、薪资也按游客清掉。每次进这一页都重取，中间先显示上次的；`GET /coop` 等 30 秒。列表有一行不对就整份当作读不懂。投稿 `POST /coop`（30 秒，不自动重试）成功以后，用服务端给的贡献数更新侧栏和等级，列表跟着重取，投稿结果那句还在（页面按登录的人给 key，不按等级）。失败只给页面 R2b `ApiError` 的状态码、`error_type` 和被拒的字段名，API 的原文到不了页面；连不上、超时、代理页面、读不懂和 503 都说「投稿暂时提交不了，请稍后再试。你填的内容还在。」。
 - **对比**：列表里的课（最多 4 门）各取一次 `GET /course/{course_id}`（30 秒），每次进这一页都重取；一门课失败只坏那一列，「重新加载」只重取失败和读不懂的列。`src/models/compareList.ts` 改成 `createCompareList()`：页面用原来那一份（导出的名字不变），演示外壳用自己的一份，演示不再改学生真正的对比列表。加课的按钮在课程详情上，R3 才接，所以在那之前真实的对比页是空的。
-- **隐私**：`GET /privacy`（8 秒），5 分钟内不重取。删号 `POST /auth/delete-account`，请求体正好是 `{"confirm": "delete"}`（15 秒）；200 要读得懂才算删了，读不懂当作不知道删没删。删完或 401，本页变成游客，删除结果留着（页面不按访客给 key）。
+- **隐私**：`GET /privacy`（8 秒），5 分钟内不重取。删号 `POST /auth/delete-account`，请求体正好是 `{"confirm": "delete"}`（15 秒）；200 要读得懂才算删了，读不懂当作不知道删没删。删完或 401，本页变成游客，删除结果留着（页面不按访客给 key）；登出由路由来做，删号路上离开了这一页，回答到了也照样登出（结果那句就看不到了）。
 - **开发 API 的 Co-op**：合成库里有七条 Co-op 记录，三条策展种子（0、1、2 级各一），两组照真的审核流程公开的投稿（每组两个投稿人）。假 Google 页多了 `dev-one`（1 次贡献）和 `dev-two`（2 次贡献），贡献是审核公开时真记的功。删号在临时库上照真的走：删掉 `dev-two`，它参与公开的两组都只剩一个投稿人，一起撤下，列表只剩三条种子，`dev-one` 的贡献不收回。重启就都回来了。
-- **测试**：`src/test/fakeApi.tsx` 按方法和路径回答、记下每个请求（测试里 `fetch` 照旧要 stub）；`src/test/timeouts.ts` 查一个请求正好在它那一档超时上放弃。项目的 `test:mutations` 还是 152 个，M35、M54、M55、M79 跟着代码改了锚点和测试名。
+- **测试**：`src/test/fakeApi.tsx` 按方法和路径回答、记下每个请求，连查询串一起（测试里 `fetch` 照旧要 stub）；`src/test/timeouts.ts` 查一个请求正好在它那一档超时上放弃。项目的 `test:mutations` 还是 152 个，M35、M54、M55、M79 跟着代码改了锚点和测试名。
 - 演示外壳没有改成懒加载（方案里写了要改），和 `/requisites-demo`、`/course-detail-demo` 一样直接加载；首屏 JavaScript gzip 185,792 字节（预算 250,000）。
 
 修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 35 节。

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import deleted from '../fixtures/privacy/delete-ok.json';
 import nothing from '../fixtures/privacy/delete-ok-nothing-else.json';
 import privacy from '../fixtures/privacy/privacy-90-days-feedback-contact.json';
-import { apiError, fakeApi, json } from '../test/fakeApi';
+import { apiError, asked, fakeApi, json } from '../test/fakeApi';
 import { expectTimeout } from '../test/timeouts';
 import { deleteAccount, parseDeleteResult, privacyQuery } from './privacy';
 import { PUBLIC_FRESH_MS, createQueryClient } from './queries';
@@ -35,6 +35,10 @@ describe('the deletion’s answer', () => {
       [`a negative ${name}`, { ...deleted.body, [name]: -1 }],
       [`${name} not whole`, { ...deleted.body, [name]: 0.5 }],
       [`${name} as text`, { ...deleted.body, [name]: '1' }],
+      [
+        `${name} past what a number holds exactly`,
+        { ...deleted.body, [name]: 2 ** 53 },
+      ],
     ]),
   ] as [string, unknown][])('with %s is not read', (_name, value) => {
     expect(parseDeleteResult(value)).toBeNull();
@@ -49,8 +53,9 @@ describe('deleting the account', () => {
     expect(api.calls[0]).toMatchObject({
       method: 'POST',
       path: '/auth/delete-account',
-      body: { confirm: 'delete' },
+      search: '',
     });
+    expect(api.calls[0]!.body).toEqual({ confirm: 'delete' });
   });
 
   it.each([
@@ -94,9 +99,7 @@ describe('the privacy text', () => {
     expect(await createQueryClient().fetchQuery(privacyQuery)).toEqual(
       privacy.body,
     );
-    expect(api.calls.map((call) => `${call.method} ${call.path}`)).toEqual([
-      'GET /privacy',
-    ]);
+    expect(api.calls.map(asked)).toEqual(['GET /privacy']);
     await expectTimeout(
       () => createQueryClient().fetchQuery(privacyQuery),
       'read',

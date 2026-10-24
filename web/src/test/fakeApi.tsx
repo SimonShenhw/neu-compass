@@ -10,17 +10,30 @@ import { WithApi, seededQueryClient } from './withApi';
 export interface Call {
   method: string;
   path: string;
+  // The query string, '' when there is none: a test that lists the calls sees one that should not be there.
+  search: string;
   init: RequestInit;
+  // A JSON body as parsed; any other body as it was sent.
   body: unknown;
+}
+function sent(body: RequestInit['body']): unknown {
+  if (typeof body !== 'string') return undefined;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return body;
+  }
 }
 export function fakeApi(answer: (call: Call) => Response | Promise<Response>) {
   const calls: Call[] = [];
   const fetch = vi.fn(async (url: string, init: RequestInit = {}) => {
+    const { pathname, search } = new URL(url);
     const call: Call = {
       method: init.method ?? 'GET',
-      path: new URL(url).pathname,
+      path: pathname,
+      search,
       init,
-      body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
+      body: sent(init.body),
     };
     calls.push(call);
     return answer(call);
@@ -44,16 +57,17 @@ export const json = (body: unknown, status = 200, headers?: HeadersInit) =>
 export const apiError = (status: number, errorType: string, detail: string) =>
   json({ detail, error_type: errorType, status_code: status }, status);
 
-// An answer the test gives later: `answer` settles it, `fail` makes fetch reject as a lost connection does.
+// An answer the test gives later, with `answer`.
 export function held() {
   let answer: (response: Response) => void = () => {};
-  let fail: (error: unknown) => void = () => {};
-  const response = new Promise<Response>((resolve, reject) => {
+  const response = new Promise<Response>((resolve) => {
     answer = resolve;
-    fail = reject;
   });
-  return { response, answer, fail };
+  return { response, answer };
 }
+// A call as `METHOD /path?query`, for tests that list what was asked.
+export const asked = ({ method, path, search }: Call) =>
+  `${method} ${path}${search}`;
 
 // The whole app at a path, with /config and /auth/me already known (seededQueryClient).
 export function livePage(

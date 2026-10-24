@@ -9,7 +9,14 @@ import member0 from '../fixtures/coop/list-member-0.json';
 import member2 from '../fixtures/coop/list-member-2.json';
 import pending from '../fixtures/coop/upload-pending.json';
 import { FALLBACK_NOTICE } from '../layout/AppShell';
-import { apiError, fakeApi, held, json, livePage } from '../test/fakeApi';
+import {
+  apiError,
+  asked,
+  fakeApi,
+  held,
+  json,
+  livePage,
+} from '../test/fakeApi';
 import { seededQueryClient } from '../test/withApi';
 
 const member = (count: number, userId = 'u-1'): Member => ({
@@ -47,6 +54,7 @@ it('a guest sees what the API gives a guest, asked once with the cookie, and no 
   expect(api.calls[0]).toMatchObject({
     method: 'GET',
     path: '/coop',
+    search: '',
     init: { credentials: 'include' },
   });
   expect(screen.getByRole('region', { name: '查看权限' })).toHaveTextContent(
@@ -121,12 +129,13 @@ it('nothing is asked before /auth/me says who is looking', async () => {
   );
 });
 
-it('when /auth/me fails for a moment the list is still asked for, as unsure, and the page reads as a guest’s', async () => {
+it('when /auth/me fails for a moment the list is still asked for, as unsure, and the page reads as a guest’s, details too', async () => {
+  // The API answers by the cookie, which here unlocks everything (A27).
   const api = fakeApi(({ path }) =>
     path === '/auth/me'
       ? apiError(503, 'service_unavailable', 'down')
       : path === '/coop'
-        ? json(guest.body)
+        ? json(member2.body)
         : json(null, 404),
   );
   const client = createQueryClient();
@@ -141,6 +150,12 @@ it('when /auth/me fails for a moment the list is still asked for, as unsure, and
   expect(screen.getByRole('region', { name: '查看权限' })).toHaveTextContent(
     '你现在是游客',
   );
+  expect(screen.queryByText('$40-45/hr')).not.toBeInTheDocument();
+  expect(screen.queryByText('面试经过')).not.toBeInTheDocument();
+  expect(screen.queryByText('技术问题')).not.toBeInTheDocument();
+  expect(
+    screen.getAllByText('这条有薪资区间：你分享的经验有 2 条公开后解锁'),
+  ).toHaveLength(2);
 });
 
 it('every visit asks again, and the last list shows at once meanwhile', async () => {
@@ -304,7 +319,9 @@ it('an upload sends the form exactly, as a write; a count the server did not cha
       ? json(pending.body, 201)
       : path === '/coop'
         ? json(member0.body)
-        : json(null, 404),
+        : path === '/auth/me'
+          ? json(identity(0))
+          : json(null, 404),
   );
   livePage('/coop', seededQueryClient({ viewer: member(0) }));
   await screen.findAllByRole('article');
@@ -333,7 +350,43 @@ it('an upload sends the form exactly, as a write; a count the server did not cha
   expect(api.count('POST', '/coop')).toBe(1);
   expect(api.count('GET', '/coop')).toBe(1);
   expect(sidebar()).toHaveTextContent('贡献数：0');
+  // Who is signed in was asked again just before (A27).
+  expect(api.calls.map(asked)).toEqual([
+    'GET /coop',
+    'GET /auth/me',
+    'POST /coop',
+  ]);
 });
+
+// Every tab shares the cookie (A27).
+it.each([
+  ['signed in as someone else', () => json({ ...identity(2), user_id: 'u-2' })],
+  ['signed out', () => apiError(401, 'unauthorized', 'Missing bearer token.')],
+])(
+  'when another tab has since %s, the upload is not sent: the form says this login no longer works and keeps the draft',
+  async (_name, me) => {
+    const api = fakeApi(({ path }) =>
+      path === '/auth/me'
+        ? me()
+        : path === '/coop'
+          ? json(member0.body)
+          : json(null, 404),
+    );
+    livePage('/coop', seededQueryClient({ viewer: member(0) }));
+    await screen.findAllByRole('article');
+    await fillRequired();
+    await submit();
+    expect(
+      await screen.findByRole('status', { name: '投稿结果' }),
+    ).toHaveTextContent('登录已经失效，请重新登录后再提交。');
+    expect(within(form()).getByLabelText(/^公司/)).toHaveValue(
+      '  Example Co.  ',
+    );
+    expect(api.count('GET', '/auth/me')).toBe(1);
+    expect(api.count('POST', '/coop')).toBe(0);
+    expect(sidebar()).toHaveTextContent('贡献数：0');
+  },
+);
 
 it('a count that grew since login comes from the server: the account box, the level and the list follow, and the result stays', async () => {
   let lists = 0;
@@ -358,6 +411,31 @@ it('a count that grew since login comes from the server: the account box, the le
   expect(
     client.getQueryData(['viewer', 'member:u-1:0', 'coop']),
   ).toBeUndefined();
+});
+
+// The plan's choice (section 35, known): signing out here would remount the page and lose the draft (B27).
+it('an upload the API refuses with 401 keeps the member, the draft and the form, and logs nobody out', async () => {
+  const api = fakeApi(({ method, path }) =>
+    method === 'POST' && path === '/coop'
+      ? apiError(401, 'unauthorized', 'Unknown user. Log in again.')
+      : path === '/coop'
+        ? json(member0.body)
+        : path === '/auth/me'
+          ? json(identity(0))
+          : json(null, 404),
+  );
+  const client = livePage('/coop', seededQueryClient({ viewer: member(0) }));
+  await screen.findAllByRole('article');
+  await fillRequired();
+  await submit();
+  expect(
+    await screen.findByRole('status', { name: '投稿结果' }),
+  ).toHaveTextContent('登录已经失效，请重新登录后再提交。');
+  expect(within(form()).getByLabelText(/^公司/)).toHaveValue('  Example Co.  ');
+  expect(sidebar()).toHaveTextContent('Synthetic Student');
+  expect(client.getQueryData(meQuery.queryKey)).toEqual(member(0));
+  expect(api.count('POST', '/coop')).toBe(1);
+  expect(api.count('POST', '/auth/logout')).toBe(0);
 });
 
 it('a refused field is marked from the API’s answer, whose words never reach the page', async () => {

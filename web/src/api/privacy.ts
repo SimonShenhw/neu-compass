@@ -47,7 +47,7 @@ export function parseDeleteResult(value: unknown): DeleteAccountResult | null {
   const counts = Object.fromEntries(COUNTS.map((name) => [name, value[name]]));
   return Object.values(counts).every(
     (count) =>
-      typeof count === 'number' && Number.isInteger(count) && count >= 0,
+      typeof count === 'number' && Number.isSafeInteger(count) && count >= 0,
   )
     ? ({ deleted: true, ...counts } as DeleteAccountResult)
     : null;

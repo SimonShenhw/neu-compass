@@ -108,6 +108,24 @@ it.each([
   );
 });
 it.each([
+  ['/compare-demo', '课程对比演示'],
+  ['/coop-demo', 'Co-op 演示'],
+  ['/privacy-demo', '数据与隐私演示'],
+])(
+  'the demo at %s has its own title and no current navigation item (R5d)',
+  (path, title) => {
+    page(path);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(title);
+    expect(document.title).toBe(`${title} · NEU-Compass`);
+    expect(
+      screen
+        .getByRole('navigation', { name: '主导航' })
+        .querySelector('[aria-current]'),
+    ).toBeNull();
+    expect(screen.queryByText('404 · 找不到这个页面')).not.toBeInTheDocument();
+  },
+);
+it.each([
   '/course/',
   '/course/CS-6140/extra',
   '/COURSE/CS-6140/extra',

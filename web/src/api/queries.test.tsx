@@ -9,6 +9,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectTimeout } from '../test/timeouts';
 import { ApiError, TIMEOUT_MS, apiGet, apiPath, apiPost } from './client';
 import {
   GUEST,
@@ -20,6 +21,7 @@ import {
   parseIdentity,
   refreshReads,
   shownData,
+  stillSignedInAs,
   useConfig,
   useMe,
   useShowingOld,
@@ -332,6 +334,7 @@ describe('GET /auth/me', () => {
       { ...member, contribution_count: true },
       { ...member, contribution_count: null },
       { ...member, contribution_count: '2' },
+      { ...member, contribution_count: 2 ** 53 },
       { ...member, display_name: 3 },
       { ...member, session_token: 3 },
     ])
@@ -348,12 +351,50 @@ describe('GET /auth/me', () => {
   });
 });
 
+describe('asking again before a write acts on the account (R5d, A27)', () => {
+  const shown = parseIdentity(member);
+
+  it.each([
+    ['the same member', true, json(member)],
+    ['someone else', false, json({ ...member, user_id: 'u-2' })],
+    ['nobody', false, json({ error_type: 'unauthorized' }, 401)],
+    ['an answer the page cannot read', true, json({ user_id: '' })],
+    ['a failure', true, json({ error_type: 'service_unavailable' }, 503)],
+  ] as const)(
+    'with %s signed in now, the write may go out: %s',
+    async (_name, same, answer) => {
+      const fetch = serve(answer);
+      expect(await stillSignedInAs(shown)).toBe(same);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0]![0]).toBe('http://127.0.0.1:8000/auth/me');
+      expect(fetch.mock.calls[0]![1]).toMatchObject({ credentials: 'include' });
+    },
+  );
+
+  it('a page that shows nobody signed in never writes as anyone, and asks nothing', async () => {
+    const fetch = serve(json(member));
+    expect(await stillSignedInAs(GUEST)).toBe(false);
+    expect(await stillSignedInAs(undefined)).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('waits 8 seconds at most for /auth/me, then lets the write go out', async () => {
+    await expectTimeout(
+      () => stillSignedInAs(shown),
+      'read',
+      (settled) => expect(settled).toBe(true),
+    );
+  });
+});
+
 describe('the shell’s refresh and its note on content from before (R5d)', () => {
   it('refresh makes every read stale and asks again what is on screen, but not who is looking', async () => {
     const fetch = serve(json(member));
     const client = createQueryClient();
     client.setQueryData(meQuery.queryKey, GUEST);
-    client.setQueryData(['privacy'], { intro: 'x' });
+    // A page left earlier: its query is in the cache, with nobody looking at it.
+    const left = vi.fn(async () => 'left');
+    await client.fetchQuery({ queryKey: ['left'], queryFn: left });
     const shown = vi.fn(async () => 'fresh');
     renderHook(
       () => {
@@ -369,8 +410,9 @@ describe('the shell’s refresh and its note on content from before (R5d)', () =
     await waitFor(() => expect(shown).toHaveBeenCalledTimes(1));
     await act(() => refreshReads(client));
     expect(shown).toHaveBeenCalledTimes(2);
-    // Not on screen: stale now, asked again when it is shown.
-    expect(client.getQueryState(['privacy'])?.isInvalidated).toBe(true);
+    // Not on screen: stale now, asked again only when it is shown.
+    expect(left).toHaveBeenCalledTimes(1);
+    expect(client.getQueryState(['left'])?.isInvalidated).toBe(true);
     expect(client.getQueryState(meQuery.queryKey)?.isInvalidated).toBe(false);
     expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
     expect(fetch).not.toHaveBeenCalled();
@@ -394,16 +436,16 @@ describe('the shell’s refresh and its note on content from before (R5d)', () =
   it.each([
     [
       'a temporary failure after a success',
-      [json(['old']), json({}, 503)],
       true,
+      [json(['old']), json({}, 503)],
     ],
     [
       'a definite failure after a success',
-      [json(['old']), json({}, 404)],
       false,
+      [json(['old']), json({}, 404)],
     ],
-    ['a temporary failure with nothing before it', [json({}, 503)], false],
-  ] as const)('the note shows for %s: %s', async (_name, answers, shown) => {
+    ['a temporary failure with nothing before it', false, [json({}, 503)]],
+  ] as const)('after %s the note shows: %s', async (_name, shown, answers) => {
     serve(...answers);
     const client = createQueryClient();
     const { result } = renderHook(

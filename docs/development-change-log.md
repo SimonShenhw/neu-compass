@@ -4404,6 +4404,7 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
    - `signedOut()`：删号成功或删号 401 以后用。和登出一样丢掉按身份的缓存、清空对比、身份换成游客（R2b 登出里的这几步提成了 `forget()`，两处共用），但不调 `/auth/logout`：账号没了，API 已经让 cookie 过期。
    - `contributed(count)`：投稿的 201 带着服务端的贡献数（R0 第 8 节：以服务端为准，不从 201 推断加一）。数没变什么都不做；变了就当作换了访客，按身份的缓存整组丢掉，侧栏和 Co-op 的等级跟着变。
    - `viewerScope`：查询键里说明是谁在问的那一段：`guest`、`member:{user_id}:{贡献数}`、`unsure`，还不知道时是 null，查询就等着。`viewerOwner`：不带等级的「这一页是给谁的」，`guest` 或 `member:{user_id}`。
+   - **写操作前再问一次是谁**（`queries.ts` 的 `stillSignedInAs`，审查 A27 L4）：cookie 是所有标签页共用的，一个标签页只在登录、登出和整页刷新时问是谁，别的标签页可能早已登出，或者换了一个人登录。所以投稿和删号发出去之前先问一次 `/auth/me`（最多等 8 秒，不进缓存）：还是这一页显示的那个会员才发；明确说是别人或者没人登录，就不发，页面照「这个登录已经失效」处理；`/auth/me` 没有能读的回答时照发，由写请求自己的回答说明结果。`/auth/me` 的请求提成了 `whoIsAsking`，`meQuery` 也用它。
 2. **刷新按钮**（`queries.ts` 的 `refreshReads`，`Sidebar.tsx`）：照 Streamlit 的 `🔄 刷新页面内容`，所有查询都过期，正在显示的马上重取。`/auth/me` 照 Streamlit 不重读（身份只在登录、登出、投稿和整页刷新时变），只有它失败过时才重读，不然「暂时无法确认」没有办法再试。按钮的字从「刷新课程数据」改成「刷新页面内容」；原来点了只显示「R1 使用固定假数据；未发送刷新请求。」。
 3. **「显示的是上次的版本」**（`queries.ts` 的 `useShowingOld`，`AppShell.tsx`）：有正在显示的查询停在「这次失败了，失败是暂时的，手里还有上次的内容」时，`<main>` 最上面一个一直在的 `role="status"`（`aria-label="内容更新"`）里说「有些内容这次没能更新，显示的是上次加载的版本；可以点「刷新页面内容」再试。」。Streamlit 原文后半句是「稍后再操作页面时会再试」，新前端不会自己重试，所以改了。放在 `<main>` 里而不是侧栏，手机上也看得见；R3、R4 的页面接上以后一样适用。不在屏幕上的查询不算；外壳一直在用的 `/config` 算，所以 API 连不上时点刷新，这句在哪一页都会出现，也就告诉了学生这次刷新没成。缓存的事件可能在别的组件渲染中途来，所以照 TanStack 自己的 `useIsFetching`，经 `notifyManager.batchCalls` 再交给 React。
 4. **侧栏和顶栏**：页脚那句「页面内容仍是假数据原型；登录已接真实接口」改成「登录、Co-op、课程对比、数据与隐私已接真实接口；搜索、课程详情和培养方案还是假数据原型」。顶栏的游客标记原来就不出现在 `/coop`、`/privacy`（页面自己说是游客），现在两个演示地址也一样；隐私演示页的标题也带锁。
@@ -4411,13 +4412,13 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 
 **Co-op**
 
-6. **列表**（`api/coop.ts`）：`coopListQuery(scope)`，键 `['viewer', 身份, 'coop']`（R2b 的 `VIEWER_KEY`，登录、登出时整组丢掉；R0 第 14 节第 9 条：键里有用户和贡献数），`GET /coop` 用 `slow`（30 秒）。Streamlit 的 Co-op 页每次画都取，所以 `staleTime: 0`：每次进这一页都重取，中间先显示缓存里的。`parseCoopList` 要求是数组，每一行照 `CoopRecord` 查：字段和类型；`industry` 是六个代码之一或 null（生成的类型里多了代码，要先加进 `INDUSTRIES` 才编译得过）；`visibility_level` 是 0–2；`duration_months` 是 1–8 的整数或 null；`related_courses` 是字符串数组；可以不给的文字字段读成 null；只留这些键。有一行不对就整份当作读不懂（502 `invalid_response`，和 R2b 的 `parseIdentity` 一样，不显示半份）。
-7. **投稿**（`uploadCoop`、`parseUploadResponse`）：`POST /coop`，`slow`，不自动重试（超时的投稿可能已经存下了，再发一次 API 会答「重复」）。201 照 `CoopUploadResponse` 查（状态是四种之一，贡献数是非负整数）。
+6. **列表**（`api/coop.ts`）：`coopListQuery(scope)`，键 `['viewer', 身份, 'coop']`（R2b 的 `VIEWER_KEY`，登录、登出时整组丢掉；R0 第 14 节第 9 条：键里有用户和贡献数），`GET /coop` 用 `slow`（30 秒）。Streamlit 的 Co-op 页每次画都取，所以 `staleTime: 0`：每次进这一页都重取，中间先显示缓存里的。`parseCoopList` 要求是数组，每一行照 `CoopRecord` 查：字段和类型；`industry` 是六个代码之一或 null（生成的类型里要是多了代码，得先加进 `INDUSTRIES` 才编译得过）；`visibility_level` 是 0–2；`duration_months` 是 1–8 的整数或 null；`related_courses` 是字符串数组；可以不给的文字字段读成 null；只留这些键。有一行不对就整份当作读不懂（502 `invalid_response`，和 R2b 的 `parseIdentity` 一样，不显示半份）。
+7. **投稿**（`uploadCoop`、`parseUploadResponse`）：`POST /coop`，`slow`，不自动重试（超时的投稿可能已经存下了，再发一次 API 会答「重复」）。201 照 `CoopUploadResponse` 查（状态是四种之一，等级是 0–2，贡献数是精确表示范围内的非负整数；A27 N6 以后，`/auth/me` 的贡献数和删号的七个计数也照这样查）。
 8. **投稿失败的形状**（`SubmitOutcome`、`submitFailure`，`models/coop.ts`，`CoopForm.tsx`）：R5a 的失败原来带 API 的错误体（`body.detail`），R2b 定了页面不拿 `detail`，所以改成 R2b `ApiError` 的三样：`status`、`errorType`、`invalidFields`。不是 `ApiError` 的异常当作连不上（503 `transport_error`）。
    - 422 标出的字段来自 `invalidFields`（R2b 已经从 `detail` 里取出了字段名），`errorFields` 只认表单自己的字段。原来只能标出 `detail` 开头的那一个，现在认得的都标。
    - 「投稿暂时提交不了，请稍后再试。你填的内容还在。」原来看有没有错误体，现在看 `errorType`：没有回答（连不上、超时）、不是 API 的回答（代理的页面，`errorType` 是 null）、读不懂（`invalid_response`）和 503 说这句；别的失败照旧「提交没有成功，请稍后再试。」。
    - 演示外壳的失败结果改成用 R2b 的 `failureFrom` 从 R5a 的假数据读（和真页面读回答的办法一样），页面上的字一个没改。
-9. **`CoopRoute`**（新文件 `web/src/pages/CoopRoute.tsx`）：还不知道是谁时只显示「正在加载」（`aria-label="Co-op 加载"`），不发请求；`/auth/me` 暂时失败时照 `unsure` 去问（API 只看 cookie），页面按游客画。列表：能显示的（`shownData`）就显示；失败了、也没在重取才是失败；其余是加载，重试的路上显示加载，不显示失败。投稿成功以后先 `contributed(contribution_count)`，再把结果交给表单。
+9. **`CoopRoute`**（新文件 `web/src/pages/CoopRoute.tsx`）：还不知道是谁时只显示「正在加载」（`aria-label="Co-op 加载"`），不发请求；`/auth/me` 暂时失败时照 `unsure` 去问（API 只看 cookie），页面按游客画；cookie 可能还是会员的，API 就会给出面试、薪资，所以这时把这三个细节字段也按游客清掉再交给页面（`asGuest`，A27 L3），不然页面一边说「你现在是游客」，一边显示薪资。列表：能显示的（`shownData`）就显示；失败了、也没在重取才是失败；其余是加载，重试的路上显示加载，不显示失败。投稿前先 `stillSignedInAs`（第 1 条），不是同一个人就不发，表单说「登录已经失效，请重新登录后再提交。」、草稿留着；投稿成功以后先 `contributed(contribution_count)`，再把结果交给表单。
    - **两层 key**：`CoopPage` 里面原来按「游客／会员几级」给 key，等级一变草稿和结果都清掉；现在里面只分游客和会员，外面 `CoopRoute` 按登录的人（`viewerOwner`）给 key。换了一个人，页面从头开始（R5a 说明书要求的按真实会话的人隔开）；同一个人投稿以后等级变高，投稿结果那句还在。
 
 **对比**
@@ -4428,7 +4429,9 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 
 **隐私**
 
-12. **`PrivacyRoute`**（新文件；`api/privacy.ts`）：`privacyQuery`，`['privacy']`，`GET /privacy`，`read`（8 秒），和别的公开内容一样 5 分钟内不重取；回答原样交给 R5c 的 `privacyContent` 检查。删号 `deleteAccount()`：`POST /auth/delete-account`，请求体正好是 `{"confirm": "delete"}`，`write`（15 秒），不重试。200 照 `DeleteAccountResponse` 查（`deleted` 是 true，七个计数都是非负整数，只留这些键）；读不懂的 200 也是 API 回的，账号很可能已经没了，所以和没收到回答一样当作不知道（502）。失败给页面 `{ok: false, status}`，连不上、超时是 null（R5c 第 3 节）。成功或 401 时页面调 `onSignedOut`，也就是 `signedOut()`。页面不按访客给 key：变成游客以后删除结果还留着（R5c 第 4 条）。游客看不到删除那一节；身份还在确认时先当游客画。
+12. **`PrivacyRoute`**（新文件；`api/privacy.ts`）：`privacyQuery`，`['privacy']`，`GET /privacy`，`read`（8 秒），和别的公开内容一样 5 分钟内不重取；回答原样交给 R5c 的 `privacyContent` 检查。删号 `deleteAccount()`：`POST /auth/delete-account`，请求体正好是 `{"confirm": "delete"}`，`write`（15 秒），不重试。200 照 `DeleteAccountResponse` 查（`deleted` 是 true，七个计数都是非负整数，只留这些键）；读不懂的 200 也是 API 回的，账号很可能已经没了，所以和没收到回答一样当作不知道（502）。失败给页面 `{ok: false, status}`，连不上、超时是 null（R5c 第 3 节）。删号前先 `stillSignedInAs`（第 1 条），不是这一页显示的那个会员就不发，当作 401。
+    - **登出由路由来做**（A27 M1）：200 或 401 以后，账号（或者这个登录）就没了，不管页面还在不在。R5c 的页面在它或删除表单卸载以后不再处理回来的结果（R5c 说明书第 4 节），原来登出只挂在页面的 `onSignedOut` 上，删号路上离开这一页，回答到了也不登出，前端还按原来的人显示、按身份的缓存和对比都留着。现在 `PrivacyRoute` 自己在 200 或 401 以后调 `signedOut()`，放在下一轮事件里，页面还在时先由页面写出结果；页面的 `onSignedOut` 就不用再做什么。
+    - 页面不按访客给 key：变成游客以后删除结果还留着（R5c 第 4 条）。游客看不到删除那一节；身份还在确认时先当游客画。
 
 **开发用的 API**
 
@@ -4438,11 +4441,14 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 
 **测试**
 
-14. **测试工具**：`web/src/test/fakeApi.tsx`：`fakeApi(answer)` 按方法和路径回答、记下每个请求（`calls`、`count`）；`json`、`apiError`（API 自己的错误体）、`held()`（回答由测试稍后给）、`livePage(path, client)`（整个 App，`/config` 和身份预先放好）。`web/src/test/timeouts.ts` 的 `expectTimeout`：一个请求在它那一档超时前 1 毫秒还在等，到点放弃（假计时器）。
-15. **新测试**：`api/coop.test.ts`、`privacy.test.ts`、`course.test.ts`，`layout/account.test.ts`，`pages/CoopRoute.test.tsx`、`CompareRoute.test.tsx`、`PrivacyRoute.test.tsx`；`queries.test.tsx`（刷新、回退提示）、`session.test.tsx`（`account` 的五条）、`client.test.ts`（`answerStatus`）、`compareList.test.tsx`（两份列表互不影响）各加了几条。`tests/test_dev_api.py` 加了 Co-op 的四条（一条分三种账号跑），共 6 项。
-16. **改过的旧测试**：
-    - 三个演示外壳的测试改地址；`CoopPage.spec.test.tsx` 照新的失败形状（422 的字段改从 `invalidFields` 来）。
-    - `pages.test.tsx`：对比的几条改到 `/compare-demo`；「侧栏数字跟着列表」「换页后移出的还在」两条挪到 `CompareRoute.test.tsx` 用真列表测；`/coop`、`/privacy` 现在会发请求，用假的 fetch 回答；无障碍和外壳的检查把真实页和演示页都算上。
+14. **测试工具**：`web/src/test/fakeApi.tsx`：`fakeApi(answer)` 按方法和路径回答、记下每个请求（`calls`、`count`；每个请求连查询串一起记，`asked` 把它写成「方法 路径?查询」，列请求顺序的测试都用它，多出查询串就对不上；请求体是 JSON 就解析，别的原样留着，B27 L6）；`json`、`apiError`（API 自己的错误体）、`held()`（回答由测试稍后给）、`livePage(path, client)`（整个 App，`/config` 和身份预先放好）。`web/src/test/timeouts.ts` 的 `expectTimeout`：一个请求在它那一档超时前 1 毫秒还在等，到点放弃（假计时器）。
+15. **新测试**：`api/coop.test.ts`、`privacy.test.ts`、`course.test.ts`，`layout/account.test.ts`、`shell.test.tsx`（回退提示在 `<main>` 最前面、原文写死、外壳的 `/config` 也算，手机菜单的刷新，刷新只重取屏幕上的，B27 L2、L3），`pages/CoopRoute.test.tsx`、`CompareRoute.test.tsx`、`PrivacyRoute.test.tsx`；`queries.test.tsx`（刷新、回退提示）、`session.test.tsx`（`account` 的五条）、`client.test.ts`（`answerStatus`）、`compareList.test.tsx`（两份列表互不影响）各加了几条。`tests/test_dev_api.py` 加了 Co-op 的四条（一条分三种账号跑），共 6 项。
+16. **改过的旧测试**（B27 L7 以后照实补全）：
+    - 三个演示外壳的测试改地址，Co-op 演示的标题改成「Co-op 演示」。
+    - `CompareDemoPage.test.tsx`：断言从 `getCompareList()` 换成演示自己的 `demoList`；「回到清空的演示不会复活示例课」原来是点侧栏回到 `/compare`，现在 `/compare` 是真实页，改成卸载再挂载演示页；**删掉了一条**「外部像登出那样清空，演示也跟着空」：演示有了自己的列表，登出只清学生的列表，这条不再成立，换成新的一条「演示用自己的列表，学生的列表和侧栏数字不动」。
+    - `CoopPage.spec.test.tsx`：失败结果照新的形状给（`failureFrom` 从 R5a 的假数据读，另加代理页面、读不懂的 201 两种）；**去掉了「never shows raw detail」那几句断言**：detail 现在到不了页面（类型里没有它，`submitFailure` 的测试用 `toEqual` 钉住只有三样），换成 422 只标被拒的字段、两个字段都标、`__proto__` 和 `constructor` 不标、只有 422 才标。
+    - `CoopDemoPage.test.tsx`：演示结果的契约从「有没有错误体」改成查 `errorType` 和 `invalidFields`。
+    - `pages.test.tsx`：对比的几条改到 `/compare-demo`；「侧栏数字跟着列表」「换页后移出的还在」两条挪到 `CompareRoute.test.tsx` 用真列表测；`/coop`、`/privacy` 现在会发请求，用假的 fetch 回答，检查前等页面加载完；无障碍的检查把真实页和演示页都算上，外壳的检查（标题、导航当前项）另加三个演示地址；「加号只记一次演示动作」那条找提示的办法改了（页面上多了一个 `role="status"`，回退提示那个）。
     - `session.test.tsx` 那条「state 不对什么都不发」回到的页面从 `/coop` 改成 `/compare`：接线以后 `/coop` 会自己取列表。
     - `test_dev_api.py` 里假登录页那条按账号数算链接的位置，不再写死第 6、7 个。
 17. **项目的变异脚本**（`web/scripts/mutations.mjs`）：M35（`CoopPage` 的 key 改了）、M54（422 标字段改用 `invalidFields`）、M55（原来测「不显示 detail」，现在 detail 根本到不了页面，改成测「不是 API 的回答当作没提交成」）、M79（测试改了名）重新对上锚点和测试名，总数还是 152。
@@ -4454,6 +4460,7 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 - 前端测试新建：`api/coop.test.ts`、`course.test.ts`、`privacy.test.ts`，`layout/account.test.ts`，`pages/CoopRoute.test.tsx`、`CompareRoute.test.tsx`、`PrivacyRoute.test.tsx`；改：`api/client.test.ts`、`queries.test.tsx`，`layout/session.test.tsx`，`models/compareList.test.tsx`，`pages/CompareDemoPage.test.tsx`、`CoopDemoPage.test.tsx`、`CoopPage.spec.test.tsx`、`PrivacyDemoPage.test.tsx`、`pages.test.tsx`。
 - 后端（只有开发用的 API）：改 `tests/support/dev_api.py`、`tests/test_dev_api.py`。
 - 文档：`web/README.md`（R5d 一节、路由表、几句已经不对的话、R5a 到 R5c 三节里的演示地址），本节。
+- 第二个提交（第 26 轮的修复）：前端改 `web/src/api/queries.ts`、`coop.ts`、`privacy.ts`，`web/src/pages/CoopRoute.tsx`、`PrivacyRoute.tsx`；测试新建 `web/src/layout/shell.test.tsx`，改 `api/coop.test.ts`、`course.test.ts`、`privacy.test.ts`、`queries.test.tsx`，`pages/CoopRoute.test.tsx`、`CompareRoute.test.tsx`、`PrivacyRoute.test.tsx`、`pages.test.tsx`，`test/fakeApi.tsx`、`timeouts.ts`；文档改 `web/README.md` 和本节。
 
 数据库结构、API、检索、提示词和 Streamlit 版都没改。
 
@@ -4461,16 +4468,43 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 
 - **前端检查**：类型、零警告 lint、构建、格式、生成的类型都过；Vitest **53 个文件 1508 项**全过（开工前 46 个文件 1348 项）；首屏 JavaScript gzip **185,792 字节**（开工前 182,933；预算 250,000）。构建的「有块超过 500 kB」提示开工前就有。
 - **后端**：`tests/test_dev_api.py` 30 项都过；Ruff F／E9／B 在改过的 2 个 Python 文件上通过；改动和新建的文件里没有 CR。**串行全量 5220 passed／7 warnings／563.12 秒**，退出码 0，比 R2b 最后一次的 5214 多 6 项，就是这次新加的 6 项。全量开始以后只改了 `web/README.md` 和本节。
-- **变异**（都在副本里跑。前端照 R2b 的判法读 Vitest 的 JSON 报告，只有对口的具名测试断言失败才算杀掉；Python 看 pytest 的 FAILED）：
+- **变异**（都在副本里跑。前端读 Vitest 的 JSON 报告：R5d 的测试文件里有具名测试因断言失败才算杀掉，只撞上超时、整个文件起不来的不算；第一个提交时日志只记第一条失败的测试，B27 记下每个变异的全部失败重跑，被杀的都有对口的测试，之后脚本也记全部失败。Python 看 pytest 的 FAILED）：
   - 前端我自己的 100 个（外壳、三页的接线、Co-op 的检查和投稿、对比列表、演示外壳）：第一遍 91 个由断言杀掉，9 个存活，没有超时或出错。
     - 5 个是测试缺口，补了测试以后都由对口的测试杀掉。R02、M02、Y03（三页的「重取中算加载」去掉「没在重取」）：TanStack v5 对从没成功过的查询重取时，把状态退回 pending、清掉错误，原来那几条「重试路上显示加载」都是第一次就失败，看不出差别；只有先成功过、后来明确失败（404）、再重试时，状态才停在 error，三页各补了这一条。Y04（隐私页不用 `shownData`）：补了「先成功，刷新后 503 留着旧文字并提示，再刷新 404 就不留」（Co-op 和对比原来就有这条）。Q02（回退提示把不在屏幕上的查询也算进去）：原来那条测试卸下页面时，查询已经不是「暂时失败、手里有旧内容」了；改成停在这个状态时卸下页面，再看提示。
     - 4 个是等价的，见「已知」。
   - Python D01–D08（开发 API 的 Co-op 数据：不审核、种子不当种子、顺序反了、贡献数手写、第二组的投稿人换成 `dev-one`、种子都当 0 级、整个不建、第二组只审一半），8／8。
   - 项目自己的 `npm run test:mutations`：第三遍基线通过，**152／152** 都由对口的测试杀掉，工作源文件没变（`sourceUnchanged: true`）。前两遍不作数：第一遍中途我补了测试，记成 `sourceUnchanged: false`；第二遍基线没过，因为我补的一条测试有类型错误（展开写法造的会员 TypeScript 没认成 `Member`；之前只用 Vitest 跑过它，没跑 tsc），改了以后重跑。补完上面 5 条测试、写完开发 API 以后又跑了第四遍，结果一样：基线通过，152／152，源文件没变。
+- **浏览器验收**：对着开发 API 在另一个会话里做（内置浏览器，用第一个提交 `81f2c84` 的副本），第二个提交写下时还在做，结果做完补在这一条下面。
+- **第二个提交（第 26 轮的修复）：**
+  - 前端：类型、零警告 lint、构建、格式、生成的类型都过；Vitest **54 个文件 1544 项**全过（新加的是 `shell.test.tsx` 和各文件补的测试）；首屏 JavaScript gzip **185,954 字节**（第一个提交 185,792，多的是写前确认和按游客清字段）。格式检查第一次挂了几个改过的测试文件，Prettier 排好以后过，那几个文件只动了排版、重跑也都过。
+  - 变异：A27 的修复让 7 个旧变异的锚点失效（C22、C28、P02、P03、R07、Y01、Y02），重写以后连同新加的 C29–C33、P12、W01–W06、R08–R10、Y06–Y10 和函数改过的旧变异，共 41 个：40 个由断言杀掉，Y09 等价（见「已知」）。B27 存活的 10 个（X 组）搬过来，10／10 由新测试杀掉。脚本现在共 130 个。
+  - 项目自己的 `npm run test:mutations`（第五遍）：基线通过，**152／152**，源文件没变。
+  - 后端没改，Python 的测试和变异不重跑。
+
+### 审查
+
+第 26 轮，两路只读审查，在第一个提交 `81f2c84` 上做，都不派子 agent：A27 看安全和正确性，B27 看测试、变异和文档。两路都说环境不让它们写报告文件，报告原文由主会话存进评审目录。
+
+- **A27：** 没有 CRITICAL、HIGH；1 MEDIUM、3 LOW、3 NIT。核过、没问题的：查询键里表示身份的那一段不会撞，还不知道是谁、从 Google 回来的路上都不发；登出、删号、贡献数变化都走 `becomes()`，还在路上的 `/coop` 被中止，登出以后才到的投稿 201 不改任何人；两层 key 换人时什么都不留；投稿防连点、不重试、只信检查过的服务端的数，422 只标表单自己的字段；对比的路径逐个编码、只重取失败的列；刷新不重读成功的 `/auth/me`，回退提示只算屏幕上的，没有自己不停重取的循环；三个检查函数对 `__proto__`、多余的键、类型不对、NaN 都稳；开发 API 不会被部署，记功走真代码。
+- **B27：** 没有 CRITICAL、HIGH；1 MEDIUM、8 LOW、3 NIT。本节的数字它重跑都对得上。我那 100 个变异它记下全部失败重跑，96 个被杀的都有对口的测试，4 个等价成立。它自己写了 26 个变异，存活 14 个，其中 4 个是等价或防御代码（见「已知」），10 个是测试缺口。
+
+修复在第二个提交里，正文各条已经改成修完的样子：
+
+1. **删号的回答在离开页面以后才到（A27 M1）：** 登出改由路由来做（第 12 条）。
+2. **别的标签页换了账号（A27 L4）：** 投稿、删号之前再问一次 `/auth/me`（第 1 条）。
+3. **unsure 时卡片照 cookie 显示细节（A27 L3）：** 按游客清掉（第 9 条）。
+4. **数的范围放得太宽（A27 N6）：** 上传回答的等级 0–2，贡献数和删号的计数都要在精确表示的范围里（第 7 条）。
+5. **投稿 401 不动身份和草稿，没有测试管（B27 M1）：** 补了路由测试：`POST /coop` 回 401，那句话、草稿、侧栏的会员、缓存里的身份都还在，也不调 `/auth/logout`。
+6. **几处设计没有测试钉住（B27 L2–L5）：** 回退提示原文写死、在 `<main>` 最前面、外壳的 `/config` 也算；手机菜单的刷新；刷新不重取已经离开的页面（`queries.test.tsx` 里原来那个离屏的查询没有 queryFn，断言测不出什么，换成真的）；身份还没确定时隐私页先当游客画、文字照常显示；三个演示地址的标题和导航当前项。
+7. **测试工具（B27 L6）：** 第 14 条：记查询串、`asked`、请求体容错，`held()` 去掉没用到的 `fail`，`timeouts.ts` 补了注释。B27 存活的 10 个变异（X01、X06、X07、X08、X14、X14b、X48、X60、X62、X63）搬进我的变异脚本，都被对口的新测试杀掉。
+8. **文档（B27 L7–L9、N10–N12）：** 第 16 条照实补全；变异的判法照脚本实际做的写，脚本也改成记下全部失败；验证记录写明浏览器验收另外做；两个测试名改成和断言一致；两条「原样发出」的测试对请求体改用 `toEqual`；README 两处加了限定；这里几句措辞。A27 的 L2、N5、N7 写进「已知」。
 
 ### 已知、未处理
 
-- **会话在页面开着时过期**（第 34 节「已知」里留给 R5d 的那条）：照方案，投稿的 401 不把身份改回游客。查下来按身份的读请求不会回 401：API 把坏掉或过期的 cookie 当作游客（R2a），`GET /coop` 就回游客的列表。所以 cookie 过期以后，Co-op 页还按会员画（等级、投稿表单），内容却是游客的（细节字段都是空的），侧栏也还显示已登录，直到整页刷新或重新登录。投稿这时会回 401，页面说「登录已经失效，请重新登录后再提交。」并给登录按钮，草稿和身份都不动，和 Streamlit 一样；要是当场改成游客，按登录的人给 key 的页面会重来，草稿就没了。删号的 401 照旧登出。要做得更好，得让 API 在读请求的回答里说明这次是按谁回答的（比如一个响应头），R3 或 R7 再看。
+- **会话在页面开着时过期**（第 34 节「已知」里留给 R5d 的那条）：读请求不会回 401：API 把坏掉或过期的 cookie 当作游客（R2a），`GET /coop` 就回游客的列表。所以 cookie 过期以后，Co-op 页还按会员画（等级、投稿表单），内容却是游客的（细节字段都是空的），侧栏也还显示已登录，直到整页刷新或重新登录。写操作前会再问一次 `/auth/me`（第 1 条）：投稿不发，表单说「登录已经失效，请重新登录后再提交。」并给登录按钮，草稿和身份都不动（照方案，和 Streamlit 一样；要是当场改成游客，按登录的人给 key 的页面会重来，草稿立刻就没了）；删号照旧登出。不过草稿也只是留在页面上、可以先复制下来：点登录是整页去 Google，回来草稿就没了，那句话没有提醒（A27 L2）。要不要在 R5a 的这句里加「先复制」，等用户定。要做得更好，得让 API 在读请求的回答里说明这次是按谁回答的（比如一个响应头），R3 或 R7 再看。
+- **删号的结果在页面离开以后才到**：照样登出（第 12 条），但结果那句不再显示，这是 R5c 有意的；删号路上点「退出登录」也一样。
+- **投稿超时，或者 201 读不懂**（A27 N5）：说「投稿暂时提交不了，请稍后再试。你填的内容还在。」，其实可能已经存下了；重交会得到「重复提交」，没有害处。改说法要动 R5a 的文案，留给用户定。
+- **R1 的「加入对比」把课号写进控制台**（A27 N7，`SearchPage.tsx`、`CourseDetail.tsx` 的 `console.info`）：现在是假数据的课号，不是这一批加的；R3 把按钮接到 `addToCompare` 时一起删掉（R0 14.1）。
 - **演示外壳没改成懒加载**（第 5 条）：首屏比开工前多 2,859 字节，是新的接线代码；三个演示外壳和它们的假数据本来就在首屏里。R3 以后首屏要是紧，演示外壳可以一起改成懒加载。
 - **对比页在 R3 之前是空的**：加课的按钮在课程详情上（R5b 说明书第 8 节），R3 接。
 - **等价的 4 个变异体**：
@@ -4478,7 +4512,9 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
   - Q04（回退提示的订阅不经 `notifyManager.batchCalls`）：测试里看不出差别。它防的是缓存事件在别的组件渲染中途同步通知 React，引出「渲染时更新了另一个组件」的警告；TanStack 自己的 `useIsFetching` 也这样做。
   - D02（只给测试用的复位函数不清演示列表）：每条用演示的测试进页面时都会按场景重新填一遍，所以看不出来。
   - B01（两份对比列表共用一组监听）：一份变了也会通知另一份的订阅者，但那一份的快照没变，`useSyncExternalStore` 不会重画。
-- **和 R3d 合并**：R5d 和用户的 R3d 都改 `web/src/App.tsx` 和 `web/README.md`，后合并的那个由我来合。
+  - Y09（删号以后当场登出，不等下一轮事件）：`becomes()` 改缓存之前先 `await` 了一次（取消路上的 `/auth/me`），页面照样先写出结果，所以看不出差别。留着下一轮事件，是为了这个顺序不靠 `becomes()` 里面怎么写。
+  - B27 认定的四个：X03（`contributed` 不等它做完）、X16（「重新加载」也重取还在加载的列：TanStack 把它并进进行中的请求）、X25／X25b（缺 `industry`、`duration_months` 的行当作读不懂：OpenAPI 里这两个都是必填，读成 null 是防御）；Python 的 PX2（开发 API 投稿的等级一律给 0：`review()` 会照脱敏后的字段重算）。
+- **和 R3d 合并**：R5d 和用户的 R3d 都改 `web/src/App.tsx` 和 `web/README.md`；不管哪一个后合并，冲突由写 R5d 的这一边来解。
 - 第 34 节「已知」里账号的提示放在页面最底下的那条没动，R3 改外壳时一起改。
 
 ### 发布状态

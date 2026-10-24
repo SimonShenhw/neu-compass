@@ -17,6 +17,8 @@ export async function expectTimeout(
 ) {
   vi.useFakeTimers();
   try {
+    // This fetch stays for the rest of the test (later requests never answer either); the next test's setup puts the
+    // blocking one back (test/setup.ts).
     vi.stubGlobal(
       'fetch',
       vi.fn(

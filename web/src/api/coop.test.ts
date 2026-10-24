@@ -3,7 +3,7 @@ import guest from '../fixtures/coop/list-guest.json';
 import member1 from '../fixtures/coop/list-member-1.json';
 import member2 from '../fixtures/coop/list-member-2.json';
 import pending from '../fixtures/coop/upload-pending.json';
-import { fakeApi, json } from '../test/fakeApi';
+import { asked, fakeApi, json } from '../test/fakeApi';
 import { expectTimeout } from '../test/timeouts';
 import { ApiError } from './client';
 import {
@@ -98,9 +98,7 @@ describe('the Co-op list', () => {
     expect(
       await createQueryClient().fetchQuery(coopListQuery('guest')),
     ).toEqual(guest.body);
-    expect(api.calls.map((call) => `${call.method} ${call.path}`)).toEqual([
-      'GET /coop',
-    ]);
+    expect(api.calls.map(asked)).toEqual(['GET /coop']);
     await expectTimeout(
       () => createQueryClient().fetchQuery(coopListQuery('guest')),
       'slow',
@@ -121,14 +119,27 @@ describe('an upload', () => {
     ['an empty coop_id', { ...pending.body, coop_id: '' }],
     ['accepted as text', { ...pending.body, accepted: 'true' }],
     ['a level that is not whole', { ...pending.body, visibility_level: 1.5 }],
+    ['a level below 0', { ...pending.body, visibility_level: -1 }],
+    ['a level above 2', { ...pending.body, visibility_level: 3 }],
     ['an unknown status', { ...pending.body, status: 'queued' }],
     ['duplicate as a number', { ...pending.body, duplicate: 0 }],
     ['credited missing', { ...pending.body, contribution_credited: undefined }],
     ['a negative count', { ...pending.body, contribution_count: -1 }],
     ['a count that is not whole', { ...pending.body, contribution_count: 1.5 }],
     ['a count as text', { ...pending.body, contribution_count: '2' }],
+    [
+      'a count past what a number holds exactly',
+      { ...pending.body, contribution_count: 2 ** 53 },
+    ],
   ])('with %s is unreadable', (_name, value) => {
     expect(() => parseUploadResponse(value)).toThrow(ApiError);
+  });
+
+  it.each([0, 1, 2])('may report level %s', (level) => {
+    expect(
+      parseUploadResponse({ ...pending.body, visibility_level: level })
+        .visibility_level,
+    ).toBe(level);
   });
 
   it.each(['pending', 'approved', 'rejected', 'published'])(
@@ -147,8 +158,9 @@ describe('an upload', () => {
     expect(api.calls[0]).toMatchObject({
       method: 'POST',
       path: '/coop',
-      body: request,
+      search: '',
     });
+    expect(api.calls[0]!.body).toEqual(request);
     await expectTimeout(() => uploadCoop(request), 'slow');
   });
 

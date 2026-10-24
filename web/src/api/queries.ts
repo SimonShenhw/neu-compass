@@ -25,6 +25,7 @@ import {
   isTransientError,
   unreadableAnswer,
 } from './client';
+import type { Timeout } from './client';
 import type { Schemas } from './types';
 
 export const PUBLIC_FRESH_MS = 5 * 60_000;
@@ -142,7 +143,7 @@ export function parseIdentity(value: unknown): Member {
       typeof email === 'string' &&
       email !== '' &&
       typeof count === 'number' &&
-      Number.isInteger(count) &&
+      Number.isSafeInteger(count) &&
       count >= 0 &&
       (displayName === null || typeof displayName === 'string') &&
       (token === null || typeof token === 'string')
@@ -158,22 +159,44 @@ export function parseIdentity(value: unknown): Member {
   throw unreadableAnswer();
 }
 
-// Who is looking: 401 means a guest (the API also expires a cookie that no longer works). It changes only through
-// login and logout, which update it here, so it never goes stale by itself.
+// Who is looking, from /auth/me: 401 means a guest (the API also expires a cookie that no longer works).
+export async function whoIsAsking(
+  timeout: Timeout = 'slow',
+  signal?: AbortSignal,
+): Promise<Viewer> {
+  try {
+    return parseIdentity(
+      await apiGet(apiPath('/auth/me'), { timeout, signal }),
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return GUEST;
+    throw error;
+  }
+}
+
+// Who is looking changes only through login and logout, which update it here, so it never goes stale by itself.
 export const meQuery = queryOptions({
   queryKey: ['me'],
-  queryFn: async ({ signal }): Promise<Viewer> => {
-    try {
-      return parseIdentity(
-        await apiGet(apiPath('/auth/me'), { timeout: 'slow', signal }),
-      );
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) return GUEST;
-      throw error;
-    }
-  },
+  queryFn: ({ signal }) => whoIsAsking('slow', signal),
   staleTime: Infinity,
 });
+
+// Every tab shares the cookie, and a tab asks who is looking only at login, logout and a reload, so another tab may
+// have logged out, or in as someone else, since. A write that acts on the account (an upload, the deletion) asks again
+// first and goes out only while the member this page shows is still the one signed in (A27). When /auth/me gives no
+// answer this page can read within 8 seconds, the write goes out and its own answer says what happened.
+export async function stillSignedInAs(
+  viewer: Viewer | undefined,
+): Promise<boolean> {
+  if (viewer?.kind !== 'member') return false;
+  let asking: Viewer;
+  try {
+    asking = await whoIsAsking('read');
+  } catch {
+    return true;
+  }
+  return asking.kind === 'member' && asking.userId === viewer.userId;
+}
 
 export function useMe(enabled = true) {
   return useQuery({ ...meQuery, enabled });

@@ -9,7 +9,14 @@ import cs7800 from '../fixtures/compare/course-cs-7800.json';
 import ds5220 from '../fixtures/compare/course-ds-5220.json';
 import { FALLBACK_NOTICE } from '../layout/AppShell';
 import { addToCompare, getCompareList } from '../models/compareList';
-import { apiError, fakeApi, held, json, livePage } from '../test/fakeApi';
+import {
+  apiError,
+  asked,
+  fakeApi,
+  held,
+  json,
+  livePage,
+} from '../test/fakeApi';
 
 const courses = [cs5800, cs6140, ds5220, cs5100, cs7800].map((f) => f.body);
 const byPath = new Map(
@@ -51,7 +58,7 @@ it('each course in the list is asked for once, by its ID, in the order it was ad
   expect(
     await screen.findByRole('link', { name: '查看 CS 5800' }),
   ).toBeInTheDocument();
-  expect(api.calls.map((call) => `${call.method} ${call.path}`)).toEqual([
+  expect(api.calls.map(asked)).toEqual([
     'GET /course/c-cs-6140',
     'GET /course/c-cs-5800',
   ]);
@@ -169,7 +176,8 @@ it('an answer the page cannot read is a failed column, and 重新加载 asks for
   expect(api.count('GET', '/course/c-odd')).toBe(2);
 });
 
-it('only the first four are asked for', async () => {
+// The list holds four at most, so the route's own cut at four (M04) cannot be seen from here.
+it('a full list of four asks for each course once', async () => {
   const api = fakeApi(catalog);
   choose('c-cs-5800', 'c-cs-6140', 'c-ds-5220', 'c-cs-5100');
   livePage('/compare');

@@ -116,6 +116,16 @@ function coopRecord(value: unknown): CoopRecord | null {
   };
 }
 
+// A row as a guest is shown it: below a contribution the API leaves these out (api/routes/coop.py).
+export function asGuest(record: CoopRecord): CoopRecord {
+  return {
+    ...record,
+    interview_summary: null,
+    technical_questions: null,
+    salary_range_usd: null,
+  };
+}
+
 // GET /coop's answer: a list of rows, each as CoopRecord says. One row the page cannot read makes the whole answer
 // unreadable, as a malformed identity is (R2b): the page shows no half list.
 export function parseCoopList(value: unknown): CoopRecord[] {
@@ -163,13 +173,14 @@ export function parseUploadResponse(value: unknown): CoopUploadResponse {
       isText(coop_id) &&
       coop_id !== '' &&
       typeof accepted === 'boolean' &&
-      typeof visibility_level === 'number' &&
-      Number.isInteger(visibility_level) &&
+      (visibility_level === 0 ||
+        visibility_level === 1 ||
+        visibility_level === 2) &&
       STATUSES.has(status) &&
       typeof duplicate === 'boolean' &&
       typeof contribution_credited === 'boolean' &&
       typeof contribution_count === 'number' &&
-      Number.isInteger(contribution_count) &&
+      Number.isSafeInteger(contribution_count) &&
       contribution_count >= 0
     )
       return {
