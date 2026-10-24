@@ -487,8 +487,9 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 `redirect_uri` is optional; defaults to the value configured in
 `config/settings.py` `google_oauth_redirect_uri`. It is the address Google sent
 the browser back to, which Google checks again in the exchange. In the cookie
-mode (R2b) it may only be a web front end's own address, an origin in
-`WEB_ORIGINS` followed by `/`; anything else gets **422**
+mode (R2b) it may only be the front end's own address: the request's `Origin`
+(one in `WEB_ORIGINS`) followed by `/`, so a code Google sent to one front end
+is redeemed only by that one. Anything else gets **422**
 `redirect_uri must be the web front end's own address.` before the code is
 exchanged. The token mode does not check it (Streamlit sends its own).
 
@@ -532,8 +533,8 @@ the browser into an account of its choosing.
   anywhere else gets the same body from the global handler.
 - **403**: the cookie mode, not from an allowed web origin with
   `X-NEU-Compass: 1` (the fixed CSRF body under *Session cookie, CSRF and CORS*).
-- **422**: a malformed body, or the cookie mode's `redirect_uri` is not a web
-  front end's own address.
+- **422**: a malformed body, or the cookie mode's `redirect_uri` is not the
+  request's own `Origin` followed by `/`.
 
 ---
 
@@ -685,7 +686,8 @@ For the new web front end, which calls `api.<zone>` from `compass.<zone>` (the s
 
 ### Safe error exits (SAFE-02)
 
-The `{detail, error_type, status_code}` shape and existing HTTP status codes remain.
+The `{detail, error_type, status_code}` shape and existing HTTP status codes remain; an OAuth refusal's 401 also
+has `reason` (R2b, below).
 Uncaught 500 uses `internal_error`; other HTTP 5xx use `server_error` unless explicitly
 mapped (502 `upstream_error`, 503 `service_unavailable`); 429 is `rate_limited`.
 No request ID is added to the body. An inbound `x-request-id` is retained only if it

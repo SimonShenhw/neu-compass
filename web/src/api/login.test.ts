@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LOCAL_API, PRODUCTION_API } from './apiBase';
 import { ApiError } from './client';
 import {
   LOGIN_MESSAGES,
@@ -6,6 +7,7 @@ import {
   PENDING_KEY,
   finishLogin,
   isLoginReturn,
+  loginAddress,
   loginFailureMessage,
   logout,
   makeState,
@@ -43,6 +45,18 @@ describe('the state', () => {
     const states = new Set(Array.from({ length: 200 }, makeState));
     expect(states.size).toBe(200);
     for (const state of states) expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it('comes from the browser’s cryptographic random source', () => {
+    const random = vi
+      .spyOn(crypto, 'getRandomValues')
+      .mockImplementation(<T extends ArrayBufferView | null>(array: T): T => {
+        if (array instanceof Uint8Array) array.fill(255);
+        return array;
+      });
+    expect(makeState()).toBe(`${'_'.repeat(42)}8`);
+    expect(random).toHaveBeenCalledTimes(1);
+    expect(random.mock.calls[0]![0]).toEqual(new Uint8Array(32).fill(255));
   });
 
   it('Google sends the browser back to this site’s own root', () => {
@@ -111,15 +125,24 @@ describe('starting a login', () => {
   });
 
   it('goes to the dev API’s fake Google on this machine, but nowhere odd', async () => {
-    for (const url of ['http://127.0.0.1:8000/__dev/google?state=x']) {
+    for (const url of [
+      'http://127.0.0.1:8000/__dev/google?state=x',
+      'https://accounts.google.com:443/o/oauth2/v2/auth',
+    ]) {
       serve(() => json({ url }));
       const go = vi.fn();
       await startLogin('/', go);
-      expect(go).toHaveBeenCalledWith(url);
+      expect(go).toHaveBeenCalledWith(new URL(url).href);
     }
     for (const url of [
       'javascript:alert(1)',
       'http://evil.test/',
+      'https://evil.test/',
+      'https://accounts.google.com.evil.test/',
+      'http://accounts.google.com/',
+      'https://user:secret@accounts.google.com/',
+      'http://localhost:8000/__dev/google',
+      'http://127.0.0.1:9999/__dev/google',
       'data:text/html,x',
       'not a url',
       7,
@@ -133,6 +156,21 @@ describe('starting a login', () => {
       expect(go).not.toHaveBeenCalled();
       expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
     }
+  });
+
+  it('a bundle for the real API goes to Google’s page and nowhere else', () => {
+    const google = 'https://accounts.google.com/o/oauth2/v2/auth?state=x';
+    expect(loginAddress({ url: google }, PRODUCTION_API)).toBe(google);
+    for (const url of [
+      'http://127.0.0.1:8000/__dev/google',
+      `${PRODUCTION_API}/__dev/google`,
+    ])
+      expect(() => loginAddress({ url }, PRODUCTION_API), url).toThrow(
+        expect.objectContaining({ status: 502 }),
+      );
+    expect(loginAddress({ url: `${LOCAL_API}/__dev/google` }, LOCAL_API)).toBe(
+      `${LOCAL_API}/__dev/google`,
+    );
   });
 
   it('a failure to get the address leaves nothing stored', async () => {
@@ -171,6 +209,11 @@ describe('what was stored', () => {
       '[]',
       '{"state":1,"returnTo":"/"}',
       '{"state":"x"}',
+      // Only what makeState makes: 43 of A-Z a-z 0-9 _ -.
+      '{"state":"","returnTo":"/"}',
+      `{"state":"${STATE.slice(1)}","returnTo":"/"}`,
+      `{"state":"${STATE}x","returnTo":"/"}`,
+      `{"state":"${STATE.slice(1)}.","returnTo":"/"}`,
     ]) {
       sessionStorage.setItem(PENDING_KEY, text);
       expect(takePendingLogin(), text).toBeNull();
@@ -253,7 +296,7 @@ describe('coming back from Google', () => {
     }
   });
 
-  it('Google’s own error names its code only when it is a plain name', async () => {
+  it('Google’s own error names its code only when it is a plain name, and uses the state up', async () => {
     const fetch = serve(() => json(member));
     pending();
     await expect(
@@ -263,10 +306,45 @@ describe('coming back from Google', () => {
       returnTo: '/compare',
       message: '登录没有完成（access_denied），请再试一次。',
     });
-    await expect(finishLogin('?error=%3Cb%3Ex')).resolves.toMatchObject({
-      message: LOGIN_MESSAGES.failed,
-    });
+    expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
+    pending();
+    await expect(
+      finishLogin(`?error=%3Cb%3Ex&state=${STATE}`),
+    ).resolves.toMatchObject({ message: LOGIN_MESSAGES.failed });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('an error link this tab’s login did not start shows none of its words', async () => {
+    const words = 'your_account_is_locked_call_the_help_desk_now';
+    for (const [stored, search] of [
+      [false, `?error=${words}`],
+      [false, `?error=${words}&state=${STATE}`],
+      [true, `?error=${words}&state=another-state-0123456789abcdef`],
+      [true, `?error=${words}`],
+    ] as const) {
+      if (stored) pending();
+      const result = await finishLogin(search);
+      expect(result, search).toEqual({
+        kind: 'failed',
+        message: LOGIN_MESSAGES.forged,
+        returnTo: stored ? '/compare' : '/',
+      });
+      expect(JSON.stringify(result)).not.toContain(words);
+      expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
+    }
+  });
+
+  it('the stored page to come back to is checked again', async () => {
+    serve(() => json(member));
+    pending(STATE, '//evil.test/x');
+    await expect(finishLogin(`?code=c&state=${STATE}`)).resolves.toMatchObject({
+      kind: 'done',
+      returnTo: '/',
+    });
+    pending(STATE, 'https://evil.test/');
+    await expect(
+      finishLogin(`?error=access_denied&state=${STATE}`),
+    ).resolves.toMatchObject({ kind: 'failed', returnTo: '/' });
   });
 
   it('says a wrong domain and an unverified email apart, and nothing more', async () => {

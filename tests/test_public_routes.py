@@ -169,6 +169,17 @@ def test_login_url_without_login_is_503_whatever_the_address(client, monkeypatch
     assert response.status_code == 503
 
 
+def test_login_url_refuses_an_address_over_2048_characters_with_the_request(client, monkeypatch):
+    """The length limit of api_contract.md is checked with the rest of the request, ahead of the 503 for a missing
+    login, and the address is not echoed. 中文：api_contract.md 写的长度上限和请求的其他部分一起查，先于没配置登录的 503，
+    也不回显地址。"""
+    monkeypatch.setattr(settings, "google_oauth_client_id", "")
+    address = "https://evil.test/" + "a" * (2049 - len("https://evil.test/"))
+    response = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": address})
+    assert response.status_code == 422 and "evil" not in response.text
+    assert client.get("/auth/login-url", params={"state": STATE, "redirect_uri": address[:2048]}).status_code == 503
+
+
 @pytest.mark.parametrize("missing", WITHOUT_LOGIN, ids=missing_names)
 def test_login_url_is_unavailable_without_google_or_a_secret(client, monkeypatch, missing):
     """A public route: the whole body is pinned, so no setting's name or value can slip into it (B25 L3).

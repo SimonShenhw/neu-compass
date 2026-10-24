@@ -175,6 +175,29 @@ def test_the_cookie_login_takes_only_the_front_ends_own_address(empty_db, monkey
         assert response.status_code == 200 and seen[-1] == "https://other.test/"
 
 
+def test_a_code_sent_to_one_front_end_is_redeemed_only_by_that_one(empty_db, monkeypatch):
+    """R2b: with two front ends allowed (a beta, say), the address must be the root of the origin the request comes
+    from, not just any of them. 中文：R2b：允许两个前端时（比如 beta），地址必须是请求所在来源的根路径，不是其中随便哪个。"""
+    beta = "https://beta.example.test"
+    seen = []
+
+    def exchange(code, *, redirect_uri=None):
+        seen.append(redirect_uri)
+        return {"user_id": "synthetic-sub-1", "email": "synthetic.one@husky.neu.edu", "name": "Synthetic One"}
+
+    monkeypatch.setattr(settings, "session_secret", SECRET)
+    monkeypatch.setattr(settings, "web_origins", [ORIGIN, beta])
+    app = build_test_app(empty_db, seed=False)
+    app.dependency_overrides[get_oauth_exchange_fn] = lambda: exchange
+    with TestClient(app, base_url="https://testserver") as client:
+        response = client.post("/auth/callback", headers=WRITE,
+                               json={"code": "synthetic-code", "session": "cookie", "redirect_uri": f"{beta}/"})
+        assert response.status_code == 422 and set_cookie_headers(response) == [] and seen == []
+        response = client.post("/auth/callback", headers={**WRITE, "Origin": beta},
+                               json={"code": "synthetic-code", "session": "cookie", "redirect_uri": f"{beta}/"})
+        assert response.status_code == 200 and seen == [f"{beta}/"]
+
+
 @pytest.mark.parametrize("content_type", [None, "text/plain"], ids=["no-content-type", "text-plain"])
 @pytest.mark.parametrize("session", ["token", "cookie"])
 def test_a_login_body_not_sent_as_json_is_never_read(empty_db, monkeypatch, content_type, session):

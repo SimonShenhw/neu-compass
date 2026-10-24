@@ -15,8 +15,9 @@ stand-ins put together:
     done), `dev:cut` (the connection drops mid-answer), `dev:stall` (it falls silent for longer than the web front
     end waits).
 
-The session secret is new on every start, so a restart logs everyone out. Both this and the dev server are on
-127.0.0.1: one host name keeps them one site for the browser, so the SameSite=Lax session cookie goes along.
+Every setting starts from the code's default, whatever .env or the environment says, and the session secret is new on
+every start, so a restart logs everyone out. The access log is filtered as in production. Both this and the dev server
+are on 127.0.0.1: one host name keeps them one site for the browser, so the SameSite=Lax session cookie goes along.
 
 Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8000]
 
@@ -25,7 +26,8 @@ import 它，API 里也没有任何测试模式；这里只是把测试套件自
 （/__dev/google），点链接带着 code 回到前端，回调用替身换 code，有几个 code 会像 Google 或身份检查那样被拒，还有一个
 state 不对的链接和一个「取消」；模型换成 tests/conftest.py 的替身；/chat 按脚本回答，从不调用 Gemini，会调用它的 HyDE
 补救也关掉。问题里带上面那几个词，就换成对应的脚本：模型中途出错、没有回答、今天的次数用完、流没有 done 就结束、连接中途
-断开、停得比前端等的还久。每次启动换一个会话密钥，所以重启就都登出了。它和开发服务器都在 127.0.0.1，同一个主机名，
+断开、停得比前端等的还久。每个设置都从代码里的默认值开始，不管 .env 或环境变量怎么写；每次启动换一个会话密钥，所以重启
+就都登出了。访问日志和生产一样过滤。它和开发服务器都在 127.0.0.1，同一个主机名，
 浏览器才把它们算作同一个站点，SameSite=Lax 的会话 cookie 才会跟着请求走。
 """
 
@@ -65,9 +67,6 @@ REFUSALS = {
     "dev-refused": ("Google refuses the code (refused)", "token_exchange_rejected"),
 }
 WRONG_STATE = "dev-wrong-state-0123456789abcdef"
-# What configure() changes, so a test can put it back. 中文：configure() 改动的设置，测试好还原。
-CONFIGURED = ("sqlite_path", "web_origins", "session_secret", "google_oauth_client_id", "google_oauth_client_secret",
-              "google_oauth_redirect_uri", "answer_feedback_enabled")
 # The scripted answer, in pieces. 中文：脚本里的回答，分成几块。
 ANSWER = ("按合成目录，", "CS 5800 ", "是算法课，", "CS 6140 ", "是机器学习。", "（这是开发用的假回答，", "没有调用模型。）")
 PIECE_SECONDS = 0.05  # Between pieces, so the page shows the answer arriving. 中文：块与块之间停一下，页面上看得出在流。
@@ -75,8 +74,22 @@ STALL_SECONDS = 35  # Longer than the web front end's 30 s wait. 中文：比前
 CUT_AFTER_LINES = 3  # dev:cut and dev:no-done stop after meta and two pieces. 中文：meta 和两块以后就停。
 
 
+def pinned(settings) -> list[str]:
+    """The settings configure() sets: every one that has a default, so a test can put them back.
+    中文：configure() 设的设置：凡是有默认值的都设，测试好还原。"""
+    return [name for name, field in type(settings).model_fields.items() if not field.is_required()]
+
+
 def configure(settings, db_path: Path) -> None:
-    """Point the process's settings at the synthetic world. 中文：把这个进程的设置指向合成的那一套。"""
+    """Point the process's settings at the synthetic world. Every setting first goes back to the code's default,
+    whatever .env or the environment says (a request limit or a data path there would change what this API does),
+    then the few this API needs are set. Only the Gemini key has no default and stays as it is; nothing here calls
+    Gemini.
+    中文：把这个进程的设置指向合成的那一套。每个设置先恢复成代码里的默认值，不管 .env 或环境变量怎么写（那里的限流或
+    数据路径会改变这个 API 的行为），再设它需要的几项。只有 Gemini key 没有默认值，保持原样；这里不会调用 Gemini。"""
+    fields = type(settings).model_fields
+    for name in pinned(settings):
+        setattr(settings, name, fields[name].get_default(call_default_factory=True))
     settings.sqlite_path = str(db_path)
     settings.web_origins = list(FRONT_ENDS)
     settings.session_secret = secrets.token_urlsafe(32)
@@ -212,6 +225,7 @@ def build_dev_app(db_path: Path, *, base: str) -> FastAPI:
         get_model_budget,
         get_oauth_exchange_fn,
     )
+    from api.logging import configure_logging  # noqa: PLC0415
     from api.main import create_app  # noqa: PLC0415
     from config import settings  # noqa: PLC0415
     from db.connection import connect  # noqa: PLC0415
@@ -221,6 +235,10 @@ def build_dev_app(db_path: Path, *, base: str) -> FastAPI:
     from tests.conftest import FixtureEmbedder, FixtureReranker  # noqa: PLC0415
 
     configure(settings, db_path)
+    # The API's own logging, which production sets up at startup (skipped here): uvicorn's access log loses the login
+    # address's query and names course reads by their template (R2a). 中文：生产在启动时装上的 API 日志（这里不跑启动）：
+    # uvicorn 的访问日志去掉登录地址的查询串，课程读取只记路径模板（R2a）。
+    configure_logging()
     make_database(db_path)
 
     def authorize_url(*, state_token: str = "", redirect_uri: str | None = None) -> str:

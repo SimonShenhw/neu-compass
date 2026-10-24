@@ -28,14 +28,16 @@ export function useSession(
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const config = useConfig();
-  const me = useMe();
   // The address the page was loaded with: a return from Google is handled once, on that address only.
   const loaded = useRef(location);
   const [busy, setBusy] = useState<'returning' | 'login' | 'logout' | null>(
     () =>
       isLoginReturn(location.pathname, location.search) ? 'returning' : null,
   );
+  // While the address still carries Google's code, neither /config nor /auth/me is asked: an /auth/me sent with an
+  // old cookie could answer after the login and expire the new cookie.
+  const config = useConfig(busy !== 'returning');
+  const me = useMe(busy !== 'returning');
   const handled = useRef(false);
 
   const becomes = useCallback(
@@ -48,6 +50,17 @@ export function useSession(
     [queryClient],
   );
 
+  // After the callback, /auth/me is read again (plan 3.1): only that shows the browser kept the cookie. A browser that
+  // refused it answers as a guest; a read that fails for a moment leaves the callback's answer standing.
+  const kept = useCallback(async () => {
+    try {
+      const viewer = await queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
+      return viewer.kind === 'member';
+    } catch {
+      return true;
+    }
+  }, [queryClient]);
+
   useEffect(() => {
     if (handled.current) return;
     handled.current = true;
@@ -56,13 +69,16 @@ export function useSession(
     // First take code and state out of the address bar and the history, so no link or reload carries them.
     void navigate('/', { replace: true });
     void finishLogin(search).then(async (result) => {
-      if (result.kind === 'done') await becomes(result.member);
+      if (result.kind === 'done') {
+        await becomes(result.member);
+        if (!(await kept())) announce(LOGIN_MESSAGES.notKept);
+      }
       if (result.kind === 'failed') announce(result.message);
       if (result.kind !== 'none')
         void navigate(result.returnTo, { replace: true });
       setBusy(null);
     });
-  }, [announce, becomes, navigate]);
+  }, [announce, becomes, kept, navigate]);
 
   useEffect(() => {
     // Back from Google's page, the browser may show this page as it was left (the back-forward cache), still on its

@@ -10,7 +10,8 @@
 // - Waiting for the answer to start, and for each next piece, takes 30 s at most, as Streamlit's read timeout does
 //   (R0 0.5). Nothing is sent again by itself: every question counts against the day's model calls and writes
 //   query_log.
-// - A stream that breaks off, falls silent, or sends a line that is not one of the four events ends with an error
+// - A stream that breaks off, falls silent, or sends a line that is not one of the four events (or is longer than any
+//   line the API sends) ends with an error
 //   event in Streamlit's words, after what had arrived, so the page keeps the partial answer (R0 0.6). Streamlit
 //   skips a line it cannot read; here it ends the stream. A cancel (the caller's signal) throws the caller's reason.
 import {
@@ -29,6 +30,9 @@ import type { Schemas } from './types';
 export type ChatRequest = Schemas['ChatRequest'];
 
 export const STREAM_WAIT_MS = 30_000;
+// No line the API sends comes near this (meta, the longest, is some tens of KB). A longer one, or a piece of one that
+// has not ended yet, means the stream is broken, and the buffer never grows without end.
+export const MAX_LINE_CHARS = 1_000_000;
 
 export const STREAM_MESSAGES = {
   lost: '连接中断。仅保留部分回答，未完整结束；请稍后手动重试。',
@@ -134,6 +138,11 @@ export async function* streamChat(
     }
     const reader = body.getReader();
     const decoder = new TextDecoder();
+    const broken: ChatEvent = {
+      type: 'error',
+      errorType: 'invalid_stream',
+      message: STREAM_MESSAGES.incomplete,
+    };
     let buffer = '';
     let first = true;
     for (;;) {
@@ -151,26 +160,31 @@ export async function* streamChat(
       }
       // A line can be cut between two pieces, and so can the bytes of one character; the last line may have no
       // newline.
-      buffer += chunk.done
+      const text = chunk.done
         ? decoder.decode()
         : decoder.decode(chunk.value, { stream: true });
-      const lines = buffer.split('\n');
+      buffer += text;
+      // A piece without a newline ends no line, so the buffer is not split again: a long line arriving in many pieces
+      // would otherwise take time in the square of its length.
+      const lines =
+        chunk.done || text.includes('\n') ? buffer.split('\n') : [buffer];
       buffer = chunk.done ? '' : (lines.pop() ?? '');
       for (const raw of lines) {
         const line = raw.trim();
         if (line === '') continue;
-        const event = readEvent(line, first);
+        const event =
+          line.length > MAX_LINE_CHARS ? null : readEvent(line, first);
         if (event === null) {
-          yield {
-            type: 'error',
-            errorType: 'invalid_stream',
-            message: STREAM_MESSAGES.incomplete,
-          };
+          yield broken;
           return;
         }
         first = false;
         yield event;
         if (event.type === 'error' || event.type === 'done') return;
+      }
+      if (buffer.length > MAX_LINE_CHARS) {
+        yield broken;
+        return;
       }
       if (chunk.done) {
         yield {

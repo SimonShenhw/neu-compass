@@ -7,9 +7,11 @@
 // 2. Google sends the browser to /?code=&state= (or ?error=). The caller first takes code and state out of the
 //    address bar (they must not stay in history or in a shared link), then finishLogin checks the state against the
 //    stored one, used once: a missing or different state is refused before anything is sent. That is the login
-//    forgery the API cannot stop on its own (R2a). Then POST /auth/callback in the cookie mode.
+//    forgery the API cannot stop on its own (R2a). Then POST /auth/callback in the cookie mode, and the caller reads
+//    /auth/me again to see that the browser kept the cookie.
 // 3. logout: POST /auth/logout. The cookie is HttpOnly, so only the API can end the session; a failure says so.
 import {
+  API_BASE_URL,
   ApiError,
   apiErrorMessage,
   apiGet,
@@ -30,6 +32,8 @@ export const LOGIN_MESSAGES = {
   domain: '只能用 husky.neu.edu 或 northeastern.edu 邮箱登录。',
   unverified: '这个 Google 账号的邮箱还没有验证，验证以后再登录。',
   storage: '这个浏览器不让本页暂存登录信息，所以没法登录。',
+  notKept:
+    '这个浏览器没有保存登录状态（可能不让本站使用 cookie），所以没法登录。',
   logoutFailed: '没能退出登录，请再试一次。',
   loggedOut: '已退出登录。',
 } as const;
@@ -77,6 +81,9 @@ function rememberLogin(pending: Pending): void {
   }
 }
 
+// What makeState makes; anything else in storage was not put there by this site's login.
+const STATE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+
 // What startLogin stored, removed as it is read: a state is good for one return only.
 export function takePendingLogin(): Pending | null {
   let text: string | null = null;
@@ -91,6 +98,7 @@ export function takePendingLogin(): Pending | null {
     if (
       isJsonObject(value) &&
       typeof value.state === 'string' &&
+      STATE_SHAPE.test(value.state) &&
       typeof value.returnTo === 'string'
     )
       return { state: value.state, returnTo: value.returnTo };
@@ -104,16 +112,22 @@ export class LoginStorageError extends Error {
   override name = 'LoginStorageError';
 }
 
-const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+const GOOGLE_SIGN_IN = 'https://accounts.google.com';
 
-// Google's address, or the dev API's fake one on this machine; never a script URL or plain http elsewhere.
-function loginAddress(value: unknown): string {
+// Google's sign-in page; or, when the API is the one on this machine (plain http, which apiBaseUrl allows for that
+// alone), a page of that API: the dev API's fake Google. Never a script URL or any other site.
+export function loginAddress(
+  value: unknown,
+  api: string = API_BASE_URL,
+): string {
   if (isJsonObject(value) && typeof value.url === 'string') {
     try {
       const url = new URL(value.url);
       if (
-        url.protocol === 'https:' ||
-        (url.protocol === 'http:' && LOOPBACK.has(url.hostname))
+        (url.origin === GOOGLE_SIGN_IN ||
+          (api.startsWith('http:') && url.origin === api)) &&
+        url.username === '' &&
+        url.password === ''
       )
         return url.href;
     } catch {
@@ -160,6 +174,10 @@ export async function finishLogin(search: string): Promise<LoginReturn> {
   if (code === null && error === null) return { kind: 'none' };
   const pending = takePendingLogin();
   const returnTo = safeReturnPath(pending?.returnTo);
+  // Only a return from the login this tab started counts: a link carrying someone else's code, or words of its own
+  // after error=, is refused before anything is sent or shown.
+  if (!pending || params.get('state') !== pending.state)
+    return { kind: 'failed', returnTo, message: LOGIN_MESSAGES.forged };
   if (error !== null)
     // Google's own error code (e.g. access_denied) is shown only when it is a plain name, as in Streamlit.
     return {
@@ -169,7 +187,7 @@ export async function finishLogin(search: string): Promise<LoginReturn> {
         ? `登录没有完成（${error}），请再试一次。`
         : LOGIN_MESSAGES.failed,
     };
-  if (!pending || !code || params.get('state') !== pending.state)
+  if (!code)
     return { kind: 'failed', returnTo, message: LOGIN_MESSAGES.forged };
   try {
     const answer = await apiPost(

@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
+import tomllib
 from html import unescape
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -29,11 +31,15 @@ STATE = "dev-test-state-0123456789abcdef0123"
 
 
 @pytest.fixture()
-def client(tmp_path, monkeypatch):
+def settings_back(monkeypatch):
     # Everything the dev API changes in this process goes back after the test. 中文：测试完把改动都还原。
-    for name in dev_api.CONFIGURED:
+    for name in dev_api.pinned(settings):
         monkeypatch.setattr(settings, name, getattr(settings, name))
     monkeypatch.setattr(api.google_oauth, "authorize_url", api.google_oauth.authorize_url)
+
+
+@pytest.fixture()
+def client(tmp_path, settings_back):
     app = dev_api.build_dev_app(tmp_path / "dev.sqlite3", base="https://dev-api.test")
     with TestClient(app, base_url="https://testserver") as c:
         yield c
@@ -67,10 +73,64 @@ def test_a_preview_build_comes_back_to_its_own_port(client):
     assert all(link.startswith(f"{preview}/?") for link in sign_in_links(client, preview))
 
 
-def test_a_restart_logs_everyone_out(client, tmp_path):
+def test_a_restart_logs_everyone_out(client):
+    client.post("/auth/callback", headers=WRITE,
+                json={"code": "dev-student", "session": "cookie", "redirect_uri": f"{FRONT_END}/"})
+    assert client.get("/auth/me").status_code == 200
     first = settings.session_secret
-    dev_api.configure(settings, tmp_path / "again.sqlite3")
+    dev_api.configure(settings, Path(settings.sqlite_path))
     assert settings.session_secret != first and len(settings.session_secret) >= 32
+    assert client.get("/auth/me").status_code == 401
+
+
+def test_settings_start_from_the_codes_defaults(settings_back, tmp_path):
+    """Whatever .env or the environment says (a request limit, a log level) changes nothing here; only the Gemini key,
+    which has no default, is left alone. 中文：.env 或环境变量（限流、日志级别）在这里都不起作用；只有没有默认值的
+    Gemini key 不动。"""
+    fields = type(settings).model_fields
+    settings.request_guard_enabled = True
+    settings.log_level = "DEBUG"
+    dev_api.configure(settings, tmp_path / "dev.sqlite3")
+    assert settings.request_guard_enabled is fields["request_guard_enabled"].default is False
+    assert settings.log_level == fields["log_level"].default != "DEBUG"
+    assert set(fields) - set(dev_api.pinned(settings)) == {"gemini_api_key"}
+
+
+def test_the_access_log_is_filtered_as_in_production(settings_back, tmp_path):
+    access = logging.getLogger("uvicorn.access")
+    for installed in list(access.filters):  # Whatever an earlier test installed. 中文：之前的测试装上的。
+        access.removeFilter(installed)
+    dev_api.build_dev_app(tmp_path / "dev.sqlite3", base="https://dev-api.test")
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+                               ("127.0.0.1:50000", "GET", f"/auth/login-url?state={STATE}", "1.1", 200), None)
+    assert access.filter(record) and STATE not in record.getMessage()
+
+
+def test_the_dev_api_listens_on_this_machine_only(settings_back, monkeypatch, capsys):
+    import uvicorn  # noqa: PLC0415
+
+    calls = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: calls.append(options))
+    assert dev_api.main(["--port", "8123"]) == 0
+    assert calls == [{"host": "127.0.0.1", "port": 8123, "log_level": "info"}]
+    assert "http://127.0.0.1:8123" in capsys.readouterr().out
+
+
+def test_the_front_ends_are_the_dev_server_and_the_preview():
+    """The hosts and ports of web/vite.config.ts, on 127.0.0.1 and never localhost: one host name keeps the page and
+    this API one site for the browser. 中文：和 web/vite.config.ts 的主机、端口一样，用 127.0.0.1、不用 localhost：
+    同一个主机名，浏览器才把页面和这个 API 算作同一个站点。"""
+    config = (ROOT / "web" / "vite.config.ts").read_text(encoding="utf-8")
+    port = {name: re.search(rf"{name}: \{{ host: '127\.0\.0\.1', port: (\d+),", config).group(1)
+            for name in ("server", "preview")}
+    assert dev_api.FRONT_ENDS == (f"http://127.0.0.1:{port['server']}", f"http://127.0.0.1:{port['preview']}")
+    assert dev_api.HOST == "127.0.0.1"
+
+
+def test_a_code_the_sign_in_page_never_gave_is_refused_as_google_would():
+    with pytest.raises(api.google_oauth.OAuthError) as refused:
+        dev_api.exchange("not-a-dev-code")
+    assert refused.value.reason == "token_exchange_rejected"
 
 
 def test_logging_in_and_out_with_the_cookie(client):
@@ -182,9 +242,13 @@ def imported_names(path):
 
 
 def test_production_code_never_imports_the_dev_api():
-    """What is deployed imports nothing from tests; the tools in scripts/ may use test helpers, never the dev API.
-    中文：部署的代码不 import tests 里的任何东西；scripts/ 里的工具可以用测试的辅助函数，但不碰开发用的 API。"""
-    for package in ("api", "app", "config", "db", "llm", "rag", "schemas"):
+    """What is deployed (the wheel's packages, read from pyproject.toml) imports nothing from tests; the tools in
+    scripts/ may use test helpers, never the dev API. 中文：部署的代码（wheel 里的包，从 pyproject.toml 读）不 import
+    tests 里的任何东西；scripts/ 里的工具可以用测试的辅助函数，但不碰开发用的 API。"""
+    wheel = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["hatch"]["build"]["targets"]
+    packages = wheel["wheel"]["packages"]
+    assert {"api", "app", "scrapers"} <= set(packages)
+    for package in packages:
         for path in (ROOT / package).rglob("*.py"):
             assert not any(name.startswith("tests") for name in imported_names(path)), path
     for path in (ROOT / "scripts").rglob("*.py"):

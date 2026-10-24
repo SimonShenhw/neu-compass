@@ -85,7 +85,21 @@ describe('where requests go', () => {
     ).toBe('/programs/p%201/plans/q%2F2/policies');
   });
 
-  it('refuses a template the API does not have, or a missing parameter', () => {
+  it('refuses a value that would ask for another path', () => {
+    for (const value of ['', '.', '..'])
+      expect(
+        () => apiPath('/course/{course_id}', { course_id: value }),
+        value,
+      ).toThrow(`Path parameter course_id cannot be "${value}"`);
+    expect(apiPath('/course/{course_id}', { course_id: '...' })).toBe(
+      '/course/...',
+    );
+    expect(apiPath('/course/{course_id}', { course_id: '.x' })).toBe(
+      '/course/.x',
+    );
+  });
+
+  it('a template the API does not have does not compile, and a missing parameter throws', () => {
     // @ts-expect-error: not a path in openapi.json
     expect(apiPath('/no-such-route')).toBe('/no-such-route');
     // @ts-expect-error: the parameter is required
@@ -372,6 +386,7 @@ describe('the connection', () => {
       await vi.advanceTimersByTimeAsync(ms - 1);
       expect(settled).toBe(false);
       await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
       const error = await outcome;
       expect(error).toBeInstanceOf(ApiError);
       expect([
@@ -401,7 +416,12 @@ describe('the connection', () => {
       }),
     );
     const outcome = failureOf(apiGet('/config', { timeout: 'quick' }));
-    await vi.advanceTimersByTimeAsync(TIMEOUT_MS.quick);
+    let settled = false;
+    void outcome.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS.quick - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBe(true);
     expect(await outcome).toMatchObject({
       status: 504,
       errorType: 'transport_timeout',
@@ -423,6 +443,8 @@ describe('the connection', () => {
     );
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     controller.abort();
+    // The request itself is cancelled at once, not left to time out.
+    expect(fetch.mock.calls[0]![1].signal?.aborted).toBe(true);
     const error = await outcome;
     expect(error).toBe(controller.signal.reason);
     expect(error).not.toBeInstanceOf(ApiError);

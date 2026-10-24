@@ -30,7 +30,7 @@ it('direct dependencies are exact, stable pins; TanStack Query is the only data 
     })) {
       expect(version, `${file}: ${name}`).toMatch(/^\d+\.\d+\.\d+$/);
       expect(name).not.toMatch(
-        /playwright|puppeteer|axios|ky$|superagent|got$|devtools/,
+        /playwright|puppeteer|axios|ky$|superagent|got$|devtools|ofetch|wretch|node-fetch|cross-fetch|isomorphic-fetch|undici|socket\.io/,
       );
       if (name.includes('tanstack')) expect(name).toBe('@tanstack/react-query');
     }
@@ -47,13 +47,25 @@ it('fixtures contain only the five approved course codes', () => {
   ]);
 });
 
-// R2b: the API layer is the one place that talks to the network: the client, and the /chat stream next to it.
-const NETWORK_CALL =
-  /^(?:(?:window|globalThis|self)\.)?(?:fetch|XMLHttpRequest|WebSocket|EventSource)$|^navigator\.sendBeacon$/;
-const ALLOWED_NETWORK_CALLS = new Set([
+// R2b: the API layer is the one place that talks to the network: the client, and the /chat stream next to it. Any
+// mention of these names counts, not only a call: `const send = globalThis.fetch; send()` is a request too.
+const NETWORK_NAMES = new Set([
+  'fetch',
+  'XMLHttpRequest',
+  'WebSocket',
+  'EventSource',
+  'sendBeacon',
+]);
+const ALLOWED_NETWORK_USES = new Set([
   'src/api/client.ts fetch',
   'src/api/chatStream.ts fetch',
 ]);
+
+it('the page sends other sites its origin only, wherever it is served from (R0 14.15)', () => {
+  expect(readFileSync(resolve(root, 'index.html'), 'utf8')).toContain(
+    '<meta name="referrer" content="strict-origin-when-cross-origin" />',
+  );
+});
 
 it('first-party TypeScript has no any types and only the API client makes requests', () => {
   for (const path of files(resolve(root, 'src')).filter((path) =>
@@ -69,11 +81,17 @@ it('first-party TypeScript has no any types and only the API client makes reques
     function visit(node: ts.Node) {
       expect(node.kind, name).not.toBe(ts.SyntaxKind.AnyKeyword);
       if (!name.includes('.test.') && !name.startsWith('src/test/')) {
-        if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-          const callee = `${name} ${node.expression.getText(source)}`;
-          if (NETWORK_CALL.test(node.expression.getText(source)))
-            expect(ALLOWED_NETWORK_CALLS, callee).toContain(callee);
-        }
+        // A name, a property (window.navigator.sendBeacon) or a string key (globalThis['fetch']).
+        const used = ts.isIdentifier(node)
+          ? node.text
+          : ts.isElementAccessExpression(node) &&
+              ts.isStringLiteralLike(node.argumentExpression)
+            ? node.argumentExpression.text
+            : null;
+        if (used !== null && NETWORK_NAMES.has(used))
+          expect(ALLOWED_NETWORK_USES, `${name} ${used}`).toContain(
+            `${name} ${used}`,
+          );
       }
       ts.forEachChild(node, visit);
     }

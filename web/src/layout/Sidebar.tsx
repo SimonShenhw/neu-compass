@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { pagePresentation } from './routePresentation';
@@ -49,12 +49,13 @@ export function Sidebar({
   const box = useRef<HTMLDivElement>(null);
   const action = useRef<HTMLButtonElement>(null);
   // The button pressed here is disabled while it works, and a logout replaces it, so focus falls to the page or the
-  // menu around it. When the work ends, focus goes to the box's button again, unless the student has moved on.
+  // menu around it. When the work ends, focus goes to the box's button again, unless the student has moved on; in
+  // the same commit that shows the result, so the result is never on screen with focus lost.
   const pressed = useRef(false);
   const busy =
     (session.kind === 'guest' && session.login === 'busy') ||
     (session.kind === 'signed-in' && session.busy === true);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (busy || !pressed.current) return;
     pressed.current = false;
     const active = document.activeElement;

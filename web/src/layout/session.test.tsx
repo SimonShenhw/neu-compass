@@ -7,7 +7,7 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
@@ -73,20 +73,48 @@ async function pressAndDropFocus(name: string, busyName: string) {
 }
 
 beforeEach(() => sessionStorage.clear());
-afterEach(() => sessionStorage.clear());
+afterEach(() => {
+  sessionStorage.clear();
+  window.history.replaceState(null, '', '/');
+});
+
+// Every request answered by its path; held ones wait until the test answers them.
+function held() {
+  const calls: {
+    answer: (response: Response) => void;
+    fail: (error: unknown) => void;
+  }[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<Fetch>(
+      () =>
+        new Promise<Response>((answer, fail) => calls.push({ answer, fail })),
+    ),
+  );
+  return calls;
+}
+const pendingLogin = (returnTo: string) =>
+  sessionStorage.setItem(
+    PENDING_KEY,
+    JSON.stringify({ state: STATE, returnTo }),
+  );
+// The address bar as the browser shows it (BrowserRouter writes it at once; MemoryRouter never does).
+const addressBar = () =>
+  `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
 describe('coming back from Google', () => {
   it('takes code and state out of the address, logs in and returns to the page', async () => {
-    sessionStorage.setItem(
-      PENDING_KEY,
-      JSON.stringify({ state: STATE, returnTo: '/compare' }),
-    );
+    pendingLogin('/compare');
     let answer: (response: Response) => void = () => {};
-    const fetch = vi.fn<Fetch>(
-      () => new Promise<Response>((resolve) => (answer = resolve)),
+    const fetch = vi.fn<Fetch>((url) =>
+      url.endsWith('/auth/callback')
+        ? new Promise<Response>((resolve) => (answer = resolve))
+        : Promise.resolve(json(identity)),
     );
     vi.stubGlobal('fetch', fetch);
-    const client = page(`/?code=synthetic-code&state=${STATE}`);
+    const client = seededQueryClient();
+    client.setQueryData([...VIEWER_KEY, 'u-0', 'coop'], ['the last viewer’s']);
+    page(`/?code=synthetic-code&state=${STATE}`, client);
     // Before the API has answered, the address no longer carries them.
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(where()).toHaveTextContent(/^\/$/);
@@ -98,33 +126,113 @@ describe('coming back from Google', () => {
     expect(where()).toHaveTextContent('/compare');
     expect(screen.queryByText(LOGIN_MESSAGES.forged)).not.toBeInTheDocument();
     expect(client.getQueryData(meQuery.queryKey)).toEqual(MEMBER);
+    expect(client.getQueryData([...VIEWER_KEY, 'u-0', 'coop'])).toBeUndefined();
     expect(screen.getAllByText('Synthetic Student').length).toBeGreaterThan(0);
-    expect(fetch.mock.calls[0]![0]).toBe('http://127.0.0.1:8000/auth/callback');
+    // The callback, then /auth/me read again; nothing else.
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      'http://127.0.0.1:8000/auth/callback',
+      'http://127.0.0.1:8000/auth/me',
+    ]);
     expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
     expect(screen.queryByText('游客')).not.toBeInTheDocument();
   });
 
-  it('a wrong state is refused before anything is sent', async () => {
-    sessionStorage.setItem(
-      PENDING_KEY,
-      JSON.stringify({ state: STATE, returnTo: '/coop' }),
+  it('nothing is asked while the address carries the code, and it never stays in the history', async () => {
+    pendingLogin('/compare');
+    const sent: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>(async (url) => {
+        sent.push(`${new URL(url).pathname} from ${addressBar()}`);
+        return url.endsWith('/config')
+          ? json({ answer_feedback_enabled: false, login_available: true })
+          : json(identity);
+      }),
     );
+    window.history.replaceState(
+      null,
+      '',
+      `/?code=synthetic-code&state=${STATE}`,
+    );
+    const length = window.history.length;
+    render(
+      <WithApi client={createQueryClient()}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </WithApi>,
+    );
+    await waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent).toEqual([
+      '/auth/callback from /',
+      '/auth/me from /',
+      '/config from /compare',
+    ]);
+    expect(addressBar()).toBe('/compare');
+    // Both steps replaced the entry: going back cannot reach an address with the code in it.
+    expect(window.history.length).toBe(length);
+  });
+
+  it('a browser that did not keep the cookie is told so, and the student stays a guest', async () => {
+    pendingLogin('/compare');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>(async (url) =>
+        url.endsWith('/auth/callback')
+          ? json(identity)
+          : json({ error_type: 'unauthorized' }, 401),
+      ),
+    );
+    const client = page(`/?code=c&state=${STATE}`);
+    await waitFor(() =>
+      expect(notice()).toHaveTextContent(LOGIN_MESSAGES.notKept),
+    );
+    await waitFor(() => expect(where()).toHaveTextContent('/compare'));
+    expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
+    expect(accountButton('用 NEU 邮箱登录')).toBeEnabled();
+  });
+
+  it('an /auth/me that fails for a moment after the login leaves the member shown', async () => {
+    pendingLogin('/compare');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>(async (url) =>
+        url.endsWith('/auth/callback')
+          ? json(identity)
+          : json({ error_type: 'service_unavailable' }, 503),
+      ),
+    );
+    page(`/?code=c&state=${STATE}`);
+    await waitFor(() => expect(where()).toHaveTextContent('/compare'));
+    expect(
+      within(sidebar()).getByText('Synthetic Student'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(LOGIN_MESSAGES.notKept)).not.toBeInTheDocument();
+  });
+
+  it('a wrong state is refused before anything is sent', async () => {
+    pendingLogin('/coop');
+    const fetch = vi.fn<Fetch>();
+    vi.stubGlobal('fetch', fetch);
     page('/?code=synthetic-code&state=someone-elses-state-0123456789');
     await waitFor(() =>
       expect(notice()).toHaveTextContent('登录没有完成，请重新登录。'),
     );
     // React Router commits a navigation in a transition, after the notice.
     await waitFor(() => expect(where()).toHaveTextContent('/coop'));
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('Google’s cancel comes back as a line, not a login', async () => {
-    page('/?error=access_denied&state=x');
+    pendingLogin('/');
+    page(`/?error=access_denied&state=${STATE}`);
     await waitFor(() =>
       expect(notice()).toHaveTextContent(
         '登录没有完成（access_denied），请再试一次。',
       ),
     );
     await waitFor(() => expect(where()).toHaveTextContent(/^\/$/));
+    expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
   });
 
   it('a refused domain is said in Chinese, and the student stays a guest', async () => {
@@ -153,41 +261,6 @@ describe('coming back from Google', () => {
     );
     expect(document.body).not.toHaveTextContent('Email domain not allowed');
     expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
-  });
-
-  it('an /auth/me asked before the login cannot turn the member back into a guest', async () => {
-    sessionStorage.setItem(
-      PENDING_KEY,
-      JSON.stringify({ state: STATE, returnTo: '/' }),
-    );
-    const client = createQueryClient();
-    client.setQueryData(configQuery.queryKey, {
-      answer_feedback_enabled: false,
-      login_available: true,
-    });
-    let late: (response: Response) => void = () => {};
-    let meSignal: AbortSignal | undefined;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn<Fetch>((url, init) => {
-        if (url.endsWith('/auth/me')) {
-          meSignal = init.signal ?? undefined;
-          return new Promise<Response>((resolve, reject) => {
-            late = resolve;
-            meSignal?.addEventListener('abort', () => reject(meSignal?.reason));
-          });
-        }
-        return Promise.resolve(json(identity));
-      }),
-    );
-    page(`/?code=c&state=${STATE}`, client);
-    await waitFor(() =>
-      expect(client.getQueryData(meQuery.queryKey)).toEqual(MEMBER),
-    );
-    expect(meSignal?.aborted).toBe(true);
-    late(json({ error_type: 'unauthorized' }, 401));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(client.getQueryData(meQuery.queryKey)).toEqual(MEMBER);
   });
 });
 
@@ -234,24 +307,76 @@ describe('logging out', () => {
     expect(client.getQueryData(meQuery.queryKey)).toEqual(MEMBER);
     expect(getCompareList()).toEqual(['c-cs-5800']);
   });
+
+  it('an /auth/me still on its way at logout cannot bring the member back', async () => {
+    const user = userEvent.setup();
+    let late: (response: Response) => void = () => {};
+    let meSignal: AbortSignal | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>((url, init) => {
+        if (url.endsWith('/auth/me')) {
+          meSignal = init.signal ?? undefined;
+          return new Promise<Response>((resolve, reject) => {
+            late = resolve;
+            meSignal?.addEventListener('abort', () => reject(meSignal?.reason));
+          });
+        }
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }),
+    );
+    const client = seededQueryClient({ viewer: MEMBER });
+    page('/', client);
+    void client.refetchQueries({ queryKey: meQuery.queryKey });
+    await waitFor(() => expect(meSignal).toBeDefined());
+    await user.click(accountButton('退出登录'));
+    await waitFor(() => expect(notice()).toHaveTextContent('已退出登录。'));
+    expect(meSignal?.aborted).toBe(true);
+    late(json(identity));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
+  });
+});
+
+describe('the mobile menu', () => {
+  async function openMenu() {
+    await userEvent.click(screen.getByRole('button', { name: '打开导航菜单' }));
+    return screen.getByRole('dialog');
+  }
+
+  it('has the same account box as the sidebar', async () => {
+    page('/', seededQueryClient({ viewer: MEMBER }));
+    const menu = await openMenu();
+    expect(menu).toHaveTextContent('Synthetic Student');
+    expect(menu).toHaveTextContent('贡献数：2');
+    expect(
+      within(menu).getByRole('button', { name: '退出登录' }),
+    ).toBeEnabled();
+  });
+
+  it('a logout in the menu leaves focus on the menu’s login button', async () => {
+    const calls = held();
+    page('/', seededQueryClient({ viewer: MEMBER }));
+    const menu = await openMenu();
+    within(menu).getByRole('button', { name: '退出登录' }).focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(
+        within(menu).getByRole('button', { name: '正在退出…' }),
+      ).toBeDisabled(),
+    );
+    // A browser moves focus off the disabled button to the menu around it.
+    menu.focus();
+    expect(menu).toHaveFocus();
+    calls[0]!.answer(new Response(null, { status: 204 }));
+    const login = await within(menu).findByRole('button', {
+      name: '用 NEU 邮箱登录',
+    });
+    expect(login).toHaveFocus();
+  });
 });
 
 describe('focus in the account box', () => {
-  function held() {
-    const calls: {
-      answer: (response: Response) => void;
-      fail: (error: unknown) => void;
-    }[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn<Fetch>(
-        () =>
-          new Promise<Response>((answer, fail) => calls.push({ answer, fail })),
-      ),
-    );
-    return calls;
-  }
-
   it('a keyboard logout leaves focus on the login button that replaces it', async () => {
     const calls = held();
     page('/', seededQueryClient({ viewer: MEMBER }));
@@ -360,7 +485,7 @@ describe('the hook', () => {
     return function Wrapper({ children }: { children: ReactNode }) {
       return (
         <WithApi client={client}>
-          <MemoryRouter initialEntries={['/course/CS-6140?x=1']}>
+          <MemoryRouter initialEntries={['/course/CS-6140?x=1#evidence']}>
             {children}
           </MemoryRouter>
         </WithApi>
@@ -391,7 +516,7 @@ describe('the hook', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(
       JSON.parse(sessionStorage.getItem(PENDING_KEY)!) as { returnTo: string },
-    ).toMatchObject({ returnTo: '/course/CS-6140?x=1' });
+    ).toMatchObject({ returnTo: '/course/CS-6140?x=1#evidence' });
   });
 
   it('a second logout while one is on its way sends nothing', async () => {

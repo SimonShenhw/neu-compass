@@ -45,6 +45,10 @@ export function apiPath<T extends keyof paths & string>(
   return template.replace(/\{([^}]+)\}/g, (_, name: string) => {
     const value = params[name];
     if (value === undefined) throw new Error(`Missing path parameter ${name}`);
+    // Encoding leaves "." and "..", which a URL reads as this path and the one above it, and an empty value names
+    // another route: none of them can be what the page meant.
+    if (value === '' || value === '.' || value === '..')
+      throw new Error(`Path parameter ${name} cannot be "${value}"`);
     return encodeURIComponent(value);
   });
 }

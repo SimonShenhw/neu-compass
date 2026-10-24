@@ -26,10 +26,15 @@ const run = (...args: string[]) =>
 describe.skipIf(!installed)(
   'the generated API types (needs npm ci --prefix tools/openapi-types)',
   () => {
-    it('src/api/schema.ts is what openapi.json generates', () => {
-      const result = run('--check');
-      expect(result.status, result.stderr).toBe(0);
-    });
+    // A cold start of the generator takes seconds (about 3 here), more on a slow runner.
+    it(
+      'src/api/schema.ts is what openapi.json generates',
+      { timeout: 60_000 },
+      () => {
+        const result = run('--check');
+        expect(result.status, result.stderr).toBe(0);
+      },
+    );
 
     it(
       '--check fails on a stale file and writes nothing; a plain run writes it',

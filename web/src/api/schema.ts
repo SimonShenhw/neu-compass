@@ -21,7 +21,7 @@ export interface paths {
      *
      *     **Session** (R2a): `"session": "token"` (the default) returns the signed token as `session_token`, as before. `"session": "cookie"` sets it instead as the HttpOnly cookie `__Host-nc_api_session` (Secure, Path=/, SameSite=Lax, as long as the token lasts) and returns `session_token: null`; the web front end uses this. The cookie mode must come from an allowed web origin with `X-NEU-Compass: 1`, or it gets the fixed CSRF 403 before the code is exchanged: a page elsewhere must not log the browser into an account of its choosing.
      *
-     *     **redirect_uri** (R2b): the address Google sent the browser back to, which Google checks again in the exchange; it defaults to `GOOGLE_OAUTH_REDIRECT_URI`. The cookie mode takes only a web front end's own address, an origin in `WEB_ORIGINS` followed by `/`, and answers 422 to anything else before the code is exchanged.
+     *     **redirect_uri** (R2b): the address Google sent the browser back to, which Google checks again in the exchange; it defaults to `GOOGLE_OAUTH_REDIRECT_URI`. The cookie mode takes only the front end's own address, the request's `Origin` (one in `WEB_ORIGINS`) followed by `/`, and answers 422 to anything else before the code is exchanged.
      */
     post: operations['oauth_callback_auth_callback_post'];
     delete?: never;
@@ -1978,7 +1978,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description The body is malformed, or the cookie mode's `redirect_uri` is not a web front end's own address. */
+      /** @description The body is malformed, or the cookie mode's `redirect_uri` is not the request's own `Origin` followed by `/`. */
       422: {
         headers: {
           [name: string]: unknown;

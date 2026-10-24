@@ -1,8 +1,14 @@
-import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import {
+  QueryClientProvider,
+  focusManager,
+  onlineManager,
+  useMutation,
+  useQuery,
+} from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, TIMEOUT_MS } from './client';
+import { ApiError, TIMEOUT_MS, apiPath, apiPost } from './client';
 import {
   GUEST,
   PUBLIC_FRESH_MS,
@@ -63,11 +69,67 @@ afterEach(() => {
 });
 
 describe('the query client', () => {
-  it('retries nothing and does not refetch when the window regains focus', () => {
+  it('retries nothing', () => {
     const defaults = createQueryClient().getDefaultOptions();
     expect(defaults.queries?.retry).toBe(false);
-    expect(defaults.queries?.refetchOnWindowFocus).toBe(false);
     expect(defaults.mutations?.retry).toBe(false);
+  });
+
+  it('neither the window regaining focus nor the network coming back refetches anything', async () => {
+    const fetch = serve(
+      json({ answer_feedback_enabled: true, login_available: true }),
+    );
+    // Stale at once, so either event would refetch it if it were allowed to.
+    const { result } = renderHook(
+      () => useQuery({ ...configQuery, staleTime: 0 }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    try {
+      await act(async () => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+        onlineManager.setOnline(false);
+        onlineManager.setOnline(true);
+        // The client reacts to both after a promise; by the next task it has, if it is going to.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      focusManager.setFocused(undefined);
+      onlineManager.setOnline(true);
+    }
+  });
+
+  it('offline, a read and a write still go out and fail like any other, instead of waiting to go out by themselves', async () => {
+    const fetch = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    vi.stubGlobal('fetch', fetch);
+    onlineManager.setOnline(false);
+    try {
+      const client = createQueryClient();
+      const read = renderHook(() => useConfig(), { wrapper: wrapper(client) });
+      const write = renderHook(
+        () =>
+          useMutation({
+            mutationFn: () =>
+              apiPost(apiPath('/auth/logout'), undefined, { timeout: 'read' }),
+          }),
+        { wrapper: wrapper(client) },
+      );
+      let settled = false;
+      void write.result.current.mutateAsync().catch(() => (settled = true));
+      await waitFor(() => expect(settled).toBe(true));
+      await waitFor(() => expect(read.result.current.isError).toBe(true));
+      expect(read.result.current.error).toMatchObject({
+        status: 503,
+        errorType: 'transport_error',
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 
   it('a failed read is not tried again', async () => {
@@ -158,6 +220,7 @@ describe('GET /config', () => {
     await vi.advanceTimersByTimeAsync(TIMEOUT_MS.quick - 1);
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBe(true);
     expect(await outcome).toMatchObject({ status: 504 });
   });
 

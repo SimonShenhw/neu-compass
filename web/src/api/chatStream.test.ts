@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { STREAM_MESSAGES, STREAM_WAIT_MS, streamChat } from './chatStream';
+import {
+  MAX_LINE_CHARS,
+  STREAM_MESSAGES,
+  STREAM_WAIT_MS,
+  streamChat,
+} from './chatStream';
 import type { ChatEvent, ChatRequest } from './chatStream';
 import { ApiError, apiErrorMessage } from './client';
 
@@ -228,6 +233,13 @@ describe('a question and its answer', () => {
 });
 
 describe('a broken stream', () => {
+  it('is said in Streamlit’s words (app/api_client.py), its English opening in Chinese', () => {
+    expect(STREAM_MESSAGES).toEqual({
+      lost: '连接中断。仅保留部分回答，未完整结束；请稍后手动重试。',
+      incomplete: '回答流未完整结束；仅保留部分内容，请稍后手动重试。',
+    });
+  });
+
   it('that ends without done or an error says so after what arrived', async () => {
     serve([line(META), line({ type: 'token', text: '按合成目录，' })]);
     expect(await collect(streamChat(REQUEST))).toEqual([
@@ -245,6 +257,10 @@ describe('a broken stream', () => {
     const token = line({ type: 'token', text: 'x' });
     for (const [bad, before] of [
       [token, 0],
+      [
+        line({ type: 'error', error_type: 'upstream_error', detail: '出错' }),
+        0,
+      ],
       [line({ ...META, results: {} }), 0],
       [line({ ...META, matched_via: 1 }), 0],
       [line({ type: 'done' }), 0],
@@ -271,6 +287,34 @@ describe('a broken stream', () => {
       ]);
       expect(fetch).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('ends at a line longer than any the API sends, without waiting for the rest of it', async () => {
+    expect(MAX_LINE_CHARS).toBe(1_000_000);
+    const tokenLine = (length: number) =>
+      `{"type":"token","text":"${'x'.repeat(length - 26)}"}\n`;
+    serve([line(META), tokenLine(MAX_LINE_CHARS), line({ type: 'done' })]);
+    expect(
+      (await collect(streamChat(REQUEST))).map((event) => event.type),
+    ).toEqual(['meta', 'token', 'done']);
+    serve([line(META), tokenLine(MAX_LINE_CHARS + 1), line({ type: 'done' })]);
+    expect(await collect(streamChat(REQUEST))).toEqual([
+      { type: 'meta', meta: META },
+      broken('invalid_stream'),
+    ]);
+    // A line still arriving and already too long: the stream ends without waiting for its newline.
+    const body = pipe();
+    const fetch = answerWith(body);
+    body.push(line(META));
+    body.push(`{"type":"token","text":"${'x'.repeat(MAX_LINE_CHARS)}`);
+    let ended = false;
+    const events = collect(streamChat(REQUEST)).finally(() => (ended = true));
+    await vi.waitFor(() => expect(ended).toBe(true));
+    expect(await events).toEqual([
+      { type: 'meta', meta: META },
+      broken('invalid_stream'),
+    ]);
+    expect(signalOf(fetch).aborted).toBe(true);
   });
 
   it('that drops mid-answer keeps what arrived', async () => {
@@ -380,6 +424,31 @@ describe('waiting', () => {
     expect(apiErrorMessage(error)).toBe(
       '请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。',
     );
+  });
+
+  it('for the body of a refusal takes 30 s at most, then 504', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<Fetch>(async (_url, init) => {
+        const signal = init.signal;
+        return {
+          status: 429,
+          headers: new Headers(),
+          body: null,
+          text: () =>
+            new Promise<string>((_answer, fail) =>
+              signal?.addEventListener('abort', () => fail(signal.reason)),
+            ),
+        } as unknown as Response;
+      }),
+    );
+    const outcome = failureOf(collect(streamChat(REQUEST)));
+    await settlesAfter(outcome, STREAM_WAIT_MS);
+    expect(await outcome).toMatchObject({
+      status: 504,
+      errorType: 'transport_timeout',
+    });
   });
 
   it('for each next piece takes 30 s at most, and the clock starts again with every piece', async () => {

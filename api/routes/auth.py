@@ -106,9 +106,9 @@ def web_redirect_uris() -> set[str]:
         "must not log the browser into an account of its choosing.\n\n"
         "**redirect_uri** (R2b): the address Google sent the browser back to, which "
         "Google checks again in the exchange; it defaults to `GOOGLE_OAUTH_REDIRECT_URI`. "
-        "The cookie mode takes only a web front end's own address, an origin in "
-        "`WEB_ORIGINS` followed by `/`, and answers 422 to anything else before the code "
-        "is exchanged."
+        "The cookie mode takes only the front end's own address, the request's `Origin` "
+        "(one in `WEB_ORIGINS`) followed by `/`, and answers 422 to anything else before "
+        "the code is exchanged."
     ),
     responses={
         200: {"description": "OAuth round-trip succeeded; user persisted."},
@@ -122,8 +122,8 @@ def web_redirect_uris() -> set[str]:
             ),
         },
         403: {"description": "The cookie mode, not from an allowed web origin with `X-NEU-Compass: 1`."},
-        422: {"description": "The body is malformed, or the cookie mode's `redirect_uri` is not a web front end's own "
-                             "address."},
+        422: {"description": "The body is malformed, or the cookie mode's `redirect_uri` is not the request's own "
+                             "`Origin` followed by `/`."},
     },
 )
 def oauth_callback(
@@ -149,9 +149,11 @@ def oauth_callback(
     # Google. 中文：R2a：只有新前端能用 cookie 模式登录浏览器，不管原来带没带 cookie；在 code 交给 Google 之前查。
     if req.session == "cookie" and not from_web_origin(request, settings.web_origins):
         return refusal()
-    # R2b: the web front end says where Google sent it back; only its own addresses, before the code reaches Google.
-    # 中文：R2b：新前端告诉我们 Google 把它送回了哪里；只认它自己的地址，在 code 交给 Google 之前查。
-    if req.session == "cookie" and req.redirect_uri is not None and req.redirect_uri not in web_redirect_uris():
+    # R2b: the web front end says where Google sent it back: the root of the origin it posts from (an origin in
+    # WEB_ORIGINS, checked just above), before the code reaches Google.
+    # 中文：R2b：新前端告诉我们 Google 把它送回了哪里：它发请求所在来源的根路径（上面刚查过来源在 WEB_ORIGINS 里），
+    # 在 code 交给 Google 之前查。
+    if req.session == "cookie" and req.redirect_uri is not None and req.redirect_uri != f"{request.headers['origin']}/":
         raise HTTPException(status_code=422, detail=REDIRECT_URI_REFUSED)
     try:
         identity = exchange_fn(

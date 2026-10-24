@@ -1,5 +1,7 @@
 // TanStack Query, set up the way Streamlit's page caches behaved (R2b; R0 12, app/view_cache.py):
-// - nothing is retried by itself (every failure line says 手动重试), and focusing the window refetches nothing;
+// - nothing is retried by itself (every failure line says 手动重试), and neither focusing the window nor the network
+//   coming back refetches anything; offline, a request still goes out and fails like any other, instead of waiting
+//   for the network and then going out by itself (a write must never do that);
 // - a public list stays fresh for five minutes;
 // - after a temporary failure a page keeps showing what the same visitor last saw, after a definite answer
 //   (401, 403, 404...) nothing old (shownData);
@@ -22,8 +24,13 @@ export const PUBLIC_FRESH_MS = 5 * 60_000;
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
-      queries: { retry: false, refetchOnWindowFocus: false },
-      mutations: { retry: false },
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        networkMode: 'always',
+      },
+      mutations: { retry: false, networkMode: 'always' },
     },
   });
 }
@@ -61,8 +68,9 @@ export const configQuery = queryOptions({
   staleTime: PUBLIC_FRESH_MS,
 });
 
-export function useConfig() {
-  return useQuery(configQuery);
+// `enabled: false` holds the request back: useSession does, while the address still carries Google's code.
+export function useConfig(enabled = true) {
+  return useQuery({ ...configQuery, enabled });
 }
 
 export type Member = {
@@ -124,6 +132,6 @@ export const meQuery = queryOptions({
   staleTime: Infinity,
 });
 
-export function useMe() {
-  return useQuery(meQuery);
+export function useMe(enabled = true) {
+  return useQuery({ ...meQuery, enabled });
 }

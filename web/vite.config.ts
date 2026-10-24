@@ -1,16 +1,12 @@
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
-import { LOCAL_API, PRODUCTION_API, apiBaseUrl } from './src/api/apiBase.ts';
+import { chooseApiBase } from './src/api/apiBase.ts';
 
 export default defineConfig(({ command, mode }) => {
-  // R2b: the API address is fixed here, at build time. A production build talks to the production API unless
-  // VITE_API_BASE_URL says otherwise; the dev server, tests and other modes default to the API on this machine.
+  // R2b: the API address is fixed here, at build time (src/api/apiBase.ts says which one for which build).
   const { VITE_API_BASE_URL } = loadEnv(mode, process.cwd(), 'VITE_');
-  const apiBase = apiBaseUrl(
-    VITE_API_BASE_URL,
-    command === 'build' && mode === 'production' ? PRODUCTION_API : LOCAL_API,
-  );
+  const apiBase = chooseApiBase(command, mode, VITE_API_BASE_URL);
   return {
     plugins: [react()],
     define: { __API_BASE_URL__: JSON.stringify(apiBase) },
