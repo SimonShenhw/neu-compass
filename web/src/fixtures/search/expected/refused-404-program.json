@@ -1,0 +1,75 @@
+{
+  "name": "refused-404-program",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "refused-404-program"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 6140 讲什么？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "⚠️ Chat failed: Selected program_id not found"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 6140 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "所选的项目已经不存在，这个问题还没有回答。请在「项目」里重新选择，或者改回「不指定」再问。"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 6140 讲什么？"
+          }
+        ],
+        "context_course_ids": []
+      }
+    }
+  ]
+}

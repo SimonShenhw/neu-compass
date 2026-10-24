@@ -1,0 +1,31 @@
+{
+  "case": "refused-404-program",
+  "notes": "An unknown program_id: 404 before the stream.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 6140 讲什么？",
+      "k": 10,
+      "allow_feedback_capture": false,
+      "program_id": "ms-gone-synthetic"
+    }
+  },
+  "status": 404,
+  "retry_after": null,
+  "lines": [
+    {
+      "detail": "Selected program_id not found",
+      "error_type": "not_found",
+      "status_code": 404
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 404,
+    "errorType": "not_found",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

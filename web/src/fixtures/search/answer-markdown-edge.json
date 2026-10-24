@@ -1,0 +1,236 @@
+{
+  "case": "answer-markdown-edge",
+  "notes": "An answer that tries every kind of link, image, HTML and Markdown: only the official catalog links may become links.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 5800 怎么样？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "alias",
+      "retrieval_ms": 0.17,
+      "prompt_version": "4.5",
+      "results": [
+        {
+          "course_id": "c-cs-5800",
+          "primary_code": "CS 5800",
+          "primary_name": "Algorithms",
+          "score": 1.0,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [
+                {
+                  "catalog_year": "2026-2027",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                }
+              ],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "token",
+      "text": "# 标题\n\n"
+    },
+    {
+      "type": "token",
+      "text": "**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，"
+    },
+    {
+      "type": "token",
+      "text": "也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 "
+    },
+    {
+      "type": "token",
+      "text": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n"
+    },
+    {
+      "type": "token",
+      "text": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、"
+    },
+    {
+      "type": "token",
+      "text": "<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、"
+    },
+    {
+      "type": "token",
+      "text": "http://catalog.northeastern.edu/course-descriptions/cs/、"
+    },
+    {
+      "type": "token",
+      "text": "https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n"
+    },
+    {
+      "type": "token",
+      "text": "```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n"
+    },
+    {
+      "type": "token",
+      "text": "行内 `CS 5800` 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "alias",
+        "retrieval_ms": 0.17,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "score": 1.0,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "token",
+      "text": "# 标题\n\n"
+    },
+    {
+      "type": "token",
+      "text": "**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，"
+    },
+    {
+      "type": "token",
+      "text": "也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 "
+    },
+    {
+      "type": "token",
+      "text": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n"
+    },
+    {
+      "type": "token",
+      "text": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、"
+    },
+    {
+      "type": "token",
+      "text": "<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、"
+    },
+    {
+      "type": "token",
+      "text": "http://catalog.northeastern.edu/course-descriptions/cs/、"
+    },
+    {
+      "type": "token",
+      "text": "https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n"
+    },
+    {
+      "type": "token",
+      "text": "```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n"
+    },
+    {
+      "type": "token",
+      "text": "行内 `CS 5800` 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

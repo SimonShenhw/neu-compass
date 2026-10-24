@@ -1,0 +1,308 @@
+{
+  "case": "plan-ds-2025-year-not-recorded",
+  "notes": "A selected plan for 2025-2026, a year DS 5220 has no requisite document for: requisite_year_not_recorded and the line that says so.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "DS 5220 能算进方案吗？",
+      "k": 10,
+      "allow_feedback_capture": false,
+      "program_id": "ms-ds-synthetic",
+      "plan": {
+        "program_id": "ms-ds-synthetic",
+        "plan_id": "ms-ds-synthetic-boston-2025-2026-standard",
+        "campus": "boston",
+        "catalog_year": "2025-2026",
+        "pathway": "standard",
+        "concentration": null,
+        "plan_content_sha256": "2b3a20a33d47cc3f0a5ad4638f1410fea3ab245dee2353d9561bd16ba881faf7"
+      }
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "alias",
+      "retrieval_ms": 0.25,
+      "prompt_version": "4.5",
+      "results": [
+        {
+          "course_id": "c-ds-5220",
+          "primary_code": "DS 5220",
+          "primary_name": "Supervised Machine Learning and Learning Theory",
+          "score": 1.0,
+          "answer_evidence": {
+            "catalog": {
+              "course_code": "DS 5220",
+              "course_name": "Supervised Machine Learning and Learning Theory",
+              "description": null,
+              "credits": 3,
+              "prereq_codes": [],
+              "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+              "snapshot_id": "catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7",
+              "imported_at": "2026-09-29T03:00:00",
+              "retrieved_at": null
+            },
+            "field_evidence": [
+              {
+                "field": "workload_hours_per_week",
+                "value": 10.0,
+                "source_id": "syllabus_ds5220_2027",
+                "quote": "Plan for ten hours a week. (Synthetic text for interface tests.)",
+                "confidence": 0.7
+              },
+              {
+                "field": "difficulty_score",
+                "value": 4.25,
+                "source_id": "rmp_review_ds5220_1",
+                "quote": "The proofs are tough. (Synthetic text for interface tests.)",
+                "confidence": 0.65
+              }
+            ],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "professor",
+              "skill_tags",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_retrieval_date_unknown",
+              "catalog_metadata_conflict",
+              "extracted_evidence_not_official_facts",
+              "field_evidence_value_conflict",
+              "topics_source_unavailable",
+              "requisite_clause_unparsed",
+              "requisite_year_not_recorded"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [
+                {
+                  "catalog_year": "2026-2027",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "unparsed",
+                    "rule": null,
+                    "clause_text": "Graduate standing and permission of the instructor",
+                    "clause_truncated": false,
+                    "unparsed_reason": "unsupported_syntax",
+                    "clause_sha256": "0917bdf22b63d7e9e108d10eac029de88f59f4ea25939bbcaaab5412a11b2a6b"
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                }
+              ],
+              "editions_omitted": 0,
+              "unusable_records": 0,
+              "selected_year": "2025-2026",
+              "other_years_recorded": 1
+            }
+          }
+        }
+      ],
+      "plan_context": {
+        "program_id": "ms-ds-synthetic",
+        "plan_id": "ms-ds-synthetic-boston-2025-2026-standard",
+        "campus": "boston",
+        "catalog_year": "2025-2026",
+        "pathway": "standard",
+        "concentration": null,
+        "plan_content_sha256": "2b3a20a33d47cc3f0a5ad4638f1410fea3ab245dee2353d9561bd16ba881faf7",
+        "coverage": "partial",
+        "review_status": "source_checked",
+        "checked_on": "2026-10-01",
+        "captured_on": "2026-09-28",
+        "source_catalog_year": "2025-2026",
+        "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/synthetic-program/",
+        "placements": {
+          "c-ds-5220": [
+            {
+              "path": [
+                "Supervised learning core (synthetic)"
+              ],
+              "relation": "required",
+              "under_any_of": false,
+              "activate_when": [],
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": [],
+              "subject_codes": [],
+              "course_ranges": []
+            }
+          ]
+        },
+        "placements_omitted": {
+          "c-ds-5220": 0
+        }
+      }
+    },
+    {
+      "type": "token",
+      "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；"
+    },
+    {
+      "type": "token",
+      "text": "但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "alias",
+        "retrieval_ms": 0.25,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-ds-5220",
+            "primary_code": "DS 5220",
+            "primary_name": "Supervised Machine Learning and Learning Theory",
+            "score": 1.0,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "DS 5220",
+                "course_name": "Supervised Machine Learning and Learning Theory",
+                "description": null,
+                "credits": 3,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+                "snapshot_id": "catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7",
+                "imported_at": "2026-09-29T03:00:00",
+                "retrieved_at": null
+              },
+              "field_evidence": [
+                {
+                  "field": "workload_hours_per_week",
+                  "value": 10.0,
+                  "source_id": "syllabus_ds5220_2027",
+                  "quote": "Plan for ten hours a week. (Synthetic text for interface tests.)",
+                  "confidence": 0.7
+                },
+                {
+                  "field": "difficulty_score",
+                  "value": 4.25,
+                  "source_id": "rmp_review_ds5220_1",
+                  "quote": "The proofs are tough. (Synthetic text for interface tests.)",
+                  "confidence": 0.65
+                }
+              ],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "professor",
+                "skill_tags",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_retrieval_date_unknown",
+                "catalog_metadata_conflict",
+                "extracted_evidence_not_official_facts",
+                "field_evidence_value_conflict",
+                "topics_source_unavailable",
+                "requisite_clause_unparsed",
+                "requisite_year_not_recorded"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "unparsed",
+                      "rule": null,
+                      "clause_text": "Graduate standing and permission of the instructor",
+                      "clause_truncated": false,
+                      "unparsed_reason": "unsupported_syntax",
+                      "clause_sha256": "0917bdf22b63d7e9e108d10eac029de88f59f4ea25939bbcaaab5412a11b2a6b"
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 0,
+                "unusable_records": 0,
+                "selected_year": "2025-2026",
+                "other_years_recorded": 1
+              }
+            }
+          }
+        ],
+        "plan_context": {
+          "program_id": "ms-ds-synthetic",
+          "plan_id": "ms-ds-synthetic-boston-2025-2026-standard",
+          "campus": "boston",
+          "catalog_year": "2025-2026",
+          "pathway": "standard",
+          "concentration": null,
+          "plan_content_sha256": "2b3a20a33d47cc3f0a5ad4638f1410fea3ab245dee2353d9561bd16ba881faf7",
+          "coverage": "partial",
+          "review_status": "source_checked",
+          "checked_on": "2026-10-01",
+          "captured_on": "2026-09-28",
+          "source_catalog_year": "2025-2026",
+          "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/synthetic-program/",
+          "placements": {
+            "c-ds-5220": [
+              {
+                "path": [
+                  "Supervised learning core (synthetic)"
+                ],
+                "relation": "required",
+                "under_any_of": false,
+                "activate_when": [],
+                "min_courses": null,
+                "min_credits": null,
+                "min_areas": null,
+                "areas": [],
+                "subject_codes": [],
+                "course_ranges": []
+              }
+            ]
+          },
+          "placements_omitted": {
+            "c-ds-5220": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "token",
+      "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；"
+    },
+    {
+      "type": "token",
+      "text": "但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

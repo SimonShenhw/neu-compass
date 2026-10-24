@@ -1,0 +1,30 @@
+{
+  "case": "refused-429-rate",
+  "notes": "Too many questions: the request guard answers 429 with Retry-After 100.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 5800 讲什么？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 429,
+  "retry_after": "100",
+  "lines": [
+    {
+      "detail": "Request rate exceeded. Retry manually later.",
+      "error_type": "rate_limited",
+      "status_code": 429
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 429,
+    "errorType": "rate_limited",
+    "retryAfter": 100,
+    "invalidFields": [],
+    "reason": null
+  }
+}

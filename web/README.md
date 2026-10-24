@@ -171,10 +171,46 @@ npm.cmd run test:mutations
 
 完整修改索引、浏览器证据、具名变异及未完成边界见 [COURSE_DETAIL_WORKLOG.md](COURSE_DETAIL_WORKLOG.md)。这不是 R3 真实取数／resolver／分享链接集成；不宣称已部署、线上验收或完成真实网络瀑布检查。
 
+## R3c 搜索回答区与演示（2026-10-24）
+
+从 R3b `f2cf032` 开 `feat/web-search-answer`，只改 `web/`，无新增依赖。`courseDetail.ts` 的 `catalog` / `evidence` 仅增加 export，独立提交 `4a9d008`；原型搜索页及 R3a / R3b 其他实现保持原样。完整索引、验证证据与返工记录见 [SEARCH_ANSWER_WORKLOG.md](SEARCH_ANSWER_WORKLOG.md)。
+
+`/search-demo` 是不加入导航的 `React.lazy` 演示页。例：`/search-demo?case=feedback-receipt&feedback=on&speed=instant`。打开即播放，方便直接验收网址；「开始」从头重播。任何控件变更都卸载旧会话、abort 旧来源并清空反馈与展开状态，再按新选择播放。
+
+| 参数       | 值及缺省                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `case`     | 32 个单轮 case（不含 `feedback-responses`）及 `conversation-followup` / `conversation-four-turns`；缺省 `alias-cs-6140` |
+| `feedback` | `off`（缺省）/ `on`                                                                                                     |
+| `reason`   | `on`（缺省）/ `off`，控制 409 是否采用导出的 proposed_reason                                                            |
+| `vote`     | `saved`（缺省）/ `404` / `503` / `mismatch`                                                                             |
+| `speed`    | `normal`（缺省）/ `slow` / `instant`                                                                                    |
+
+未知值逐项回退缺省。正常速度 meta 前 400ms、每块及结束前 150ms；慢速乘四，立即为零。多轮依次播放；「查看」和追问只写演示 status，不导航、不提问、不修改对比列表。评价回调只返回固定合成结果，**没有真实接口请求或数据保存**。
+
+- **分层：** `api/chat.ts` 手写消费类型；`models/` 放纯状态转换、历史窗口、受限正文解析、失败文案及 unknown 数据校验；`features/search-answer/` 放 `useConversation` 和展示组件。钩子只消费调用方的异步事件来源，负责同步忙碌锁、终态停止、异常、卸载取消和迟到事件隔离，不承担请求组装。会话、展开及评价均只在内存中。
+- **加载与状态：** 等待时显示「正在查找相关的课…」，收到 meta 后无正文显示「正在生成回答…」；相关课程随 meta 出现，最多三门默认展开。进行中的回答带 `aria-busy`，整个对话用一个隐藏 status 宣告开始／终态，不逐字播报。每轮保留自己的课程与错误，追问只放在最后一轮。
+- **正文与安全：** 不引入 Markdown 库，按 Python 参考实现受限子集，所有内容由 React 文本节点呈现；标题用有样式的段落，代码与长网址可折行。只有严格通过校验的官方 HTTPS 目录／方案来源链接可点击，带 `_blank` 和 `noopener noreferrer`。学生问题、课程与方案文字不解析 HTML 或 Markdown。
+- **数据及数值：** 复用已有目录／证据校验器和精确取偶算法。分数 `.3f` 保留负零，条宽先浮点乘 100 再除 top，取偶并限制在 8–100；不拿 `toFixed` / `Math.round` 代替。meta 有一门课坏掉时整组拒绝；先修年份或方案位置不合法时只隐藏对应部分。方案标签的重复 ID 按 Python 字典取最后一条，保留原列表顺序与重复项。
+- **评价：** 三字段凭证严格无额外键，完成且允许保存、正文非空时，异步核对原始 UTF-8 正文的 SHA-256 再显示。按字段而非对象身份识别凭证变化，避免原地修改对象沿用旧校验。只发四字段；仅精确匹配的成功响应更新已记录评价，失败保留旧记录；pending 禁止重复操作，卸载后丢弃回复。
+- **固定数据：** 33 份导出和 36 份标准答案原字节放在 `fixtures/search/` 与 `expected/`。69 份 SHA-256 全部锁定、跳过 Prettier；expected 只供测试，不导入生产。50 个 scenario 核对实际 DOM、折叠默认值、层级、文案、按钮、链接、时序与下一次请求；86 个正文向量另测解析结构和真实元素。
+
+在 Windows Node 24 下从 `web/` 执行：
+
+```powershell
+npm.cmd ci
+npm.cmd run check
+npm.cmd run format:check
+node scripts/search-mutations.mjs
+npm.cmd run test:mutations
+npm.cmd run preview -- --port 4173 --strictPort
+```
+
+前一个变异脚本是 R3c 的 36 个具名变异，后一个保留现有 152 个回归变异；均在临时快照运行并核对工作源文件未变。完整网络瀑布、屏幕阅读器语音、真实 `/chat` / `/feedback`、方案选择、停止、分享及生产集成另行验收。本轮只有本地提交，不推送、不建 PR、不部署。
+
 ## 设计选择及差异
 
 - 用户确认：沿用第一版白底细线与钴蓝强调色；导航以中文为主；R1 只做浅色，不做主题切换。原 R1 的「默认只看不同的行」已被 R5b 的「本轮不做行筛选」取代。
-- `tokens.css` 只声明变量；产品 token 去掉设计稿的 `a-` 前缀。CSS Modules 使用 tokens，无内联布局样式；唯一内联值是对比列数，用于动态表格最小宽度。
+- `tokens.css` 只声明变量；产品 token 去掉设计稿的 `a-` 前缀。CSS Modules 使用 tokens，无内联布局样式；动态值只有对比列数及 R3c 分数条百分比，分别控制表格最小宽度和条宽。
 - 原稿次级文字色 `#727e90` 对小字偏淡，调整为 `--ink3: #596678`，另加 4.5:1 token 对比度测试。其他主色沿用设计稿。
 - 字体由 Fontsource 随包打包，IBM Plex Sans / Mono 仅带所需 Latin 字重，中文用指定系统字体，不使用 Google Fonts。图标只用 Lucide。
 - 原 R1 原型先修树的叶子可以直接点击，所以原型曾删掉树下重复的“去看看”按钮；R3a 按新说明书恢复旧边导航，理由见上节。课号和未知要求不会自行推断为可注册。

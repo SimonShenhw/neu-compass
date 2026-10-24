@@ -1,0 +1,104 @@
+{
+  "name": "rejected",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "rejected"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "ancient roman empire history"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "ancient roman empire history"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "没有找到和这个问题匹配的课。可以换个说法，"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "ancient roman empire history"
+          },
+          {
+            "role": "assistant",
+            "content": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。"
+          }
+        ],
+        "context_course_ids": []
+      }
+    }
+  ]
+}

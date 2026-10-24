@@ -1,0 +1,75 @@
+{
+  "name": "refused-503-warming",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "refused-503-warming"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 5800 讲什么？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "⚠️ Chat failed: 服务暂不可用，请稍后手动重试。"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 5800 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "服务暂不可用，请稍后手动重试。"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 5800 讲什么？"
+          }
+        ],
+        "context_course_ids": []
+      }
+    }
+  ]
+}

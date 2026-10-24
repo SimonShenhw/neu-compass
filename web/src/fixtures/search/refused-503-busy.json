@@ -1,0 +1,30 @@
+{
+  "case": "refused-503-busy",
+  "notes": "One question is already being answered: 503 service_busy with Retry-After 1.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 5800 讲什么？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 503,
+  "retry_after": "1",
+  "lines": [
+    {
+      "detail": "Service busy. Retry manually later.",
+      "error_type": "service_busy",
+      "status_code": 503
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 503,
+    "errorType": "service_busy",
+    "retryAfter": 1,
+    "invalidFields": [],
+    "reason": null
+  }
+}

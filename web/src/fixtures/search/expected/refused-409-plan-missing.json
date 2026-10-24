@@ -1,0 +1,145 @@
+{
+  "name": "refused-409-plan-missing",
+  "scenarios": [
+    {
+      "name": "today's API (no reason)",
+      "turns": [
+        "refused-409-plan-missing"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 6140 能算进方案吗？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "🧭 所选方案已不可用，这个问题还没有回答；方案选择已清除。可以在上方「方案版本（可选）」重新选择后再问，或不选方案直接再问。"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 6140 能算进方案吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "这个问题和所选的项目或方案对不上，还没有回答。请检查「项目」和「方案」，或者改写问题后再问。"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 6140 能算进方案吗？"
+          }
+        ],
+        "context_course_ids": []
+      }
+    },
+    {
+      "name": "with the proposed reason",
+      "turns": [
+        "refused-409-plan-missing"
+      ],
+      "feedback_enabled": false,
+      "with_reason": true,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 6140 能算进方案吗？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "🧭 所选方案已不可用，这个问题还没有回答；方案选择已清除。可以在上方「方案版本（可选）」重新选择后再问，或不选方案直接再问。"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 6140 能算进方案吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "所选方案已不可用，这个问题还没有回答；方案选择已清除。可以在「方案」里重新选择后再问，或不选方案直接再问。"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 6140 能算进方案吗？"
+          }
+        ],
+        "context_course_ids": []
+      }
+    }
+  ]
+}

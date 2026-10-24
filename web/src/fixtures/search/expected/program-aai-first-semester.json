@@ -1,0 +1,326 @@
+{
+  "name": "program-aai-first-semester",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "program-aai-first-semester"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "AAI 第一学期上什么课？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。这份关系没有核实，不是正式的 Plan of Study。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（2 门）",
+              "expanded": true
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#F0EBFF;color:#7B61FF;\">按培养方案</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">AAI 6600</span> <span class=\"nc-result-name\">Applied AI</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 培养方案关系没有核实，不是正式的 Plan of Study。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-aai-6600",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">2</span><span class=\"nc-result-code\">CS 5100</span> <span class=\"nc-result-name\">Foundations of Artificial Intelligence</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：开课学期、授课方式、教师、结构化先修信息、结构化主题等 10 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 培养方案关系没有核实，不是正式的 Plan of Study。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5100",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这几门课怎么选？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 哪门最适合零基础？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 第一门的先修要求？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "AAI 第一学期上什么课？"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "合成的 Applied AI 项目在旧 seed 里第一学期列了 "
+                },
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "AAI 6600"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": " 和 "
+                },
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "CS 5100"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": "。这份关系没有核实，不是正式的 Plan of Study。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（2 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按培养方案"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "AAI 6600",
+          "name": "Applied AI",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "培养方案关系没有核实，不是正式的 Plan of Study。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-aai-6600"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 2,
+          "code": "CS 5100",
+          "name": "Foundations of Artificial Intelligence",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：开课学期、授课方式、教师、结构化先修信息、结构化主题等 10 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "培养方案关系没有核实，不是正式的 Plan of Study。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5100"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这几门课怎么选？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "哪门最适合零基础？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "第一门的先修要求？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。这份关系没有核实，不是正式的 Plan of Study。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。这份关系没有核实，不是正式的 Plan of Study。"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "AAI 第一学期上什么课？"
+          },
+          {
+            "role": "assistant",
+            "content": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。这份关系没有核实，不是正式的 Plan of Study。"
+          }
+        ],
+        "context_course_ids": [
+          "c-aai-6600",
+          "c-cs-5100"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "case": "refused-409-plan-unusable",
+  "notes": "A plan selection that resolves as unusable: 409 before the stream.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 6140 能算进方案吗？",
+      "k": 10,
+      "allow_feedback_capture": false,
+      "program_id": "ms-cs-synthetic",
+      "plan": {
+        "program_id": "ms-cs-synthetic",
+        "plan_id": "ms-cs-synthetic-boston-2025-2026-standard",
+        "campus": "boston",
+        "catalog_year": "2025-2026",
+        "pathway": "standard",
+        "concentration": null,
+        "plan_content_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  },
+  "status": 409,
+  "retry_after": null,
+  "proposed_reason": "plan_unusable",
+  "lines": [
+    {
+      "detail": "所选方案的身份、范围或格式无法确认，这个问题还没有回答；方案选择已清除。可以在上方「方案版本（可选）」重新选择后再问，或不选方案直接再问。",
+      "error_type": "conflict",
+      "status_code": 409
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

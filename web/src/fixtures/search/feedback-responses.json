@@ -1,0 +1,48 @@
+{
+  "notes": "Real POST /feedback answers for the receipt in feedback-receipt.json.",
+  "responses": [
+    {
+      "name": "up",
+      "request": {
+        "answer_id": "00000000000000000000000000000001",
+        "answer_sha256": "cf95aadf2d1fdf2dc9f8e147d9ec16e9d5738bcac1727226003c2d40282d43ff",
+        "feedback_token": "synthetic-receipt-token-0010000000000000000",
+        "rating": "up"
+      },
+      "status": 200,
+      "body": {
+        "answer_id": "00000000000000000000000000000001",
+        "rating": "up"
+      }
+    },
+    {
+      "name": "down",
+      "request": {
+        "answer_id": "00000000000000000000000000000001",
+        "answer_sha256": "cf95aadf2d1fdf2dc9f8e147d9ec16e9d5738bcac1727226003c2d40282d43ff",
+        "feedback_token": "synthetic-receipt-token-0010000000000000000",
+        "rating": "down"
+      },
+      "status": 200,
+      "body": {
+        "answer_id": "00000000000000000000000000000001",
+        "rating": "down"
+      }
+    },
+    {
+      "name": "wrong-token",
+      "request": {
+        "answer_id": "00000000000000000000000000000001",
+        "answer_sha256": "cf95aadf2d1fdf2dc9f8e147d9ec16e9d5738bcac1727226003c2d40282d43ff",
+        "feedback_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "rating": "up"
+      },
+      "status": 404,
+      "body": {
+        "detail": "Feedback target unavailable",
+        "error_type": "not_found",
+        "status_code": 404
+      }
+    }
+  ]
+}

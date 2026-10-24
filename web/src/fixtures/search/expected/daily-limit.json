@@ -1,0 +1,423 @@
+{
+  "name": "daily-limit",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "daily-limit"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 5800 讲什么？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "⚠️ 今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 5800</span> <span class=\"nc-result-name\">Algorithms</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5800",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课讲什么内容？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课作业量大吗？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 先修要求是什么？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 5800 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "stream_error",
+          "text": "今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 5800",
+          "name": "Algorithms",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5800"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课讲什么内容？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课作业量大吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "先修要求是什么？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "error",
+            "status": "stopped",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 5800 讲什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "⚠️ 今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+          }
+        ],
+        "context_course_ids": [
+          "c-cs-5800"
+        ]
+      }
+    },
+    {
+      "name": "feedback on",
+      "turns": [
+        "daily-limit"
+      ],
+      "feedback_enabled": true,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 5800 讲什么？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "⚠️ 今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 5800</span> <span class=\"nc-result-name\">Algorithms</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5800",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课讲什么内容？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课作业量大吗？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 先修要求是什么？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 5800 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "stream_error",
+          "text": "今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 5800",
+          "name": "Algorithms",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5800"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课讲什么内容？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课作业量大吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "先修要求是什么？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "error",
+            "status": "stopped",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 5800 讲什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "⚠️ 今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+          }
+        ],
+        "context_course_ids": [
+          "c-cs-5800"
+        ]
+      }
+    }
+  ]
+}
