@@ -1,0 +1,32 @@
+{
+  "case": "refused-409-program-conflict",
+  "notes": "The chosen program (AAI) and the prefix in the question (DS) do not match: 409.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "DS 第一学期上什么课？",
+      "k": 10,
+      "allow_feedback_capture": false,
+      "program_id": "ms-aai-synthetic"
+    }
+  },
+  "status": 409,
+  "retry_after": null,
+  "proposed_reason": "program_conflict",
+  "lines": [
+    {
+      "detail": "上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。 (Selected program_id conflicts with the detected program prefix.)",
+      "error_type": "conflict",
+      "status_code": 409
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

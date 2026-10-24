@@ -1,0 +1,976 @@
+{
+  "case": "hybrid-neural-network",
+  "notes": "A topic question: the hybrid route with blended scores; a numbered list in the answer.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "neural network training",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "hybrid",
+      "retrieval_ms": 9.51,
+      "prompt_version": "4.5",
+      "results": [
+        {
+          "course_id": "c-ds-5220",
+          "primary_code": "DS 5220",
+          "primary_name": "Supervised Machine Learning and Learning Theory",
+          "score": 1.3064094292023918,
+          "answer_evidence": {
+            "catalog": {
+              "course_code": "DS 5220",
+              "course_name": "Supervised Machine Learning and Learning Theory",
+              "description": null,
+              "credits": 3,
+              "prereq_codes": [],
+              "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+              "snapshot_id": "catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7",
+              "imported_at": "2026-09-29T03:00:00",
+              "retrieved_at": null
+            },
+            "field_evidence": [
+              {
+                "field": "workload_hours_per_week",
+                "value": 10.0,
+                "source_id": "syllabus_ds5220_2027",
+                "quote": "Plan for ten hours a week. (Synthetic text for interface tests.)",
+                "confidence": 0.7
+              },
+              {
+                "field": "difficulty_score",
+                "value": 4.25,
+                "source_id": "rmp_review_ds5220_1",
+                "quote": "The proofs are tough. (Synthetic text for interface tests.)",
+                "confidence": 0.65
+              }
+            ],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "professor",
+              "skill_tags",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_retrieval_date_unknown",
+              "catalog_metadata_conflict",
+              "extracted_evidence_not_official_facts",
+              "field_evidence_value_conflict",
+              "topics_source_unavailable",
+              "requisite_clause_unparsed"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [
+                {
+                  "catalog_year": "2026-2027",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "unparsed",
+                    "rule": null,
+                    "clause_text": "Graduate standing and permission of the instructor",
+                    "clause_truncated": false,
+                    "unparsed_reason": "unsupported_syntax",
+                    "clause_sha256": "0917bdf22b63d7e9e108d10eac029de88f59f4ea25939bbcaaab5412a11b2a6b"
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                }
+              ],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "synth-cs-9999",
+          "primary_code": "CS 9999",
+          "primary_name": "Synthetic Systems Seminar",
+          "score": 0.836466188795735,
+          "answer_evidence": {
+            "catalog": {
+              "course_code": "CS 9999",
+              "course_name": "Synthetic Systems Seminar",
+              "description": "A synthetic seminar used only by tests. (Synthetic text for interface tests.)",
+              "credits": 0,
+              "prereq_codes": [],
+              "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+              "snapshot_id": "catalog:ffff86edd9a31b67d8247618f5c0f8281453354db2babee8db3a79808119f640",
+              "imported_at": "2026-09-29T03:00:15Z",
+              "retrieved_at": "2026-09-28T14:05:30Z"
+            },
+            "field_evidence": [],
+            "source_review_ids": [
+              "synthetic_seed_cs9999"
+            ],
+            "missing_fields": [
+              "term",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "synthetic_record_not_real_course"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-6140",
+          "primary_code": "CS 6140",
+          "primary_name": "Machine Learning",
+          "score": 0.7868985899272134,
+          "answer_evidence": {
+            "catalog": {
+              "course_code": "CS 6140",
+              "course_name": "Machine Learning",
+              "description": "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)",
+              "credits": 4,
+              "prereq_codes": [],
+              "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+              "snapshot_id": "catalog:dfea54f8ec3f30ec60fd0b6bebf64e2075a57184a05f62a318ef5b600729a442",
+              "imported_at": "2026-09-29T03:00:15Z",
+              "retrieved_at": "2026-09-28T14:05:30Z"
+            },
+            "field_evidence": [
+              {
+                "field": "workload_hours_per_week",
+                "value": 7.5,
+                "source_id": "rmp_review_cs6140_1",
+                "quote": "About seven or eight hours a week. (Synthetic text for interface tests.)",
+                "confidence": 0.875
+              },
+              {
+                "field": "difficulty_score",
+                "value": 4.0,
+                "source_id": "reddit_cs6140_thread",
+                "quote": "Hard but fair. (Synthetic text for interface tests.)",
+                "confidence": 0.125
+              },
+              {
+                "field": "skill_tags",
+                "value": [
+                  "Python",
+                  "scikit-learn"
+                ],
+                "source_id": "syllabus_cs6140_2026",
+                "quote": "Assignments use Python and scikit-learn. (Synthetic text for interface tests.)",
+                "confidence": 0.9
+              },
+              {
+                "field": "career_relevance",
+                "value": "Machine learning engineer",
+                "source_id": "rmp_review_cs6140_1",
+                "quote": "Good preparation for ML jobs. (Synthetic text for interface tests.)",
+                "confidence": 0.5
+              }
+            ],
+            "source_review_ids": [
+              "rmp_review_cs6140_1",
+              "reddit_cs6140_thread",
+              "syllabus_cs6140_2026",
+              "rmp_review_cs6140_1"
+            ],
+            "missing_fields": [],
+            "warnings": [
+              "extracted_evidence_not_official_facts",
+              "requisites_differ_by_catalog_year"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [
+                {
+                  "catalog_year": "2026-2027",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "parsed",
+                    "rule": {
+                      "kind": "all_of",
+                      "course_code": null,
+                      "minimum_grade": null,
+                      "academic_level": null,
+                      "concurrent_allowed": false,
+                      "children": [
+                        {
+                          "kind": "any_of",
+                          "course_code": null,
+                          "minimum_grade": null,
+                          "academic_level": null,
+                          "concurrent_allowed": false,
+                          "children": [
+                            {
+                              "kind": "course",
+                              "course_code": "CS 5800",
+                              "minimum_grade": "C-",
+                              "academic_level": null,
+                              "concurrent_allowed": false,
+                              "children": []
+                            },
+                            {
+                              "kind": "course",
+                              "course_code": "CS 7800",
+                              "minimum_grade": "C-",
+                              "academic_level": null,
+                              "concurrent_allowed": false,
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "any_of",
+                          "course_code": null,
+                          "minimum_grade": null,
+                          "academic_level": null,
+                          "concurrent_allowed": false,
+                          "children": [
+                            {
+                              "kind": "course",
+                              "course_code": "DS 5220",
+                              "minimum_grade": "C-",
+                              "academic_level": "Graduate",
+                              "concurrent_allowed": false,
+                              "children": []
+                            },
+                            {
+                              "kind": "course",
+                              "course_code": "CS 6220",
+                              "minimum_grade": null,
+                              "academic_level": null,
+                              "concurrent_allowed": true,
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "clause_text": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))",
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                },
+                {
+                  "catalog_year": "2025-2026",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "parsed",
+                    "rule": {
+                      "kind": "course",
+                      "course_code": "CS 5800",
+                      "minimum_grade": "C-",
+                      "academic_level": null,
+                      "concurrent_allowed": false,
+                      "children": []
+                    },
+                    "clause_text": "CS 5800 with a minimum grade of C-",
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                },
+                {
+                  "catalog_year": "2024-2025",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "parsed",
+                    "rule": {
+                      "kind": "course",
+                      "course_code": "CS 5800",
+                      "minimum_grade": "C-",
+                      "academic_level": null,
+                      "concurrent_allowed": false,
+                      "children": []
+                    },
+                    "clause_text": "CS 5800 with a minimum grade of C-",
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                }
+              ],
+              "editions_omitted": 1,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-aai-6600",
+          "primary_code": "AAI 6600",
+          "primary_name": "Applied AI",
+          "score": -0.9638540179754278,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-5100",
+          "primary_code": "CS 5100",
+          "primary_name": "Foundations of Artificial Intelligence",
+          "score": -0.9767254803751098,
+          "answer_evidence": {
+            "catalog": {
+              "course_code": "CS 5100",
+              "course_name": "Foundations of Artificial Intelligence",
+              "description": "Introduces search, planning and learning. (Synthetic text for interface tests.)",
+              "credits": 4,
+              "prereq_codes": [],
+              "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+              "snapshot_id": "catalog:4e81841768085005ebb89fb9a2daec7664bb6a8a4e3e4458b40105e88805d885",
+              "imported_at": "2026-09-29T03:00:15Z",
+              "retrieved_at": "2026-09-28T14:05:30Z"
+            },
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-5800",
+          "primary_code": "CS 5800",
+          "primary_name": "Algorithms",
+          "score": -0.9891947095748015,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [
+                {
+                  "catalog_year": "2026-2027",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                }
+              ],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "token",
+      "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n"
+    },
+    {
+      "type": "token",
+      "text": "2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，"
+    },
+    {
+      "type": "token",
+      "text": "不是官方信息。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "hybrid",
+        "retrieval_ms": 9.51,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-ds-5220",
+            "primary_code": "DS 5220",
+            "primary_name": "Supervised Machine Learning and Learning Theory",
+            "score": 1.3064094292023918,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "DS 5220",
+                "course_name": "Supervised Machine Learning and Learning Theory",
+                "description": null,
+                "credits": 3,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+                "snapshot_id": "catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7",
+                "imported_at": "2026-09-29T03:00:00",
+                "retrieved_at": null
+              },
+              "field_evidence": [
+                {
+                  "field": "workload_hours_per_week",
+                  "value": 10.0,
+                  "source_id": "syllabus_ds5220_2027",
+                  "quote": "Plan for ten hours a week. (Synthetic text for interface tests.)",
+                  "confidence": 0.7
+                },
+                {
+                  "field": "difficulty_score",
+                  "value": 4.25,
+                  "source_id": "rmp_review_ds5220_1",
+                  "quote": "The proofs are tough. (Synthetic text for interface tests.)",
+                  "confidence": 0.65
+                }
+              ],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "professor",
+                "skill_tags",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_retrieval_date_unknown",
+                "catalog_metadata_conflict",
+                "extracted_evidence_not_official_facts",
+                "field_evidence_value_conflict",
+                "topics_source_unavailable",
+                "requisite_clause_unparsed"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "unparsed",
+                      "rule": null,
+                      "clause_text": "Graduate standing and permission of the instructor",
+                      "clause_truncated": false,
+                      "unparsed_reason": "unsupported_syntax",
+                      "clause_sha256": "0917bdf22b63d7e9e108d10eac029de88f59f4ea25939bbcaaab5412a11b2a6b"
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "synth-cs-9999",
+            "primary_code": "CS 9999",
+            "primary_name": "Synthetic Systems Seminar",
+            "score": 0.836466188795735,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "CS 9999",
+                "course_name": "Synthetic Systems Seminar",
+                "description": "A synthetic seminar used only by tests. (Synthetic text for interface tests.)",
+                "credits": 0,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                "snapshot_id": "catalog:ffff86edd9a31b67d8247618f5c0f8281453354db2babee8db3a79808119f640",
+                "imported_at": "2026-09-29T03:00:15Z",
+                "retrieved_at": "2026-09-28T14:05:30Z"
+              },
+              "field_evidence": [],
+              "source_review_ids": [
+                "synthetic_seed_cs9999"
+              ],
+              "missing_fields": [
+                "term",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "synthetic_record_not_real_course"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "score": 0.7868985899272134,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "CS 6140",
+                "course_name": "Machine Learning",
+                "description": "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)",
+                "credits": 4,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                "snapshot_id": "catalog:dfea54f8ec3f30ec60fd0b6bebf64e2075a57184a05f62a318ef5b600729a442",
+                "imported_at": "2026-09-29T03:00:15Z",
+                "retrieved_at": "2026-09-28T14:05:30Z"
+              },
+              "field_evidence": [
+                {
+                  "field": "workload_hours_per_week",
+                  "value": 7.5,
+                  "source_id": "rmp_review_cs6140_1",
+                  "quote": "About seven or eight hours a week. (Synthetic text for interface tests.)",
+                  "confidence": 0.875
+                },
+                {
+                  "field": "difficulty_score",
+                  "value": 4.0,
+                  "source_id": "reddit_cs6140_thread",
+                  "quote": "Hard but fair. (Synthetic text for interface tests.)",
+                  "confidence": 0.125
+                },
+                {
+                  "field": "skill_tags",
+                  "value": [
+                    "Python",
+                    "scikit-learn"
+                  ],
+                  "source_id": "syllabus_cs6140_2026",
+                  "quote": "Assignments use Python and scikit-learn. (Synthetic text for interface tests.)",
+                  "confidence": 0.9
+                },
+                {
+                  "field": "career_relevance",
+                  "value": "Machine learning engineer",
+                  "source_id": "rmp_review_cs6140_1",
+                  "quote": "Good preparation for ML jobs. (Synthetic text for interface tests.)",
+                  "confidence": 0.5
+                }
+              ],
+              "source_review_ids": [
+                "rmp_review_cs6140_1",
+                "reddit_cs6140_thread",
+                "syllabus_cs6140_2026",
+                "rmp_review_cs6140_1"
+              ],
+              "missing_fields": [],
+              "warnings": [
+                "extracted_evidence_not_official_facts",
+                "requisites_differ_by_catalog_year"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "parsed",
+                      "rule": {
+                        "kind": "all_of",
+                        "course_code": null,
+                        "minimum_grade": null,
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": [
+                          {
+                            "kind": "any_of",
+                            "course_code": null,
+                            "minimum_grade": null,
+                            "academic_level": null,
+                            "concurrent_allowed": false,
+                            "children": [
+                              {
+                                "kind": "course",
+                                "course_code": "CS 5800",
+                                "minimum_grade": "C-",
+                                "academic_level": null,
+                                "concurrent_allowed": false,
+                                "children": []
+                              },
+                              {
+                                "kind": "course",
+                                "course_code": "CS 7800",
+                                "minimum_grade": "C-",
+                                "academic_level": null,
+                                "concurrent_allowed": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "any_of",
+                            "course_code": null,
+                            "minimum_grade": null,
+                            "academic_level": null,
+                            "concurrent_allowed": false,
+                            "children": [
+                              {
+                                "kind": "course",
+                                "course_code": "DS 5220",
+                                "minimum_grade": "C-",
+                                "academic_level": "Graduate",
+                                "concurrent_allowed": false,
+                                "children": []
+                              },
+                              {
+                                "kind": "course",
+                                "course_code": "CS 6220",
+                                "minimum_grade": null,
+                                "academic_level": null,
+                                "concurrent_allowed": true,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "clause_text": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))",
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  },
+                  {
+                    "catalog_year": "2025-2026",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "parsed",
+                      "rule": {
+                        "kind": "course",
+                        "course_code": "CS 5800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      "clause_text": "CS 5800 with a minimum grade of C-",
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  },
+                  {
+                    "catalog_year": "2024-2025",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "parsed",
+                      "rule": {
+                        "kind": "course",
+                        "course_code": "CS 5800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      "clause_text": "CS 5800 with a minimum grade of C-",
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 1,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-aai-6600",
+            "primary_code": "AAI 6600",
+            "primary_name": "Applied AI",
+            "score": -0.9638540179754278,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-5100",
+            "primary_code": "CS 5100",
+            "primary_name": "Foundations of Artificial Intelligence",
+            "score": -0.9767254803751098,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "CS 5100",
+                "course_name": "Foundations of Artificial Intelligence",
+                "description": "Introduces search, planning and learning. (Synthetic text for interface tests.)",
+                "credits": 4,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                "snapshot_id": "catalog:4e81841768085005ebb89fb9a2daec7664bb6a8a4e3e4458b40105e88805d885",
+                "imported_at": "2026-09-29T03:00:15Z",
+                "retrieved_at": "2026-09-28T14:05:30Z"
+              },
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "score": -0.9891947095748015,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "token",
+      "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n"
+    },
+    {
+      "type": "token",
+      "text": "2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，"
+    },
+    {
+      "type": "token",
+      "text": "不是官方信息。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

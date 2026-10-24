@@ -1,0 +1,61 @@
+{
+  "case": "empty-filtered",
+  "notes": "A credits filter nothing passes: matched_via empty, no results.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "machine learning",
+      "k": 10,
+      "credits": 11,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "empty",
+      "retrieval_ms": 0.24,
+      "prompt_version": "4.5",
+      "results": []
+    },
+    {
+      "type": "token",
+      "text": "按你的筛选条件（11 学分）没有找到课。"
+    },
+    {
+      "type": "token",
+      "text": "可以放宽筛选再问。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "empty",
+        "retrieval_ms": 0.24,
+        "prompt_version": "4.5",
+        "results": []
+      }
+    },
+    {
+      "type": "token",
+      "text": "按你的筛选条件（11 学分）没有找到课。"
+    },
+    {
+      "type": "token",
+      "text": "可以放宽筛选再问。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

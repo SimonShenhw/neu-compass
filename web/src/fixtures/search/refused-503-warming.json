@@ -1,0 +1,30 @@
+{
+  "case": "refused-503-warming",
+  "notes": "The API is still warming up: 503 service_unavailable, no Retry-After.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 5800 讲什么？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 503,
+  "retry_after": null,
+  "lines": [
+    {
+      "detail": "Service warming up. Check /ready and retry shortly.",
+      "error_type": "service_unavailable",
+      "status_code": 503
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 503,
+    "errorType": "service_unavailable",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

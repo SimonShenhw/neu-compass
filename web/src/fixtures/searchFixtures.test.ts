@@ -1,0 +1,170 @@
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, it } from 'vitest';
+const frozen = {
+  'alias-cs-6140.json':
+    '88c8cac77f68ada9d22059b2df57f036e541bb06ff0a61a4cf4845f23dbdb637',
+  'answer-markdown-edge.json':
+    '1caaa4e84b3090d3a15cee8a44caa2e6b5088efd025faea6b8683642e4e9a1ab',
+  'context-followup.json':
+    '7ed8c2ebe9af9f351233188debb97aca01ecbb27f99f73aaeb7ed559cb9e255e',
+  'cs-first-semester-unverified.json':
+    'ec8ee8a839623378f160ca439b8a4c6eb525425c40bd5be14692caa4f4743a55',
+  'daily-limit.json':
+    '0f7fe2e49b0bb1f3b4fd7345c2f4abe526be69b1a9aa7253cafa60d5d7345d44',
+  'derived-connection-lost.json':
+    '6c3a05b5ab865ca777b7c55db00d34c448a34151ffa12cdee109c979adfd8b20',
+  'derived-no-done.json':
+    '1ba44736e14c73f668d3b8be9aa5214a67ef3cf8953bd72ff5ff8301fdbbf117',
+  'derived-silent.json':
+    '14556d047e6d17a7116f931a77950b9f482935bbd180abb3464260d44e2104ce',
+  'derived-unreadable-line.json':
+    '6395e6a701716c9af4eb567d5be7d9f42c6407d60e15550b1c5775e365114da6',
+  'empty-filtered.json':
+    '50a68acdd19ca26b72fbbaed021ac69a98f190c7799f568d0858c1f11544cecf',
+  'feedback-receipt.json':
+    '54cf7fddcce464560034ccb52a2f1ed6041990a4c6269cff1e1870f9302df948',
+  'feedback-responses.json':
+    '31f3bacb44b844c45866645a4f70bece5e8679d7785623ae7c1645cbbffe80ec',
+  'hybrid-neural-network.json':
+    'ef83b6c4b32607f8202bd840cb27cbbde5a5077c369fb517e4d434358e49fff1',
+  'internal-error.json':
+    '23b14cd7ee8f6d134cd173323bfd090653b037b28c21aab26a9af1388a12b6ad',
+  'model-error.json':
+    '9da002b41e0eedda44e5fb87fb5ee1b27f56f39947d418ad293e820e65224d44',
+  'no-answer.json':
+    '119537b2490cbf41188844e47401eac545bb783ddda8d32788b4a464a0158beb',
+  'plan-cs-2026.json':
+    '8dec9c302c8867e51e366def5cfb84f7b2323b48bc9096b6e3baead0f024802d',
+  'plan-ds-2025-year-not-recorded.json':
+    '67400f2a3d7bea1d526725851f4e2047871818cf902d9161d2504e15ff9a25e0',
+  'plan-ds-align.json':
+    '218b3de625fcf146b6bf3ebf599a970abd13d0af5072b9d26e7b993abe3835ad',
+  'program-aai-first-semester.json':
+    '3d1f47102fbc81833c164ee91fc17375413af7e0e95b1c42636442ef742f25f2',
+  'refused-404-program.json':
+    'bf836fb8990f4f6162303d8fe429b5d5c504035afa919d09920b3a69c4ba9bd0',
+  'refused-409-plan-draft.json':
+    '5633223903db9b0c3425d030cd5a5e040d69827c24c8238452fcd3657351298f',
+  'refused-409-plan-missing.json':
+    '4513252448f151e9f1f4eac1b4b9c3416f769ee7553b65b23ed283eb3ed08760',
+  'refused-409-plan-stale.json':
+    '9df3db784b7fc68c4f8223cafe491ad2180168589c482d31338d80e21c871336',
+  'refused-409-plan-unavailable.json':
+    '494fa3f96b679c2a4f174c0c23167856ae96cc3a86e249133a42f04f5d9e6770',
+  'refused-409-plan-unusable.json':
+    'b597d8089a8e0d73047ae986265aa60a287c7ade3dcead86f983e4b24e812540',
+  'refused-409-program-ambiguous.json':
+    '1fe3c92c21a725079f6e2dbcbede7ab05927b513edab69d029d907626476930f',
+  'refused-409-program-conflict.json':
+    '7a3b9df1a8fd0c8fff88942d19142fb70a10709bcb2f2ce60f36a3eeb9ac9d00',
+  'refused-422-too-long.json':
+    '02745c5623e70a62b498384e800cc663565aa3d847d0c29539a81fbefd0a3c3e',
+  'refused-429-rate.json':
+    'e5221af6bea821bc2b6863d94179dbdb752142023f1afcd9bbae01fcd283bb54',
+  'refused-503-busy.json':
+    '680b387f3779cd286b15fa7ad9e672c60431313e745255f94d2c3f5280bee6c8',
+  'refused-503-warming.json':
+    '10072381db39a0e4c166713605e94f652d553439aa1ed8ed96488d0cdf0442d5',
+  'rejected.json':
+    'fa8db0a057742694e2aca825ab9079558b353eaeb321be139112d7a1ddbba9ef',
+  'expected/alias-cs-6140.json':
+    'b80e4eed4a2d504f906664bf9a94ffffabd98719444e3f76022394cb81130d6d',
+  'expected/answer-markdown-edge.json':
+    'cbda34542005ad3eff8c35811c2e72932f1d22be745d51e9409d43f0fb963df9',
+  'expected/answer-text-vectors.json':
+    'a6f5b4817b04461c37258e106ae6774432c7b7d0f2daa7a96af7fd35ea3ccdb2',
+  'expected/context-followup.json':
+    '66f82f37a53c2e7aad11f3d83cecb8d30647e2ef762537ea6ebd60f3bbba7bc4',
+  'expected/conversation-followup.json':
+    '4386f4edc0505526790ce80ef19b6ebbc6f781d3733cc66e358689864f9f0802',
+  'expected/conversation-four-turns.json':
+    '949f5f2b575fa7ffe1cfeb3dc56847a4918de9d5e7a721c2334dc4aecede17a3',
+  'expected/cs-first-semester-unverified.json':
+    'c7c7f46d848c008be1d6c76ae7ff3a253da94c3f16b9765e9e9d09a49c9c123a',
+  'expected/daily-limit.json':
+    'ad7a9a9da4b382e79ab41d46092d4748278f93b169506e759175909c0abd4c36',
+  'expected/derived-connection-lost.json':
+    'a8622a8083dd103f05f9aa53384b81ce3d7e5eb0eee8c15802e3c5d84e27bd97',
+  'expected/derived-no-done.json':
+    '50813262134b8a8300bc30586fd4d6bdbbc9d86ed57a139012be108d4e81b1fe',
+  'expected/derived-silent.json':
+    '285a70edc8705f384566188a31bc1514f95f9c6425bf8cd9e212f842a302e64d',
+  'expected/derived-unreadable-line.json':
+    '158c1de956126cf4c8563429b3a5aa2162ad78180678401dd95adc9a6f175e5e',
+  'expected/empty-filtered.json':
+    '9d8892b6524891a8d0252661b26385fc52484345c8cf9e9a4eab1d607bf00d6a',
+  'expected/feedback-receipt.json':
+    'c5266035d62558826bedfe0721e97fd4930e83afc056e513134296802e98745f',
+  'expected/format-vectors.json':
+    'a395d221403dbfe03263eea00012dfe6b2c50a95b30df8c6810539140c345399',
+  'expected/hybrid-neural-network.json':
+    'd89920c1bffaddc0c6559039006f3ce73a1607485e25cb57070eb04c4a4517d2',
+  'expected/internal-error.json':
+    '80caf4959dc9cd5157292852d8035493a33657b53c9e79f08d97b07f4cff1faa',
+  'expected/model-error.json':
+    '338b520ce44dce5b33824014a8bf4be42dbbe406f73e1cb2c127b117cb7e1774',
+  'expected/no-answer.json':
+    '3a3215680428a13d7a958057c5e2169cd1412241d5ae9b0aaed55fc04cb739b9',
+  'expected/plan-cs-2026.json':
+    '731abcb70452283058ced40a308e082c7f20c587227cb8a6e77e2acd842fb818',
+  'expected/plan-ds-2025-year-not-recorded.json':
+    '5c8727889cfac137f42b3ead319e3ae99ed3a60262dda5508e904935cac11427',
+  'expected/plan-ds-align.json':
+    '49026c3f2ead02a0f0201c4badc2a2d64102bd04e9b0e06a3f4477c793b36c6a',
+  'expected/program-aai-first-semester.json':
+    '769380803c07de14f5c32064689a60ede00e294671e8db9c44d9dade3391e183',
+  'expected/refused-404-program.json':
+    '77e8a13ad9ebffdb52053bad265ae6b176b6af09cb34442491379cedc3da3cc0',
+  'expected/refused-409-plan-draft.json':
+    'df160dbd4bfa99462921372905c90a09f18182bd9c1398df48c8540805a73597',
+  'expected/refused-409-plan-missing.json':
+    'dc65cf79ecb0bda2edae14e81d870381ecbbf7092d11ce6326d39f51fe2e8ab1',
+  'expected/refused-409-plan-stale.json':
+    '313815f77be5eb24a83e2bef472d5c3070d2cd7585e35e53894960d851272e21',
+  'expected/refused-409-plan-unavailable.json':
+    'a21ffd0ad3e75f27a08c1bcd8a5b25fbed7cad19c90478d696621553ce38033a',
+  'expected/refused-409-plan-unusable.json':
+    '4f7f9188edb840752a2a69cc108c6788c4b27e58b4a78229a5fe4770c104f154',
+  'expected/refused-409-program-ambiguous.json':
+    '3813bb720a4e07c96236f9b6b5683735d4d99c1e72b9f0e9b6ee3e30119298d0',
+  'expected/refused-409-program-conflict.json':
+    '59f2ad958e1032027c379b08cb6510356c182325cc101d4b5636177ac3e4f627',
+  'expected/refused-422-too-long.json':
+    '3d985a380b1a556b09a1f3687e55dc08468d78363696d2964349f69415b95f1d',
+  'expected/refused-429-rate.json':
+    'ef732f999d3734fafd14539b6b6e7775e744e355fc9798c8a91a1486dfac4adb',
+  'expected/refused-503-busy.json':
+    '55d0e395b39a0133e1ab5b14d03a2dc75197a9721bf531d55d6ceecb4f83342c',
+  'expected/refused-503-warming.json':
+    '05d04bf8a981ec08a0f474c038b8eda4c10cb48cf11cd4ce4fcc916c8f5f284d',
+  'expected/rejected.json':
+    'f01ec1cedb0715aef43a609e675da6de6d0b5fc8b3ac44c631eba184576ff301',
+} as const;
+it('69 search exports and goldens retain original filenames and SHA-256 bytes', () => {
+  const root = resolve('src/fixtures/search');
+  expect(Object.keys(frozen)).toHaveLength(69);
+  expect(
+    readdirSync(root)
+      .filter((f) => f.endsWith('.json'))
+      .sort(),
+  ).toEqual(
+    Object.keys(frozen)
+      .filter((f) => !f.includes('/'))
+      .sort(),
+  );
+  expect(readdirSync(resolve(root, 'expected')).sort()).toEqual(
+    Object.keys(frozen)
+      .filter((f) => f.includes('/'))
+      .map((f) => f.slice(9))
+      .sort(),
+  );
+  for (const [file, hash] of Object.entries(frozen))
+    expect(
+      createHash('sha256')
+        .update(readFileSync(resolve(root, file)))
+        .digest('hex'),
+      file,
+    ).toBe(hash);
+});

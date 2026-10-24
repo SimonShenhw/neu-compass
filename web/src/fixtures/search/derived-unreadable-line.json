@@ -1,0 +1,250 @@
+{
+  "case": "derived-unreadable-line",
+  "notes": "A line that is not one of the four events after meta and two tokens: invalid_stream and the incomplete line.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 6140 讲什么？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": null,
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "alias",
+        "retrieval_ms": 0.28,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "score": 1.0,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "CS 6140",
+                "course_name": "Machine Learning",
+                "description": "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)",
+                "credits": 4,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                "snapshot_id": "catalog:dfea54f8ec3f30ec60fd0b6bebf64e2075a57184a05f62a318ef5b600729a442",
+                "imported_at": "2026-09-29T03:00:15Z",
+                "retrieved_at": "2026-09-28T14:05:30Z"
+              },
+              "field_evidence": [
+                {
+                  "field": "workload_hours_per_week",
+                  "value": 7.5,
+                  "source_id": "rmp_review_cs6140_1",
+                  "quote": "About seven or eight hours a week. (Synthetic text for interface tests.)",
+                  "confidence": 0.875
+                },
+                {
+                  "field": "difficulty_score",
+                  "value": 4.0,
+                  "source_id": "reddit_cs6140_thread",
+                  "quote": "Hard but fair. (Synthetic text for interface tests.)",
+                  "confidence": 0.125
+                },
+                {
+                  "field": "skill_tags",
+                  "value": [
+                    "Python",
+                    "scikit-learn"
+                  ],
+                  "source_id": "syllabus_cs6140_2026",
+                  "quote": "Assignments use Python and scikit-learn. (Synthetic text for interface tests.)",
+                  "confidence": 0.9
+                },
+                {
+                  "field": "career_relevance",
+                  "value": "Machine learning engineer",
+                  "source_id": "rmp_review_cs6140_1",
+                  "quote": "Good preparation for ML jobs. (Synthetic text for interface tests.)",
+                  "confidence": 0.5
+                }
+              ],
+              "source_review_ids": [
+                "rmp_review_cs6140_1",
+                "reddit_cs6140_thread",
+                "syllabus_cs6140_2026",
+                "rmp_review_cs6140_1"
+              ],
+              "missing_fields": [],
+              "warnings": [
+                "extracted_evidence_not_official_facts",
+                "requisites_differ_by_catalog_year"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "parsed",
+                      "rule": {
+                        "kind": "all_of",
+                        "course_code": null,
+                        "minimum_grade": null,
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": [
+                          {
+                            "kind": "any_of",
+                            "course_code": null,
+                            "minimum_grade": null,
+                            "academic_level": null,
+                            "concurrent_allowed": false,
+                            "children": [
+                              {
+                                "kind": "course",
+                                "course_code": "CS 5800",
+                                "minimum_grade": "C-",
+                                "academic_level": null,
+                                "concurrent_allowed": false,
+                                "children": []
+                              },
+                              {
+                                "kind": "course",
+                                "course_code": "CS 7800",
+                                "minimum_grade": "C-",
+                                "academic_level": null,
+                                "concurrent_allowed": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "any_of",
+                            "course_code": null,
+                            "minimum_grade": null,
+                            "academic_level": null,
+                            "concurrent_allowed": false,
+                            "children": [
+                              {
+                                "kind": "course",
+                                "course_code": "DS 5220",
+                                "minimum_grade": "C-",
+                                "academic_level": "Graduate",
+                                "concurrent_allowed": false,
+                                "children": []
+                              },
+                              {
+                                "kind": "course",
+                                "course_code": "CS 6220",
+                                "minimum_grade": null,
+                                "academic_level": null,
+                                "concurrent_allowed": true,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "clause_text": "(CS 5800 with a minimum grade of C- or CS 7800 with a minimum grade of C-) and (DS 5220 with a minimum grade of C- (Graduate) or CS 6220 (may be taken concurrently))",
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  },
+                  {
+                    "catalog_year": "2025-2026",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "parsed",
+                      "rule": {
+                        "kind": "course",
+                        "course_code": "CS 5800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      "clause_text": "CS 5800 with a minimum grade of C-",
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  },
+                  {
+                    "catalog_year": "2024-2025",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "parsed",
+                      "rule": {
+                        "kind": "course",
+                        "course_code": "CS 5800",
+                        "minimum_grade": "C-",
+                        "academic_level": null,
+                        "concurrent_allowed": false,
+                        "children": []
+                      },
+                      "clause_text": "CS 5800 with a minimum grade of C-",
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 1,
+                "unusable_records": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "token",
+      "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+    },
+    {
+      "type": "token",
+      "text": "目录](https://catalog.northeastern.edu/course-descri"
+    },
+    {
+      "type": "error",
+      "errorType": "invalid_stream",
+      "message": "回答流未完整结束；仅保留部分内容，请稍后手动重试。"
+    }
+  ],
+  "failure": null,
+  "derived_from": "alias-cs-6140",
+  "edit": "A line that is not one of the four events after meta and two tokens: invalid_stream and the incomplete line."
+}

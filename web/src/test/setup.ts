@@ -1,8 +1,11 @@
 import '@testing-library/jest-dom/vitest';
+import { webcrypto } from 'node:crypto';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { clearCompare } from '../models/compareList';
 import { resetCompareDemoForTests } from '../fixtures/compareDemo';
+
+if (!globalThis.crypto?.subtle) vi.stubGlobal('crypto', webcrypto);
 
 // jsdom has no layout or pointer-capture implementation. Keep real Radix behavior.
 if (!Element.prototype.scrollIntoView)

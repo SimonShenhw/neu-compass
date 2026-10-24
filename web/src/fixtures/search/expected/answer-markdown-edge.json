@@ -1,0 +1,358 @@
+{
+  "name": "answer-markdown-edge",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "answer-markdown-edge"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 5800 怎么样？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 <https://catalog.northeastern.edu/course-descriptions/cs/#cs5800>。\n\n不能点的：[别的网站]\\(h⁠ttps://example.com/x)、\\![图]\\(h⁠ttps://example.com/a.png)、\\<img src=x onerror=alert(1)>、[脚本]\\(javascript\\:⁠alert(1))、h⁠ttp://catalog.northeastern.edu/course-descriptions/cs/、<https://catalog.northeastern.edu/course-descriptions/cs/>extra、w⁠ww.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n行内 `CS 5800` 代码，\\$x\\$ 公式，\\:⁠smile: 短代码，\\&amp; 实体，\\\\*不是转义\\\\*。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 5800</span> <span class=\"nc-result-name\">Algorithms</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5800",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课讲什么内容？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课作业量大吗？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 先修要求是什么？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 5800 怎么样？"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "heading",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "标题"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "CS 5800"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": " 的描述见 "
+                },
+                {
+                  "t": "link",
+                  "v": "目录",
+                  "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+                },
+                {
+                  "t": "text",
+                  "v": "，也可以看 "
+                },
+                {
+                  "t": "link",
+                  "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+                },
+                {
+                  "t": "text",
+                  "v": " 或者 "
+                },
+                {
+                  "t": "link",
+                  "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+                  "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+                },
+                {
+                  "t": "text",
+                  "v": "。"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、"
+                },
+                {
+                  "t": "link",
+                  "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+                },
+                {
+                  "t": "text",
+                  "v": "extra、www.example.com。"
+                }
+              ]
+            },
+            {
+              "type": "code",
+              "text": "**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)"
+            },
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "行内 "
+                },
+                {
+                  "t": "code",
+                  "v": "CS 5800"
+                },
+                {
+                  "t": "text",
+                  "v": " 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 5800",
+          "name": "Algorithms",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5800"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课讲什么内容？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课作业量大吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "先修要求是什么？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 "
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n行内 `CS 5800` 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n行内 `CS 5800` 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 5800 怎么样？"
+          },
+          {
+            "role": "assistant",
+            "content": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n行内 `CS 5800` 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+          }
+        ],
+        "context_course_ids": [
+          "c-cs-5800"
+        ]
+      }
+    }
+  ]
+}

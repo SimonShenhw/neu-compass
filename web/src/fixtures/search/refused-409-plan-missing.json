@@ -1,0 +1,41 @@
+{
+  "case": "refused-409-plan-missing",
+  "notes": "A plan selection that resolves as missing: 409 before the stream.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 6140 能算进方案吗？",
+      "k": 10,
+      "allow_feedback_capture": false,
+      "program_id": "ms-cs-synthetic",
+      "plan": {
+        "program_id": "ms-cs-synthetic",
+        "plan_id": "ms-cs-synthetic-boston-2030-2031-standard",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "standard",
+        "concentration": null,
+        "plan_content_sha256": "1447443331a3e9bd4e481e9d669b13d0ee399b67f3cdeadbd677a3d4be4053e5"
+      }
+    }
+  },
+  "status": 409,
+  "retry_after": null,
+  "proposed_reason": "plan_missing",
+  "lines": [
+    {
+      "detail": "所选方案已不可用，这个问题还没有回答；方案选择已清除。可以在上方「方案版本（可选）」重新选择后再问，或不选方案直接再问。",
+      "error_type": "conflict",
+      "status_code": 409
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "case": "program-aai-first-semester",
+  "notes": "A first-semester question for a family without version-scoped plans: the legacy program route (score 1.0, program_seed_unverified on every result).",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "AAI 第一学期上什么课？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "program",
+      "retrieval_ms": 0.52,
+      "prompt_version": "4.5",
+      "results": [
+        {
+          "course_id": "c-aai-6600",
+          "primary_code": "AAI 6600",
+          "primary_name": "Applied AI",
+          "score": 1.0,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable",
+              "program_seed_unverified"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-5100",
+          "primary_code": "CS 5100",
+          "primary_name": "Foundations of Artificial Intelligence",
+          "score": 1.0,
+          "answer_evidence": {
+            "catalog": {
+              "course_code": "CS 5100",
+              "course_name": "Foundations of Artificial Intelligence",
+              "description": "Introduces search, planning and learning. (Synthetic text for interface tests.)",
+              "credits": 4,
+              "prereq_codes": [],
+              "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+              "snapshot_id": "catalog:4e81841768085005ebb89fb9a2daec7664bb6a8a4e3e4458b40105e88805d885",
+              "imported_at": "2026-09-29T03:00:15Z",
+              "retrieved_at": "2026-09-28T14:05:30Z"
+            },
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "program_seed_unverified"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "token",
+      "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。"
+    },
+    {
+      "type": "token",
+      "text": "这份关系没有核实，不是正式的 Plan of Study。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "program",
+        "retrieval_ms": 0.52,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-aai-6600",
+            "primary_code": "AAI 6600",
+            "primary_name": "Applied AI",
+            "score": 1.0,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable",
+                "program_seed_unverified"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-5100",
+            "primary_code": "CS 5100",
+            "primary_name": "Foundations of Artificial Intelligence",
+            "score": 1.0,
+            "answer_evidence": {
+              "catalog": {
+                "course_code": "CS 5100",
+                "course_name": "Foundations of Artificial Intelligence",
+                "description": "Introduces search, planning and learning. (Synthetic text for interface tests.)",
+                "credits": 4,
+                "prereq_codes": [],
+                "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                "snapshot_id": "catalog:4e81841768085005ebb89fb9a2daec7664bb6a8a4e3e4458b40105e88805d885",
+                "imported_at": "2026-09-29T03:00:15Z",
+                "retrieved_at": "2026-09-28T14:05:30Z"
+              },
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "program_seed_unverified"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "token",
+      "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。"
+    },
+    {
+      "type": "token",
+      "text": "这份关系没有核实，不是正式的 Plan of Study。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

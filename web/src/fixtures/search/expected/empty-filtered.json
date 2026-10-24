@@ -1,0 +1,104 @@
+{
+  "name": "empty-filtered",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "empty-filtered"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "machine learning"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "machine learning"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "按你的筛选条件（11 学分）没有找到课。"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "machine learning"
+          },
+          {
+            "role": "assistant",
+            "content": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。"
+          }
+        ],
+        "context_course_ids": []
+      }
+    }
+  ]
+}

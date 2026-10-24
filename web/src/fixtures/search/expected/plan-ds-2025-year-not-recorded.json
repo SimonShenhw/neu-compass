@@ -1,0 +1,343 @@
+{
+  "name": "plan-ds-2025-year-not-recorded",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "plan-ds-2025-year-not-recorded"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "DS 5220 能算进方案吗？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📘 所选方案与课程位置",
+              "expanded": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "本回答按方案：ms\\-ds\\-synthetic · boston · Catalog 2025\\-2026 · 普通 MS · 共同部分／未限定 concentration",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "这是明确选择的方案文档，不代表你的适用年度、注册或毕业资格；未列出课程不代表禁止，开放池仍需核实。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "仅部分规则；未建模内容未知，条件没有自动判定，跨组重叠不代表可以重复计入。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "text",
+              "value": "DS 5220：方案列明的必修课程；Supervised learning core (synthetic)"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "markdown",
+              "value": "[方案官方目录来源](https://catalog.northeastern.edu/graduate/computer-information-science/synthetic-program/)"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源 Catalog 2025-2026 · 摘录 2026-09-28 · 对照 2026-10-01；非实时核验",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">DS 5220</span> <span class=\"nc-result-name\">Supervised Machine Learning and Learning Theory</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "所选方案 Catalog 2025-2026 没有可用的课程块规则；展示的其他年份不能替代。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、教师、技能标签、考核构成、职业方向；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 目录学分和课程记录不一致，请向学校核实；工作量、难度等是根据评价的估计，不是官方信息；有估计值和评价原文对不上，需要核实；有一段先修/共修原文没能解析，请照原文核对；所选方案年度没有课程块规则，其他年份不能替代。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-ds-5220",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课讲什么内容？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课作业量大吗？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 先修要求是什么？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "DS 5220 能算进方案吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "你选的是 Catalog 2025-2026 的方案，"
+                },
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "DS 5220"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": " 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "所选方案与课程位置",
+          "open": false
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "本回答按方案：ms-ds-synthetic · boston · Catalog 2025-2026 · 普通 MS · 共同部分／未限定 concentration"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "这是明确选择的方案文档，不代表你的适用年度、注册或毕业资格；未列出课程不代表禁止，开放池仍需核实。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "仅部分规则；未建模内容未知，条件没有自动判定，跨组重叠不代表可以重复计入。"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "DS 5220：方案列明的必修课程；Supervised learning core (synthetic)"
+        },
+        {
+          "depth": 1,
+          "kind": "link",
+          "text": "方案官方目录来源",
+          "href": "https://catalog.northeastern.edu/graduate/computer-information-science/synthetic-program/"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源 Catalog 2025-2026 · 摘录 2026-09-28 · 对照 2026-10-01；非实时核验"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "DS 5220",
+          "name": "Supervised Machine Learning and Learning Theory",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "所选方案 Catalog 2025-2026 没有可用的课程块规则；展示的其他年份不能替代。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、教师、技能标签、考核构成、职业方向；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "目录学分和课程记录不一致，请向学校核实；工作量、难度等是根据评价的估计，不是官方信息；有估计值和评价原文对不上，需要核实；有一段先修/共修原文没能解析，请照原文核对；所选方案年度没有课程块规则，其他年份不能替代。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-ds-5220"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课讲什么内容？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课作业量大吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "先修要求是什么？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "DS 5220 能算进方案吗？"
+          },
+          {
+            "role": "assistant",
+            "content": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+          }
+        ],
+        "context_course_ids": [
+          "c-ds-5220"
+        ]
+      }
+    }
+  ]
+}

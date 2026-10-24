@@ -1,0 +1,62 @@
+{
+  "case": "rejected",
+  "notes": "Nothing matches well enough: matched_via rejected, no results; the model says so.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "ancient roman empire history",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "rejected",
+      "retrieval_ms": 13.82,
+      "prompt_version": "4.5",
+      "results": [],
+      "rejection_reason": "max_reranker_sigmoid 0.000 < threshold 0.05"
+    },
+    {
+      "type": "token",
+      "text": "没有找到和这个问题匹配的课。可以换个说法，"
+    },
+    {
+      "type": "token",
+      "text": "或者直接写课号再问一次。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "rejected",
+        "retrieval_ms": 13.82,
+        "prompt_version": "4.5",
+        "results": [],
+        "rejection_reason": "max_reranker_sigmoid 0.000 < threshold 0.05"
+      }
+    },
+    {
+      "type": "token",
+      "text": "没有找到和这个问题匹配的课。可以换个说法，"
+    },
+    {
+      "type": "token",
+      "text": "或者直接写课号再问一次。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

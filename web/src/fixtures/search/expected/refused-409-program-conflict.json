@@ -1,0 +1,145 @@
+{
+  "name": "refused-409-program-conflict",
+  "scenarios": [
+    {
+      "name": "today's API (no reason)",
+      "turns": [
+        "refused-409-program-conflict"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "DS 第一学期上什么课？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "🧭 上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。 (Selected program_id conflicts with the detected program prefix.)"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "DS 第一学期上什么课？"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "这个问题和所选的项目或方案对不上，还没有回答。请检查「项目」和「方案」，或者改写问题后再问。"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "DS 第一学期上什么课？"
+          }
+        ],
+        "context_course_ids": []
+      }
+    },
+    {
+      "name": "with the proposed reason",
+      "turns": [
+        "refused-409-program-conflict"
+      ],
+      "feedback_enabled": false,
+      "with_reason": true,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "DS 第一学期上什么课？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "🧭 上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。 (Selected program_id conflicts with the detected program prefix.)"
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "DS 第一学期上什么课？"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "「项目」里选的项目和问题里的专业前缀不一致，这个问题还没有回答。请把「项目」改回「不指定」，或者改写问题。"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "DS 第一学期上什么课？"
+          }
+        ],
+        "context_course_ids": []
+      }
+    }
+  ]
+}

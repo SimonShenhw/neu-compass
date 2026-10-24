@@ -1,0 +1,1039 @@
+{
+  "name": "conversation-four-turns",
+  "scenarios": [
+    {
+      "name": "four questions: a hybrid answer, a refusal, a broken answer, an alias answer",
+      "turns": [
+        "hybrid-neural-network",
+        "refused-422-too-long",
+        "model-error",
+        "alias-cs-6140"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "neural network training"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，不是官方信息。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（6 门）",
+              "expanded": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E8F1FF;color:#1677FF;\">按内容检索</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">DS 5220</span> <span class=\"nc-result-name\">Supervised Machine Learning and Learning Theory</span><span class=\"nc-score-num\">1.306</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、教师、技能标签、考核构成、职业方向；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 目录学分和课程记录不一致，请向学校核实；工作量、难度等是根据评价的估计，不是官方信息；有估计值和评价原文对不上，需要核实；有一段先修/共修原文没能解析，请照原文核对。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-ds-5220",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">2</span><span class=\"nc-result-code\">CS 9999</span> <span class=\"nc-result-name\">Synthetic Systems Seminar</span><span class=\"nc-score-num\">0.836</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:64%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：开课学期、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 这是测试数据，不是真实课程。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-synth-cs-9999",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">3</span><span class=\"nc-result-code\">CS 6140</span> <span class=\"nc-result-name\">Machine Learning</span><span class=\"nc-score-num\">0.787</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:60%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-6140",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">4</span><span class=\"nc-result-code\">AAI 6600</span> <span class=\"nc-result-name\">Applied AI</span><span class=\"nc-score-num\">-0.964</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:8%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-aai-6600",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">5</span><span class=\"nc-result-code\">CS 5100</span> <span class=\"nc-result-name\">Foundations of Artificial Intelligence</span><span class=\"nc-score-num\">-0.977</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:8%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：开课学期、授课方式、教师、结构化先修信息、结构化主题等 10 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5100",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">6</span><span class=\"nc-result-code\">CS 5800</span> <span class=\"nc-result-name\">Algorithms</span><span class=\"nc-score-num\">-0.989</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:8%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5800",
+              "disabled": false
+            },
+            {
+              "message": 2,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 2,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很"
+            },
+            {
+              "message": 3,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 3,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "⚠️ Chat failed: query: String should have at most 500 characters"
+            },
+            {
+              "message": 4,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 4,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 6140 讲什么？"
+            },
+            {
+              "message": 5,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 5,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录]\\(h⁠ttps://catalog.northeastern.edu/course-descri\n\n⚠️ 模型服务暂时出错，这条回答没有完成。请稍后再问一次。"
+            },
+            {
+              "message": 5,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 5,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 5,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 6140</span> <span class=\"nc-result-name\">Machine Learning</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 5,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 5,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 5,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。",
+              "help": null
+            },
+            {
+              "message": 5,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-5-assistant-c-cs-6140",
+              "disabled": false
+            },
+            {
+              "message": 6,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 6,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 6140 讲什么？"
+            },
+            {
+              "message": 7,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 7,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，要看你适用哪一年。\n\n你适用哪一个 Catalog 年份？"
+            },
+            {
+              "message": 7,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 7,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 7,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 6140</span> <span class=\"nc-result-name\">Machine Learning</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 7,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 7,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 7,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。",
+              "help": null
+            },
+            {
+              "message": 7,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-7-assistant-c-cs-6140",
+              "disabled": false
+            },
+            {
+              "message": 7,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课讲什么内容？",
+              "key": "chip-7-0",
+              "disabled": false
+            },
+            {
+              "message": 7,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课作业量大吗？",
+              "key": "chip-7-1",
+              "disabled": false
+            },
+            {
+              "message": 7,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 先修要求是什么？",
+              "key": "chip-7-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "neural network training"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "和「neural network training」相关的有这几门："
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "start": 1,
+              "items": [
+                [
+                  {
+                    "t": "strong",
+                    "c": [
+                      {
+                        "t": "text",
+                        "v": "DS 5220"
+                      }
+                    ]
+                  },
+                  {
+                    "t": "text",
+                    "v": " 偏理论；"
+                  }
+                ],
+                [
+                  {
+                    "t": "strong",
+                    "c": [
+                      {
+                        "t": "text",
+                        "v": "CS 6140"
+                      }
+                    ]
+                  },
+                  {
+                    "t": "text",
+                    "v": " 更全面。"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "工作量和难度来自评价的估计，不是官方信息。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（6 门）",
+          "open": false
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按内容检索"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "DS 5220",
+          "name": "Supervised Machine Learning and Learning Theory",
+          "score": "1.306",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、教师、技能标签、考核构成、职业方向；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "目录学分和课程记录不一致，请向学校核实；工作量、难度等是根据评价的估计，不是官方信息；有估计值和评价原文对不上，需要核实；有一段先修/共修原文没能解析，请照原文核对。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-ds-5220"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 2,
+          "code": "CS 9999",
+          "name": "Synthetic Systems Seminar",
+          "score": "0.836",
+          "pct": 64
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：开课学期、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "这是测试数据，不是真实课程。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "synth-cs-9999"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 3,
+          "code": "CS 6140",
+          "name": "Machine Learning",
+          "score": "0.787",
+          "pct": 60
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-6140"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 4,
+          "code": "AAI 6600",
+          "name": "Applied AI",
+          "score": "-0.964",
+          "pct": 8
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-aai-6600"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 5,
+          "code": "CS 5100",
+          "name": "Foundations of Artificial Intelligence",
+          "score": "-0.977",
+          "pct": 8
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：开课学期、授课方式、教师、结构化先修信息、结构化主题等 10 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5100"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 6,
+          "code": "CS 5800",
+          "name": "Algorithms",
+          "score": "-0.989",
+          "pct": 8
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5800"
+        },
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很"
+        },
+        {
+          "depth": 0,
+          "kind": "failure",
+          "text": "问题最多 500 个字，这个问题没有发出去。请改短一点再问。"
+        },
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 6140 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "CS 6140 Machine Learning"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "stream_error",
+          "text": "模型服务暂时出错，这条回答没有完成。请稍后再问一次。"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 6140",
+          "name": "Machine Learning",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-6140"
+        },
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 6140 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "CS 6140 Machine Learning"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": " 讲监督学习和模型选择，课程描述见 "
+                },
+                {
+                  "t": "link",
+                  "v": "NEU 官方课程目录",
+                  "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+                },
+                {
+                  "t": "text",
+                  "v": "。这是目录的存档副本，不是实时核对。"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "start": null,
+              "items": [
+                [
+                  {
+                    "t": "text",
+                    "v": "学生评价里估计每周约 7.5 小时（估计值），难度 4/5；"
+                  }
+                ],
+                [
+                  {
+                    "t": "text",
+                    "v": "先修规则各个 Catalog 年份不一样，要看你适用哪一年。"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "你适用哪一个 Catalog 年份？"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 6140",
+          "name": "Machine Learning",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-6140"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课讲什么内容？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课作业量大吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "先修要求是什么？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，不是官方信息。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，不是官方信息。"
+          }
+        ],
+        [
+          {
+            "after": "refusal",
+            "status": "failed",
+            "text": ""
+          }
+        ],
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+          },
+          {
+            "after": "error",
+            "status": "stopped",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+          }
+        ],
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，要看你适用哪一年。\n\n你适用哪一个 Catalog 年份？"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，要看你适用哪一年。\n\n你适用哪一个 Catalog 年份？"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很很"
+          },
+          {
+            "role": "user",
+            "content": "CS 6140 讲什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri\n\n⚠️ 模型服务暂时出错，这条回答没有完成。请稍后再问一次。"
+          },
+          {
+            "role": "user",
+            "content": "CS 6140 讲什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，要看你适用哪一年。\n\n你适用哪一个 Catalog 年份？"
+          }
+        ],
+        "context_course_ids": [
+          "c-cs-6140"
+        ]
+      }
+    }
+  ]
+}

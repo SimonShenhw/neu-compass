@@ -1,0 +1,31 @@
+{
+  "case": "refused-409-program-ambiguous",
+  "notes": "A first-semester question whose prefix (ALY) matches two programs and no program chosen: 409.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "ALY 第一学期上什么课？",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 409,
+  "retry_after": null,
+  "proposed_reason": "program_ambiguous",
+  "lines": [
+    {
+      "detail": "这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：ms-aly-boston-synthetic, ms-aly-online-synthetic。",
+      "error_type": "conflict",
+      "status_code": 409
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

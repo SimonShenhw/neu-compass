@@ -1,0 +1,243 @@
+{
+  "name": "internal-error",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "internal-error"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 6140 讲什么？"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程\n\n⚠️ 服务内部出错，这条回答没有完成。请稍后再问一次。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（1 门）",
+              "expanded": true
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">按课程代码找到</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 6140</span> <span class=\"nc-result-name\">Machine Learning</span><span class=\"nc-score-num\">1.000</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-6140",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课讲什么内容？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这门课作业量大吗？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 先修要求是什么？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 6140 讲什么？"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "strong",
+                  "c": [
+                    {
+                      "t": "text",
+                      "v": "CS 6140 Machine Learning"
+                    }
+                  ]
+                },
+                {
+                  "t": "text",
+                  "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "stream_error",
+          "text": "服务内部出错，这条回答没有完成。请稍后再问一次。"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（1 门）",
+          "open": true
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按课程代码找到"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 6140",
+          "name": "Machine Learning",
+          "score": "1.000",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-6140"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课讲什么内容？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这门课作业量大吗？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "先修要求是什么？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          },
+          {
+            "after": "error",
+            "status": "stopped",
+            "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 6140 讲什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程\n\n⚠️ 服务内部出错，这条回答没有完成。请稍后再问一次。"
+          }
+        ],
+        "context_course_ids": [
+          "c-cs-6140"
+        ]
+      }
+    }
+  ]
+}

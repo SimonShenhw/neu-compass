@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 import { PrototypeProvider } from './layout/PrototypeContext';
@@ -11,6 +12,8 @@ import { RequisitesDemoPage } from './pages/RequisitesDemoPage';
 import { CourseDetailDemoPage } from './pages/CourseDetailDemoPage';
 import { NotFound } from './pages/NotFound';
 
+const SearchDemoPage = lazy(() => import('./pages/SearchDemoPage'));
+
 export function App() {
   return (
     <PrototypeProvider>
@@ -23,6 +26,14 @@ export function App() {
           <Route path="/coop" element={<CoopDemoPage />} />
           <Route path="/privacy" element={<PrivacyDemoPage />} />
           <Route path="/requisites-demo" element={<RequisitesDemoPage />} />
+          <Route
+            path="/search-demo"
+            element={
+              <Suspense fallback={<p role="status">正在加载搜索演示…</p>}>
+                <SearchDemoPage />
+              </Suspense>
+            }
+          />
           <Route
             path="/course-detail-demo"
             element={<CourseDetailDemoPage />}

@@ -1,0 +1,432 @@
+{
+  "name": "cs-first-semester-unverified",
+  "scenarios": [
+    {
+      "name": "default",
+      "turns": [
+        "cs-first-semester-unverified"
+      ],
+      "feedback_enabled": false,
+      "with_reason": false,
+      "clicks": [],
+      "raw": [
+        {
+          "run": "settled",
+          "events": [
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "message",
+              "value": "user"
+            },
+            {
+              "message": 0,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "CS 第一学期 machine learning 课"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "message",
+              "value": "assistant"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "markdown",
+              "value": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。"
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "caption",
+              "value": "ℹ️ 该项目已有版本化培养方案规则，但没有经过核验的学期安排；以上只是检索到的相关课程，不是官方的第一学期/基础课方案。具体规则请到「培养方案」页查看。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "expander",
+              "value": "📎 相关课程（4 门）",
+              "expanded": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<span class=\"nc-badge\" style=\"background:#E8F1FF;color:#1677FF;\">按内容检索</span>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">1</span><span class=\"nc-result-code\">CS 5100</span> <span class=\"nc-result-name\">Foundations of Artificial Intelligence</span><span class=\"nc-score-num\">1.006</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:100%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：开课学期、授课方式、教师、结构化先修信息、结构化主题等 10 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5100",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">2</span><span class=\"nc-result-code\">CS 6140</span> <span class=\"nc-result-name\">Machine Learning</span><span class=\"nc-score-num\">0.994</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:99%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-6140",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">3</span><span class=\"nc-result-code\">CS 9999</span> <span class=\"nc-result-name\">Synthetic Systems Seminar</span><span class=\"nc-score-num\">-0.987</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:8%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：已存目录快照（非实时核验）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：开课学期、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "⚠️ 这是测试数据，不是真实课程。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-synth-cs-9999",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "html",
+              "value": "<div class=\"nc-result-card\"><span class=\"nc-result-rank\">4</span><span class=\"nc-result-code\">CS 5800</span> <span class=\"nc-result-name\">Algorithms</span><span class=\"nc-score-num\">-1.013</span><div class=\"nc-score-track\"><div class=\"nc-score-fill\" style=\"width:8%;\"></div></div></div>"
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "来源：未附可追溯目录快照",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "caption",
+              "value": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。",
+              "help": null
+            },
+            {
+              "message": 1,
+              "depth": 1,
+              "kind": "button",
+              "value": "查看",
+              "key": "open-1-assistant-c-cs-5800",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 这几门课怎么选？",
+              "key": "chip-1-0",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 哪门最适合零基础？",
+              "key": "chip-1-1",
+              "disabled": false
+            },
+            {
+              "message": 1,
+              "depth": 0,
+              "kind": "button",
+              "value": "↳ 第一门的先修要求？",
+              "key": "chip-1-2",
+              "disabled": false
+            }
+          ]
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "question",
+          "text": "CS 第一学期 machine learning 课"
+        },
+        {
+          "depth": 0,
+          "kind": "answer",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "inlines": [
+                {
+                  "t": "text",
+                  "v": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "notice",
+          "text": "该项目已有版本化培养方案规则，但没有经过核验的学期安排；以上只是检索到的相关课程，不是官方的第一学期/基础课方案。具体规则请到「培养方案」页查看。"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "相关课程（4 门）",
+          "open": false
+        },
+        {
+          "depth": 1,
+          "kind": "badge",
+          "text": "按内容检索"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 1,
+          "code": "CS 5100",
+          "name": "Foundations of Artificial Intelligence",
+          "score": "1.006",
+          "pct": 100
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：开课学期、授课方式、教师、结构化先修信息、结构化主题等 10 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5100"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 2,
+          "code": "CS 6140",
+          "name": "Machine Learning",
+          "score": "0.994",
+          "pct": 99
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027、Catalog 2025-2026、Catalog 2024-2025 的课程块原文，另有 1 个更早年份没有列出（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "工作量、难度等是根据评价的估计，不是官方信息；先修/共修规则各年份不一样，要看你的 Catalog 年份。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-6140"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 3,
+          "code": "CS 9999",
+          "name": "Synthetic Systems Seminar",
+          "score": "-0.987",
+          "pct": 8
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：开课学期、教师、结构化先修信息、结构化主题、技能标签等 9 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "这是测试数据，不是真实课程。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "synth-cs-9999"
+        },
+        {
+          "depth": 1,
+          "kind": "result",
+          "rank": 4,
+          "code": "CS 5800",
+          "name": "Algorithms",
+          "score": "-1.013",
+          "pct": 8
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：未附可追溯目录快照"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "先修/共修规则：已存 Catalog 2026-2027 的课程块原文（非实时核验，不判断能否注册）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：官方描述、学分、开课学期、授课方式、教师等 11 项（详情查看全部）；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "button",
+          "text": "查看",
+          "course_id": "c-cs-5800"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "这几门课怎么选？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "哪门最适合零基础？"
+        },
+        {
+          "depth": 0,
+          "kind": "followup",
+          "text": "第一门的先修要求？"
+        }
+      ],
+      "timeline": [
+        [
+          {
+            "after": "meta",
+            "status": "answering",
+            "text": ""
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，"
+          },
+          {
+            "after": "token",
+            "status": "answering",
+            "text": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。"
+          },
+          {
+            "after": "done",
+            "status": "done",
+            "text": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。"
+          }
+        ]
+      ],
+      "next_request": {
+        "history": [
+          {
+            "role": "user",
+            "content": "CS 第一学期 machine learning 课"
+          },
+          {
+            "role": "assistant",
+            "content": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。"
+          }
+        ],
+        "context_course_ids": [
+          "c-cs-5100",
+          "c-cs-6140",
+          "synth-cs-9999",
+          "c-cs-5800"
+        ]
+      }
+    }
+  ]
+}

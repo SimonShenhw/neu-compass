@@ -1,0 +1,2483 @@
+[
+  {
+    "name": "empty",
+    "text": "",
+    "blocks": []
+  },
+  {
+    "name": "only spaces and line breaks",
+    "text": "  \n\t\n",
+    "blocks": []
+  },
+  {
+    "name": "one paragraph",
+    "text": "CS 5800 是算法课。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "CS 5800 是算法课。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "two paragraphs, a line break kept, spaces at the ends dropped",
+    "text": "  第一段第一行  \n第一段第二行\n\n第二段",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "第一段第一行\n第一段第二行"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "第二段"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CRLF and CR are line breaks",
+    "text": "第一行\r\n第二行\r第三行",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "第一行\n第二行\n第三行"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bold",
+    "text": "**CS 6140** 讲监督学习",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bold that is not closed yet",
+    "text": "**CS 6140 讲监督学习",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "**CS 6140 讲监督学习"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bold with a space inside the markers stays as written",
+    "text": "** CS 6140** 和 **CS 5800 **",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "** CS 6140** 和 **CS 5800 **"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bold across a line break stays as written",
+    "text": "**CS\n6140**",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "**CS\n6140**"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "three stars",
+    "text": "***CS 6140***",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "*"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": "*"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "empty bold stays as written",
+    "text": "****",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "****"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "one star is not italic",
+    "text": "*CS 6140* 和 _CS 5800_",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "*CS 6140* 和 _CS 5800_"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "inline code",
+    "text": "运行 `pip install x` 以后",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "运行 "
+          },
+          {
+            "t": "code",
+            "v": "pip install x"
+          },
+          {
+            "t": "text",
+            "v": " 以后"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "code span keeps a link and bold as written",
+    "text": "`[目录](https://catalog.northeastern.edu/course-descriptions/cs/) **x**`",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "code",
+            "v": "[目录](https://catalog.northeastern.edu/course-descriptions/cs/) **x**"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "a backtick that is not closed",
+    "text": "这是 `没有关上",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "这是 `没有关上"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "catalog link",
+    "text": "见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "见 "
+          },
+          {
+            "t": "link",
+            "v": "NEU 官方课程目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "catalog link in angle brackets, with a title",
+    "text": "见 [目录](<https://catalog.northeastern.edu/course-descriptions/ds/> \"标题\")。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/ds/"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "catalog link with an anchor",
+    "text": "[CS 5800](https://catalog.northeastern.edu/course-descriptions/cs/#cs5800)",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "link",
+            "v": "CS 5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "catalog link inside bold",
+    "text": "**见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)**",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "见 "
+              },
+              {
+                "t": "link",
+                "v": "目录",
+                "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bold inside a link label stays as written",
+    "text": "[**目录**](https://catalog.northeastern.edu/course-descriptions/cs/)",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "["
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "目录"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": "]("
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": ")"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "autolink and bare catalog URL",
+    "text": "<https://catalog.northeastern.edu/course-descriptions/cs/> 和 https://catalog.northeastern.edu/course-descriptions/ds/。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 和 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/ds/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/ds/"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "a bare catalog URL followed by more path: only the department page is a link",
+    "text": "https://catalog.northeastern.edu/course-descriptions/cs/extra",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "extra"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "http, another host, a longer department, javascript: none is a link",
+    "text": "http://catalog.northeastern.edu/course-descriptions/cs/ https://catalog.northeastern.edu.evil.com/course-descriptions/cs/ https://catalog.northeastern.edu/course-descriptions/abcdefghi/ [x](javascript:alert(1)) [y](https://example.com)",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "http://catalog.northeastern.edu/course-descriptions/cs/ https://catalog.northeastern.edu.evil.com/course-descriptions/cs/ https://catalog.northeastern.edu/course-descriptions/abcdefghi/ [x](javascript:alert(1)) [y](https://example.com)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "image syntax: the ! stays, a catalog target becomes a plain link",
+    "text": "![图](https://example.com/a.png) ![目录](https://catalog.northeastern.edu/course-descriptions/cs/)",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "![图](https://example.com/a.png) !"
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "HTML, entities and backslashes stay as written",
+    "text": "<b>x</b> <img src=x onerror=alert(1)> &amp; \\*x\\*",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "<b>x</b> <img src=x onerror=alert(1)> &amp; \\*x\\*"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "a link split across tokens is text until it is complete",
+    "text": "见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "heading",
+    "text": "# 标题\n正文",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "正文"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "heading levels are not kept; seven # is a paragraph; no space is a paragraph",
+    "text": "### 三级\n####### 七个\n#没有空格",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "三级"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "####### 七个\n#没有空格"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "an empty heading is a paragraph",
+    "text": "#",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "#"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bulleted list",
+    "text": "- 第一项\n* 第二项\n+ 第三项",
+    "blocks": [
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "第一项"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "第二项"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "第三项"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "numbered list keeps its first number",
+    "text": "3. 第三\n4. 第四",
+    "blocks": [
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 3,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "第三"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "第四"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "a list right after a paragraph",
+    "text": "有这几门：\n1. CS 5800\n2. CS 6140",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "有这几门："
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "CS 5800"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "CS 6140"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "a blank line between items makes two lists",
+    "text": "1. a\n\n2. b",
+    "blocks": [
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "a"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 2,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "b"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "switching between bullets and numbers starts a new list",
+    "text": "- a\n1. b\n- c",
+    "blocks": [
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "a"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "b"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "c"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "indented items are flattened; a plain line continues the item",
+    "text": "- a\n  - b\n  接着 b",
+    "blocks": [
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "a"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "b\n接着 b"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "thematic break and a number without a space stay as written",
+    "text": "---\n1.没有空格\n2)有空格",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "---\n1.没有空格\n2)有空格"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "numbers with a closing parenthesis",
+    "text": "1) 一\n2) 二",
+    "blocks": [
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "一"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "二"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "fenced code",
+    "text": "```python\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n之后",
+    "blocks": [
+      {
+        "type": "code",
+        "text": "**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)"
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "之后"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "tilde fence, a shorter fence does not close a longer one",
+    "text": "~~~~\n~~~\n代码\n~~~~",
+    "blocks": [
+      {
+        "type": "code",
+        "text": "~~~\n代码"
+      }
+    ]
+  },
+  {
+    "name": "a fence that is not closed runs to the end",
+    "text": "前面\n```\n还在代码里",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "前面"
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "text": "还在代码里"
+      }
+    ]
+  },
+  {
+    "name": "a fence closes a paragraph and a list",
+    "text": "段落\n```\nx\n```\n- 项\n```\ny\n```",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "段落"
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "text": "x"
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "项"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "code",
+        "text": "y"
+      }
+    ]
+  },
+  {
+    "name": "a backtick fence with text after the closing marker does not close it",
+    "text": "```\na\n``` 不是结束\n```",
+    "blocks": [
+      {
+        "type": "code",
+        "text": "a\n``` 不是结束"
+      }
+    ]
+  },
+  {
+    "name": "table and quote stay as written",
+    "text": "| a | b |\n|---|---|\n> 引用",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "| a | b |\n|---|---|\n> 引用"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "alias-cs-6140, after 1 of 5 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "alias-cs-6140, after 2 of 5 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "alias-cs-6140, after 3 of 5 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 "
+          },
+          {
+            "t": "link",
+            "v": "NEU 官方课程目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "。这是目录的存档副本，不是实时核对。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "alias-cs-6140, after 4 of 5 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 "
+          },
+          {
+            "t": "link",
+            "v": "NEU 官方课程目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "。这是目录的存档副本，不是实时核对。"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "学生评价里估计每周约 7.5 小时（估计值），难度 4/5；"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "先修规则各个 Catalog 年份不一样，"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "alias-cs-6140, after 5 of 5 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/)。这是目录的存档副本，不是实时核对。\n\n- 学生评价里估计每周约 7.5 小时（估计值），难度 4/5；\n- 先修规则各个 Catalog 年份不一样，要看你适用哪一年。\n\n你适用哪一个 Catalog 年份？",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 "
+          },
+          {
+            "t": "link",
+            "v": "NEU 官方课程目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "。这是目录的存档副本，不是实时核对。"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "start": null,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "学生评价里估计每周约 7.5 小时（估计值），难度 4/5；"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "先修规则各个 Catalog 年份不一样，要看你适用哪一年。"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "你适用哪一个 Catalog 年份？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 1 of 10 tokens",
+    "text": "# 标题\n\n",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 2 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 3 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 ",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 4 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 5 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 6 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 7 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 8 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、"
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "extra、www.example.com。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 9 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、"
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "extra、www.example.com。"
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "text": "**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)"
+      }
+    ]
+  },
+  {
+    "name": "answer-markdown-edge, after 10 of 10 tokens",
+    "text": "# 标题\n\n**CS 5800** 的描述见 [目录](https://catalog.northeastern.edu/course-descriptions/cs/)，也可以看 <https://catalog.northeastern.edu/course-descriptions/cs/> 或者 https://catalog.northeastern.edu/course-descriptions/cs/#cs5800。\n\n不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、https://catalog.northeastern.edu/course-descriptions/cs/extra、www.example.com。\n\n```\n**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)\n```\n\n行内 `CS 5800` 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。",
+    "blocks": [
+      {
+        "type": "heading",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "标题"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 的描述见 "
+          },
+          {
+            "t": "link",
+            "v": "目录",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "，也可以看 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": " 或者 "
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/#cs5800"
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "不能点的：[别的网站](https://example.com/x)、![图](https://example.com/a.png)、<img src=x onerror=alert(1)>、[脚本](javascript:alert(1))、http://catalog.northeastern.edu/course-descriptions/cs/、"
+          },
+          {
+            "t": "link",
+            "v": "https://catalog.northeastern.edu/course-descriptions/cs/",
+            "href": "https://catalog.northeastern.edu/course-descriptions/cs/"
+          },
+          {
+            "t": "text",
+            "v": "extra、www.example.com。"
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "text": "**不是加粗** [x](https://catalog.northeastern.edu/course-descriptions/cs/)"
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "行内 "
+          },
+          {
+            "t": "code",
+            "v": "CS 5800"
+          },
+          {
+            "t": "text",
+            "v": " 代码，$x$ 公式，:smile: 短代码，&amp; 实体，\\*不是转义\\*。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "context-followup, after 1 of 2 tokens",
+    "text": "按学生评价的估计，CS 6140 每周约 7.5 小时（估计值）；",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按学生评价的估计，CS 6140 每周约 7.5 小时（估计值）；"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "context-followup, after 2 of 2 tokens",
+    "text": "按学生评价的估计，CS 6140 每周约 7.5 小时（估计值）；这不是官方信息。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按学生评价的估计，CS 6140 每周约 7.5 小时（估计值）；这不是官方信息。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "cs-first-semester-unverified, after 1 of 2 tokens",
+    "text": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "cs-first-semester-unverified, after 2 of 2 tokens",
+    "text": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "合成的 CS 项目没有经过核验的学期安排；下面只是检索到的相关课程，不是官方的第一学期方案。具体规则请到「培养方案」页查看。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "empty-filtered, after 1 of 2 tokens",
+    "text": "按你的筛选条件（11 学分）没有找到课。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你的筛选条件（11 学分）没有找到课。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "empty-filtered, after 2 of 2 tokens",
+    "text": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你的筛选条件（11 学分）没有找到课。可以放宽筛选再问。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "feedback-receipt, after 1 of 4 tokens",
+    "text": "CS 6140 讲监督学习。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "CS 6140 讲监督学习。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "feedback-receipt, after 2 of 4 tokens",
+    "text": "CS 6140 讲监督学习。作业以 Python 为主，",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "CS 6140 讲监督学习。作业以 Python 为主，"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "feedback-receipt, after 3 of 4 tokens",
+    "text": "CS 6140 讲监督学习。作业以 Python 为主，期末有项目。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "CS 6140 讲监督学习。作业以 Python 为主，期末有项目。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "feedback-receipt, after 4 of 4 tokens",
+    "text": "CS 6140 讲监督学习。作业以 Python 为主，期末有项目。评价说节奏比较快。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "CS 6140 讲监督学习。作业以 Python 为主，期末有项目。评价说节奏比较快。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "hybrid-neural-network, after 1 of 3 tokens",
+    "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "和「neural network training」相关的有这几门："
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "strong",
+              "c": [
+                {
+                  "t": "text",
+                  "v": "DS 5220"
+                }
+              ]
+            },
+            {
+              "t": "text",
+              "v": " 偏理论；"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "hybrid-neural-network, after 2 of 3 tokens",
+    "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "和「neural network training」相关的有这几门："
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "strong",
+              "c": [
+                {
+                  "t": "text",
+                  "v": "DS 5220"
+                }
+              ]
+            },
+            {
+              "t": "text",
+              "v": " 偏理论；"
+            }
+          ],
+          [
+            {
+              "t": "strong",
+              "c": [
+                {
+                  "t": "text",
+                  "v": "CS 6140"
+                }
+              ]
+            },
+            {
+              "t": "text",
+              "v": " 更全面。"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "工作量和难度来自评价的估计，"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "hybrid-neural-network, after 3 of 3 tokens",
+    "text": "和「neural network training」相关的有这几门：\n\n1. **DS 5220** 偏理论；\n2. **CS 6140** 更全面。\n\n工作量和难度来自评价的估计，不是官方信息。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "和「neural network training」相关的有这几门："
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "start": 1,
+        "items": [
+          [
+            {
+              "t": "strong",
+              "c": [
+                {
+                  "t": "text",
+                  "v": "DS 5220"
+                }
+              ]
+            },
+            {
+              "t": "text",
+              "v": " 偏理论；"
+            }
+          ],
+          [
+            {
+              "t": "strong",
+              "c": [
+                {
+                  "t": "text",
+                  "v": "CS 6140"
+                }
+              ]
+            },
+            {
+              "t": "text",
+              "v": " 更全面。"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "工作量和难度来自评价的估计，不是官方信息。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "internal-error, after 1 of 1 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "model-error, after 1 of 2 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "model-error, after 2 of 2 tokens",
+    "text": "**CS 6140 Machine Learning** 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140 Machine Learning"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 讲监督学习和模型选择，课程描述见 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descri"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-cs-2026, after 1 of 3 tokens",
+    "text": "按你选的方案（boston · Catalog 2026-2027 · 普通 MS），**CS 5800** 是核心课，",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你选的方案（boston · Catalog 2026-2027 · 普通 MS），"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 是核心课，"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-cs-2026, after 2 of 3 tokens",
+    "text": "按你选的方案（boston · Catalog 2026-2027 · 普通 MS），**CS 5800** 是核心课，**CS 6140** 在选修池里（至少选 2 门，不是全部必修）。\n\n",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你选的方案（boston · Catalog 2026-2027 · 普通 MS），"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 是核心课，"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 在选修池里（至少选 2 门，不是全部必修）。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-cs-2026, after 3 of 3 tokens",
+    "text": "按你选的方案（boston · Catalog 2026-2027 · 普通 MS），**CS 5800** 是核心课，**CS 6140** 在选修池里（至少选 2 门，不是全部必修）。\n\n方案只说明规则，不判断你能否注册或毕业。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你选的方案（boston · Catalog 2026-2027 · 普通 MS），"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5800"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 是核心课，"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 在选修池里（至少选 2 门，不是全部必修）。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "方案只说明规则，不判断你能否注册或毕业。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-ds-2025-year-not-recorded, after 1 of 2 tokens",
+    "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "你选的是 Catalog 2025-2026 的方案，"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "DS 5220"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 是它列明的课程；"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-ds-2025-year-not-recorded, after 2 of 2 tokens",
+    "text": "你选的是 Catalog 2025-2026 的方案，**DS 5220** 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "你选的是 Catalog 2025-2026 的方案，"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "DS 5220"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 是它列明的课程；但这一年没有记录 DS 5220 的先修规则，别的年份的规则不能拿来代替。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-ds-align, after 1 of 3 tokens",
+    "text": "按你选的方案（boston · Catalog 2026-2027 · Align · Synthetic AI concentration），",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你选的方案（boston · Catalog 2026-2027 · Align · Synthetic AI concentration），"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-ds-align, after 2 of 3 tokens",
+    "text": "按你选的方案（boston · Catalog 2026-2027 · Align · Synthetic AI concentration），**CS 6140** 和 **DS 5220** 都是「任选一支」里的选项，也都在领域选修池里。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你选的方案（boston · Catalog 2026-2027 · Align · Synthetic AI concentration），"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 和 "
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "DS 5220"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 都是「任选一支」里的选项，也都在领域选修池里。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "plan-ds-align, after 3 of 3 tokens",
+    "text": "按你选的方案（boston · Catalog 2026-2027 · Align · Synthetic AI concentration），**CS 6140** 和 **DS 5220** 都是「任选一支」里的选项，也都在领域选修池里。论文那一支只在你选论文时才适用。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "按你选的方案（boston · Catalog 2026-2027 · Align · Synthetic AI concentration），"
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 6140"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 和 "
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "DS 5220"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 都是「任选一支」里的选项，也都在领域选修池里。论文那一支只在你选论文时才适用。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "program-aai-first-semester, after 1 of 2 tokens",
+    "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "合成的 Applied AI 项目在旧 seed 里第一学期列了 "
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "AAI 6600"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 和 "
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5100"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": "。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "program-aai-first-semester, after 2 of 2 tokens",
+    "text": "合成的 Applied AI 项目在旧 seed 里第一学期列了 **AAI 6600** 和 **CS 5100**。这份关系没有核实，不是正式的 Plan of Study。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "合成的 Applied AI 项目在旧 seed 里第一学期列了 "
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "AAI 6600"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": " 和 "
+          },
+          {
+            "t": "strong",
+            "c": [
+              {
+                "t": "text",
+                "v": "CS 5100"
+              }
+            ]
+          },
+          {
+            "t": "text",
+            "v": "。这份关系没有核实，不是正式的 Plan of Study。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "rejected, after 1 of 2 tokens",
+    "text": "没有找到和这个问题匹配的课。可以换个说法，",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "没有找到和这个问题匹配的课。可以换个说法，"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "rejected, after 2 of 2 tokens",
+    "text": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "inlines": [
+          {
+            "t": "text",
+            "v": "没有找到和这个问题匹配的课。可以换个说法，或者直接写课号再问一次。"
+          }
+        ]
+      }
+    ]
+  }
+]

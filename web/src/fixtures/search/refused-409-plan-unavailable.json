@@ -1,0 +1,41 @@
+{
+  "case": "refused-409-plan-unavailable",
+  "notes": "The plan store cannot be read: 409 unavailable before the stream.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 6140 能算进方案吗？",
+      "k": 10,
+      "allow_feedback_capture": false,
+      "program_id": "ms-cs-synthetic",
+      "plan": {
+        "program_id": "ms-cs-synthetic",
+        "plan_id": "ms-cs-synthetic-boston-2026-2027-standard",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "standard",
+        "concentration": null,
+        "plan_content_sha256": "1447443331a3e9bd4e481e9d669b13d0ee399b67f3cdeadbd677a3d4be4053e5"
+      }
+    }
+  },
+  "status": 409,
+  "retry_after": null,
+  "proposed_reason": "plan_unavailable",
+  "lines": [
+    {
+      "detail": "暂时无法核对所选方案，这个问题还没有回答；方案选择已清除。可以先不选方案直接再问，稍后再到上方「方案版本（可选）」选择。",
+      "error_type": "conflict",
+      "status_code": 409
+    }
+  ],
+  "events": [],
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

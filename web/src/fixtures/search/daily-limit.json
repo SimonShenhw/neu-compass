@@ -1,0 +1,162 @@
+{
+  "case": "daily-limit",
+  "notes": "Today's model calls are used up: meta (the courses still listed), the daily_limit error, done; no token.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "CS 5800 讲什么？",
+      "k": 10,
+      "allow_feedback_capture": true
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "alias",
+      "retrieval_ms": 0.24,
+      "prompt_version": "4.5",
+      "results": [
+        {
+          "course_id": "c-cs-5800",
+          "primary_code": "CS 5800",
+          "primary_name": "Algorithms",
+          "score": 1.0,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [
+                {
+                  "catalog_year": "2026-2027",
+                  "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                  "captured_at": "2026-09-28T14:05:00Z",
+                  "prerequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  },
+                  "corequisite": {
+                    "status": "not_listed",
+                    "rule": null,
+                    "clause_text": null,
+                    "clause_truncated": false,
+                    "unparsed_reason": null,
+                    "clause_sha256": null
+                  }
+                }
+              ],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "error_type": "daily_limit",
+      "detail": "今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "alias",
+        "retrieval_ms": 0.24,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "score": 1.0,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [
+                  {
+                    "catalog_year": "2026-2027",
+                    "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+                    "captured_at": "2026-09-28T14:05:00Z",
+                    "prerequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    },
+                    "corequisite": {
+                      "status": "not_listed",
+                      "rule": null,
+                      "clause_text": null,
+                      "clause_truncated": false,
+                      "unparsed_reason": null,
+                      "clause_sha256": null
+                    }
+                  }
+                ],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "error",
+      "errorType": "daily_limit",
+      "message": "今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"
+    }
+  ],
+  "failure": null
+}
