@@ -1,0 +1,56 @@
+{
+  "case": "curriculum-ds-ms",
+  "notes": "GET /programs/ds-ms. Semester 1 has only an elective: no pick, so no card for DS.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/ds-ms",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "ds-ms",
+    "full_name": "MS in Data Science (synthetic)",
+    "prefix": "DS",
+    "notes": null,
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-ds-5110",
+            "primary_code": "DS 5110",
+            "primary_name": "Essentials of Data Science",
+            "requirement_type": "elective_pool",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-ds-5220",
+            "primary_code": "DS 5220",
+            "primary_name": "Supervised Machine Learning and Learning Theory",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null
+}

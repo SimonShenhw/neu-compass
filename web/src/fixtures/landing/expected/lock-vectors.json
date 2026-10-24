@@ -1,0 +1,123 @@
+[
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 0
+    },
+    "lock": null
+  },
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 1
+    },
+    "lock": "这条有面试细节：你分享的经验公开后解锁"
+  },
+  {
+    "row": {
+      "interview_summary": "two rounds",
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 1
+    },
+    "lock": null
+  },
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": "SQL",
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 1
+    },
+    "lock": null
+  },
+  {
+    "row": {
+      "interview_summary": "",
+      "technical_questions": "",
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 1
+    },
+    "lock": "这条有面试细节：你分享的经验公开后解锁"
+  },
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 2
+    },
+    "lock": "这条有薪资区间：你分享的经验公开后解锁"
+  },
+  {
+    "row": {
+      "interview_summary": "two rounds",
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 2
+    },
+    "lock": "这条有薪资区间：你分享的经验公开后解锁"
+  },
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": "$30/hr",
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 2
+    },
+    "lock": null
+  },
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": "",
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 2
+    },
+    "lock": "这条有薪资区间：你分享的经验公开后解锁"
+  },
+  {
+    "row": {
+      "interview_summary": "x",
+      "technical_questions": null,
+      "salary_range_usd": "$30/hr",
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 2
+    },
+    "lock": null
+  },
+  {
+    "row": {
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": "$30/hr",
+      "company": "Acme",
+      "role": "SWE",
+      "visibility_level": 0
+    },
+    "lock": null
+  }
+]

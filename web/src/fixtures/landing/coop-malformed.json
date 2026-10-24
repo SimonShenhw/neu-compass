@@ -1,0 +1,16 @@
+{
+  "case": "coop-malformed",
+  "notes": "The body is an object, not a list: no section, no notice.",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": {
+    "detail": "not a list"
+  },
+  "failure": null,
+  "derived_from": "coop-guest",
+  "edit": "The body is an object, not a list: no section, no notice."
+}

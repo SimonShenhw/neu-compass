@@ -1,0 +1,22 @@
+{
+  "case": "coop-401",
+  "notes": "GET /coop with a session the API cannot verify (Bearer): 401, a definite answer. Through R2b's cookie the API answers as for a guest instead.",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "invalid-token"
+  },
+  "status": 401,
+  "body": {
+    "detail": "Invalid or expired session token. Log in again.",
+    "error_type": "unauthorized",
+    "status_code": 401
+  },
+  "failure": {
+    "status": 401,
+    "errorType": "unauthorized",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

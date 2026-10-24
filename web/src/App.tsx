@@ -13,11 +13,31 @@ import { CourseDetailDemoPage } from './pages/CourseDetailDemoPage';
 import { NotFound } from './pages/NotFound';
 
 const SearchDemoPage = lazy(() => import('./pages/SearchDemoPage'));
+const OfflineDemoShell = lazy(() => import('./features/demo/OfflineDemoShell'));
+const SearchLandingDemoPage = lazy(
+  () => import('./pages/SearchLandingDemoPage'),
+);
 
 export function App() {
   return (
     <PrototypeProvider>
       <Routes>
+        <Route
+          element={
+            <Suspense fallback={<p role="status">正在加载落地演示…</p>}>
+              <OfflineDemoShell />
+            </Suspense>
+          }
+        >
+          <Route
+            path="/search-landing-demo"
+            element={
+              <Suspense fallback={<p role="status">正在加载落地演示…</p>}>
+                <SearchLandingDemoPage />
+              </Suspense>
+            }
+          />
+        </Route>
         <Route element={<AppShell />}>
           <Route path="/" element={<SearchPage />} />
           <Route path="/course/:code" element={<CourseDetail />} />

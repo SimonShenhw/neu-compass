@@ -233,6 +233,24 @@ npm.cmd run preview -- --port 4173 --strictPort
 
 前一个变异脚本是 R3c 的 36 个具名变异，后一个保留现有 152 个回归变异；均在临时快照运行并核对工作源文件未变。完整网络瀑布、屏幕阅读器语音、真实 `/chat` / `/feedback`、方案选择、停止、分享及生产集成另行验收。本轮只有本地提交，不推送、不建 PR、不部署。
 
+## R3d 搜索落地内容与演示（2026-10-24）
+
+从已合并 R3c / R2b 的 `4797a32` 开 `feat/web-search-landing`，仅 `web/`，无新增依赖。R3a–R3c 的模型、组件、测试及数据只 import，不改。独立修改记录与验收边界见 [LANDING_WORKLOG.md](LANDING_WORKLOG.md)。
+
+入口 `/search-landing-demo?scenario=guest&speed=instant` 不加入导航，页面与演示外壳均 `React.lazy`。`scenario` 为顶部「数据」里的 27 个场景，缺省／未知回退 `guest`；`speed` 为 `normal`（缺省）、`slow`、`instant`、`forever`，未知回退正常。正常项目列表 300ms、有效精选课程表在它之后再 300ms、Co-op 450ms；慢速乘四，立即零延迟，一直加载不安排计时器。
+
+- **共享边界：** `api/load.ts` 是三态 Load 与基于 R2b 的 ApiFailure；`api/programs.ts` 和 `models/programs.ts` 放完整项目消费类型及列表／课程表校验，给 R4a 原样复用。`programs.types.test.ts` 将四层消费类型逐一对照生成 schema，不能只测顶层而遗漏数组元素。
+- **展示与派生：** `SearchLanding` 无状态，只接数据和回调；`landingView` 一次派生区块、pending、单一重试提示。项目和 Co-op 独立；入门推荐等所有「精选且在列表里」的课程表有结果再画。只挑第 1 学期的第一门 core / foundation；Co-op 仅校验并显示前两条，不读取第三条。
+- **失败处理：** 普通 fixture failure 先构造 ApiError 再复用 `isTransientError`，没有用强制断言冒充实例。只对 408、429、5xx 显示一次重试；明确失败、空数据、坏形状不显示重试，其他已就绪区块照常显示。
+- **演示会话：** 来源调度在 `useLandingDemo`，不进入产品组件；换任一控件／重试／返回都用 key 重建会话并取消旧计时器。重试重播同一份合成失败，不假装联网成功。项目、课程、Co-op 按钮只写 status；四个示例发送 query 而非 label，以 R3c 的真实钩子／展示组件播放四份 chat-sample，正常速度、允许保存 false、反馈关。第一轮一创建即隐藏落地内容并接续焦点，被拒／出错也不会重新显示落地内容。
+- **演示壳隔离：** 新增 `features/demo/OfflineDemoShell` 复用原侧栏、顶栏及布局 CSS，固定游客与不可登录状态，完全不挂载 useSession。这样生产构建的本演示路由不会因外壳读取 `/config` / `/auth/me` 而访问公网；不依赖测试 WithApi 的预填缓存，也不改真实 AppShell 或全局 fetch。member 场景仅模拟 Co-op 返回体，不改变真实账号或共享缓存。
+- **纯文本与排版：** 沿用浅色 tokens 和 CourseCode，项目标签用现有 oneLine；卡片／Co-op 值仅去 CR，LF 保留为换行，其余文本不解析 HTML 或 Markdown。本区没有链接。桌面最多四列项目、三列课程、两列示例，手机一列；长课号、课名与公司可折行。
+- **固定数据：** 31 份导出、30 份 expected 原字节冻结，独立 SHA-256 测试；expected 只供测试，生产场景来源映射单独手写并与 27 个参考场景核对，不从标准答案生成页面。27 个 DOM 场景及 11 / 11 / 16 个向量之外另测坏形状、时序、焦点、取消和冷启动无请求。
+
+使用已有 Node 24 环境：`npm.cmd run check`、`npm.cmd run format:check`、`node scripts/landing-mutations.mjs`。本轮新增变异工具在临时副本验证行为与生成类型漂移，副本包含 R2b 生成器、独立依赖链接和 Prettier 配置；超时、导入失败或无具名断言不能冒充 kill。预览为 `npm.cmd run preview -- --port 4173 --strictPort`。
+
+R1 原型首页、真实请求／缓存、允许保存勾选、路由跳转、R4a 培养方案页均留给后续约定批次。浏览器控制没有完整网络瀑布接口，不能把无请求组件／空 QueryClient 测试替代为完整网络面板验收；详细证据与限制见独立记录。本轮仅本地提交，无 push、PR 或部署。
+
 ## 设计选择及差异
 
 - 用户确认：沿用第一版白底细线与钴蓝强调色；导航以中文为主；R1 只做浅色，不做主题切换。原 R1 的「默认只看不同的行」已被 R5b 的「本轮不做行筛选」取代。

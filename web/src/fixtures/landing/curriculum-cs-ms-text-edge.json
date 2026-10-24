@@ -1,0 +1,77 @@
+{
+  "case": "curriculum-cs-ms-text-edge",
+  "notes": "The curriculum's prefix and its first course's name carry HTML, a Markdown link, \\n, \\r\\n and a lone \\r: all plain text.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "cs-ms",
+    "full_name": "MS in Computer Science (synthetic)",
+    "prefix": "CS <i>MS</i>",
+    "notes": "Synthetic program notes for interface tests.",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-cs-5010",
+            "primary_code": "CS 5010",
+            "primary_name": "Programming <b>Design</b>\n[note](https://example.com/x)\r\nline two\rjoined",
+            "requirement_type": "core",
+            "notes": "Synthetic edge note: usually taken first."
+          },
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-5200",
+            "primary_code": "CS 5200",
+            "primary_name": "Database Management Systems",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-cs-7990",
+            "primary_code": "CS 7990",
+            "primary_name": "Thesis",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null,
+  "derived_from": "curriculum-cs-ms",
+  "edit": "The curriculum's prefix and its first course's name carry HTML, a Markdown link, \\n, \\r\\n and a lone \\r: all plain text."
+}

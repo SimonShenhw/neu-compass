@@ -1,0 +1,12 @@
+{
+  "case": "coop-empty",
+  "notes": "GET /coop with nothing public yet: an empty list.",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": [],
+  "failure": null
+}

@@ -1,0 +1,75 @@
+{
+  "case": "coop-empty-interview",
+  "notes": "A member with one contribution, and the second row (level 1) has interview_summary \"\": an empty string does not count, so that row gets its lock line.",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "member-1"
+  },
+  "status": 200,
+  "body": [
+    {
+      "coop_id": "coop-seed-quant",
+      "company": "Example Quant LLC",
+      "role": "Quant Developer Co-op",
+      "industry": "quant_fintech",
+      "coop_term": "Spring 2026",
+      "duration_months": 6,
+      "related_courses": [
+        "CS 5800",
+        "DS 5220"
+      ],
+      "interview_summary": "两轮：先是 45 分钟的电话面，问简历和一道概率题；第二轮现场，写一段数据清洗的代码。",
+      "technical_questions": "期望和方差的推导；用 pandas 按组算滚动均值；一道二分查找。",
+      "salary_range_usd": null,
+      "visibility_level": 2
+    },
+    {
+      "coop_id": "coop-seed-health",
+      "company": "Sample Health Inc.",
+      "role": "Data Science Co-op",
+      "industry": "biotech_health",
+      "coop_term": "Fall 2025",
+      "duration_months": 4,
+      "related_courses": [
+        "CS 6140"
+      ],
+      "interview_summary": "",
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 1
+    },
+    {
+      "coop_id": "coop-seed-robotics",
+      "company": "Demo Robotics",
+      "role": "Software Engineer Co-op",
+      "industry": "startup",
+      "coop_term": "Summer 2026",
+      "duration_months": 6,
+      "related_courses": [],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 0
+    },
+    {
+      "coop_id": "coop-seed-cloud",
+      "company": "Example Cloud Co.",
+      "role": "ML Engineer Co-op",
+      "industry": "big_tech",
+      "coop_term": null,
+      "duration_months": 8,
+      "related_courses": [
+        "CS 6140",
+        "CS 5100"
+      ],
+      "interview_summary": null,
+      "technical_questions": "设计一个推荐系统的特征管道；解释过拟合和正则化。",
+      "salary_range_usd": null,
+      "visibility_level": 2
+    }
+  ],
+  "failure": null,
+  "derived_from": "coop-member-1",
+  "edit": "A member with one contribution, and the second row (level 1) has interview_summary \"\": an empty string does not count, so that row gets its lock line."
+}

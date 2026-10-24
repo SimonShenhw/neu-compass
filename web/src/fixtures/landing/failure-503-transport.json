@@ -1,0 +1,20 @@
+{
+  "case": "failure-503-transport",
+  "notes": "No answer: the API could not be reached (R2b: 503 transport_error).",
+  "derived_from": null,
+  "edit": "No answer: the API could not be reached (R2b: 503 transport_error).",
+  "request": {
+    "method": "GET",
+    "path": null,
+    "viewer": null
+  },
+  "status": null,
+  "body": null,
+  "failure": {
+    "status": 503,
+    "errorType": "transport_error",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

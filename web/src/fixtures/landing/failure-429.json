@@ -1,0 +1,20 @@
+{
+  "case": "failure-429",
+  "notes": "A proxy answered 429 with Retry-After: 30 and a page that is not JSON.",
+  "derived_from": null,
+  "edit": "A proxy answered 429 with Retry-After: 30 and a page that is not JSON.",
+  "request": {
+    "method": "GET",
+    "path": null,
+    "viewer": null
+  },
+  "status": 429,
+  "body": null,
+  "failure": {
+    "status": 429,
+    "errorType": null,
+    "retryAfter": 30,
+    "invalidFields": [],
+    "reason": null
+  }
+}
