@@ -1,0 +1,496 @@
+{
+  "case": "derived-malformed-snapshot-id",
+  "scenarios": [
+    {
+      "name": "compare empty",
+      "compare": [],
+      "raw": [
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-card\"><span class=\"nc-card-code\">CS 6140</span><p class=\"nc-card-name\">Machine Learning</p><div class=\"nc-meta-row\"><div class=\"nc-meta-chip\"><span class=\"nc-meta-label\">Term</span><span class=\"nc-meta-value\">Fall 2026</span></div><div class=\"nc-meta-chip\"><span class=\"nc-meta-label\">Credits</span><span class=\"nc-meta-value\">4</span></div><div class=\"nc-meta-chip\"><span class=\"nc-meta-label\">Mode</span><span class=\"nc-meta-value\">in person</span></div></div></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "button",
+          "value": "➕ 加入对比",
+          "disabled": false
+        },
+        {
+          "depth": 0,
+          "kind": "text",
+          "value": "Covers supervised learning, model selection and evaluation.\n\nStudents complete a final project. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 0,
+          "kind": "caption",
+          "value": "课程描述来自 [NEU 官方课程目录](https://catalog.northeastern.edu/course-descriptions/cs/) 的存档副本，不是实时核对。",
+          "help": null
+        },
+        {
+          "depth": 0,
+          "kind": "caption",
+          "value": "⚠️ 工作量、难度等是根据评价的估计，不是官方信息；培养方案关系没有核实，不是正式的 Plan of Study。",
+          "help": null
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">学生评价里的估计：</span>⏱️ 每周约 7.5 小时 · 🎚️ 难度 4/5</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "requisites",
+          "value": null
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">📝 考核构成：</span>Homework 30% · Midterm 12% · Participation · Final project 57%</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**主题**"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div><span class=\"nc-pill\">Supervised learning</span><span class=\"nc-pill\">Model selection</span><span class=\"nc-pill\">Kernel methods</span></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**🛠️ 技能**"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div><span class=\"nc-pill\">Python</span><span class=\"nc-pill\">scikit-learn</span><span class=\"nc-pill\">Model evaluation</span></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">💼 职业方向：</span>Machine learning engineer · Data scientist</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">任课老师：</span>Synthetic Professor A, Synthetic Professor B</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "markdown",
+          "value": "**📋 在培养方案里的位置**"
+        },
+        {
+          "depth": 0,
+          "kind": "html",
+          "value": "<div class=\"nc-prog-row\"><div class=\"nc-prog-name\">🎓 MS in Artificial Intelligence (synthetic)</div><div class=\"nc-prog-meta\"><span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">选修池 · elective</span> </div></div><div class=\"nc-prog-row\"><div class=\"nc-prog-name\">🎓 MS in Computer Science (synthetic)</div><div class=\"nc-prog-meta\"><span class=\"nc-badge\" style=\"background:#FFF1E6;color:#E8731A;\">核心 · core</span> <span class=\"nc-pill\">第 2 学期推荐</span></div></div>"
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "🤖 AI 使用政策"
+        },
+        {
+          "depth": 1,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">✅ 允许：</span>ChatGPT for brainstorming, GitHub Copilot</div>"
+        },
+        {
+          "depth": 1,
+          "kind": "html",
+          "value": "<div class=\"nc-line\"><span class=\"nc-line-label\">🚫 禁止：</span>Any tool in exams</div>"
+        },
+        {
+          "depth": 1,
+          "kind": "markdown",
+          "value": "📣 使用 AI 需要声明"
+        },
+        {
+          "depth": 1,
+          "kind": "html",
+          "value": "<div class=\"nc-line\">Disclose every AI use in a short note.<br>Undisclosed use counts as a violation. (Synthetic text for interface tests.)</div>"
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "📎 来源与说明（数据从哪来、缺了什么）"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "来源：已存目录快照（非实时核验）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "缺失：结构化先修信息；缺失不等于零/简单/无要求。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "软字段是来源支持的抽取/评价，不是官方事实；抽取置信度不等于事实概率。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "markdown",
+          "value": "[官方目录来源](https://catalog.northeastern.edu/course-descriptions/cs/) · 非实时核验"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "快照：格式异常 · 导入：2026-09-29 03:00 UTC",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "抓取：2026-09-28 14:05 UTC",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "记录来源（非全文核验）：RateMyProfessors 教师评价 2 条、Reddit 讨论 1 条、课程大纲 1 条、抽取时用的课程文本 1 条、其他来源 1 条",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "expander",
+          "value": "来源 ID（6）"
+        },
+        {
+          "depth": 2,
+          "kind": "text",
+          "value": "rmp_review_cs6140_1、rmp_review_cs6140_2、reddit_cs6140_thread、syllabus_cs6140_2026、catalog_cs6140_extract、forum_cs6140_misc"
+        },
+        {
+          "depth": 1,
+          "kind": "markdown",
+          "value": "**评价和大纲原文摘录（4 条）**"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "每周工作量 · 抽取置信度 0.88（不是事实概率）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "value": "支持值：7.5\n来源：RateMyProfessors 教师评价 · rmp_review_cs6140_1\n引文：About seven or eight hours a week. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "难度 · 抽取置信度 0.12（不是事实概率）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "value": "支持值：4.0\n来源：Reddit 讨论 · reddit_cs6140_thread\n引文：Hard but fair. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "技能标签 · 抽取置信度 0.90（不是事实概率）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "value": "支持值：['Python', 'scikit-learn']\n来源：课程大纲 · syllabus_cs6140_2026\n引文：Assignments use Python and scikit-learn. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "职业方向 · 抽取置信度 0.50（不是事实概率）",
+          "help": null
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "value": "支持值：Machine learning engineer\n来源：RateMyProfessors 教师评价 · rmp_review_cs6140_2\n引文：Good preparation for ML jobs. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 0,
+          "kind": "expander",
+          "value": "🔗 分享这门课"
+        },
+        {
+          "depth": 1,
+          "kind": "code",
+          "value": "http://localhost:8501/?course=CS-6140"
+        },
+        {
+          "depth": 1,
+          "kind": "caption",
+          "value": "把链接发给同学，他们打开就直接看到这门课。",
+          "help": null
+        }
+      ],
+      "visible": [
+        {
+          "depth": 0,
+          "kind": "header",
+          "code": "CS 6140",
+          "name": "Machine Learning",
+          "chips": [
+            {
+              "label": "Term",
+              "value": "Fall 2026"
+            },
+            {
+              "label": "Credits",
+              "value": "4"
+            },
+            {
+              "label": "Mode",
+              "value": "in person"
+            }
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "button",
+          "text": "加入对比",
+          "disabled": false
+        },
+        {
+          "depth": 0,
+          "kind": "text",
+          "text": "Covers supervised learning, model selection and evaluation.\n\nStudents complete a final project. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 0,
+          "kind": "note_link",
+          "before": "课程描述来自 ",
+          "text": "NEU 官方课程目录",
+          "href": "https://catalog.northeastern.edu/course-descriptions/cs/",
+          "after": " 的存档副本，不是实时核对。"
+        },
+        {
+          "depth": 0,
+          "kind": "note",
+          "text": "工作量、难度等是根据评价的估计，不是官方信息；培养方案关系没有核实，不是正式的 Plan of Study。"
+        },
+        {
+          "depth": 0,
+          "kind": "line",
+          "label": "学生评价里的估计",
+          "value": "每周约 7.5 小时 · 难度 4/5"
+        },
+        {
+          "depth": 0,
+          "kind": "requisites_panel"
+        },
+        {
+          "depth": 0,
+          "kind": "line",
+          "label": "考核构成",
+          "value": "Homework 30% · Midterm 12% · Participation · Final project 57%"
+        },
+        {
+          "depth": 0,
+          "kind": "heading",
+          "text": "主题"
+        },
+        {
+          "depth": 0,
+          "kind": "pills",
+          "items": [
+            "Supervised learning",
+            "Model selection",
+            "Kernel methods"
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "heading",
+          "text": "技能"
+        },
+        {
+          "depth": 0,
+          "kind": "pills",
+          "items": [
+            "Python",
+            "scikit-learn",
+            "Model evaluation"
+          ]
+        },
+        {
+          "depth": 0,
+          "kind": "line",
+          "label": "职业方向",
+          "value": "Machine learning engineer · Data scientist"
+        },
+        {
+          "depth": 0,
+          "kind": "line",
+          "label": "任课老师",
+          "value": "Synthetic Professor A, Synthetic Professor B"
+        },
+        {
+          "depth": 0,
+          "kind": "heading",
+          "text": "在培养方案里的位置"
+        },
+        {
+          "depth": 0,
+          "kind": "program_row",
+          "name": "MS in Artificial Intelligence (synthetic)",
+          "badge": "选修池 · elective",
+          "semester": null
+        },
+        {
+          "depth": 0,
+          "kind": "program_row",
+          "name": "MS in Computer Science (synthetic)",
+          "badge": "核心 · core",
+          "semester": "第 2 学期推荐"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "AI 使用政策"
+        },
+        {
+          "depth": 1,
+          "kind": "line",
+          "label": "允许",
+          "value": "ChatGPT for brainstorming, GitHub Copilot"
+        },
+        {
+          "depth": 1,
+          "kind": "line",
+          "label": "禁止",
+          "value": "Any tool in exams"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "使用 AI 需要声明"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "Disclose every AI use in a short note.\nUndisclosed use counts as a violation. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 0,
+          "kind": "disclosure",
+          "text": "来源与说明（数据从哪来、缺了什么）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "来源：已存目录快照（非实时核验）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "缺失：结构化先修信息；缺失不等于零/简单/无要求。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "软字段是来源支持的抽取/评价，不是官方事实；抽取置信度不等于事实概率。"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "培养方案关系来自未核验 seed，不是正式 Plan of Study 或选课资格保证。"
+        },
+        {
+          "depth": 1,
+          "kind": "link",
+          "text": "官方目录来源",
+          "href": "https://catalog.northeastern.edu/course-descriptions/cs/",
+          "after": " · 非实时核验"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "快照：格式异常 · 导入：2026-09-29 03:00 UTC"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "抓取：2026-09-28 14:05 UTC"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "记录来源（非全文核验）：RateMyProfessors 教师评价 2 条、Reddit 讨论 1 条、课程大纲 1 条、抽取时用的课程文本 1 条、其他来源 1 条"
+        },
+        {
+          "depth": 1,
+          "kind": "disclosure",
+          "text": "来源 ID（6）"
+        },
+        {
+          "depth": 2,
+          "kind": "text",
+          "text": "rmp_review_cs6140_1、rmp_review_cs6140_2、reddit_cs6140_thread、syllabus_cs6140_2026、catalog_cs6140_extract、forum_cs6140_misc"
+        },
+        {
+          "depth": 1,
+          "kind": "heading",
+          "text": "评价和大纲原文摘录（4 条）"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "每周工作量 · 抽取置信度 0.88（不是事实概率）"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "支持值：7.5\n来源：RateMyProfessors 教师评价 · rmp_review_cs6140_1\n引文：About seven or eight hours a week. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "难度 · 抽取置信度 0.12（不是事实概率）"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "支持值：4\n来源：Reddit 讨论 · reddit_cs6140_thread\n引文：Hard but fair. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "技能标签 · 抽取置信度 0.90（不是事实概率）"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "支持值：Python、scikit-learn\n来源：课程大纲 · syllabus_cs6140_2026\n引文：Assignments use Python and scikit-learn. (Synthetic text for interface tests.)"
+        },
+        {
+          "depth": 1,
+          "kind": "note",
+          "text": "职业方向 · 抽取置信度 0.50（不是事实概率）"
+        },
+        {
+          "depth": 1,
+          "kind": "text",
+          "text": "支持值：Machine learning engineer\n来源：RateMyProfessors 教师评价 · rmp_review_cs6140_2\n引文：Good preparation for ML jobs. (Synthetic text for interface tests.)"
+        }
+      ]
+    }
+  ]
+}

@@ -10,35 +10,12 @@ import type {
   RequisiteSection,
 } from './requisites';
 import type { Schemas } from './types';
+import type { Misfits } from '../test/misfits';
 
 // R3a's types are the panel's view of GET /course/{id}: one shape per kind or status, without the fields the panel
 // never reads, so they stay hand-written and narrower than the generated ones. These checks are for the compiler
 // (npm run typecheck): they fail when the API drops or renames a field the panel reads, or may send a value the
-// panel's checks refuse (R2b).
-
-// The keys of every member of a union, and a field's value in whichever members have it.
-type Keys<T> = T extends unknown ? keyof T : never;
-type Field<T, K extends PropertyKey> = T extends unknown
-  ? K extends keyof T
-    ? T[K]
-    : never
-  : never;
-type Element<V> = V extends readonly (infer E)[] ? E : V;
-type Scalar = string | number | boolean;
-// The fields the panel reads that the API lacks, or whose scalar values (or array elements) the API may send outside
-// what the panel accepts. Null is left out: the panel may require a value where the API's type allows null but the
-// API never sends it, and models/requisites.ts checks that at run time.
-type Misfits<T, G> =
-  | Exclude<Keys<T>, keyof G>
-  | {
-      [K in Keys<T> & keyof G]-?: [Element<NonNullable<G[K]>>] extends [Scalar]
-        ? [Element<NonNullable<G[K]>>] extends [
-            Element<NonNullable<Field<T, K>>>,
-          ]
-          ? never
-          : K
-        : never;
-    }[Keys<T> & keyof G];
+// panel's checks refuse (R2b). models/requisites.ts checks the rest at run time.
 
 type Evidence = NonNullable<RequisiteDocument['description_evidence']>;
 

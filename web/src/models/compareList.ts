@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
+export const MAX_COMPARE_COURSES = 4;
+
 const empty: readonly string[] = Object.freeze([]);
 let ids: readonly string[] = empty;
 const listeners = new Set<() => void>();
@@ -9,7 +11,7 @@ function update(next: readonly string[]) {
 }
 export function addToCompare(id: string): 'added' | 'already' | 'full' {
   if (ids.includes(id)) return 'already';
-  if (ids.length >= 4) return 'full';
+  if (ids.length >= MAX_COMPARE_COURSES) return 'full';
   update([...ids, id]);
   return 'added';
 }

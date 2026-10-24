@@ -8,6 +8,7 @@ import { ProgramsPage } from './pages/ProgramsPage';
 import { CoopDemoPage } from './pages/CoopDemoPage';
 import { PrivacyDemoPage } from './pages/PrivacyDemoPage';
 import { RequisitesDemoPage } from './pages/RequisitesDemoPage';
+import { CourseDetailDemoPage } from './pages/CourseDetailDemoPage';
 import { NotFound } from './pages/NotFound';
 
 export function App() {
@@ -22,6 +23,10 @@ export function App() {
           <Route path="/coop" element={<CoopDemoPage />} />
           <Route path="/privacy" element={<PrivacyDemoPage />} />
           <Route path="/requisites-demo" element={<RequisitesDemoPage />} />
+          <Route
+            path="/course-detail-demo"
+            element={<CourseDetailDemoPage />}
+          />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

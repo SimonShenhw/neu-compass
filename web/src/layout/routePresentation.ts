@@ -8,6 +8,7 @@ const pages = [
   { path: '/coop', title: 'Co-op 经验' },
   { path: '/privacy', title: '数据与隐私' },
   { path: '/requisites-demo', title: '先修要求演示' },
+  { path: '/course-detail-demo', title: '课程详情演示' },
 ];
 
 export function pagePresentation(pathname: string) {

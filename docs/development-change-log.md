@@ -4239,6 +4239,10 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
       - 课程详情里放先修列表和旧边的两个字段，类型对得上。
     - API 删了或改名了面板读的字段，或者给出面板不收的值，`npm run typecheck` 就失败。
     - R3a 的演示页测试包上 `WithApi`。README 里两节都留，R3a 一节在前。
+17. **合进 main 的 R3b（#31）：**
+    - R3b 的课程详情类型（`web/src/api/course.ts` 的 `CourseDetailBody`、`CatalogSnapshot`、`AnswerEvidence`、`EvidenceSnippet`）也留手写。R3b 原来在 R5b 手写的 `CourseDetail` 上 `extends`；这一批把 `CourseDetail` 换成了生成的类型，有默认值的字段都成了可选，自动合并以后 R3b 的页面和检查有 13 处编译不过。现在 `CourseDetailBody` 自己把字段写全，形状和 R3b 原来得到的一样，R3b 的代码一行没改。
+    - 新文件 `web/src/api/course.types.test.ts` 照第 16 条的办法对照生成的类型：课程详情本身，加上成绩构成、方案关系、AI 政策、证据片段、来源说明、目录快照各一条（值是对象的字段要各自对照）。两份对照共用的类型挪到 `web/src/test/misfits.ts`。
+    - R3b 的演示页测试包上 `WithApi`。README 里 R3b 一节放在 R2b 一节前面；`test:mutations` 那一条两边合在一起（152 个；副本照 R2b 多拷几个文件，基线等 120 秒）。
 
 ### 修改文件
 
@@ -4254,6 +4258,7 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
   - 后端改 `tests/support/dev_api.py`、`tests/test_dev_api.py`；
   - 文档改 `web/README.md` 和本节。
 - 复核第 2 轮以后（第五个提交）：前端测试改 `web/src/api/requisites.types.test.ts`，文档改本节。
+- 合并 main（R3b）时：改 `web/src/api/course.ts`（R3b 的类型写全）、`web/src/api/requisites.types.test.ts`（共用的类型挪走）、`web/src/pages/CourseDetailDemoPage.test.tsx`（包 `WithApi`）、`web/README.md`；新建 `web/src/api/course.types.test.ts`、`web/src/test/misfits.ts`；文档改本节。
 
 数据库结构、检索、提示词和 Streamlit 版都没改。
 
@@ -4301,6 +4306,11 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
   - `<meta name="referrer">` 是 `strict-origin-when-cross-origin`；`build:dev-api` 的正式预览里每个请求只发一次，顺序一样。
   - 之后的提交改过的几处（重读失败时放回身份、没保存住登录的那句话、`build:dev-api` 的输出目录）没有再在浏览器里看，由前端测试钉住。
 - **第五个提交（复核第 2 轮的 NIT）：** 只多了一条类型检查。把生成的 `areas` 改成数字数组、把面板的 `areas` 收窄成两种前缀，`tsc` 都在这条上失败；把面板的放宽作对照，照样通过。check 全过，667 项（32 个测试文件），首屏 JavaScript gzip 173,198 字节；格式、生成的类型都一致。
+- **合并 main（R3b）以后：**
+  - 只有 `web/README.md` 冲突，`course.ts`、`mutations.mjs` 自动合并。自动合并的结果 `tsc` 报 13 处错（第 17 条），R3b 演示页的 18 项测试报「No QueryClient set」；改完都过。
+  - check 全过，**909 项**（39 个测试文件）；首屏 JavaScript gzip **181,908 字节**（R3b 的演示页连同假数据也是静态 import 的；预算 250,000）；格式、生成的类型都一致。
+  - 新对照的检查：在 R3b 的类型上做 8 处改动（快照 ID 改名、交付方式去掉 `async`、置信度改成字符串、成绩权重改成字符串、方案关系的字段改名、AI 政策的布尔改成字符串、来源说明的警告改成数字、抓取时间改成数字），再把生成的交付方式多加一个取值，`tsc` 都在新文件上失败；把证据原文放宽成 `string | number` 作对照，照样通过。第 16 条的 R3a 对照（四处改动加 `areas` 两处，各带对照）重跑，结果不变。
+  - 项目自己的 `npm run test:mutations`：基线通过，**152／152** 都由对口的测试杀掉，R3b 的 M131–M152 也在内。
 
 ### 审查
 
@@ -4366,10 +4376,11 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 - 两条测试在固定等 20 毫秒以后做否定断言（B26 N4）：负载很大时可能漏掉变异体，不会误报。
 - 变异 W03（去掉 `refetchOnReconnect: false`）是等价的：`networkMode: 'always'` 下 TanStack 默认就不在网络恢复时重取（本节验证记录里有探针）。这一行留着，以后要是有人把 `networkMode` 改回去，它还能兜底。
 - **浏览器里重验的是第二个提交 `3ebc04d`**（见验证记录）；之后改的几处只有前端测试。
+- **合并 R3b 的改动（第 17 条）在复核第 2 轮之后，没有再审：** 两轮复核的上限已经用完。它只动类型和测试，由上面的类型变异、全部前端测试和项目自己的变异核过。
 - **账号的提示放在页面最底下（浏览器重验时发现，MINOR）：** 登录、登出的提示写在外壳 `<main>` 后面那个 `role="status"` 里（R1 原型的提示区）。长页面上第一屏看不见；手机菜单开着时，它在 Radix 给菜单外面加的 `aria-hidden` 里，所以在菜单里登出失败什么提示都看不到，像是按了没反应（焦点回到「退出登录」是对的）。R3 接线时外壳的这个提示区要改（原型的 PrototypeContext 会去掉），到时候把账号的话放进账号框里（桌面侧栏和手机菜单各显示自己的），回来时的结果放在页面顶上。
 - **取消登录的说法：** 显示「登录没有完成（access_denied），请再试一次。」，照 Streamlit 把 Google 的错误码放进括号，字面上没有「取消」。要改成「你取消了登录」这类说法的话，Streamlit 和新前端一起改。
 - 正式构建写明 `https://localhost:8443` 这样的地址也能过（A26 记下的，不算问题）：本机 http 拦住了，https 的本机地址只能是有意写的。
 
 ### 发布状态
 
-分支 `feat/web-api-client`，基底是合并 R2a（#29）以后的 main `2aa2327`。第一个提交是 R2b 本身，第二个提交是第 25 轮审查的修复。R3a（#30）10-23 已经合并（main `7363572`），第三个提交把 main 合了进来（见第 16 条），第四个提交是复核第 1 轮的修复，第五个提交是复核第 2 轮（最后一轮）的那条 NIT 和本节。R3b（#31，还没合并）也改 `web/src/api/course.ts`、`web/scripts/mutations.mjs` 和 `web/README.md`：建议先合 R3b，再把 main 合进这里，像 R3a 那样给 R3b 的类型加对照。没有使用真实模型、账号、NAS 或生产库；登录和聊天都对着本机的开发 API 和合成数据。上线要另外授权。
+分支 `feat/web-api-client`，基底是合并 R2a（#29）以后的 main `2aa2327`。第一个提交是 R2b 本身，第二个提交是第 25 轮审查的修复。R3a（#30）10-23 已经合并（main `7363572`），第三个提交把 main 合了进来（见第 16 条），第四个提交是复核第 1 轮的修复，第五个提交是复核第 2 轮（最后一轮）的那条 NIT 和本节。R3b（#31）10-24 已经合并（main `fe9203f`），第六个提交把 main 合了进来，给 R3b 的类型加了对照（第 17 条）。没有使用真实模型、账号、NAS 或生产库；登录和聊天都对着本机的开发 API 和合成数据。上线要另外授权。

@@ -1,0 +1,138 @@
+{
+  "case": "ds-5220-conflicts",
+  "notes": "Conflicts and gaps: the snapshot says 3 credits (the course 4), has no retrieval date, no description and a naive import time; the workload quote says 10 against 12; topics without a source; a flat prerequisite with no year rule; a program edge (foundation, semester 1); no AI policy, no instructors, no source IDs.",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-ds-5220"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-ds-5220",
+    "primary_code": "DS 5220",
+    "primary_name": "Supervised Machine Learning and Learning Theory",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": "Spring 2027",
+    "credits": 4,
+    "prereqs": [
+      "CS 5800"
+    ],
+    "delivery_mode": "hybrid",
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": 12.0,
+    "difficulty_score": 4.25,
+    "grading_components": [
+      {
+        "name": "Problem sets",
+        "weight": 0.5
+      },
+      {
+        "name": "Exam",
+        "weight": 0.5
+      }
+    ],
+    "topics_covered": [
+      "Learning theory",
+      "Regularization"
+    ],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [
+      {
+        "field": "workload_hours_per_week",
+        "value": 10.0,
+        "source_id": "syllabus_ds5220_2027",
+        "quote": "Plan for ten hours a week. (Synthetic text for interface tests.)",
+        "confidence": 0.7
+      },
+      {
+        "field": "difficulty_score",
+        "value": 4.25,
+        "source_id": "rmp_review_ds5220_1",
+        "quote": "The proofs are tough. (Synthetic text for interface tests.)",
+        "confidence": 0.65
+      }
+    ],
+    "extraction_confidence": null,
+    "source_review_ids": [],
+    "created_at": "2026-09-20T12:00:00Z",
+    "updated_at": "2026-09-20T12:00:00Z",
+    "program_context": [
+      {
+        "program_id": "ms-ai-synthetic",
+        "program_name": "MS in Artificial Intelligence (synthetic)",
+        "requirement_type": "foundation",
+        "semester_recommended": 1
+      }
+    ],
+    "prerequisites": [],
+    "answer_evidence": {
+      "catalog": {
+        "course_code": "DS 5220",
+        "course_name": "Supervised Machine Learning and Learning Theory",
+        "description": null,
+        "credits": 3,
+        "prereq_codes": [],
+        "catalog_url": "https://catalog.northeastern.edu/course-descriptions/ds/",
+        "snapshot_id": "catalog:5658f5ae723e9ebe7121b716accdf398af1329825048df90a24907cd2d9403c7",
+        "imported_at": "2026-09-29T03:00:00",
+        "retrieved_at": null
+      },
+      "field_evidence": [
+        {
+          "field": "workload_hours_per_week",
+          "value": 10.0,
+          "source_id": "syllabus_ds5220_2027",
+          "quote": "Plan for ten hours a week. (Synthetic text for interface tests.)",
+          "confidence": 0.7
+        },
+        {
+          "field": "difficulty_score",
+          "value": 4.25,
+          "source_id": "rmp_review_ds5220_1",
+          "quote": "The proofs are tough. (Synthetic text for interface tests.)",
+          "confidence": 0.65
+        }
+      ],
+      "source_review_ids": [],
+      "missing_fields": [
+        "catalog_description",
+        "professor",
+        "skill_tags",
+        "career_relevance"
+      ],
+      "warnings": [
+        "catalog_retrieval_date_unknown",
+        "catalog_metadata_conflict",
+        "extracted_evidence_not_official_facts",
+        "field_evidence_value_conflict",
+        "topics_source_unavailable",
+        "prerequisite_logic_unavailable",
+        "program_seed_unverified"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": false,
+      "documents": [],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic",
+        "structured_requisites_missing"
+      ],
+      "program_contexts": []
+    }
+  }
+}

@@ -34,25 +34,26 @@ npm.cmd run test:mutations
 - `check` 依次做 strict 类型检查、零 lint 警告、Vitest 行为测试和构建。
 - `gen:api:check` 查 `src/api/schema.ts` 和 `openapi.json` 生成的一致（要先装生成器）。
 - `build` 额外读取 Vite manifest，累加首屏入口及其静态 import 的 JavaScript gzip 字节，超过 **250,000 bytes** 就失败。字体和 CSS 不混进 JS 指标，也没有靠延迟加载隐藏首屏依赖。
-- `test:mutations` 在系统临时目录创建隔离副本，先验证未修改副本的完整测试和类型，再执行 130 个具名变异。每项只运行对应名称的行为测试，避免重复执行整份表单用例；原 R1、Co-op、R5b 检查保留，R5c 另加 26 项，R3a 另加 M111–M130。副本里除了 `src/` 和配置，还有测试要读的 `index.html`、`openapi.json` 和生成器的 `package.json`（R2b）。完整基线测试最多等 120 秒，单个变异仍为 45 秒。不修改当前源码、不安装额外依赖。只把命中预期测试名称的真实断言失败算作杀死；超时、导入失败不算。类型变异要求命中缺失 label 的编译断言。
+- `test:mutations` 在系统临时目录创建隔离副本，先验证未修改副本的完整测试和类型，再执行 152 个具名变异。每项只运行对应名称的行为测试，避免重复执行整份表单用例；原 R1、Co-op、R5b 检查保留，R5c 另加 26 项，R3a 另加 M111–M130，R3b 另加 M131–M152（M64 仅将同一四门上限的变异锚点改到共享常量）。副本里除了 `src/` 和配置，还有测试要读的 `index.html`、`openapi.json` 和生成器的 `package.json`（R2b）。完整基线测试最多等 120 秒，单个变异仍为 45 秒。不修改当前源码、不安装额外依赖。只把命中预期测试名称的真实断言失败算作杀死；超时、导入失败不算。类型变异要求命中缺失 label 的编译断言。
 - 变异日志、失败测试名、源码 SHA-256 与结果位于 `artifacts/mutations-<UTC timestamp>/`，副本保留以便复核，不自动递归清理。
 - `.github/workflows/ci.yml` 的前端 job：Node 24 → `npm ci` → 装生成器 → `gen:api:check` → 格式 → `check`；Python job 另查 `web/openapi.json` 是最新的（R2b）。远端是否绿色，必须在后续授权 push 后由 GitHub 验证，不能从本地检查推断。
 
 ## 路由与演示
 
-| 路径                 | 内容                                                                |
-| -------------------- | ------------------------------------------------------------------- |
-| `/`                  | 固定示例问答、回答用到的四门课、项目／方案选择、输入框              |
-| `/?demo=empty`       | 四个示例问题的空首页；发送后显示固定示例回答                        |
-| `/course/CS-6140`    | 桌面保留左侧对话，右侧课程详情；手机一栏到底                        |
-| `/course/CS-5800` 等 | 只支持五门 fixture 课程；未知课号显示明确空状态                     |
-| `/compare`           | R5b 合成 API 课程对比，默认四列；七项信息、独立失败状态、移出与清空 |
-| `/coop`              | R5a 合成 Co-op 列表、等级展示、投稿表单与结果演示                   |
-| `/programs`          | “这一页正在搬到新版”                                                |
-| `/privacy`           | R5c 接口形状的合成隐私说明、确认删除与四类结果演示                  |
-| 其他                 | 404 与返回首页链接                                                  |
+| 路径                  | 内容                                                                |
+| --------------------- | ------------------------------------------------------------------- |
+| `/`                   | 固定示例问答、回答用到的四门课、项目／方案选择、输入框              |
+| `/?demo=empty`        | 四个示例问题的空首页；发送后显示固定示例回答                        |
+| `/course/CS-6140`     | 桌面保留左侧对话，右侧课程详情；手机一栏到底                        |
+| `/course/CS-5800` 等  | 只支持五门 fixture 课程；未知课号显示明确空状态                     |
+| `/compare`            | R5b 合成 API 课程对比，默认四列；七项信息、独立失败状态、移出与清空 |
+| `/coop`               | R5a 合成 Co-op 列表、等级展示、投稿表单与结果演示                   |
+| `/programs`           | “这一页正在搬到新版”                                                |
+| `/privacy`            | R5c 接口形状的合成隐私说明、确认删除与四类结果演示                  |
+| `/course-detail-demo` | R3b 合成课程详情、四种对比状态及原样接入的 R3a 先修面板             |
+| 其他                  | 404 与返回首页链接                                                  |
 
-课程路径使用横线，例如 `CS-6140`；旧 `?course=` / `?program=` 兼容留给 R3。假数据只有 CS 5800、CS 6140、CS 7800、DS 5220、CS 5100，不含真实用户数据。
+原型课程路径使用横线，例如 `CS-6140`；旧 `?course=` / `?program=` 兼容留给 R3。原型课程路由的假数据只有 CS 5800、CS 6140、CS 7800、DS 5220、CS 5100；独立演示的数据见各节，均不含真实用户数据。
 
 标题、导航当前项和搜索输入框共同使用 Router 的路径匹配规则：已匹配页面的尾斜杠 / 主路径大小写变体仍显示一致的页面状态；无效子路径显示客户端 404，不混入搜索控件。保留原始 URL 和课号参数，不做重定向或新增课号归一化；客户端 404 展示不等于服务器 HTTP 状态码验收。
 
@@ -158,6 +159,21 @@ npm.cmd run test:mutations
 
 过程、验证与边界另见 [REQUISITES_WORKLOG.md](REQUISITES_WORKLOG.md)。真实 R3 接入、线上数据和完整网络瀑布仍需另验。
 
+## R3b 课程详情组件与演示（2026-10-23）
+
+从 `origin/feat/web-requisites @ 87f96d8` 开 `feat/web-course-detail`，只改 `web/`，无新增依赖。按 `frontend_react/R3B_COURSE_DETAIL_SPEC.md` 实施；保留原型 `/course/:code`，R3a 组件、模型及测试不改。沿用 Sites 本地开发／预览流程，不注册托管、不发布。
+
+`/course-detail-demo?case=cs-6140-everything&compare=empty` 不加入导航。顶部「演示数据」列出九份导出；`case` 缺省或未知回退 `cs-6140-everything`。`compare` 为 `empty`（空）、`has`（已有／两门）、`full`（满且没有这门）、`full-with`（满且已有），缺省／未知回退 `empty`。切换任意参数都会重建详情，清空折叠状态及结果；两个回调只写 status，不跳转、不改变对比列表。
+
+- **组件与数据边界：** `features/course-detail/CourseDetail.tsx` 只收 unknown 课程、只读对比列表及两个回调；展示辅助组件同目录。`models/courseDetail.ts` 独立校验各字段；只有身份错误才整页拒绝。列表有一个坏项就整块不显示，不偷偷保留半份。R3a 原始参数透传、以 course ID 为 key；不在这页重写先修规则或判断能否注册。
+- **格式化复用：** `models/courseDetailFormat.ts` 复用 R5b 的 `generalNumber`／`when`／精确二进制 `scaledEven`，避免另写一套数字和日期算法；只额外导出已有函数，不改其行为。百分比先做浮点乘法再取偶数，置信度精确取两位；合法负零保留 Python 的 `-0%`／`-0.00`，不改变「支持值」明确要求的 JS String 规则。单行文字照 Python 全套 `splitlines()`，标签值和 AI 备注只去 CR，其余原文保留空白。
+- **目录与证据选择：** 目录采用 Python 的可选字段默认值（省略 description／credits／retrieved_at 为 null，省略 prereq_codes 为 []，显式 null 的 prereq_codes 仍无效）。忽略额外键；坏快照不显示描述和链接，仍保留其他来源说明和引文。ID 不合摘要格式并不意味着整份快照无效，只标「格式异常」且没有完整 ID 悬停提示。未用于展示的 program_id 不额外限制，缺省统一为空串。
+- **展示选择：** 主题／技能不复用 R1 八项截断的 Chips，全部显示、保持顺序与重复项；未知方案关系按说明书落到 foundation。对比四门上限复用 `models/compareList.ts` 的 `MAX_COMPARE_COURSES`，已有优先于满额。使用原生 details，默认收起；只读纯文本，不解析 HTML、Markdown 或正文网址。只有校验通过的两个官方目录链接可跳出，新标签页带 `noopener noreferrer`。
+- **数据冻结：** 九份 API 导出及九份 Python 标准答案原字节放在 `fixtures/course-detail/` 与其 `expected/`，SHA-256 测试锁定全部 18 份；该目录单独跳过 Prettier。expected 仅用于测试、不进入 bundle；12 个 scenario 从实际 DOM 核对种类、文字、顺序、折叠层级、链接、title 和按钮状态，不拿标准答案生成页面。
+- **真实交互的覆盖边界：** 九份导出都没有年度规则文档或可导航旧边。因此浏览器不能从这些固定数据点出「打开课程」；测试中另注入有效关系，经真实 R3a 面板验证课号回调、课程切换与选择重置，不改原始 JSON、不加演示专用假按钮。
+
+完整修改索引、浏览器证据、具名变异及未完成边界见 [COURSE_DETAIL_WORKLOG.md](COURSE_DETAIL_WORKLOG.md)。这不是 R3 真实取数／resolver／分享链接集成；不宣称已部署、线上验收或完成真实网络瀑布检查。
+
 ## 接口层与登录 R2b（2026-10-23）
 
 从 main 开 `feat/web-api-client`，依据评审目录 `frontend_react/R2B_PLAN.md`。这一批让前端第一次真的请求 API：接口层、登录和登出、聊天流的客户端；各页的内容还是假数据，隐私、Co-op、对比三页在 R5d 接上，搜索和聊天页在 R3。
@@ -170,7 +186,7 @@ npm.cmd run test:mutations
 页面和 API 的主机名必须一样：浏览器按主机名算「站点」，`localhost` 和 `127.0.0.1` 是两个站点，SameSite=Lax 的会话 cookie 就不跟着请求走，登录了也像没登录。Chromium 在 `http://127.0.0.1` 上收 `__Host-` 开头、带 Secure 的 cookie（10-23 在浏览器里验过）。
 
 - **API 地址在构建时定**（`src/api/apiBase.ts`）：`npm run build` 是正式构建，默认 `https://api.neu-compass.me`，`VITE_API_BASE_URL` 可以换成别的 https 地址，本机的 http 一律让构建失败，免得给学生的页面去连他们自己的电脑；`npm run build:dev-api` 和开发服务器默认 `http://127.0.0.1:8000`，前者输出到 `dist-dev-api/`，不和正式构建的 `dist/` 混；别的构建模式（比如 beta）必须写明 `VITE_API_BASE_URL`。测试一律用本机的，不管环境里设了什么。地址只认 https 或本机的 http，不带路径、查询、`#` 或账号密码，坏值让构建失败。`web/.env.local` 这类文件已在 `.gitignore` 里。
-- **接口类型是生成的：** 后端的 `scripts/export_openapi.py` 导出 `web/openapi.json`，`npm run gen:api` 从它生成 `src/api/schema.ts`，`npm run gen:api:check` 和 CI 查两者一致；后端那边 CI 也查 `openapi.json` 是最新的。生成器 openapi-typescript 7.13.0 只声明支持 TypeScript 5，本包用 6，所以它单独放在 `tools/openapi-types/`（自带 TypeScript 5 和 lockfile），没有用 `--legacy-peer-deps`。R3a 的先修类型（`src/api/requisites.ts`）比生成的窄，按 kind、status 分开，所以还是手写；`src/api/requisites.types.test.ts` 在类型检查时把它们和生成的类型对照：面板读的字段 API 得有，API 可能给的值面板得收。
+- **接口类型是生成的：** 后端的 `scripts/export_openapi.py` 导出 `web/openapi.json`，`npm run gen:api` 从它生成 `src/api/schema.ts`，`npm run gen:api:check` 和 CI 查两者一致；后端那边 CI 也查 `openapi.json` 是最新的。生成器 openapi-typescript 7.13.0 只声明支持 TypeScript 5，本包用 6，所以它单独放在 `tools/openapi-types/`（自带 TypeScript 5 和 lockfile），没有用 `--legacy-peer-deps`。R3a 的先修类型（`src/api/requisites.ts`）比生成的窄，按 kind、status 分开，所以还是手写；`src/api/requisites.types.test.ts` 在类型检查时把它们和生成的类型对照：面板读的字段 API 得有，API 可能给的值面板得收。R3b 的课程详情类型（`src/api/course.ts` 的 `CourseDetailBody` 等）也留手写：生成的类型把有默认值的字段都标成可选（API 其实都会给），页面要的是每个字段都在；`src/api/course.types.test.ts` 照同样的办法对照，两份共用 `src/test/misfits.ts`。
 - **请求只有一个出口：** `src/api/client.ts`。每个请求都带 cookie、不用 HTTP 缓存、不跟重定向；写请求带 `X-NEU-Compass: 1`，有请求体才带 JSON 的 Content-Type。四档超时照 Streamlit（5／8／15／30 秒，读完回答也算在内），什么都不自动重试。失败变成 `ApiError`（状态码、`error_type`、`Retry-After`、422 被拒的字段名、登录被拒的 `reason`），不带后端的英文原文；页面上的中文照 Streamlit。
 - **取数：** TanStack Query，不重试；切回窗口、网络恢复都不重取。断网时请求照样发出、照样失败，不会排队等网络回来再自己发（写请求尤其不能这样）。暂时的失败（超时、429、5xx）继续显示上次的内容，明确的答复（401、404、422…）不留。`/config` 5 分钟内算新鲜；`/auth/me` 的 401 就是游客。
 - **登录：** 点按钮时生成 32 字节的随机 state，和回来的页面一起放进 sessionStorage（本站只在这里存东西，用一次就删），整页去 Google（只认 Google 的登录页；页面连本机开发 API 时也认它的假登录页）。回到站点根路径时先把 code 和 state 从地址栏和历史里去掉，这时还不问 `/config`、`/auth/me`；再核对 state，对了才用 cookie 模式提交回调，然后重读一次 `/auth/me`：读到游客就说「登录状态没有保存下来…」，读失败就保留回调给的身份，最后回到原来的页面。state 对不上的返回链接（包括带 `error=` 的）什么都不发、也不显示链接里的字。外校邮箱和没验证的邮箱分开说，别的失败一句话。登录、登出时清掉按身份取的数据，登出时再清课程对比。

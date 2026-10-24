@@ -1,0 +1,217 @@
+{
+  "case": "derived-unknown-codes",
+  "notes": "A warning code, a missing field and a quote's field this page does not know: shown as plain text.",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-cs-6140"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-cs-6140",
+    "primary_code": "CS 6140",
+    "primary_name": "Machine Learning",
+    "schema_version": "1.1",
+    "professor": [
+      "Synthetic Professor A",
+      "Synthetic Professor B"
+    ],
+    "term": "Fall 2026",
+    "credits": 4,
+    "prereqs": [],
+    "delivery_mode": "in_person",
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": {
+      "permitted_tools": [
+        "ChatGPT for brainstorming",
+        "GitHub Copilot"
+      ],
+      "banned_tools": [
+        "Any tool in exams"
+      ],
+      "disclosure_required": true,
+      "notes": "Disclose every AI use in a short note.\nUndisclosed use counts as a violation. (Synthetic text for interface tests.)"
+    },
+    "workload_hours_per_week": 7.5,
+    "difficulty_score": 4.0,
+    "grading_components": [
+      {
+        "name": "Homework",
+        "weight": 0.3
+      },
+      {
+        "name": "Midterm",
+        "weight": 0.125
+      },
+      {
+        "name": "Participation",
+        "weight": null
+      },
+      {
+        "name": "Final project",
+        "weight": 0.575
+      }
+    ],
+    "topics_covered": [
+      "Supervised learning",
+      "Model selection",
+      "Kernel methods"
+    ],
+    "skill_tags": [
+      "Python",
+      "scikit-learn",
+      "Model evaluation"
+    ],
+    "career_relevance": [
+      "Machine learning engineer",
+      "Data scientist"
+    ],
+    "controversial_signals": [],
+    "evidence_snippets": [
+      {
+        "field": "future_field",
+        "value": 7.5,
+        "source_id": "rmp_review_cs6140_1",
+        "quote": "About seven or eight hours a week. (Synthetic text for interface tests.)",
+        "confidence": 0.875
+      },
+      {
+        "field": "difficulty_score",
+        "value": 4.0,
+        "source_id": "reddit_cs6140_thread",
+        "quote": "Hard but fair. (Synthetic text for interface tests.)",
+        "confidence": 0.125
+      },
+      {
+        "field": "skill_tags",
+        "value": [
+          "Python",
+          "scikit-learn"
+        ],
+        "source_id": "syllabus_cs6140_2026",
+        "quote": "Assignments use Python and scikit-learn. (Synthetic text for interface tests.)",
+        "confidence": 0.9
+      },
+      {
+        "field": "career_relevance",
+        "value": "Machine learning engineer",
+        "source_id": "rmp_review_cs6140_2",
+        "quote": "Good preparation for ML jobs. (Synthetic text for interface tests.)",
+        "confidence": 0.5
+      }
+    ],
+    "extraction_confidence": null,
+    "source_review_ids": [
+      "rmp_review_cs6140_1",
+      "rmp_review_cs6140_2",
+      "reddit_cs6140_thread",
+      "syllabus_cs6140_2026",
+      "catalog_cs6140_extract",
+      "forum_cs6140_misc",
+      "rmp_review_cs6140_1"
+    ],
+    "created_at": "2026-09-20T12:00:00Z",
+    "updated_at": "2026-09-20T12:00:00Z",
+    "program_context": [
+      {
+        "program_id": "ms-ai-synthetic",
+        "program_name": "MS in Artificial Intelligence (synthetic)",
+        "requirement_type": "elective_pool",
+        "semester_recommended": null
+      },
+      {
+        "program_id": "ms-cs-synthetic",
+        "program_name": "MS in Computer Science (synthetic)",
+        "requirement_type": "core",
+        "semester_recommended": 2
+      }
+    ],
+    "prerequisites": [],
+    "answer_evidence": {
+      "catalog": {
+        "course_code": "CS 6140",
+        "course_name": "Machine Learning",
+        "description": "Covers supervised learning, model selection and evaluation.\n\nStudents complete a final project. (Synthetic text for interface tests.)",
+        "credits": 4,
+        "prereq_codes": [],
+        "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+        "snapshot_id": "catalog:1b55cbfd57cd81b69258398ef504490ca143c9efa1d3edcc11be1f7a133958fd",
+        "imported_at": "2026-09-29T03:00:15Z",
+        "retrieved_at": "2026-09-28T14:05:30Z"
+      },
+      "field_evidence": [
+        {
+          "field": "future_field",
+          "value": 7.5,
+          "source_id": "rmp_review_cs6140_1",
+          "quote": "About seven or eight hours a week. (Synthetic text for interface tests.)",
+          "confidence": 0.875
+        },
+        {
+          "field": "difficulty_score",
+          "value": 4.0,
+          "source_id": "reddit_cs6140_thread",
+          "quote": "Hard but fair. (Synthetic text for interface tests.)",
+          "confidence": 0.125
+        },
+        {
+          "field": "skill_tags",
+          "value": [
+            "Python",
+            "scikit-learn"
+          ],
+          "source_id": "syllabus_cs6140_2026",
+          "quote": "Assignments use Python and scikit-learn. (Synthetic text for interface tests.)",
+          "confidence": 0.9
+        },
+        {
+          "field": "career_relevance",
+          "value": "Machine learning engineer",
+          "source_id": "rmp_review_cs6140_2",
+          "quote": "Good preparation for ML jobs. (Synthetic text for interface tests.)",
+          "confidence": 0.5
+        }
+      ],
+      "source_review_ids": [
+        "rmp_review_cs6140_1",
+        "rmp_review_cs6140_2",
+        "reddit_cs6140_thread",
+        "syllabus_cs6140_2026",
+        "catalog_cs6140_extract",
+        "forum_cs6140_misc",
+        "rmp_review_cs6140_1"
+      ],
+      "missing_fields": [
+        "prereqs",
+        "future_field"
+      ],
+      "warnings": [
+        "extracted_evidence_not_official_facts",
+        "program_seed_unverified",
+        "future_warning_code"
+      ],
+      "requisites": {
+        "storage": "available",
+        "editions": [],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": true,
+      "has_any_stored_records": false,
+      "documents": [],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic",
+        "structured_requisites_missing"
+      ],
+      "program_contexts": []
+    }
+  },
+  "derived_from": "cs-6140-everything",
+  "edit": "A warning code, a missing field and a quote's field this page does not know: shown as plain text."
+}
