@@ -76,6 +76,10 @@ it('the requisites panel reads only fields the API has, with values the API may 
   >().toBeNever();
   expectTypeOf<Misfits<ProgramPlan, Schemas['ProgramPlan']>>().toBeNever();
   expectTypeOf<Misfits<ProgramNode, Schemas['RequirementNode']>>().toBeNever();
+  // Misfits passes over fields whose values are objects; areas is the one the panel reads with no check of its own.
+  expectTypeOf<NonNullable<Schemas['RequirementNode']['areas']>>().toExtend<
+    ProgramNode['areas']
+  >();
   expectTypeOf<
     Misfits<ProgramNode['course_ranges'][number], Schemas['CourseRange']>
   >().toBeNever();
