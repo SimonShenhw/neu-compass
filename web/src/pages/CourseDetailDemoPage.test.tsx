@@ -5,16 +5,19 @@ import { expect, it, vi } from 'vitest';
 import { App } from '../App';
 import * as detailDemo from '../fixtures/courseDetailDemo';
 import { getCompareList } from '../models/compareList';
+import { WithApi } from '../test/withApi';
 
 function Location() {
   return <output aria-label="演示网址">{useLocation().search}</output>;
 }
 function page(path = '/course-detail-demo') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-      <Location />
-    </MemoryRouter>,
+    <WithApi>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+        <Location />
+      </MemoryRouter>
+    </WithApi>,
   );
 }
 it.each(detailDemo.courseDetailFixtures)(

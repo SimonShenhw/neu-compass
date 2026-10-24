@@ -120,22 +120,25 @@ def is_email_allowed(email: str | None) -> bool:
     return domain in {d.strip().lower() for d in settings.allowed_email_domains}
 
 
-def authorize_url(*, state_token: str = "") -> str:
+def authorize_url(*, state_token: str = "", redirect_uri: str | None = None) -> str:
     """Build the Google OAuth 2.0 authorize URL.
 
     Caller is responsible for generating + verifying `state_token`
     (CSRF protection). MVP can pass an empty string in dev; production
     MUST pass a per-request random token and verify it on callback.
+    `redirect_uri` defaults to GOOGLE_OAUTH_REDIRECT_URI; the caller checks any
+    other value first (R2b: only the web front end's own addresses).
 
     构造 Google OAuth 2.0 的 authorize URL。
 
     生成 + 校验 `state_token`（CSRF 防护）是调用方的责任。MVP 在开发
     环境下可以传空字符串；生产环境必须为每次请求传一个随机 token，
-    并在回调时校验它。
+    并在回调时校验它。`redirect_uri` 默认是 GOOGLE_OAUTH_REDIRECT_URI；
+    传别的值，调用方先核对（R2b：只认新前端自己的地址）。
     """
     params: dict[str, str] = {
         "client_id": settings.google_oauth_client_id,
-        "redirect_uri": settings.google_oauth_redirect_uri,
+        "redirect_uri": redirect_uri or settings.google_oauth_redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "online",

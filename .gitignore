@@ -1,6 +1,8 @@
 # Secrets - NEVER commit
 .env
 *.env
+# Vite's too (web/.env.local, .env.production and the like).
+.env.*
 !.env.example
 *.key
 *.pem

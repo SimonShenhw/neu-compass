@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 
@@ -24,8 +24,10 @@ it.each([
   ).toHaveAttribute('aria-current', 'page');
   expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
 });
-it('has a guest view with no working login integration', () => {
-  render(
+it('a guest can press login only when the API says login works', async () => {
+  const user = userEvent.setup();
+  const onLogin = vi.fn();
+  const { rerender } = render(
     <MemoryRouter>
       <Sidebar />
     </MemoryRouter>,
@@ -36,16 +38,73 @@ it('has a guest view with no working login integration', () => {
   expect(
     screen.getByText('只限 husky.neu.edu、northeastern.edu'),
   ).toBeInTheDocument();
-});
-it('supports the signed-in component view using synthetic data only', () => {
-  render(
+  expect(screen.getByText('暂时不能登录。')).toBeInTheDocument();
+  rerender(
     <MemoryRouter>
-      <Sidebar session={{ kind: 'signed-in', displayName: '演示用户' }} />
+      <Sidebar session={{ kind: 'guest', login: 'ready' }} onLogin={onLogin} />
     </MemoryRouter>,
   );
-  expect(screen.getByText('演示用户')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '退出登录' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: '用 NEU 邮箱登录' }));
+  expect(onLogin).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText('暂时不能登录。')).not.toBeInTheDocument();
+  for (const [login, label] of [
+    ['busy', '正在前往 Google…'],
+    ['checking', '用 NEU 邮箱登录'],
+  ] as const) {
+    rerender(
+      <MemoryRouter>
+        <Sidebar session={{ kind: 'guest', login, unsure: true }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: label })).toBeDisabled();
+    expect(screen.queryByText('暂时不能登录。')).not.toBeInTheDocument();
+    expect(screen.getByText('暂时无法确认登录状态。')).toBeInTheDocument();
+  }
+});
+it('a member sees their name and contributions as plain text and can log out', async () => {
+  const user = userEvent.setup();
+  const onLogout = vi.fn();
+  const { rerender } = render(
+    <MemoryRouter>
+      <Sidebar
+        session={{
+          kind: 'signed-in',
+          displayName: '<b>演示用户</b>',
+          contributionCount: 2,
+        }}
+        onLogout={onLogout}
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('<b>演示用户</b>')).toBeInTheDocument();
+  expect(screen.getByText('贡献数：2')).toBeInTheDocument();
   expect(screen.queryByText('用 NEU 邮箱登录')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '退出登录' }));
+  expect(onLogout).toHaveBeenCalledTimes(1);
+  rerender(
+    <MemoryRouter>
+      <Sidebar
+        session={{
+          kind: 'signed-in',
+          displayName: '演示用户',
+          contributionCount: 0,
+          busy: true,
+        }}
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: '正在退出…' })).toBeDisabled();
+});
+it('while the login is being checked there is no button at all', () => {
+  render(
+    <MemoryRouter>
+      <Sidebar session={{ kind: 'checking' }} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('正在确认登录状态…')).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: /登录/ }),
+  ).not.toBeInTheDocument();
 });
 it('mobile trigger reports expansion, Escape closes and restores focus', async () => {
   const user = userEvent.setup();

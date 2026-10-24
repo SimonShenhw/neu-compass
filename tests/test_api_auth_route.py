@@ -187,6 +187,28 @@ def test_callback_oauth_error_returns_401(api_client: TestClient) -> None:
     assert "not allowed" in r.json()["detail"]
 
 
+@pytest.mark.parametrize("reason", sorted(OAuthError.MESSAGES))
+def test_a_refused_login_names_its_reason(api_client: TestClient, empty_db: sqlite3.Connection, reason) -> None:
+    """R2b: the web front end tells a wrong domain and an unverified email apart from the rest, by `reason`, never by
+    the detail text. The detail stays the fixed English one; nothing is written.
+    中文：R2b：新前端靠 `reason` 分清邮箱域名不对、邮箱没验证和其余情况，不读 detail；detail 照旧是固定英文，什么也不写。"""
+    # id_token_invalid keeps a type-only diagnostic as its message; the 401 still has only the fixed text.
+    # 中文：id_token_invalid 的消息里可以留一个只含类型名的诊断；401 照样只有固定文字。
+    message = ("ID token verification failed: ExpiredSignatureError" if reason == "id_token_invalid"
+               else "synthetic upstream text")
+
+    def refuse(code: str, **kw) -> dict:
+        raise OAuthError(message, reason=reason, email_domain="example.test")
+
+    _override_exchange(api_client, refuse)
+    r = api_client.post("/auth/callback", json={"code": "synthetic-code"})
+    assert r.status_code == 401
+    assert r.json() == {"detail": OAuthError.MESSAGES[reason], "error_type": "unauthorized", "status_code": 401,
+                        "reason": reason}
+    assert message not in r.text and "Expired" not in r.text and "example.test" not in r.text
+    assert empty_db.execute("SELECT count(*) FROM users").fetchone()[0] == 0
+
+
 def test_callback_missing_code_returns_422(api_client: TestClient) -> None:
     _override_exchange(api_client, lambda c, **kw: {})
     r = api_client.post("/auth/callback", json={})

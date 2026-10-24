@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
@@ -28,12 +28,16 @@ const taskTemp = mkdtempSync(
   join(realpathSync.native(tmpdir()), 'neu-compass-r1-'),
 );
 console.info(`Evidence: ${output}`);
+// Everything the tests read besides src/ (R2b: the page, the API document and the generator's pins).
 const configFiles = [
   'package.json',
   'package-lock.json',
   'tsconfig.json',
   'vite.config.ts',
   'eslint.config.js',
+  'index.html',
+  'openapi.json',
+  'tools/openapi-types/package.json',
 ];
 function sourcePaths(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
@@ -59,7 +63,10 @@ function snapshot(name) {
   const path = join(taskTemp, name);
   mkdirSync(path);
   cpSync(join(root, 'src'), join(path, 'src'), { recursive: true });
-  for (const file of configFiles) cpSync(join(root, file), join(path, file));
+  for (const file of configFiles) {
+    mkdirSync(dirname(join(path, file)), { recursive: true });
+    cpSync(join(root, file), join(path, file));
+  }
   symlinkSync(
     resolve(root, 'node_modules'),
     join(path, 'node_modules'),
@@ -71,7 +78,7 @@ function run(cwd, args, name) {
   const result = spawnSync(process.execPath, args, {
     cwd,
     encoding: 'utf8',
-    timeout: name === 'baseline-tests' ? 60000 : 45000,
+    timeout: name === 'baseline-tests' ? 120000 : 45000,
     maxBuffer: 8 * 1024 * 1024,
     windowsHide: true,
   });

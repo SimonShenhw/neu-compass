@@ -4174,3 +4174,213 @@ B24 还核过这些：每一轮红和绿的原因都对；它读了每个变异�
 ### 发布状态
 
 分支 `feat/api-cookie-session`，基底是合并 T（#24）以后的 main `3a08ebd`。之后 main 又合并了 R1（#25）、Co-op 页（#26）、课程对比页（#27）和隐私页（#28），现在是 `30cfbae`；四次都只改 `web/`（R1 另改了 CI），和本节的文件不重叠。第一个提交 `2d5ebdf` 是 R2a 本身，第二个提交 `6b98209` 是第 24 轮审查（A25、B25）的修复和 Streamlit 那一句，第三个提交是复核第 1 轮的五处措辞，只改文档和 `.env.example` 的一行注释。没有使用真实模型、账号、NAS 或生产库，也没有连真实的 Google（测试用现有的替身）。上线要另外授权。
+
+## 34 — 新前端接上真实 API：接口层、登录和聊天流（R2b，2026-10-23）
+
+### 范围与原因
+
+R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）。第 33 节（R2a）给了 cookie 登录、跨站防护、CORS 和三个公开接口；这一批让 React 前端第一次真的请求 API：接口类型从 OpenAPI 生成，请求和错误统一处理，cookie 登录和登出，`/chat` 的流式客户端，外加一个只给本机开发和验收用的 API 外壳。各页的内容还是假数据：隐私、Co-op、对比三页在 R5d 接，搜索和聊天页在 R3。
+
+线上不变：新前端还没部署，生产也没设 `WEB_ORIGINS`。后端只多了两样（第 6、7 条），Streamlit 版不受影响：`/auth/login-url` 它不调用；回调的 token 模式不查 `redirect_uri`；401 多一个字段，它不读。
+
+### 已实现
+
+**第一步：接口层**
+
+1. **导出 OpenAPI**（`scripts/export_openapi.py`）：`create_app(run_startup=False).openapi()` 写成 `web/openapi.json`，键排序、不转义中文、缩进 2、一个 LF 结尾；不起服务、不加载模型。`--check` 只比较不写，不一致就退出 1。设置（`WEB_ORIGINS`、反馈开关、限流、保留天数）不影响导出的内容。除了 `POST /chat` 的 200（NDJSON，第 11 条手写类型），每个接口的回答都有类型。
+2. **生成类型**（`web/tools/openapi-types/`）：openapi-typescript 7.13.0 的 peer 只声明 TypeScript 5，主包用 6.0.3，直接装会 ERESOLVE；规矩不许 `--legacy-peer-deps`／`--force`，所以生成器单独一个包（自带 TypeScript 5.9.3 和 lockfile），用主包的 Prettier 排版。`npm run gen:api` 生成 `web/src/api/schema.ts`，`gen:api:check` 比较。原来手写的 `api/coop.ts`、`privacy.ts`、`course.ts` 的接口形状改成从生成的类型取（`CoopRecord` 从 `CoopOut` 收窄 industry 和 visibility_level，`CoopUploadRequest` 用 `Required<>`，表单总是发全部字段）。
+3. **API 地址**（`web/src/api/apiBase.ts` 的 `chooseApiBase`、`vite.config.ts`）：构建时定，`VITE_API_BASE_URL`。正式构建（`npm run build`）默认 `https://api.neu-compass.me`，换成别的也只能是 https，本机的 http 让构建失败，免得给学生的页面去连他们自己的电脑；`npm run build:dev-api`（模式 `dev-api`）和开发服务器默认 `http://127.0.0.1:8000`，前者输出到 `dist-dev-api/`、用 `npm run preview:dev-api` 预览，所以 `dist/` 里只会有连正式 API 的构建（测试钉住这几个脚本）；别的构建模式（比如以后的 beta）必须写明地址；测试一律用本机的，不管环境里设了什么。地址只认 https 或本机的 http（localhost、127.0.0.1、[::1]），不带路径、查询、`#`、账号密码，坏值让构建失败。代码里读 `__API_BASE_URL__`，不从 `window.location` 推。`web/.env.local` 这类文件加进了 `.gitignore`。
+   - 本机地址用 127.0.0.1，不用方案写的 localhost：开发服务器在 127.0.0.1:5173，主机名不同浏览器就当成两个站点，SameSite=Lax 的 cookie 不跟着 fetch 走。
+4. **请求函数**（`web/src/api/client.ts`）：
+   - 每个请求 `credentials: 'include'`、`cache: 'no-store'`、`redirect: 'manual'`；写请求加 `X-NEU-Compass: 1`，有请求体才加 JSON 的 Content-Type，读请求两样都不加，不触发预检。
+   - `apiPath` 按 OpenAPI 的路径模板填参数、逐个编码：接口改名或删掉，重新生成 `schema.ts` 以后就编译不过。空值、`.`、`..` 直接报错：编码以后 URL 会把它们读成另一条路径。
+   - 四档超时照 Streamlit（5／8／15／30 秒，读完回答也算在内）；什么都不自动重试；调用方取消时原样抛出它的原因。
+   - 失败一律是 `ApiError {status, errorType, retryAfter, invalidFields, reason}`：`error_type` 和 `reason` 只认小写名字，`Retry-After` 只认 1–3600 的整数秒，422 只取被拒字段的名字。**不带 `detail` 原文**（R2a 的约定，原文是英文、可能说出内部细节）。2xx 不是 JSON、重定向都算 502 `invalid_response`；连不上 503 `transport_error`，超时 504 `transport_timeout`。
+   - `apiErrorMessage` 照 Streamlit 的中文：429 带秒数、503 分忙和不可用、408／504「处理可能仍在进行」、502 无法识别、其余 5xx、其余一句通用的。4xx 由各页按状态和 `error_type` 说自己的话。Streamlit 版 4xx 会显示 `detail`，React 版不显示，是有意的不同。
+5. **取数**（`web/src/api/queries.ts`，新依赖 `@tanstack/react-query` 5.104.5）：不重试，切回窗口、网络恢复都不重取；`networkMode: 'always'`：断网时请求照样发出、照样失败，不排队等网络回来再自己发出去（TanStack 默认会这样，写请求不能）；`shownData`：暂时的失败（408、429、5xx、断线）继续显示同一访客上次的内容，明确的答复不留。`useConfig`（`/config`，5 分钟内算新鲜）、`useMe`（`/auth/me`，401 就是游客，不自己过期）；身份照 Streamlit 的 `valid_identity` 检查，格式不对算失败，不会半登录。
+
+**第二步：登录**
+
+6. **回调的 401 带上原因**（`api/exceptions.oauth_rejection_response`，用户定的第 1 条）：回调和全局处理器回同一个返回体，原来的三个字段之外加 `reason`（`OAuthError` 的七种稳定原因之一）。`detail` 照旧是固定英文；`reason` 本来就能从 `detail` 看出来，没有多告诉浏览器什么。
+7. **回调地址**（用户定的第 2 条，beta 上要能登录）：`GET /auth/login-url` 多一个可选的 `redirect_uri`（最多 2048 个字符），`authorize_url` 用它代替 `GOOGLE_OAUTH_REDIRECT_URI`；cookie 模式的回调也查请求体里的 `redirect_uri`。login-url 只认 `WEB_ORIGINS` 里的来源加 `/`（`auth.web_redirect_uris()`）；回调更严，只认这次请求的 `Origin`（上一步刚查过它在 `WEB_ORIGINS` 里）加 `/`，Google 送到哪个前端的 code 只有那个前端能兑换。别的回固定的 422 `redirect_uri must be the web front end's own address.`，不回显；回调在 code 交给 Google 之前就拒绝。没有登录配置时，login-url 的 503 先于这个检查。token 模式不查（Streamlit 自己发）。
+8. **前端登录**（`web/src/api/login.ts`、`web/src/layout/useSession.ts`）：
+   - 先看 `/config` 的 `login_available`，false 就禁用按钮、说「暂时不能登录」。
+   - 点按钮：32 字节随机 state（base64url，43 个字符）和「回来以后去哪」放进 sessionStorage（本站唯一往 storage 里放的东西，用一次就删；存不进去就说「这个浏览器不让本页暂存登录信息」，也不发请求），`GET /auth/login-url?state=&redirect_uri=` 拿地址，整页跳过去。地址只认 Google 的登录页（`https://accounts.google.com`，不带账号密码）；页面连的是本机的 http API 时，也认那个 API 自己的页面（开发 API 的假 Google）。拿地址失败就删掉存的 state。
+   - 回到站点根路径：先 `navigate('/', {replace})` 把 code 和 state 从地址栏和历史里去掉（两步都是 replace，后退回不到带 code 的地址），这时 `/config` 和 `/auth/me` 都还不问；再取出存的 state（取出即删，要是 43 位 base64url）核对：没存、不一致、code 是空的，都不发请求，说「登录没有完成，请重新登录」（R2a「已知」里只能靠前端挡的那种登录劫持）。对上了才用 cookie 模式提交回调，带上同一个 `redirect_uri`。Google 自己的错误（如 `access_denied`）也要 state 对上，并且是小写名字才说出来；state 对不上的 `error=` 链接一样说「请重新登录」，不显示链接里的字。
+   - 回调成功：先换成新身份，再重读一次 `/auth/me`（方案 3.1），只有它能说明浏览器收下了 cookie。读到游客就说「登录状态没有保存下来（可能是浏览器不让本站使用 cookie），请再登录一次。」：多半是浏览器拦了 cookie（比如隐私设置，或者跨站的 beta），也可能是 API 不认它刚发的令牌（比如服务器的时钟往回跳了）。重读失败就保留回调给的身份，并把它放回缓存；不然失败的那次会显示成「暂时无法确认」，还会自己再发一次。回来的路上不问 `/auth/me`，旧 cookie 的那次 401 也就不会晚于新 cookie 到达、把它删掉。登出时仍先取消还在路上的 `/auth/me`，晚到的回答改不回已登录。登录、登出都清掉按身份取的查询（键以 `['viewer']` 开头），登出另清课程对比。
+   - 失败分开说：外校邮箱「只能用 husky.neu.edu 或 northeastern.edu 邮箱登录」，邮箱没验证单说一句，暂时的失败用第 4 条的话，其余「登录没有完成，请再试一次」。登出失败（断网、503）说「没能退出登录，请再试一次」，不假装已经登出：cookie 是 HttpOnly 的，只有 API 能结束会话。
+   - 回来的路径只认本站的路径：不以 `/` 开头的、解析出别的来源的，或者结果以 `//` 开头的（`/.//evil.test` 解析后就是 `//evil.test`），都换成 `/`。
+9. **侧栏**（`Sidebar.tsx`、`TopBar.tsx`、`AppShell.tsx`）：账号框只负责显示：确认中、游客（可登录／去 Google 的路上／暂时不能登录／暂时无法确认）、已登录（名字，没有名字时显示邮箱，贡献数，登出）。手机菜单用同一个。「游客」标签只给游客。
+   - **焦点**（浏览器验收时发现）：用键盘登出时，按钮先被禁用、再被登录按钮换掉，焦点掉到页面最前面。现在按下的按钮忙完以后，焦点如果落在页面或菜单本身，就放回账号框现在的按钮上，和显示结果在同一次渲染里（`useLayoutEffect`，结果上屏时焦点已经在按钮上）；用户自己移到别处的不动；只有被按的那个账号框（桌面侧栏或手机菜单）会动。
+   - **后退**：从 Google 页按「后退」，浏览器可能原样恢复本页，按钮停在「正在前往 Google…」。现在听 `pageshow`（`persisted`）清掉这个状态。
+10. **开发用的 API**（`tests/support/dev_api.py`，`python -m tests.support.dev_api`）：真的 `create_app()`，临时文件里的合成数据库（`db/init.sql` 加 `tests/conftest.py` 的三门课），测试套件的替身模型。Google 换成本机的假登录页 `/__dev/google`：三个合成账号，三种被拒，一个 state 不对、一个取消的链接；只认前端自己的地址，转义它回显的东西，不缓存；没见过的 code 照 Google 拒绝换 code 那样回。除了没有默认值的 Gemini key，每个设置都先恢复成代码里的默认值，`.env` 和环境变量里的限流、数据路径之类改不了它的行为；装上 API 自己的日志设置（生产在启动时装，这里不跑启动），uvicorn 的访问日志去掉登录地址的查询串、课程只记路径模板；假登录页那条也带着 state，由它自己的过滤器去掉查询串（生产里没有这一页，生产代码不管它）。每次启动换一个会话密钥，重启以后旧 cookie 就失效。不部署，部署的包（从 `pyproject.toml` 读 wheel 的包清单）不 import `tests`（测试钉住），API 里也没有测试模式。前端和它都在 127.0.0.1，两个前端的端口和 `vite.config.ts` 的开发服务器、预览一致（测试读那个文件去对），它自己也只监听 127.0.0.1。
+
+**第三步：聊天流**
+
+11. **`streamChat`**（`web/src/api/chatStream.ts`，异步生成器，R3 的搜索和聊天页用）：`client.ts` 以外唯一调 fetch 的文件，两边共用请求选项、请求头和错误转换（`FETCH_OPTIONS`、`requestHeaders`、`plainName`、`failureFrom`）。
+    - 请求和别的写请求一样；流开始前的失败（422、404、409、429、503，连不上，超时）是同样的 `ApiError`，4xx、5xx 各按自己的状态，读它们的正文也最多等 30 秒；别的 2xx、重定向、没有正文的 200，都不是这个接口的流（502 `invalid_response`）。
+    - 按行切 NDJSON：一行被切在两块里、一个汉字的字节被切开、最后一行没有换行、CRLF 和空行都对。第一件必须是 meta（`matched_via` 是字符串、`results` 是数组；其余由 R3 的页面检查），meta 只有一次；token 的 `text` 是字符串；error 要有小写的 `error_type` 和非空的 `detail`；done 的反馈凭证原样交给页面，由页面照 Streamlit 的做法和显示的回答核对。遇到 error 或 done 就结束。
+    - error 的 `detail` 是 API 给学生看的固定中文（约定里写明给界面接在半截回答后面），照样显示；这和 HTTP 错误的 `detail` 不同。
+    - 等回答开始、等下一块各最多 30 秒（照 Streamlit 的读超时）；读完一块就停表，页面处理事件时不计。断线或 30 秒没动静：在已经收到的内容后面补一个 error 事件「连接中断。仅保留部分回答，未完整结束；请稍后手动重试。」（Streamlit 的英文开头换成了中文）；没有 done 或 error 就结束、有一行不是这四种事件、或者一行（包括还没收完的一行）不算行尾的 `\r` 长过 100 万个字符（API 最长的 meta 也就几十 KB）：Streamlit 的「回答流未完整结束；仅保留部分内容，请稍后手动重试。」。不带换行的一块不再把整个缓冲重新切一遍，长行不会越收越慢。**和 Streamlit 不同**：它跳过读不懂的行，这里当作流坏了（照方案）。
+    - 不自动重发：每问一次都算模型的每日次数、写 query_log。调用方取消时停止读取，抛出它的原因；页面不再读（`break`）或者流结束时，剩下的请求放掉。
+12. **开发 API 的聊天**：`/chat` 按脚本回答（七块，每块之间停 50 毫秒），从不调用 Gemini；会调用它的 HyDE 补救也关掉，每日上限只在问题里点名时才有。问题里带 `dev:model-error`、`dev:no-answer`、`dev:daily-limit`、`dev:no-done`、`dev:cut`、`dev:stall`，分别是模型中途出错、没有回答、今天的次数用完、流没有 done 就正常结束、连接中途断开（中间件不再发送也不结束响应，uvicorn 断开连接）、停 35 秒（比前端等的 30 秒久）。
+
+**其他**
+
+13. **测试的约定**：渲染整个 App 的测试套 `web/src/test/withApi.tsx` 的 `WithApi`，预先放好 `/config` 和游客身份，测试里不发请求（四个页面测试文件改了）。`contracts.test.ts`：只有 `client.ts` 和 `chatStream.ts` 能用 fetch，提到就算、不只是调用（别名 `const send = globalThis.fetch`、`globalThis['fetch']`、`window.navigator.sendBeacon`、XMLHttpRequest、WebSocket、EventSource 都查）；TanStack 只许 `@tanstack/react-query`，不许 devtools 和别的 HTTP 客户端（axios、ky、got、superagent、ofetch、wretch、node-fetch、cross-fetch、undici、socket.io 等）；两个包的依赖都要精确版本；`index.html` 设了 Referrer-Policy `strict-origin-when-cross-origin`（R0 14.15，发给别的站点的只有本站来源；R7 在服务器上再设一次）。
+    - 项目自己的 `npm run test:mutations` 的副本原来只拷 `src/` 和五个配置文件，这一批的测试要读 `index.html`、`openapi.json` 和生成器的 `package.json`，基线一跑就失败（B26 M4）；现在一起拷，基线的时限放宽到 120 秒。
+14. **CI**（`.github/workflows/ci.yml`）：前端 job 装生成器、查 `schema.ts` 和 `openapi.json` 一致；Python job 跑 `scripts/export_openapi.py --check`。
+15. `api/models.py` 里 `login_available` 的注释改成三样都要（client ID、client secret、`SESSION_SECRET`），R2a 第 24 轮以后漏改的。`tests/test_public_routes.py` 里 R2a 留下的一处 `zip()` 补上 `strict=True`（Ruff B905）。
+16. **合进 main 的 R3a（#30）：**
+    - R3a 的 `web/src/api/requisites.ts` 保留手写。面板要的是按 kind、status 分开的窄类型，生成的类型只有一个扁平的形状，换过去会丢掉这层收窄。文件顶上加了一句说明。
+    - 新文件 `web/src/api/requisites.types.test.ts` 只在类型检查时起作用，对照生成的类型查三样：
+      - 面板读的字段 API 都有；
+      - API 可能给的标量值面板都收，成绩、种类、状态这些固定取值也算在内，null 不算；值是对象的字段各有自己的那条去查，只有方案节点的 `areas` 没有，单独对一次（复核第 2 轮补的）；
+      - 课程详情里放先修列表和旧边的两个字段，类型对得上。
+    - API 删了或改名了面板读的字段，或者给出面板不收的值，`npm run typecheck` 就失败。
+    - R3a 的演示页测试包上 `WithApi`。README 里两节都留，R3a 一节在前。
+17. **合进 main 的 R3b（#31）：**
+    - R3b 的课程详情类型（`web/src/api/course.ts` 的 `CourseDetailBody`、`CatalogSnapshot`、`AnswerEvidence`、`EvidenceSnippet`）也留手写。R3b 原来在 R5b 手写的 `CourseDetail` 上 `extends`；这一批把 `CourseDetail` 换成了生成的类型，有默认值的字段都成了可选，自动合并以后 R3b 的页面和检查有 13 处编译不过。现在 `CourseDetailBody` 自己把字段写全，形状和 R3b 原来得到的一样，R3b 的代码一行没改。
+    - 新文件 `web/src/api/course.types.test.ts` 照第 16 条的办法对照生成的类型：课程详情本身，加上成绩构成、方案关系、AI 政策、证据片段、来源说明、目录快照各一条（值是对象的字段要各自对照）。两份对照共用的类型挪到 `web/src/test/misfits.ts`。
+    - R3b 的演示页测试包上 `WithApi`。README 里 R3b 一节放在 R2b 一节前面；`test:mutations` 那一条两边合在一起（152 个；副本照 R2b 多拷几个文件，基线等 120 秒）。
+
+### 修改文件
+
+- 后端：改 `api/exceptions.py`、`api/google_oauth.py`、`api/models.py`（注释）、`api/routes/auth.py`；新建 `scripts/export_openapi.py`、`tests/support/dev_api.py`。
+- 前端：新建 `web/src/api/` 下的 `apiBase.ts`、`client.ts`、`queries.ts`、`login.ts`、`chatStream.ts`、`types.ts`、`env.d.ts`，生成的 `schema.ts` 和 `web/openapi.json`，`web/src/layout/useSession.ts`、`web/src/test/withApi.tsx`，生成器 `web/tools/openapi-types/`；改 `web/src/api/coop.ts`、`course.ts`、`privacy.ts`，`layout/AppShell.tsx`、`Sidebar.tsx`、`TopBar.tsx`，`main.tsx`，`web/index.html`（第二个提交），`vite.config.ts`、`package.json`、`package-lock.json`、`eslint.config.js`、`.prettierignore`，`web/scripts/mutations.mjs`（第二个提交）。
+- CI：`.github/workflows/ci.yml`。根目录 `.gitignore`（第二个提交）。
+- 文档：`docs/api_contract.md`（回调的 `reason` 和 `redirect_uri`、login-url 的 `redirect_uri`，`/chat` 的 done 凭证和流开始前的错误，后两样是原来就落后于代码的），`web/README.md`（R2b 一节，和几句已经不对的话），本节。
+- 测试：新建 `tests/test_export_openapi.py`、`tests/test_dev_api.py`；改 `tests/test_api_auth_route.py`、`test_api_errors.py`、`test_public_routes.py`、`test_session_cookie.py`。前端新建 `apiBase.test.ts`、`client.test.ts`、`queries.test.tsx`、`schema.test.ts`、`login.test.ts`、`chatStream.test.ts`、`layout/session.test.tsx`；改 `layout/navigation.test.tsx`、`test/contracts.test.ts`、`test/setup.ts` 和四个页面测试文件。
+- 合并 main 时：新建 `web/src/api/requisites.types.test.ts`；改 R3a 的 `web/src/api/requisites.ts`（只加注释）、`web/src/pages/RequisitesDemoPage.test.tsx`（包 `WithApi`），`web/README.md`（两边的改动都留）。
+- 复核第 1 轮的修复（第四个提交）：
+  - 前端改 `web/src/layout/useSession.ts`、`web/src/api/login.ts`、`chatStream.ts`，`web/package.json`、`scripts/check-bundle.mjs`、`eslint.config.js`、`.gitignore`、`.prettierignore`；
+  - 前端测试改 `layout/session.test.tsx`、`api/login.test.ts`、`chatStream.test.ts`、`test/contracts.test.ts`；
+  - 后端改 `tests/support/dev_api.py`、`tests/test_dev_api.py`；
+  - 文档改 `web/README.md` 和本节。
+- 复核第 2 轮以后（第五个提交）：前端测试改 `web/src/api/requisites.types.test.ts`，文档改本节。
+- 合并 main（R3b）时：改 `web/src/api/course.ts`（R3b 的类型写全）、`web/src/api/requisites.types.test.ts`（共用的类型挪走）、`web/src/pages/CourseDetailDemoPage.test.tsx`（包 `WithApi`）、`web/README.md`；新建 `web/src/api/course.types.test.ts`、`web/src/test/misfits.ts`；文档改本节。
+
+数据库结构、检索、提示词和 Streamlit 版都没改。
+
+### 验证记录
+
+- **浏览器验收**（内置浏览器，开发用的 API 加 `npm run dev`，都在 127.0.0.1）：
+  - 登录：点按钮到假 Google 页，选账号回来已登录；刷新以后 `/auth/me` 还是 200，也就是 **Chromium 在 http://127.0.0.1 上收下了 `__Host-` 开头、带 Secure 的 cookie**（第一步时还没验证的一点）。登出 204，刷新以后 401。
+  - 失败：state 不对（不发回调）、外校域名、没验证、Google 拒绝、取消，各一次，中文都对，地址栏都干净，存的 state 都删了。
+  - 从 `/privacy?tab=export#export` 登录回到原地址；没有名字的账号显示邮箱；登出把课程对比从 4 门清到 0。
+  - 390 宽的手机菜单登录、登出；键盘：焦点框看得见，登出以后焦点在登录按钮上（修第 9 条以前掉到页面最前面）。
+  - 聊天流：在页面里直接 `import` 开发服务器提供的 `chatStream.ts`，用真的 fetch 问：每 50 毫秒到一块；六种脚本、空问题（422）、取消都对；`dev:stall` 在最后一块之后 30.0 秒给出「连接中断」；登录以后带着 cookie 也过跨站检查。正常结束的请求在 DevTools 里显示「已中止」：读到 done 就把剩下的放掉（Streamlit 的 httpx 也这样关），服务器那时已经发完。
+  - 「后退」的修复在这里复现不了：开发服务器和按本机 API 构建的正式预览都试过，这个浏览器面板的后退都是重新加载（页面上做的记号没了），不会原样恢复页面。只有单测。
+- **前端检查：** check（类型、零警告 lint、Vitest、构建）全过，**433 项**（25 个测试文件）；首屏 JavaScript gzip **158,231 字节**（预算 250,000；聊天流还没有页面用到）；格式、生成的类型都一致。
+- **后端：** Ruff F／E9／B 在 12 个改过和新建的 Python 文件上通过（第一次报了 R2a 留下的那处 B905）；改动和新建的文件里没有 CR。
+- **变异：** 都在副本里跑，被杀的都看了是对口的测试。
+  - 第一步：前端 83 个杀 82 个，存活的 C14（`Retry-After` 不去空白）：fetch 的 Headers 本来就去掉首尾空白，只有直接调用才看得出，补了一例以后杀掉；Python 7／7。
+  - 第二步：前端 98 个（新写 69 个，另 29 个是第一步里函数改过的，改锚重跑），全部杀掉。中间存活过三个：S04（「Google 跳回只处理一次」的标记去掉）——测试到了原页面就判过了，补了「停一会儿还在原页、没有失败提示」；L06、L07（回来的路径去掉 `//`、`/\` 的字符串检查）——第 8 条对解析结果的检查已经挡住这两种，这两条多余，删了。Python 24 个杀 23 个，存活的 X04（401 的 `detail` 改用 `str(exc)`）不是等价的：`id_token_invalid` 带诊断时会把异常类型名带出去，测试补了这种情况以后杀掉。
+  - 第三步：前端 K01–K34 34／34；第一步里跟着代码挪了位置的 C01–C06、C22、R01、R02 加一个新的 C06b，10／10。K23（预先取消时不早退）第一遍是靠测试超时失败的，改了测试以后由断言直接杀掉。Python H01–H14（开发 API 的聊天脚本）连同补了测试的 X04，15／15。
+  - 合计：前端 187 个（第一步 83、第二步新写 69、第三步新写 35；代码改动波及的旧变异体都改锚重跑了），Python 45 个；最后都被对口的测试杀掉。中途存活的 5 个（C14、S04、L06、L07、X04）按上面说的补了测试或删了多余的代码。
+- **串行全量：** **5206 passed／7 warnings／515.02 秒**，退出码 0。比 R2a 第二个提交时的 5160 多 46 项，就是这次新加的测试。全量开始以后只加了本节。
+- **第二个提交（第 25 轮审查的修复）：**
+  - 前端：check 全过，**454 项**（25 个测试文件）；首屏 JavaScript gzip **158,411 字节**；格式、生成的类型都一致。正式构建配本机的 http API 会停下来，报「A production build needs an https API…」；`build:dev-api` 照常构建。
+  - 后端：Ruff 在改过的 5 个 Python 文件上通过；改动的 30 个文件里没有 CR；改过的 3 个测试文件，加上跟着 `auth.py` 一起跑的 `test_api_auth_route.py`，共 163 项都过。
+  - 开发 API 在 8000 上短跑一次：访问日志只记了 `/auth/login-url`（不带查询参数）和 `/course/{course_id}`，state 和课程 ID 都不在日志里；停下以后端口空出来。那次只请求了登录地址和课程；假登录页那一条当时还带着 state，复核第 1 轮才找到。
+  - 变异（都在副本里；判法改成读 Vitest 的 JSON 报告，只撞上超时的不算杀）：前端新写 50 个（W 组 31 个，W25 这个编号空着；V 组 19 个，由 B26 存活的变异移植过来，它的 B03 随回环判断一起删掉了），10 个旧变异跟着代码改锚，连同函数改过的旧变异一共 184 个，**183 个由断言杀掉**，C26、C28、C32、Q10 也在内。剩下的 W03（去掉 `refetchOnReconnect: false`）是等价的：探针去掉这一行以后，`networkMode: 'always'` 下网络恢复时也不重取。Python 新写 P01–P12，连同代码改过、要重跑的 A01–A09、D01–D09 和 H01、H02、H14，33／33，都由对口的测试杀掉。项目自己的 `npm run test:mutations` 基线通过，110／110。
+  - **串行全量：** **5213 passed／7 warnings／545.56 秒**，退出码 0；比第一个提交多 7 项，就是这次新加的 7 个测试。
+- **合并 main（R3a）以后：**
+  - 合并只有 `web/README.md` 冲突；R3a 的 19 项演示页测试没包 `WithApi`，报「No QueryClient set」，包上以后都过。
+  - check 全过，**662 项**（32 个测试文件，多出来的是 R3a 的和这次的类型检查）；首屏 JavaScript gzip **173,177 字节**（R3a 的演示页连同 16 份假数据是静态 import 的，都算在首屏里；预算 250,000）；格式、生成的类型都一致。
+  - 类型检查的检查也试了：在 R3a 的类型上做四处改动，分别是去掉成绩 `S`、文档的 `catalog_year` 改名、列表的 `unusable_records` 改成字符串、方案去掉 `bridge`。每一处都让 `tsc` 在对应的那条检查上失败。把 `minimum` 放宽成 `string | number` 作对照，照样通过。改完文件都原样还原。
+- **第四个提交（复核第 1 轮的修复）：**
+  - 前端：check 全过，**667 项**（32 个测试文件）；首屏 JavaScript gzip **173,198 字节**；格式、生成的类型都一致。`build:dev-api` 输出到 `dist-dev-api/`，体积检查读的也是这个目录，`dist-dev-api/` 被 git 忽略。
+  - 后端：Ruff 在改过的 2 个 Python 文件上通过；改动的 16 个文件里没有 CR；`test_dev_api.py` 24 项都过。
+  - 变异（都由对口的测试杀掉）：
+    - 前端：去掉放回缓存那一行，新加的 3 条正好失败；`build:dev-api`、体积检查、`preview:dev-api` 三处改回 `dist/`，3/3；
+    - 前端：行长上限的三处边界、`useLayoutEffect` 改回 `useEffect`、`notKept` 改措辞，5/5，连跑三遍都一样；
+    - Python：D01–D09、P01–P14 23/23（新加的 P13、P14 是假登录页那条日志），P15（复位挪回 import 之后）也杀掉。
+  - **串行全量：** **5214 passed／7 warnings／532.39 秒**，退出码 0；比第二个提交多 1 项，就是另开进程查复位的那条。
+- **第二个提交在真浏览器里重验**（另开的会话做的，这个会话里的浏览器面板用不了；`3ebc04d` 的副本，开发 API 和合成数据，1440×900 和 390×844）：
+  - 从 `/privacy?tab=export#export` 登录，回来还在原地址，查询串和 `#` 都在；地址栏和历史里都没有 code 和 state，`sessionStorage` 用完就空。
+  - 请求顺序（浏览器的网络记录和开发 API 的访问日志对得上）：回来以后先回调，再 `/auth/me`，然后才 `/config`，回调之前这两个都不问。
+  - 刷新还是登录状态；登出 204，刷新以后 401。
+  - state 不对、取消、不带 state 的 `error=` 链接，三种都不发回调；state 对不上时链接里的字不上页面。外校、没验证、Google 拒绝三种被拒也对。
+  - 手机菜单里登录、用键盘登出，焦点落在菜单里的登录按钮上。
+  - `<meta name="referrer">` 是 `strict-origin-when-cross-origin`；`build:dev-api` 的正式预览里每个请求只发一次，顺序一样。
+  - 之后的提交改过的几处（重读失败时放回身份、没保存住登录的那句话、`build:dev-api` 的输出目录）没有再在浏览器里看，由前端测试钉住。
+- **第五个提交（复核第 2 轮的 NIT）：** 只多了一条类型检查。把生成的 `areas` 改成数字数组、把面板的 `areas` 收窄成两种前缀，`tsc` 都在这条上失败；把面板的放宽作对照，照样通过。check 全过，667 项（32 个测试文件），首屏 JavaScript gzip 173,198 字节；格式、生成的类型都一致。
+- **合并 main（R3b）以后：**
+  - 只有 `web/README.md` 冲突，`course.ts`、`mutations.mjs` 自动合并。自动合并的结果 `tsc` 报 13 处错（第 17 条），R3b 演示页的 18 项测试报「No QueryClient set」；改完都过。
+  - check 全过，**909 项**（39 个测试文件）；首屏 JavaScript gzip **181,908 字节**（R3b 的演示页连同假数据也是静态 import 的；预算 250,000）；格式、生成的类型都一致。
+  - 新对照的检查：在 R3b 的类型上做 8 处改动（快照 ID 改名、交付方式去掉 `async`、置信度改成字符串、成绩权重改成字符串、方案关系的字段改名、AI 政策的布尔改成字符串、来源说明的警告改成数字、抓取时间改成数字），再把生成的交付方式多加一个取值，`tsc` 都在新文件上失败；把证据原文放宽成 `string | number` 作对照，照样通过。第 16 条的 R3a 对照（四处改动加 `areas` 两处，各带对照）重跑，结果不变。
+  - 项目自己的 `npm run test:mutations`：基线通过，**152／152** 都由对口的测试杀掉，R3b 的 M131–M152 也在内。
+
+### 审查
+
+第 25 轮，两路只读审查，在第一个提交 `6d054f5` 上做，都不派子 agent：A26 看安全和正确性，B26 看测试、变异和文档。中途按用户的意思暂停过一次，两路都把进度写进各自的 `PROGRESS.md`，续审从原处接着做。
+
+- **A26：** 没有 CRITICAL、HIGH、MEDIUM；4 LOW、11 NIT，没有能直接利用的漏洞。核过、没问题的：前端的 state 检查和 cookie 模式要的 Origin 加标记挡住了登录劫持；`safeReturnPath` 35 种写法、两端 `redirect_uri` 各 26 种都跳不到别处；游客、已登录、坏 cookie 三种情况下的 cookie、CORS 和跨站检查；登出失败不假装；流里 error 的 `detail` 可以显示；开发 API 不会被部署，也碰不到真的 Gemini 和 Google。
+- **B26：** 4 MEDIUM、9 LOW、6 NIT。本节的数字都核对上了（433 项、158,231 字节、5160→5206、变异 187 和 45）。用更严的判法重跑前端 187 个变异：183 个由断言杀掉，4 个（C26、C28、C32、Q10）只是撞上 Vitest 的 5 秒超时，所以原来那句「最后都被对口的测试杀掉」不准；Python 45 个都由对口的测试杀掉。它自己写的变异：前端 19 个存活 18 个、Python 6 个存活 5 个（各有一个对照组被杀）。
+
+修复在第二个提交里，正文各条已经改成修完的样子：
+
+1. **登录回来（A26 L1、N1）：** 回来的路上不问 `/config` 和 `/auth/me`；回调成功以后重读 `/auth/me`，浏览器没收下 cookie 就说出来（第 8 条）。`index.html` 设 Referrer-Policy（第 13 条）。
+2. **断网（A26 L2）：** `networkMode: 'always'`，网络恢复也不重取（第 5 条）。
+3. **构建用的 API（A26 L3，B26 L3、L4）：** `chooseApiBase`：正式构建只认 https，`build:dev-api` 连本机，别的模式要写明，测试不受环境影响；`.gitignore` 加 `.env.*`（第 3 条）。
+4. **几处收紧（A26 N2、N3、N4、N6、N7、N11）：** `error=` 链接要 state 对上才说出 Google 的错误码；存的 state 要是 43 位 base64url；聊天流一行最多 100 万个字符，不带换行的一块不再重切整个缓冲；cookie 模式的回调只认请求自己的 `Origin` 加 `/`；`apiPath` 拒绝空值、`.`、`..`；登录地址只认 Google 的登录页，连本机 API 时才认它自己的页面。
+5. **开发 API（A26 N5，B26 L8）：** 设置从代码里的默认值开始，装上 API 自己的日志设置（第 10 条）；短跑一次，访问日志里没有 state，也没有课程 ID。测试钉住它只监听 127.0.0.1、两个前端的端口和 `vite.config.ts` 一致、没见过的 code 怎么拒、`main()` 用的主机和端口。
+6. **测试缺口（B26 M1、M2、L1、L6、L7、L8、L9、N1、N5、N6）：**
+   - code 和 state 不留在历史里：用 BrowserRouter 测 `history.length` 不变（后退回不到带 code 的地址），同时记下每个请求发出时地址栏的样子；
+   - 手机菜单里的账号框：显示和桌面一样；在菜单里登出以后，焦点落在菜单里的登录按钮上；
+   - C26、C28、C32、Q10 的测试改成断言请求已经结束，由断言杀掉；变异判法改成读 Vitest 的 JSON 报告，只撞上超时的不算杀掉；
+   - 聊天流：两句原话写死比对，错误正文最多等 30 秒，第一行是 error 当作坏流；
+   - 登录：取消时 state 也用掉，存的回来路径再过一遍检查，state 来自 `crypto.getRandomValues`，回来时清掉上一个人的按身份数据，回来的路径保留 `#`；
+   - Python：login-url 的 2048 上限（先于 503 查）；部署包清单改从 `pyproject.toml` 读（原来手写的漏了 `scrapers`）；重启以后旧 cookie 是 401；
+   - 网络约定改成「提到就算」，补上 HTTP 客户端的清单；schema 的第一项也给 60 秒；几个测试名改成和断言一致。
+7. **两条焦点测试不稳（B26 M3）：** 根子是焦点放回去在 passive effect 里，提示先上了屏；改成 `useLayoutEffect`，和结果同一次渲染（第 9 条），测试也就稳了。
+8. **`test:mutations` 坏了（B26 M4）：** 副本补上测试要读的文件，基线时限 120 秒（第 13 条）。
+9. **文档（A26 N9，B26 L5、N2、N3）：** README 的 CI 一句、安装和检查两节、「登录时也清课程对比」；`api_contract.md` 的 SAFE-02 提到 `reason`；本节 `dev:stall` 的「30.1 秒」改回工作记录里的 30.0 秒，「200 以外的回答都是 502」改准。
+
+没改、记进「已知」的：A26 L4（没有 PKCE）、N8（登出不清问题和方案）、N10（回来的路径带查询串和 `#`），B26 N4（两处固定等 20 毫秒）。
+
+**复核第 1 轮**（只看 `6d054f5..3ebc04d`，两路还是 A26、B26，续用原来的上下文；中途按用户的意思停过一晚）：
+
+- **A26：** 0/0/0/0，NIT 5 条。原来 15 条里 11 条确认修好；N5 修了一半（就是下面第 4 条）；L4、N8、N10 的「已知」写得准。它用探针核过：回调没有 Origin 时先 403，不会变成 500；真实构建配本机 http 停下，`--mode staging` 不写地址也停下。
+- **B26：** 0/0/0，LOW 2 条、NIT 4 条。上一轮的 19 条都修好了，M3、M4、L3 也自己确认过：M3 在负载下跑 60 次都没失败，`test:mutations` 110/110，设了 `VITE_API_BASE_URL` 也全过。它用自己的判法重跑了前端 86 个、Python 33 个变异，结果和本节一样；W03 等价是对的。
+
+修复分两处：两处措辞在合并提交里，其余在第四个提交里。正文各条已经改成修完的样子。
+
+1. **重读 `/auth/me` 失败（A26 N-A）：** 原来失败的那次留在缓存里，404 时侧栏显示「暂时无法确认」，开门以后 `/auth/me` 还会自己再发一次。现在把回调给的身份放回缓存（第 8 条）；测试换成 503、404、断网三种，各查只发了一次 `/auth/me`、缓存里是成功的那份。
+2. **没保存住登录的提示（A26 N-B，B26 N4）：** 重读读到游客也可能是 API 不认刚发的令牌（比如时钟往回跳），原来那句只怪浏览器，改成「登录状态没有保存下来（可能是浏览器不让本站使用 cookie），请再登录一次。」。登录、登出的八句话加了一条写死原文的测试。
+3. **连本机 API 的构建（A26 N-C）：** 原来和正式构建都写 `dist/`，手边的 `dist/` 可能是连本机的那份。现在输出到 `dist-dev-api/`，用 `preview:dev-api` 预览，`check-bundle.mjs` 收目录参数；contracts 测试钉住这几个脚本，三个忽略清单也加上了（第 3 条）。
+4. **开发 API 的日志（A26 新的一条）：** 假登录页那一行带着 state，生产的过滤器不管这一页。开发 API 自己加一个过滤器，测试也查这一行（第 10 条）。
+5. **开发 API 有一个设置没复位（B26 LOW 1）：** `api/routes/common.py` 在第一次 import 时就拷走了 `rerank_pool_size`，复位在那之后，所以环境里的 `RERANK_POOL_SIZE` 还管用。现在复位挪到 import 路由之前；新测试另开一个进程、设好这个变量再起，查三处拷贝都是默认值。
+6. **焦点的修法没钉住（B26 LOW 2）：** 两条失败路径的焦点测试加一个断言：提示第一次出现在页面上的那一刻，焦点就已经回到按钮上（MutationObserver 记下那一刻）。改回 `useEffect` 现在每次都失败。
+7. **行长上限两处量法不一样（B26 NIT 3，也是 A26 的 CRLF 边界）：** 收完的一行先去空白再量，没收完的不去，`\r\n` 正好切在两块之间时结果会变。现在两处都量「去掉行尾的 `\r`」以后的长度；加了测试：恰好上限的一行带 `\r\n`，切不切开都读得出来；没收完的一行恰好上限时等它收完，多一个字符就结束（第 11 条）。
+8. **文档（B26 NIT 1、2）：** 第二个提交的新变异是 50 个，不是 51 个；跑的测试是改过的 3 个文件加 `test_api_auth_route.py`。这两处在合并提交里改了。
+
+**复核第 2 轮**（最后一轮，看 `67f9fdd..56ce5e1`，B26 另看合并提交里给 R3a 加的东西；中途撞过一次额度上限，接着做完）：
+
+- **A26：** 0/0/0/0/0，上一轮的 5 条都修对了。点名要它查的四处都没找到问题：重读失败时把身份放回缓存，中间不会有别的回答插进来（回来的路上 `useMe`、`useConfig` 都关着，忙的时候不收登出，同一个查询的请求会合并成一个）；行长的量法怎么切开都一样；开发 API 复位以前，没有别的模块在 import 时读设置（另开进程、设了三个变量去试）；假登录页的过滤器不碰别的行。
+- **B26：** 0/0/0/0，NIT 1：先修类型的对照漏了方案节点的 `areas`（`Misfits` 不比值是对象的字段），API 把它的值改成数字，类型检查照样通过。上一轮的 4 条它都用变异和对照复现过，本节的数字和日志都对得上。这条只要补一条类型检查，第五个提交补了（第 16 条），没有再开一轮。
+
+### 已知、未处理
+
+- **R7 上线前：** Google OAuth 客户端要把新前端的地址（来源加 `/`）加进 Authorized redirect URI，API 的 `WEB_ORIGINS` 也要设成它（第 33 节已记），不然 Google 或 API 会拒绝。
+- **`/chat` 的 409：** 选方案没选成、专业前缀对应多个项目、选的项目和问题里的前缀不一致，这三种 `detail` 都是给学生看的中文，Streamlit 原样显示。新前端不显示 `detail`，R3 要按情况自己说，或者后端给 409 加一个稳定的原因。
+- **会话在页面开着时过期：** `useMe` 不自己过期，侧栏会一直显示已登录。R5d 的按身份请求收到 401 时要把身份改回游客。
+- **「后退」以后的一种情况：** 登录成功以后连按两次后退回到 Google 的页面，Google 要是直接再跳回来，存的 state 已经用掉，会说「登录没有完成，请重新登录」，可人其实还登录着。没处理。
+- 坏行的处理和 Streamlit 不同（见第 11 条）。生成的 `ChatRequest` 把有默认值的 `k`、`allow_feedback_capture` 也当作必填，调用方要明确给出（是否允许保存回答本来就该由页面明确给）。
+- openapi-typescript 支持 TypeScript 6 以后，生成器可以并回主包。
+- 隐私、Co-op、对比三页还用自己的演示身份，侧栏登录了它们也不知道；R5d 接上。
+- **没有 PKCE（A26 L4，原有设计）：** code 不绑浏览器。state 对不上时 code 不会被兑换，但会留在浏览器的全局历史里，有效期内能用到这台电脑的人可以拿它走 token 模式换令牌。R7 前后考虑：`code_verifier` 和 state 一起放进 sessionStorage，兑换时由 API 交给 Google。
+- **登出清得不全（A26 N8）：** 问题、项目和方案（PrototypeContext）和 MutationCache 登出时都不清；Streamlit 会清对话、项目和方案。R2b 里还是演示数据，R3／R4 要留一个统一的「重置会话」钩子。
+- **回来的路径带查询串和 `#`（A26 N10）：** 现在只有演示参数；R3 以后要是把学生自己写的东西放进网址，就只存路径（R0 14.6）。
+- 两条测试在固定等 20 毫秒以后做否定断言（B26 N4）：负载很大时可能漏掉变异体，不会误报。
+- 变异 W03（去掉 `refetchOnReconnect: false`）是等价的：`networkMode: 'always'` 下 TanStack 默认就不在网络恢复时重取（本节验证记录里有探针）。这一行留着，以后要是有人把 `networkMode` 改回去，它还能兜底。
+- **浏览器里重验的是第二个提交 `3ebc04d`**（见验证记录）；之后改的几处只有前端测试。
+- **合并 R3b 的改动（第 17 条）在复核第 2 轮之后，没有再审：** 两轮复核的上限已经用完。它只动类型和测试，由上面的类型变异、全部前端测试和项目自己的变异核过。
+- **账号的提示放在页面最底下（浏览器重验时发现，MINOR）：** 登录、登出的提示写在外壳 `<main>` 后面那个 `role="status"` 里（R1 原型的提示区）。长页面上第一屏看不见；手机菜单开着时，它在 Radix 给菜单外面加的 `aria-hidden` 里，所以在菜单里登出失败什么提示都看不到，像是按了没反应（焦点回到「退出登录」是对的）。R3 接线时外壳的这个提示区要改（原型的 PrototypeContext 会去掉），到时候把账号的话放进账号框里（桌面侧栏和手机菜单各显示自己的），回来时的结果放在页面顶上。
+- **取消登录的说法：** 显示「登录没有完成（access_denied），请再试一次。」，照 Streamlit 把 Google 的错误码放进括号，字面上没有「取消」。要改成「你取消了登录」这类说法的话，Streamlit 和新前端一起改。
+- 正式构建写明 `https://localhost:8443` 这样的地址也能过（A26 记下的，不算问题）：本机 http 拦住了，https 的本机地址只能是有意写的。
+
+### 发布状态
+
+分支 `feat/web-api-client`，基底是合并 R2a（#29）以后的 main `2aa2327`。第一个提交是 R2b 本身，第二个提交是第 25 轮审查的修复。R3a（#30）10-23 已经合并（main `7363572`），第三个提交把 main 合了进来（见第 16 条），第四个提交是复核第 1 轮的修复，第五个提交是复核第 2 轮（最后一轮）的那条 NIT 和本节。R3b（#31）10-24 已经合并（main `fe9203f`），第六个提交把 main 合了进来，给 R3b 的类型加了对照（第 17 条）。没有使用真实模型、账号、NAS 或生产库；登录和聊天都对着本机的开发 API 和合成数据。上线要另外授权。

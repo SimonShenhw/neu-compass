@@ -1,6 +1,6 @@
 # NEU-Compass · React 本地原型
 
-这是新前端的本地设计原型：长得对、点得动，只用假数据，不接任何后端接口。不是已经迁移完成的产品，也不替代线上 Streamlit。
+这是新前端的本地原型：长得对、点得动，页面内容还是假数据。R2b 起登录、登出和「现在是谁」接上了真实接口（见下面「接口层与登录 R2b」），各页的内容以后分批接。不是已经迁移完成的产品，也不替代线上 Streamlit。
 
 ## 安装与运行
 
@@ -9,31 +9,34 @@
 ```powershell
 cd <你的 worktree>\web
 npm.cmd ci
+npm.cmd ci --prefix tools/openapi-types
 npm.cmd run dev
 ```
 
-开发地址为 `http://127.0.0.1:5173/`。看生产构建：
+第二行装接口类型的生成器（R2b，见下文）；不装也能开发和测试，只是 `gen:api` 跑不了，两项 schema 测试会显示为跳过。开发地址为 `http://127.0.0.1:5173/`。看生产构建：
 
 ```powershell
-npm.cmd run build
-npm.cmd run preview
+npm.cmd run build:dev-api
+npm.cmd run preview:dev-api
 ```
 
-预览地址为 `http://127.0.0.1:4173/`。两个服务都只绑定本机；没有代理、接口请求或登录授权。`node_modules/`、`dist/` 和本地 `artifacts/` 不提交。
+预览地址为 `http://127.0.0.1:4173/`。`build:dev-api` 构建的页面连本机的开发 API，放在 `dist-dev-api/`。`npm.cmd run build` 是给学生用的正式构建，连正式 API（只认 https），放在 `dist/`，用 `npm.cmd run preview` 预览；在本机预览时，登录和各页的请求都不会成功。两种构建分两个文件夹放，`dist/` 里就只会有连正式 API 的构建，不会把连本机的那份当成正式的交出去。两个服务都只绑定本机，没有代理。本机用的 API 怎么起见下面「接口层与登录 R2b」。`node_modules/`、`dist/`、`dist-dev-api/` 和本地 `artifacts/` 不提交。
 
 ## 检查
 
 ```powershell
 npm.cmd run check
 npm.cmd run format:check
+npm.cmd run gen:api:check
 npm.cmd run test:mutations
 ```
 
 - `check` 依次做 strict 类型检查、零 lint 警告、Vitest 行为测试和构建。
+- `gen:api:check` 查 `src/api/schema.ts` 和 `openapi.json` 生成的一致（要先装生成器）。
 - `build` 额外读取 Vite manifest，累加首屏入口及其静态 import 的 JavaScript gzip 字节，超过 **250,000 bytes** 就失败。字体和 CSS 不混进 JS 指标，也没有靠延迟加载隐藏首屏依赖。
-- `test:mutations` 在系统临时目录创建隔离副本，先验证未修改副本的完整测试和类型，再执行 152 个具名变异。每项只运行对应名称的行为测试，避免重复执行整份表单用例；原 130 项保留，R3b 另加 M131–M152。M64 仅将同一四门上限的变异锚点改到共享常量。完整基线测试最多等 60 秒，单个变异仍为 45 秒。不修改当前源码、不安装额外依赖。只把命中预期测试名称的真实断言失败算作杀死；超时、导入失败不算。类型变异要求命中缺失 label 的编译断言。
+- `test:mutations` 在系统临时目录创建隔离副本，先验证未修改副本的完整测试和类型，再执行 152 个具名变异。每项只运行对应名称的行为测试，避免重复执行整份表单用例；原 R1、Co-op、R5b 检查保留，R5c 另加 26 项，R3a 另加 M111–M130，R3b 另加 M131–M152（M64 仅将同一四门上限的变异锚点改到共享常量）。副本里除了 `src/` 和配置，还有测试要读的 `index.html`、`openapi.json` 和生成器的 `package.json`（R2b）。完整基线测试最多等 120 秒，单个变异仍为 45 秒。不修改当前源码、不安装额外依赖。只把命中预期测试名称的真实断言失败算作杀死；超时、导入失败不算。类型变异要求命中缺失 label 的编译断言。
 - 变异日志、失败测试名、源码 SHA-256 与结果位于 `artifacts/mutations-<UTC timestamp>/`，副本保留以便复核，不自动递归清理。
-- `.github/workflows/ci.yml` 新增独立前端 job：Node 24 → `npm ci` → 格式 → `check`。原 Python job 不改。远端是否绿色，必须在后续授权 push 后由 GitHub 验证，不能从本地检查推断。
+- `.github/workflows/ci.yml` 的前端 job：Node 24 → `npm ci` → 装生成器 → `gen:api:check` → 格式 → `check`；Python job 另查 `web/openapi.json` 是最新的（R2b）。远端是否绿色，必须在后续授权 push 后由 GitHub 验证，不能从本地检查推断。
 
 ## 路由与演示
 
@@ -59,7 +62,7 @@ npm.cmd run test:mutations
 - 项目／方案与演示问题放在路由之上的 React context，页间跳转不会丢；换项目会清掉方案。对比页不再提供方案选择。没有持久化到 localStorage、Cookie 或后端。
 - 搜索清单和详情里的“加入对比”按 R1 规范只 `console.info` 合成课号，并显示本地提示，**不实际添加课程**。
 - 对比列表改为独立的 course ID 内存 store，侧栏和顶栏读取同一份列表。演示首次进入或切换场景才填入示例；同一场景离开再返回，不会复活已移出／清空的课程。刷新会恢复示例，不能把它当成正式登录／退出策略；R2 仍须在真实身份边界主动调用 `clearCompare()`。
-- R1 侧栏的“用 NEU 邮箱登录”明确禁用，访客／已登录两种 Sidebar 仅供组件测试；Co-op 本页的按钮只调用演示登录通知，详见下节。没有假登录流程或真实身份信息。
+- 侧栏和手机菜单的登录、登出从 R2b 起是真的（见「接口层与登录 R2b」）。Co-op、对比、隐私三页还用自己的演示身份，Co-op 本页的登录按钮仍只显示演示通知，等 R5d 接上真实接口。
 - 输入、发送、Enter、Shift+Enter、中文输入法和允许保存勾选可以操作，但只更新本地问题，回答始终标作固定示例；不会调用模型、写查询日志或真的保存回答。「允许保存」默认关闭，每次发送后重置，只代表这次问题的演示选择。未来查询日志提示文案保留；侧栏注明当前是假数据原型。
 - 分享按钮仅展开当前本地路由，不复制、上传或发布任何内容。刷新课程数据也只显示演示提示。
 
@@ -171,6 +174,29 @@ npm.cmd run test:mutations
 
 完整修改索引、浏览器证据、具名变异及未完成边界见 [COURSE_DETAIL_WORKLOG.md](COURSE_DETAIL_WORKLOG.md)。这不是 R3 真实取数／resolver／分享链接集成；不宣称已部署、线上验收或完成真实网络瀑布检查。
 
+## 接口层与登录 R2b（2026-10-23）
+
+从 main 开 `feat/web-api-client`，依据评审目录 `frontend_react/R2B_PLAN.md`。这一批让前端第一次真的请求 API：接口层、登录和登出、聊天流的客户端；各页的内容还是假数据，隐私、Co-op、对比三页在 R5d 接上，搜索和聊天页在 R3。
+
+**本机怎么跑：** 起两个服务，都在 `127.0.0.1`。
+
+1. 开发用的 API：在仓库根目录（WSL）用项目的 Python 环境运行 `uv run python -m tests.support.dev_api`，监听 `127.0.0.1:8000`；没有 `.env` 时先设一个占位的 `GEMINI_API_KEY`（设置要求有这一项）。它是真的 `create_app()`，但用临时文件里的合成数据库、测试套件的替身模型，Google 换成本机的假登录页 `/__dev/google`（三个合成账号，三种被拒、state 不对和取消各一个链接）。除了 Gemini 的 key，每个设置都从代码里的默认值开始，`.env` 和环境变量里的限流、数据路径之类不起作用；访问日志和生产一样去掉登录地址的查询串、课程只记路径模板。每次启动换一个会话密钥，重启就都登出了。不部署，生产代码不 import 它，API 里也没有测试模式。
+2. 本页：`npm.cmd run dev`，打开 `http://127.0.0.1:5173/`（不要用 `localhost`）。预览构建用 `npm.cmd run build:dev-api` 再 `npm.cmd run preview:dev-api`。
+
+页面和 API 的主机名必须一样：浏览器按主机名算「站点」，`localhost` 和 `127.0.0.1` 是两个站点，SameSite=Lax 的会话 cookie 就不跟着请求走，登录了也像没登录。Chromium 在 `http://127.0.0.1` 上收 `__Host-` 开头、带 Secure 的 cookie（10-23 在浏览器里验过）。
+
+- **API 地址在构建时定**（`src/api/apiBase.ts`）：`npm run build` 是正式构建，默认 `https://api.neu-compass.me`，`VITE_API_BASE_URL` 可以换成别的 https 地址，本机的 http 一律让构建失败，免得给学生的页面去连他们自己的电脑；`npm run build:dev-api` 和开发服务器默认 `http://127.0.0.1:8000`，前者输出到 `dist-dev-api/`，不和正式构建的 `dist/` 混；别的构建模式（比如 beta）必须写明 `VITE_API_BASE_URL`。测试一律用本机的，不管环境里设了什么。地址只认 https 或本机的 http，不带路径、查询、`#` 或账号密码，坏值让构建失败。`web/.env.local` 这类文件已在 `.gitignore` 里。
+- **接口类型是生成的：** 后端的 `scripts/export_openapi.py` 导出 `web/openapi.json`，`npm run gen:api` 从它生成 `src/api/schema.ts`，`npm run gen:api:check` 和 CI 查两者一致；后端那边 CI 也查 `openapi.json` 是最新的。生成器 openapi-typescript 7.13.0 只声明支持 TypeScript 5，本包用 6，所以它单独放在 `tools/openapi-types/`（自带 TypeScript 5 和 lockfile），没有用 `--legacy-peer-deps`。R3a 的先修类型（`src/api/requisites.ts`）比生成的窄，按 kind、status 分开，所以还是手写；`src/api/requisites.types.test.ts` 在类型检查时把它们和生成的类型对照：面板读的字段 API 得有，API 可能给的值面板得收。R3b 的课程详情类型（`src/api/course.ts` 的 `CourseDetailBody` 等）也留手写：生成的类型把有默认值的字段都标成可选（API 其实都会给），页面要的是每个字段都在；`src/api/course.types.test.ts` 照同样的办法对照，两份共用 `src/test/misfits.ts`。
+- **请求只有一个出口：** `src/api/client.ts`。每个请求都带 cookie、不用 HTTP 缓存、不跟重定向；写请求带 `X-NEU-Compass: 1`，有请求体才带 JSON 的 Content-Type。四档超时照 Streamlit（5／8／15／30 秒，读完回答也算在内），什么都不自动重试。失败变成 `ApiError`（状态码、`error_type`、`Retry-After`、422 被拒的字段名、登录被拒的 `reason`），不带后端的英文原文；页面上的中文照 Streamlit。
+- **取数：** TanStack Query，不重试；切回窗口、网络恢复都不重取。断网时请求照样发出、照样失败，不会排队等网络回来再自己发（写请求尤其不能这样）。暂时的失败（超时、429、5xx）继续显示上次的内容，明确的答复（401、404、422…）不留。`/config` 5 分钟内算新鲜；`/auth/me` 的 401 就是游客。
+- **登录：** 点按钮时生成 32 字节的随机 state，和回来的页面一起放进 sessionStorage（本站只在这里存东西，用一次就删），整页去 Google（只认 Google 的登录页；页面连本机开发 API 时也认它的假登录页）。回到站点根路径时先把 code 和 state 从地址栏和历史里去掉，这时还不问 `/config`、`/auth/me`；再核对 state，对了才用 cookie 模式提交回调，然后重读一次 `/auth/me`：读到游客就说「登录状态没有保存下来…」，读失败就保留回调给的身份，最后回到原来的页面。state 对不上的返回链接（包括带 `error=` 的）什么都不发、也不显示链接里的字。外校邮箱和没验证的邮箱分开说，别的失败一句话。登录、登出时清掉按身份取的数据，登出时再清课程对比。
+- **Referrer：** `index.html` 设 `strict-origin-when-cross-origin`，发给别的站点的只有本站的来源（R0 14.15；R7 在服务器上再设一次）。
+- **焦点：** 账号框里按下的按钮忙完以后（登出换成登录按钮、失败恢复原按钮），焦点回到账号框现在的按钮上（桌面侧栏和手机菜单里都一样，和结果同一次渲染完成），用户自己移开了就不动。从 Google 页按「后退」、浏览器原样恢复本页时，登录按钮恢复可用。
+- **聊天流：** `src/api/chatStream.ts` 的 `streamChat(request, { signal })` 边收边读 `/chat` 的 NDJSON，给 R3 的搜索和聊天页用；它是 `client.ts` 以外唯一调 fetch 的文件。先 `meta`，再若干 `token`，最后 `done`（可能带反馈凭证，由页面照 Streamlit 的做法核对）；或者中途一个 `error`，它的 `detail` 是 API 给学生看的固定中文，照样显示。等回答开始、等下一块各最多 30 秒；断线、超时、没有 `done` 就结束、有一行不是这四种事件、或者一行（不算行尾）长过 100 万个字符（API 最长的一行也就几十 KB），都在已经收到的内容后面补一句 Streamlit 的话（「连接中断。…」或「回答流未完整结束；…」）。流开始前的失败和别的请求一样是 `ApiError`。不自动重发（每问一次都算模型次数、写查询日志）；能取消。
+- **开发 API 的聊天：** `/chat` 按脚本回答，不调用模型，HyDE 补救也关着。问题里带 `dev:model-error`（模型中途出错）、`dev:no-answer`（没有回答）、`dev:daily-limit`（今天的次数用完）、`dev:no-done`（流没有 `done` 就结束）、`dev:cut`（连接中途断开）、`dev:stall`（停 35 秒，比前端等的久），就换成对应的情况。
+- **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config` 和游客身份，测试里不发请求（`fetch` 在测试里仍被禁止，要用就 stub）。
+- **上线前（R7）：** Google OAuth 客户端要把新前端的地址（来源加 `/`）加进 Authorized redirect URI，API 的 `WEB_ORIGINS` 也要设成它，不然 Google 或 API 会拒绝。
+
 ## 设计选择及差异
 
 - 用户确认：沿用第一版白底细线与钴蓝强调色；导航以中文为主；R1 只做浅色，不做主题切换。原 R1 的「默认只看不同的行」已被 R5b 的「本轮不做行筛选」取代。
@@ -202,6 +228,6 @@ Node 类型固定在 24 系列，与规定运行时一致。实际命令版本�
 
 Radix Select / Dialog 保留原生键盘和焦点管理；测试不替换这些组件。只有 jsdom 缺失的 pointer capture、scroll、ResizeObserver 做最小兼容，fetch 在测试中被禁止。
 
-已知限制：当前浏览器控制接口没有完整请求瀑布读取能力。可核对构建资源、DOM 同源声明和无 HTTP 客户端源码，但不把这等同于完整网络面板验收；最终验收仍需确认请求只有同源静态资源。
+已知限制：当前浏览器控制接口没有完整请求瀑布读取能力，不把可读到的请求列表等同于完整网络面板验收。R2b 起页面只经 `src/api/client.ts` 请求 API（`contracts.test.ts` 钉住别处不许调 fetch），最终验收仍需确认此外只有同源静态资源。
 
 R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLOG.md](WORKLOG.md)，Co-op 独立记在 [COOP_WORKLOG.md](COOP_WORKLOG.md)，R5b 记在 [COMPARE_WORKLOG.md](COMPARE_WORKLOG.md)，R5c 记在 [PRIVACY_WORKLOG.md](PRIVACY_WORKLOG.md)。本轮不执行 push、PR、合并或部署。

@@ -140,6 +140,64 @@ def test_the_cookie_login_only_comes_from_the_front_end(empty_db, monkeypatch, h
         assert calls == ["synthetic-code"]
 
 
+def test_the_cookie_login_takes_only_the_front_ends_own_address(empty_db, monkeypatch):
+    """R2b: the code goes back to Google with the address it was sent to, which must be a web front end's own; checked
+    before the code reaches Google, so nothing is exchanged or written. The token mode is not checked (Streamlit).
+    中文：R2b：code 要带着 Google 当初送回的地址再交给 Google，这个地址必须是新前端自己的；在 code 交给 Google 之前查，
+    所以什么也不交换、不写。token 模式不查（Streamlit 用）。"""
+    seen = []
+
+    def exchange(code, *, redirect_uri=None):
+        seen.append(redirect_uri)
+        return {"user_id": "synthetic-sub-1", "email": "synthetic.one@husky.neu.edu", "name": "Synthetic One"}
+
+    monkeypatch.setattr(settings, "session_secret", SECRET)
+    monkeypatch.setattr(settings, "web_origins", [ORIGIN])
+    app = build_test_app(empty_db, seed=False)
+    app.dependency_overrides[get_oauth_exchange_fn] = lambda: exchange
+    with TestClient(app, base_url="https://testserver") as client:
+        for address in [ORIGIN, f"{ORIGIN}/x", f"{ORIGIN}//", "https://elsewhere.example.test/", ""]:
+            response = client.post("/auth/callback", headers=WRITE,
+                                   json={"code": "synthetic-code", "session": "cookie", "redirect_uri": address})
+            assert response.status_code == 422, address
+            assert response.json() == {"detail": "redirect_uri must be the web front end's own address.",
+                                       "error_type": "invalid_input", "status_code": 422}
+            assert set_cookie_headers(response) == []
+        assert seen == [] and empty_db.execute("SELECT count(*) FROM users").fetchone()[0] == 0
+        response = client.post("/auth/callback", headers=WRITE,
+                               json={"code": "synthetic-code", "session": "cookie", "redirect_uri": f"{ORIGIN}/"})
+        assert response.status_code == 200 and seen == [f"{ORIGIN}/"]
+        assert len(set_cookie_headers(response)) == 1
+        # Without the cookie it just set: a write that carries the cookie must come from the front end (R2a).
+        # 中文：去掉刚设的 cookie：带 cookie 的写请求必须来自前端（R2a）。
+        client.cookies.clear()
+        response = client.post("/auth/callback", json={"code": "synthetic-code", "redirect_uri": "https://other.test/"})
+        assert response.status_code == 200 and seen[-1] == "https://other.test/"
+
+
+def test_a_code_sent_to_one_front_end_is_redeemed_only_by_that_one(empty_db, monkeypatch):
+    """R2b: with two front ends allowed (a beta, say), the address must be the root of the origin the request comes
+    from, not just any of them. 中文：R2b：允许两个前端时（比如 beta），地址必须是请求所在来源的根路径，不是其中随便哪个。"""
+    beta = "https://beta.example.test"
+    seen = []
+
+    def exchange(code, *, redirect_uri=None):
+        seen.append(redirect_uri)
+        return {"user_id": "synthetic-sub-1", "email": "synthetic.one@husky.neu.edu", "name": "Synthetic One"}
+
+    monkeypatch.setattr(settings, "session_secret", SECRET)
+    monkeypatch.setattr(settings, "web_origins", [ORIGIN, beta])
+    app = build_test_app(empty_db, seed=False)
+    app.dependency_overrides[get_oauth_exchange_fn] = lambda: exchange
+    with TestClient(app, base_url="https://testserver") as client:
+        response = client.post("/auth/callback", headers=WRITE,
+                               json={"code": "synthetic-code", "session": "cookie", "redirect_uri": f"{beta}/"})
+        assert response.status_code == 422 and set_cookie_headers(response) == [] and seen == []
+        response = client.post("/auth/callback", headers={**WRITE, "Origin": beta},
+                               json={"code": "synthetic-code", "session": "cookie", "redirect_uri": f"{beta}/"})
+        assert response.status_code == 200 and seen == [f"{beta}/"]
+
+
 @pytest.mark.parametrize("content_type", [None, "text/plain"], ids=["no-content-type", "text-plain"])
 @pytest.mark.parametrize("session", ["token", "cookie"])
 def test_a_login_body_not_sent_as_json_is_never_read(empty_db, monkeypatch, content_type, session):

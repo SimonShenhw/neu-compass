@@ -7,26 +7,65 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
+import { useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { pagePresentation } from './routePresentation';
 import styles from './Sidebar.module.css';
 
+// What the account box shows (R2b): AppShell works it out from /config, /auth/me and a login or logout in flight.
 export type SessionView =
-  { kind: 'guest' } | { kind: 'signed-in'; displayName: string };
+  | { kind: 'checking' }
+  | {
+      kind: 'guest';
+      // ready: /config says login works; unavailable: it says not, or could not be read.
+      login: 'ready' | 'busy' | 'checking' | 'unavailable';
+      // /auth/me failed for a moment, so this may be a member shown as a guest.
+      unsure?: boolean;
+    }
+  | {
+      kind: 'signed-in';
+      displayName: string;
+      contributionCount: number;
+      busy?: boolean;
+    };
 export function Sidebar({
-  session = { kind: 'guest' },
+  session = { kind: 'guest', login: 'unavailable' },
   compareCount = 0,
   onNavigate,
   onRefresh,
+  onLogin,
+  onLogout,
 }: {
   session?: SessionView;
   compareCount?: number;
   onNavigate?: () => void;
   onRefresh?: () => void;
+  onLogin?: () => void;
+  onLogout?: () => void;
 }) {
   const { pathname } = useLocation();
   const { navigationPath } = pagePresentation(pathname);
+  const box = useRef<HTMLDivElement>(null);
+  const action = useRef<HTMLButtonElement>(null);
+  // The button pressed here is disabled while it works, and a logout replaces it, so focus falls to the page or the
+  // menu around it. When the work ends, focus goes to the box's button again, unless the student has moved on; in
+  // the same commit that shows the result, so the result is never on screen with focus lost.
+  const pressed = useRef(false);
+  const busy =
+    (session.kind === 'guest' && session.login === 'busy') ||
+    (session.kind === 'signed-in' && session.busy === true);
+  useLayoutEffect(() => {
+    if (busy || !pressed.current) return;
+    pressed.current = false;
+    const active = document.activeElement;
+    if (active === null || active.contains(box.current))
+      action.current?.focus();
+  }, [busy]);
+  const press = (handler?: () => void) => () => {
+    pressed.current = true;
+    handler?.();
+  };
   const links = [
     { path: '/', label: '课程搜索', icon: Search },
     { path: '/programs', label: '培养方案', icon: BookOpen },
@@ -43,20 +82,35 @@ export function Sidebar({
           <small>选课助手</small>
         </span>
       </Link>
-      <div className={styles.account}>
-        {session.kind === 'guest' ? (
+      <div className={styles.account} ref={box}>
+        {session.kind === 'checking' ? (
+          <small>正在确认登录状态…</small>
+        ) : session.kind === 'guest' ? (
           <>
-            <Button disabled title="R1 不接登录；R2 接入">
-              用 NEU 邮箱登录
+            <Button
+              ref={action}
+              disabled={session.login !== 'ready'}
+              onClick={press(onLogin)}
+            >
+              {session.login === 'busy'
+                ? '正在前往 Google…'
+                : '用 NEU 邮箱登录'}
             </Button>
             <small>只限 husky.neu.edu、northeastern.edu</small>
+            {session.login === 'unavailable' && <small>暂时不能登录。</small>}
+            {session.unsure && <small>暂时无法确认登录状态。</small>}
           </>
         ) : (
           <>
             <strong>{session.displayName}</strong>
-            <small>已登录（组件演示）</small>
-            <Button variant="ghost" disabled>
-              退出登录
+            <small>贡献数：{session.contributionCount}</small>
+            <Button
+              ref={action}
+              variant="ghost"
+              disabled={session.busy === true}
+              onClick={press(onLogout)}
+            >
+              {session.busy ? '正在退出…' : '退出登录'}
             </Button>
           </>
         )}
@@ -91,7 +145,7 @@ export function Sidebar({
           刷新课程数据
         </Button>
         <small>非官方学生工具 · 选课以官方目录为准</small>
-        <small>假数据原型 · 不接接口、不存储</small>
+        <small>页面内容仍是假数据原型；登录已接真实接口</small>
       </div>
     </div>
   );

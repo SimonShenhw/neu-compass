@@ -19,7 +19,7 @@ STATE = "synthetic-state-0123456789abcdef"
 LOGIN_SETTINGS = {"google_oauth_client_id": "synthetic-client-id",
                   "google_oauth_client_secret": "synthetic-client-secret", "session_secret": "synthetic-secret"}
 # Every way of leaving at least one of them out. 中文：至少缺一样的每一种组合。
-WITHOUT_LOGIN = [dict(zip(LOGIN_SETTINGS, values))
+WITHOUT_LOGIN = [dict(zip(LOGIN_SETTINGS, values, strict=True))
                  for values in itertools.product(*[(value, "") for value in LOGIN_SETTINGS.values()]) if not all(values)]
 
 
@@ -120,6 +120,64 @@ def test_login_url_refuses_a_bad_state_without_echoing_it(client, login_settings
 
 def test_login_url_needs_the_state(client, login_settings):
     assert client.get("/auth/login-url").status_code == 422
+
+
+FRONT_ENDS = ["http://127.0.0.1:5173", "https://compass.example.test", "https://beta.example.test:8443"]
+REDIRECT_REFUSED = {"detail": "redirect_uri must be the web front end's own address.", "error_type": "invalid_input",
+                    "status_code": 422}
+
+
+def test_login_url_sends_google_back_to_the_front_ends_own_address(client, login_settings, monkeypatch):
+    """R2b: beta and local development log in on their own address, which the front end names. Without it, the
+    configured address, as before. 中文：R2b：beta 和本机开发在自己的地址上登录，由前端说；不说就用配置的地址，和以前一样。"""
+    monkeypatch.setattr(settings, "web_origins", FRONT_ENDS)
+    monkeypatch.setattr(settings, "google_oauth_redirect_uri", "https://streamlit.example.test/")
+    for origin in FRONT_ENDS:
+        response = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": f"{origin}/"})
+        assert response.status_code == 200, origin
+        query = parse_qs(urlparse(response.json()["url"]).query)
+        assert query["redirect_uri"] == [f"{origin}/"] and query["state"] == [STATE]
+    response = client.get("/auth/login-url", params={"state": STATE})
+    assert parse_qs(urlparse(response.json()["url"]).query)["redirect_uri"] == ["https://streamlit.example.test/"]
+
+
+@pytest.mark.parametrize("redirect_uri", [
+    "https://compass.example.test", "https://compass.example.test/x", "https://compass.example.test//",
+    "https://compass.example.test/?next=1", "https://compass.example.test/#top", "http://compass.example.test/",
+    "HTTPS://compass.example.test/", "https://compass.example.test.evil.test/", "https://evil.test/",
+    "https://compass.example.test:443/", "https://streamlit.example.test/", "",
+])
+def test_login_url_refuses_any_other_address_without_echoing_it(client, login_settings, monkeypatch, redirect_uri):
+    """Only an origin in WEB_ORIGINS and `/`: Google checks the address against its own list, but a page elsewhere
+    must not get a code sent to an address this API never chose. 中文：只认 WEB_ORIGINS 里的来源加 `/`：Google 也会对照
+    自己的名单，但不能让 code 被送到这个 API 没选过的地址。"""
+    monkeypatch.setattr(settings, "web_origins", ["https://compass.example.test"])
+    monkeypatch.setattr(settings, "google_oauth_redirect_uri", "https://streamlit.example.test/")
+    response = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": redirect_uri})
+    assert response.status_code == 422 and response.json() == REDIRECT_REFUSED
+
+
+def test_login_url_takes_no_redirect_without_web_origins(client, login_settings, monkeypatch):
+    monkeypatch.setattr(settings, "web_origins", [])
+    response = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": "http://127.0.0.1:5173/"})
+    assert response.status_code == 422 and response.json() == REDIRECT_REFUSED
+
+
+def test_login_url_without_login_is_503_whatever_the_address(client, monkeypatch):
+    monkeypatch.setattr(settings, "google_oauth_client_id", "")
+    response = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": "https://evil.test/"})
+    assert response.status_code == 503
+
+
+def test_login_url_refuses_an_address_over_2048_characters_with_the_request(client, monkeypatch):
+    """The length limit of api_contract.md is checked with the rest of the request, ahead of the 503 for a missing
+    login, and the address is not echoed. 中文：api_contract.md 写的长度上限和请求的其他部分一起查，先于没配置登录的 503，
+    也不回显地址。"""
+    monkeypatch.setattr(settings, "google_oauth_client_id", "")
+    address = "https://evil.test/" + "a" * (2049 - len("https://evil.test/"))
+    response = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": address})
+    assert response.status_code == 422 and "evil" not in response.text
+    assert client.get("/auth/login-url", params={"state": STATE, "redirect_uri": address[:2048]}).status_code == 503
 
 
 @pytest.mark.parametrize("missing", WITHOUT_LOGIN, ids=missing_names)

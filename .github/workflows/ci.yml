@@ -26,9 +26,15 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            web/tools/openapi-types/package-lock.json
       - name: Install locked dependencies
         run: npm ci
+      - name: Install the API type generator
+        run: npm ci --prefix tools/openapi-types
+      - name: Check the generated API types match openapi.json
+        run: npm run gen:api:check
       - name: Check formatting
         run: npm run format:check
       - name: Check types, lint, tests and build
@@ -73,6 +79,11 @@ jobs:
 
       - name: Execute disaster recovery rehearsal
         run: uv run python scripts/rehearse_recovery.py --json
+
+      # R2b: the web front end generates its types from web/openapi.json; an API change must come with a new export.
+      # 中文：新前端从 web/openapi.json 生成类型；改了接口就要重新导出。
+      - name: Check web/openapi.json matches the API
+        run: uv run python scripts/export_openapi.py --check
 
       - name: Run offline test suite
         run: uv run pytest -m "not live" --tb=short

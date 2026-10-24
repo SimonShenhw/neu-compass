@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { resolve, relative } from 'node:path';
+import { resolve, relative, sep } from 'node:path';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
 import { courses } from '../fixtures/courses';
@@ -8,9 +8,14 @@ const root = process.cwd();
 function files(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (
-      ['node_modules', 'dist', 'coverage', '.vite', 'artifacts'].includes(
-        entry.name,
-      )
+      [
+        'node_modules',
+        'dist',
+        'dist-dev-api',
+        'coverage',
+        '.vite',
+        'artifacts',
+      ].includes(entry.name)
     )
       return [];
     const path = resolve(directory, entry.name);
@@ -18,20 +23,38 @@ function files(directory: string): string[] {
   });
 }
 
-it('all direct dependencies are exact, stable pins and no HTTP or e2e library is installed', () => {
-  const pkg = JSON.parse(
-    readFileSync(resolve(root, 'package.json'), 'utf8'),
-  ) as {
-    dependencies: Record<string, string>;
-    devDependencies: Record<string, string>;
-  };
-  for (const [name, version] of Object.entries({
-    ...pkg.dependencies,
-    ...pkg.devDependencies,
-  })) {
-    expect(version, name).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(name).not.toMatch(/tanstack|playwright|axios|ky$|superagent|got$/);
+it('direct dependencies are exact, stable pins; TanStack Query is the only data library and no e2e library is installed', () => {
+  for (const file of ['package.json', 'tools/openapi-types/package.json']) {
+    const pkg = JSON.parse(readFileSync(resolve(root, file), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    for (const [name, version] of Object.entries({
+      ...pkg.dependencies,
+      ...pkg.devDependencies,
+    })) {
+      expect(version, `${file}: ${name}`).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(name).not.toMatch(
+        /playwright|puppeteer|axios|ky$|superagent|got$|devtools|ofetch|wretch|node-fetch|cross-fetch|isomorphic-fetch|undici|socket\.io/,
+      );
+      if (name.includes('tanstack')) expect(name).toBe('@tanstack/react-query');
+    }
   }
+});
+
+it('the build for the API on this machine never lands where the production build does', () => {
+  // dist/ only ever holds a build for the real API, so a dist/ handed to a deployment cannot point at a laptop (A26).
+  const { scripts } = JSON.parse(
+    readFileSync(resolve(root, 'package.json'), 'utf8'),
+  ) as { scripts: Record<string, string> };
+  expect(scripts.build).not.toContain('--outDir');
+  expect(scripts['build:dev-api']).toContain(
+    'vite build --mode dev-api --outDir dist-dev-api ',
+  );
+  expect(scripts['build:dev-api']).toMatch(
+    / node scripts\/check-bundle\.mjs dist-dev-api$/,
+  );
+  expect(scripts['preview:dev-api']).toMatch(/ --outDir dist-dev-api$/);
 });
 
 it('fixtures contain only the five approved course codes', () => {
@@ -44,10 +67,31 @@ it('fixtures contain only the five approved course codes', () => {
   ]);
 });
 
-it('first-party TypeScript has no any types and production code does not create HTTP clients', () => {
+// R2b: the API layer is the one place that talks to the network: the client, and the /chat stream next to it. Any
+// mention of these names counts, not only a call: `const send = globalThis.fetch; send()` is a request too.
+const NETWORK_NAMES = new Set([
+  'fetch',
+  'XMLHttpRequest',
+  'WebSocket',
+  'EventSource',
+  'sendBeacon',
+]);
+const ALLOWED_NETWORK_USES = new Set([
+  'src/api/client.ts fetch',
+  'src/api/chatStream.ts fetch',
+]);
+
+it('the page sends other sites its origin only, wherever it is served from (R0 14.15)', () => {
+  expect(readFileSync(resolve(root, 'index.html'), 'utf8')).toContain(
+    '<meta name="referrer" content="strict-origin-when-cross-origin" />',
+  );
+});
+
+it('first-party TypeScript has no any types and only the API client makes requests', () => {
   for (const path of files(resolve(root, 'src')).filter((path) =>
     /\.tsx?$/.test(path),
   )) {
+    const name = relative(root, path).split(sep).join('/');
     const source = ts.createSourceFile(
       path,
       readFileSync(path, 'utf8'),
@@ -55,18 +99,18 @@ it('first-party TypeScript has no any types and production code does not create 
       true,
     );
     function visit(node: ts.Node) {
-      expect(node.kind, relative(root, path)).not.toBe(
-        ts.SyntaxKind.AnyKeyword,
-      );
-      if (
-        !path.includes('.test.') &&
-        !path.includes(
-          `${process.platform === 'win32' ? '\\' : '/'}test${process.platform === 'win32' ? '\\' : '/'}`,
-        )
-      ) {
-        if (ts.isCallExpression(node) || ts.isNewExpression(node))
-          expect(node.expression.getText(source), path).not.toMatch(
-            /^(?:fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)$/,
+      expect(node.kind, name).not.toBe(ts.SyntaxKind.AnyKeyword);
+      if (!name.includes('.test.') && !name.startsWith('src/test/')) {
+        // A name, a property (window.navigator.sendBeacon) or a string key (globalThis['fetch']).
+        const used = ts.isIdentifier(node)
+          ? node.text
+          : ts.isElementAccessExpression(node) &&
+              ts.isStringLiteralLike(node.argumentExpression)
+            ? node.argumentExpression.text
+            : null;
+        if (used !== null && NETWORK_NAMES.has(used))
+          expect(ALLOWED_NETWORK_USES, `${name} ${used}`).toContain(
+            `${name} ${used}`,
           );
       }
       ts.forEachChild(node, visit);

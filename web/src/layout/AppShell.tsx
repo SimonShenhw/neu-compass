@@ -5,6 +5,7 @@ import { usePrototype } from './PrototypeContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { pagePresentation } from './routePresentation';
+import { useSession } from './useSession';
 import { useCompareList } from '../models/compareList';
 import styles from './AppShell.module.css';
 
@@ -13,6 +14,8 @@ export function AppShell() {
   const navigate = useNavigate();
   const state = usePrototype();
   const comparison = useCompareList();
+  const { session, login, logout } = useSession(state.announce);
+  const account = { session, onLogin: login, onLogout: logout };
   const { title, isSearch, navigationPath } = pagePresentation(pathname);
   useEffect(() => {
     document.title = `${title} · NEU-Compass`;
@@ -26,16 +29,23 @@ export function AppShell() {
         跳到主要内容
       </a>
       <aside className={styles.desktopSidebar}>
-        <Sidebar compareCount={comparison.length} onRefresh={refresh} />
+        <Sidebar
+          compareCount={comparison.length}
+          onRefresh={refresh}
+          {...account}
+        />
       </aside>
       <div className={styles.mainColumn}>
         <TopBar
           showGuest={
-            navigationPath !== '/coop' && navigationPath !== '/privacy'
+            session.kind === 'guest' &&
+            navigationPath !== '/coop' &&
+            navigationPath !== '/privacy'
           }
           title={title}
           count={comparison.length}
           onRefresh={refresh}
+          account={account}
         />
         <main id="main-content" tabIndex={-1} className={styles.main}>
           <Outlet />

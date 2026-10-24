@@ -4,11 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { App } from '../App';
 import { clearCompare, getCompareList } from '../models/compareList';
+import { WithApi } from '../test/withApi';
 function page(path = '/compare') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+    <WithApi>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </WithApi>,
   );
 }
 it.each([

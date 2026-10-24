@@ -320,7 +320,8 @@ class PublicConfigResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     answer_feedback_enabled: bool
-    login_available: bool  # A Google client ID and a SESSION_SECRET are both set. 中文：两样都配了才能登录。
+    # Google's client ID and secret and a SESSION_SECRET are all set (auth.login_configured). 中文：三样都配了才能登录。
+    login_available: bool
 
 
 class OAuthCallbackResponse(BaseModel):

@@ -181,14 +181,21 @@ async def validation_error_handler(
     )
 
 
+def oauth_rejection_response(exc: OAuthError) -> JSONResponse:
+    """The 401 for a login that Google or the claim checks refused: the fixed English detail plus `reason`, one of
+    OAuthError's seven stable reasons, so the web front end can say why without reading the detail (R2b). The detail
+    already names the reason, so `reason` tells the browser nothing new.
+    中文：Google 或身份检查拒绝登录时的 401：固定的英文 detail，加上 `reason`（OAuthError 的七种稳定原因之一），新前端
+    不用读 detail 就能说清原因（R2b）。detail 本来就说出了原因，`reason` 没有多告诉浏览器什么。"""
+    body = ErrorResponse(detail=exc.safe_detail, error_type="unauthorized", status_code=401).model_dump()
+    body["reason"] = exc.reason
+    return JSONResponse(status_code=401, content=body)
+
+
 async def oauth_error_handler(
     request: Request, exc: OAuthError,
 ) -> JSONResponse:
-    return _error_response(
-        status_code=401,
-        error_type="unauthorized",
-        detail=exc.safe_detail,
-    )
+    return oauth_rejection_response(exc)
 
 
 async def course_not_found_handler(
@@ -296,5 +303,6 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 __all__ = [
     "ErrorResponse",
+    "oauth_rejection_response",
     "register_exception_handlers",
 ]

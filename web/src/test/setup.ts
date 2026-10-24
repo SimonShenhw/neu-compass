@@ -28,8 +28,9 @@ if (!window.ResizeObserver)
 HTMLCanvasElement.prototype.getContext = () => null;
 window.scrollTo = () => {};
 
+// No test reaches the network: a test of the API layer stubs fetch itself (R2b).
 const blockedFetch = vi.fn(() => {
-  throw new Error('R1 must not make network requests');
+  throw new Error('Tests must not make network requests; stub fetch');
 });
 beforeEach(() => {
   blockedFetch.mockClear();
