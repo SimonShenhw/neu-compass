@@ -88,6 +88,28 @@ it('zero credits and zero workload are shown, absent or empty chips are not inve
   rerender(<CourseDetail {...props} course={data} />);
   expect(container.querySelector('[data-chip]')).toBeNull();
 });
+it('the chip row is not drawn once no chip is left', () => {
+  const props = input();
+  const data = detailData();
+  data.term = '';
+  data.delivery_mode = null;
+  const { container, rerender } = render(
+    <CourseDetail {...props} course={data} />,
+  );
+  const header = () => container.querySelector('[data-kind="header"]')!;
+  expect(header().children).toHaveLength(3);
+  data.credits = null;
+  rerender(<CourseDetail {...props} course={data} />);
+  expect(header().children).toHaveLength(2);
+});
+it('the header course code is folded onto one line like the name', () => {
+  const data = detailData();
+  data.primary_code = 'CS\f6140\n';
+  const { container } = render(<CourseDetail {...input()} course={data} />);
+  expect(readDetail(container).find((e) => e.kind === 'header')?.code).toBe(
+    'CS 6140',
+  );
+});
 it('signed-zero estimates, grading and confidence preserve Python display through the real page', async () => {
   const data = detailData();
   data.workload_hours_per_week = -0;
