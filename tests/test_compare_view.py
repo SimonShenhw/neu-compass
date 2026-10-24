@@ -66,7 +66,8 @@ def text(app):
 
 def test_empty_page_navigation_order_footer_and_no_search_or_fetch(backend):
     app = comparison()
-    assert app.radio(key="nav_page").options == [SEARCH, PROGRAMS, COOP, COMPARE]
+    # Batch T appended the privacy page; the first four keep their places. 中文：T 批在末尾加了隐私页，前四个位置不变。
+    assert app.radio(key="nav_page").options == [SEARCH, PROGRAMS, COOP, COMPARE, "🔒 数据与隐私 · Privacy"]
     assert "打开一门课的详情，点 ➕ 加入对比" in text(app)
     assert not app.chat_input and not backend.reads and not backend.posts
     assert "nc-footer" in text(app)

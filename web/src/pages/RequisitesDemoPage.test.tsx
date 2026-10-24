@@ -9,16 +9,19 @@ import {
   YEAR_LABEL,
 } from '../features/requisites/CourseRequisites';
 import { choose } from '../features/requisites/requisitesTestUtils';
+import { WithApi } from '../test/withApi';
 
 function Location() {
   return <output aria-label="演示网址">{useLocation().search}</output>;
 }
 function page(path = '/requisites-demo') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-      <Location />
-    </MemoryRouter>,
+    <WithApi>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+        <Location />
+      </MemoryRouter>
+    </WithApi>,
   );
 }
 it.each(requisitesFixtures)(

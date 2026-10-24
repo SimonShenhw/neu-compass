@@ -1,3 +1,5 @@
+// R3a's contract: the requisites panel's view of the API's shapes, narrower than the generated types and kept by
+// hand; requisites.types.test.ts checks it against them (R2b).
 export type Grade =
   | 'A+'
   | 'A'

@@ -84,6 +84,22 @@ services:
       # AND the ui service's value below — Google rejects any difference,
       # trailing slash included.
       GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/
+      # === Small trial (batch T, 10-21; the user chose these policies) ===
+      # P3: question text becomes its keyed hash after 90 days, and saved answers are deleted after 90 days;
+      # needs SESSION_SECRET from .env.
+      QUERY_LOG_RETENTION_DAYS: "90"
+      # P5: Gemini calls per UTC day (chat answers + HyDE rescues); then /chat streams a fixed notice.
+      MODEL_DAILY_CALL_LIMIT: "200"
+      # P6: 👍/👎 with a per-session opt-in that starts unticked. Keep equal to the ui value (joint release).
+      ANSWER_FEEDBACK_ENABLED: "true"
+      # P4: GET /privacy (R2a) shows the address as the Streamlit page does. Keep equal to the ui value.
+      PRIVACY_CONTACT_EMAIL: shen.haow@northeastern.edu
+      # P5: one process-wide budget for POST /search and /chat (not per user, not a cost quota). Not measured on
+      # the NAS: 4 at once ≈ two chat streams + two searches; burst 20; 0.5/s ≈ 30 a minute site-wide.
+      REQUEST_GUARD_ENABLED: "true"
+      REQUEST_GUARD_CAPACITY: "20"
+      REQUEST_GUARD_REFILL_PER_SECOND: "0.5"
+      REQUEST_GUARD_MAX_INFLIGHT: "4"
     volumes:
       - ./runtime-data:/data
     devices:
@@ -117,6 +133,11 @@ services:
       # builds shareable ?course= / ?program= links, and the redirect URI
       # has already moved once (postmortem_week7).
       PUBLIC_BASE_URL: https://compass.neu-compass.me
+      # === Small trial (batch T): the 数据与隐私 page states these, so they must equal the api values ===
+      QUERY_LOG_RETENTION_DAYS: "90"
+      ANSWER_FEEDBACK_ENABLED: "true"
+      # P4: the user chose to show their NEU address for questions and deletion requests.
+      PRIVACY_CONTACT_EMAIL: shen.haow@northeastern.edu
     command:
       - streamlit
       - run

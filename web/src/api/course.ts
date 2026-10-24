@@ -1,24 +1,7 @@
-// Handwritten R5b view contract; R2 will replace this with generated API types.
-export interface CourseDetail {
-  course_id: string;
-  primary_code: string;
-  primary_name: string;
-  term: string | null;
-  credits: number | null;
-  delivery_mode: string | null;
-  workload_hours_per_week: number | null;
-  difficulty_score: number | null;
-  grading_components: { name: string; weight: number | null }[];
-  topics_covered: string[];
-  program_context: {
-    program_id: string;
-    program_name: string;
-    requirement_type: string;
-    semester_recommended: number | null;
-  }[];
-  answer_evidence: unknown;
-  course_requisites: unknown;
-}
+// R5b's view contract. The course detail is the API's own shape (generated, R2b); the rest is the page's.
+import type { Schemas } from './types';
+
+export type CourseDetail = Schemas['CourseDetailOut'];
 export type CompareColumn =
   | { status: 'loading' }
   | { status: 'error'; httpStatus: number | null }
@@ -31,7 +14,9 @@ export interface ComparePageProps {
   onReload: () => void;
 }
 
-// Handwritten R3b response contract; runtime parsing is deliberately separate.
+// Handwritten R3b response contract; runtime parsing is deliberately separate. It stays hand-written beside the
+// generated CourseDetail, as R3a's requisites types do: the generated type marks every field with a default optional
+// (the API always sends them), and the page wants them all present. course.types.test.ts ties it to the API (R2b).
 export interface CatalogSnapshot {
   course_code: string;
   course_name: string;
@@ -56,11 +41,23 @@ export interface EvidenceSnippet {
   quote: string;
   confidence: number;
 }
-export interface CourseDetailBody extends Omit<
-  CourseDetail,
-  'delivery_mode' | 'answer_evidence' | 'course_requisites'
-> {
+export interface CourseDetailBody {
+  course_id: string;
+  primary_code: string;
+  primary_name: string;
+  term: string | null;
+  credits: number | null;
   delivery_mode: 'in_person' | 'online' | 'hybrid' | 'async' | null;
+  workload_hours_per_week: number | null;
+  difficulty_score: number | null;
+  grading_components: { name: string; weight: number | null }[];
+  topics_covered: string[];
+  program_context: {
+    program_id: string;
+    program_name: string;
+    requirement_type: string;
+    semester_recommended: number | null;
+  }[];
   professor: string[];
   skill_tags: string[];
   career_relevance: string[];

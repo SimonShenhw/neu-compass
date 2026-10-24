@@ -1,0 +1,14 @@
+{
+  "name": "neu-compass-openapi-types",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Generates web/src/api/schema.ts from web/openapi.json. Its own package because openapi-typescript supports TypeScript 5 only.",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

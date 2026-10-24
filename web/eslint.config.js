@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**'] },
+  { ignores: ['dist/**', 'dist-dev-api/**', 'node_modules/**', 'coverage/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -25,7 +25,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.js', 'scripts/*.mjs'],
+    files: ['*.js', 'scripts/*.mjs', 'tools/*/*.mjs'],
     languageOptions: { globals: globals.node },
   },
 );

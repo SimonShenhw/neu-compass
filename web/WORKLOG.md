@@ -5,7 +5,7 @@
 ## 2026-10-21 · 开工
 
 - 按 `frontend_react/R1_SPEC.md` 和 `mockup_v1/neu-compass-redesign.html` 实施；用户确认沿用设计稿、中文导航、对比默认只看不同的行；首版只做浅色，保留主题 tokens。
-- 从已合并 L 的 `origin/main @ 6395ee586e3145323bd0bc94eb87c4b8ec0aa69d`，经 WSL 建立 `H:\neu-compass-web` / `feat/web-skeleton`。
+- 从已合并 L 的 `origin/main @ 6395ee586e3145323bd0bc94eb87c4b8ec0aa69d`，经 WSL 建立单独的 worktree，分支 `feat/web-skeleton`。
 - 范围仅 `web/` 与 `.github/workflows/ci.yml` 的前端 job。不接接口、不做登录、不安装 HTTP 库或 Playwright、不改 Python、Docker 或 Streamlit。
 - Windows Node 24.19.0 / npm 11.17.0；依赖精确锁定，提交 lockfile。测试、视觉验收、体积和边界结果在完成后追加，不提前写成通过。
 
@@ -39,7 +39,7 @@
 
 ## 干净安装与检查结果
 
-2026-10-21，在 `H:\neu-compass-web\web`，使用 Windows Node 24.19.0 / npm 11.17.0：
+2026-10-21，在 worktree 的 `web/` 里，使用 Windows Node 24.19.0 / npm 11.17.0：
 
 | 命令 / 检查     | 结果                                                                                      |
 | --------------- | ----------------------------------------------------------------------------------------- |
@@ -201,3 +201,14 @@ R2 的接口、认证、聊天流，R3 的旧深链，以及真实数据 / 登�
 - 证据位于评审目录 `frontend_react/r1-routes-2026-10-21/`：`desktop-compare-slash.jpg`、`mobile-privacy-navigation.jpg`、`route-observations.json`。JSON 的原始 DOM 查询包含 CSS 隐藏的桌面导航，手机开抽屉时会记录两个相同标签；可见 / 可访问导航以截图和 AX 状态为准，并非两个可见当前项。
 
 本批客户端 404 不等于服务器 HTTP 状态码检查。完整网络面板、全页人工键盘 / 读屏、远端 CI 和 ESLint 9 兼容例外仍待独立验收。临时视口已重置，独占预览进程已停止；未改后端、CI、部署或真实账号，不进入 R2。
+
+## 2026-10-22 · 独立验收（协调方）
+
+在 `f372988` 的独立副本上照 `R1_SPEC.md` 第 8 节逐条验收，没有在 worktree 里跑任何东西。
+
+- **干净安装：** `npm ci` 装了 402 个包，0 个漏洞，唯一的警告是上面写明的 ESLint 9 停止支持。`npm run check`（90 passed，strict、零警告 lint、构建）和 `format:check` 都过，首屏 JS 124,771 gzip bytes。
+- **协调方自己的 20 个变异**（和 `scripts/mutations.mjs` 无关）：19 个被对口的测试杀掉。存活 1 个：先修树的「满足其一」「都要」两个标签互换。原来的测试只查两个标签都在，没查各自标在哪种节点上；标签反了，学生会以为修一门就行。这个提交在 `controls.test.tsx` 补了按节点核对的断言，这个变异体随之被杀。
+- **浏览器**（构建产物的 preview，1440×900 和 390×844）：搜索、课程详情、对比、手机四屏和设计稿对得上；只有同源请求；手机整页不横滚，对比表在自己的框里横滑，首列固定；键盘顺序合理，焦点框都看得见；手机菜单按 Escape 关闭后，焦点回到菜单按钮。
+- **和设计稿不同、没写理由的一处：** 对比页的行序，「在你的方案里」放到了最后（设计稿在「学生评价」后面）。留给用户定。
+- **版本例外**（TypeScript 6.0.3、ESLint 9）：同意，两处都受插件的 peer 范围限制；等 `eslint-plugin-jsx-a11y` 支持 ESLint 10 再升。
+- **公开内容：** README 和本文件里有三处带盘符的本机路径，这个提交改成了不带盘符的写法；没有邮箱和密钥。

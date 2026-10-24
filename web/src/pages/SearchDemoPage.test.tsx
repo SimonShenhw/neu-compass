@@ -21,6 +21,7 @@ import {
 import { parseReceipt } from '../models/answerFeedback';
 import { getCompareList } from '../models/compareList';
 import { loadExpected } from '../features/search-answer/searchTestUtils';
+import { WithApi } from '../test/withApi';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -31,10 +32,12 @@ function Location() {
 function page(query = '?speed=instant', app = false) {
   return render(
     <StrictMode>
-      <MemoryRouter initialEntries={['/search-demo' + query]}>
-        {app ? <App /> : <SearchDemoPage />}
-        <Location />
-      </MemoryRouter>
+      <WithApi>
+        <MemoryRouter initialEntries={['/search-demo' + query]}>
+          {app ? <App /> : <SearchDemoPage />}
+          <Location />
+        </MemoryRouter>
+      </WithApi>
     </StrictMode>,
   );
 }

@@ -18,8 +18,9 @@ Wire format: NDJSON. One JSON object per line, chunks of:
   {"type": "meta",  "matched_via": "alias|hybrid|empty",
                     "results": [{"course_id", "primary_code", "primary_name", "score"}]}
   {"type": "token", "text": "..."}     (zero or more)
-  {"type": "error", "error_type": "upstream_error|no_answer|internal_error", "detail": "..."}
-                                       (only on stream failure; fixed text, never the exception)
+  {"type": "error", "error_type": "upstream_error|no_answer|internal_error|daily_limit", "detail": "..."}
+                                       (only on stream failure, or daily_limit instead of tokens when
+                                        today's model calls are used up; fixed text, never the exception)
   {"type": "done", "feedback": {...}}  (optional receipt, always last)
 
 线路格式：NDJSON。每行一个 JSON 对象，依次是：meta（携带 matched_via 与
@@ -55,6 +56,7 @@ from api.dependencies import (
     get_course_repo,
     get_hybrid_retriever,
     get_hyde_rescue_fn,
+    get_model_budget,
     get_program_repo,
     get_reranker,
 )
@@ -118,6 +120,10 @@ STREAM_ERROR_DETAIL = {
     # 中文：空回答或被安全规则拦下：照原样再问一次多半没用。
     "no_answer": "这次模型没有给出回答，可能被它的安全规则拦下了。换个问法再试试。",
     "internal_error": "服务内部出错，这条回答没有完成。请稍后再问一次。",
+    # Batch T (P5): today's model places are used up; retrieval still ran and its results are in meta.
+    # 中文：T 批（P5）：今天的模型名额用完了；检索照常做了，结果在 meta 里。
+    "daily_limit": ("今天的回答次数已经用完，这次没有生成回答；检索到的课程照常列出。"
+                    "次数在 UTC 零点恢复，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）。"),
 }
 _NO_ANSWER_KINDS = frozenset({"empty_stream", "empty_response"})
 
@@ -143,8 +149,9 @@ def _stream_error_event(error_type: str) -> bytes:
         "was answered from hybrid retrieval instead of a guessed sequence.\n"
         "2. `{\"type\": \"token\", \"text\": \"...\"}` — zero or more, "
         "Gemini stream chunks.\n"
-        "3. `{\"type\": \"error\", \"error_type\": \"upstream_error|no_answer|internal_error\", "
-        "\"detail\": \"...\"}` — only on stream failure. `detail` is fixed text, never the "
+        "3. `{\"type\": \"error\", \"error_type\": \"upstream_error|no_answer|internal_error|daily_limit\", "
+        "\"detail\": \"...\"}` — only on stream failure, or `daily_limit` instead of tokens when "
+        "today's model calls are used up (`MODEL_DAILY_CALL_LIMIT`). `detail` is fixed text, never the "
         "exception; the server log line carries the same `x-request-id`.\n"
         "4. `{\"type\": \"done\", \"feedback\": {answer_id, answer_sha256, feedback_token}}` "
         "— always last; feedback is optional and issued only after a complete, "
@@ -183,6 +190,7 @@ def chat(
         Callable[[str], str | None] | None, Depends(get_hyde_rescue_fn)
     ] = None,
     x_eval_run: Annotated[str | None, Header()] = None,
+    budget: Annotated[Any, Depends(get_model_budget)] = None,
 ) -> StreamingResponse:
     """Stream a Gemini-generated answer grounded in the retrieved courses.
 
@@ -337,6 +345,13 @@ def chat(
 
     def event_stream() -> Iterator[bytes]:
         yield meta_line
+
+        # One place right before the model call; none left means no call today (batch T, P5).
+        # 中文：调用模型之前占一个名额；没有名额今天就不调用（T 批，P5）。
+        if budget is not None and not budget.acquire():
+            yield _stream_error_event("daily_limit")
+            yield (json.dumps({"type": "done"}) + "\n").encode("utf-8")
+            return
 
         # Bound memory and issue a receipt only after normal upstream completion.
         from schemas.answer_feedback import MAX_ANSWER_CHARS

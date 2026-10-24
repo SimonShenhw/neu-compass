@@ -8,12 +8,12 @@ Mirrors CourseRepository pattern. Caller owns the connection.
 Key method: `upsert_login()` is the single entry point the OAuth callback
 uses. It either creates the row (first login) or just stamps last_login_at
 + refreshes display_name. Email/domain are required; we trust the OAuth
-layer (app/auth.py) to have already vetted them against the whitelist
+layer (api/google_oauth.py) to have already vetted them against the whitelist
 before calling this.
 
 关键方法:`upsert_login()` 是 OAuth 回调唯一的入口。它要么新建这一行
 (首次登录),要么只是刷新 last_login_at + display_name(后续登录)。
-email/domain 是必填的;这里信任 OAuth 层(app/auth.py)在调用本方法前
+email/domain 是必填的;这里信任 OAuth 层(api/google_oauth.py)在调用本方法前
 已经用白名单校验过它们。
 
 contribution_count is NOT touched by upsert_login — it's modified by
@@ -28,7 +28,6 @@ contribution_count 不会被 upsert_login 触碰 —— 它只在用户提交 Co
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
 
 from schemas.user import User
 
@@ -89,14 +88,14 @@ class UserRepository:
         display_name on subsequent logins. Returns the persisted User.
 
         Caller is responsible for domain whitelist enforcement (see
-        app.auth.is_email_allowed) BEFORE calling this — the repo trusts
+        api.google_oauth.is_email_allowed) BEFORE calling this — the repo trusts
         what it gets.
 
         中文:首次登录时新建用户行,后续登录时只刷新 last_login_at +
         display_name。返回落库后的 User。
 
         调用方在调用本方法之前,必须自行完成域名白名单校验
-        (参见 app.auth.is_email_allowed)—— 本仓储无条件信任传入的数据。
+        (参见 api.google_oauth.is_email_allowed)—— 本仓储无条件信任传入的数据。
         """
         # ON CONFLICT strategy: email/domain/last_login_at are always
         # overwritten with the fresh OAuth values; display_name uses

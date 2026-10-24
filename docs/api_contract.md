@@ -31,14 +31,33 @@
 | GET    | `/ready`              | Lifespan readiness (models warmed)     |
 | POST   | `/search`             | Course search (alias→hybrid→rerank)    |
 | GET    | `/course/{course_id}` | Full Course detail                     |
+| GET    | `/course/{course_id}/requisites` | Year-scoped requisite clauses |
+| GET    | `/resolve/course`     | Deep-link course reference → IDs       |
+| GET    | `/programs`           | Seeded programs                        |
+| GET    | `/programs/{program_id}` | Curriculum by recommended semester  |
+| GET    | `/programs/{program_id}/plans` | Requirement documents by version |
+| GET    | `/programs/{program_id}/plans/{plan_id}/policies` | Policy evidence for one plan |
 | POST   | `/coop`               | Submit Co-op (k=2 anonymity gated)     |
 | GET    | `/coop`               | List Co-op visible to user             |
 | POST   | `/chat`               | Streamed grounded chat (NDJSON)        |
+| POST   | `/feedback`           | One vote on a saved answer (opt-in)    |
 | POST   | `/auth/callback`      | OAuth code exchange                    |
+| GET    | `/auth/me`            | Identity behind the token or cookie    |
+| POST   | `/auth/delete-account`| Delete own account + Co-op (batch T)   |
+| POST   | `/auth/logout`        | Expire the session cookie (R2a)        |
+| GET    | `/auth/login-url`     | Google login address for a state (R2a) |
+| GET    | `/privacy`            | The privacy page's words (R2a)         |
+| GET    | `/config`             | Public settings for the front end (R2a)|
 
-Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}`,
-`/chat`, and `GET /coop` (degraded view). `POST /coop` requires `Authorization: Bearer <session_token>`.
-`POST /auth/callback` issues identity but takes no header itself.
+The routes without a section below are described in their OpenAPI docstrings (`/docs`).
+
+Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}` (and its requisites), `/resolve/course`,
+`/programs…`, `/chat`, `/feedback` (a vote carries its own receipt), `/privacy`, `/config`, `/auth/login-url`, and
+`GET /coop` (degraded view). `GET /auth/me`, `POST /coop` and `POST /auth/delete-account` need
+`Authorization: Bearer <session_token>`, or, without a non-empty `Authorization` header, the API's session cookie
+(R2a; see "Session cookie, CSRF and CORS" under Conventions); without either they answer 401.
+`POST /auth/callback` issues identity: its token mode takes no header, while its cookie mode, like
+`POST /auth/logout`, needs one `Origin` in `WEB_ORIGINS` and `X-NEU-Compass: 1`.
 
 ---
 
@@ -411,7 +430,9 @@ One JSON object per line. Order of object types:
    - `upstream_error`: the Gemini call or stream failed;
    - `no_answer`: Gemini returned no text (a safety block or an empty
      completion), so asking the same way again rarely helps;
-   - `internal_error`: anything else.
+   - `internal_error`: anything else;
+   - `daily_limit` (batch T): today's Gemini calls are used up (`MODEL_DAILY_CALL_LIMIT`, per UTC day). It comes
+     right after meta, instead of any token; retrieval still ran and the courses are in meta. No model call is made.
 
    `detail` is fixed text per `error_type` that the UI appends to the partial
    answer; it never carries the exception message, which can hold upstream URLs
@@ -427,6 +448,9 @@ One JSON object per line. Order of object types:
    ```json
    {"type": "done"}
    ```
+   With `feedback` (`{"answer_id", "answer_sha256", "feedback_token"}`, the receipt for `POST /feedback`) only when
+   answer feedback is on, the request allowed saving (`allow_feedback_capture`), and the complete, non-empty answer
+   was stored; never in meta.
 
 > **No reranker on the chat path** in v0.1 — first-token latency is the UX
 > currency, and the ~50ms blocking rerank cost would push it over budget.
@@ -434,8 +458,13 @@ One JSON object per line. Order of object types:
 
 ### Error responses
 
-- **422** on invalid request body. The error response is plain JSON, NOT
-  NDJSON — the stream never starts.
+Plain JSON, NOT NDJSON — the stream never starts:
+
+- **422** on invalid request body.
+- **404** for an unknown `program_id`.
+- **409** for a plan selection that does not resolve, a program prefix that matches several programs, or a selected
+  program that conflicts with the prefix in the question. `detail` leads with Chinese, which Streamlit shows.
+- **503** while the service warms up; **429** and **503** from the request guard.
 
 ---
 
@@ -456,7 +485,24 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 ```
 
 `redirect_uri` is optional; defaults to the value configured in
-`config/settings.py` `oauth_redirect_uri`.
+`config/settings.py` `google_oauth_redirect_uri`. It is the address Google sent
+the browser back to, which Google checks again in the exchange. In the cookie
+mode (R2b) it may only be the front end's own address: the request's `Origin`
+(one in `WEB_ORIGINS`) followed by `/`, so a code Google sent to one front end
+is redeemed only by that one. Anything else gets **422**
+`redirect_uri must be the web front end's own address.` before the code is
+exchanged. The token mode does not check it (Streamlit sends its own).
+
+`session` (R2a) is optional: `"token"` (the default) returns the signed token
+in the body as `session_token`, as before; `"cookie"` sets it instead as the
+cookie `__Host-nc_api_session` (HttpOnly, Secure, Path=/, SameSite=Lax, no
+Domain, Max-Age = `SESSION_MAX_AGE_SECONDS`) and returns `session_token: null`.
+The web front end uses the cookie mode; Streamlit and scripts keep the token.
+Without `SESSION_SECRET` there is no token in either mode. The cookie mode must
+come from an allowed web origin with `X-NEU-Compass: 1` (one `Origin` in
+`WEB_ORIGINS`), with or without an existing cookie; otherwise it gets the fixed
+CSRF **403** below before the code is exchanged, so a page elsewhere cannot log
+the browser into an account of its choosing.
 
 ### Success (HTTP 200)
 
@@ -465,7 +511,8 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
   "user_id": "u-google-1234567890",
   "email": "alice@husky.neu.edu",
   "display_name": "Alice Husky",
-  "contribution_count": 0
+  "contribution_count": 0,
+  "session_token": "<signed token, or null in the cookie mode>"
 }
 ```
 
@@ -477,6 +524,108 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
   - the email domain isn't whitelisted (PLAN §3.5: split-on-`@` exact match
     for `husky.neu.edu` / `northeastern.edu`; `attacker@husky.neu.edu.evil.com`
     is rejected)
+
+  The body (R2b) is `{"detail": "<fixed text>", "error_type": "unauthorized",
+  "status_code": 401, "reason": "<reason>"}`, where `reason` is one of the seven
+  stable reasons under *Safe error exits* below, so the web front end can say a
+  wrong domain (`domain_not_allowed`) and an unverified email
+  (`email_unverified`) apart without reading `detail`. An `OAuthError` raised
+  anywhere else gets the same body from the global handler.
+- **403**: the cookie mode, not from an allowed web origin with
+  `X-NEU-Compass: 1` (the fixed CSRF body under *Session cookie, CSRF and CORS*).
+- **422**: a malformed body, or the cookie mode's `redirect_uri` is not the
+  request's own `Origin` followed by `/`.
+
+---
+
+## POST /auth/delete-account
+
+Batch T (10-21, policy P4): a logged-in student deletes their own account and Co-op contributions from the
+数据与隐私 page. Needs `Authorization: Bearer <session_token>` (or the API's session cookie, R2a) and exactly
+`{"confirm": "delete"}`.
+
+In one transaction (`db/account_deletion.py`), in this order:
+1. the Co-op experiences this account published, and every unlock of them;
+2. a group (company, role, term) this account helped publish that is left with only one contributor is withdrawn:
+   the others' items go back to `approved` and leave the public list (with their unlocks) until another approval in
+   the group publishes them again. Credits already given are kept, and none is given twice. The user chose this
+   on 10-21 so that the last item cannot point at its author (k=2);
+3. the `users` row, which cascades to its unlocks, planned courses, Co-op submissions (any review state) and
+   contribution credits.
+
+`query_log` and saved answers never record an account (a real user's `user_id` is NULL) and are not touched. Daily
+backups keep a copy for up to 14 days. Afterwards the same token gets 401 from `GET /auth/me` and from this route.
+
+### Success (HTTP 200)
+
+```json
+{"deleted": true, "published_experiences": 1, "unlocks_of_those": 0, "own_unlocks": 2,
+ "submissions": 3, "credits": 1, "planned_courses": 0, "withdrawn_from_groups": 1}
+```
+
+Counts only; the log line `account.deleted` carries the same counts and no identity.
+
+### Error responses
+
+- **401**: missing, invalid or expired token, or the account no longer exists.
+- **422**: the body is not exactly `{"confirm": "delete"}`.
+
+With the session cookie (R2a), a successful deletion also expires the cookie, and so does the 401 for a cookie that no
+longer works (bad, expired, or its account already gone).
+
+---
+
+## POST /auth/logout
+
+R2a. Expires the session cookie and answers **204** with no body, also when there is none. Bearer tokens are not
+revoked: they expire on their own, and Streamlit logs out by dropping its copy. It must come from an allowed web
+origin with `X-NEU-Compass: 1`, with or without the cookie; otherwise it gets the fixed CSRF **403** and expires
+nothing. A form posted from another site arrives without the SameSite=Lax cookie, so the CSRF middleware alone would
+let it by, and the expiring header in a 204 would still log the browser out.
+
+---
+
+## GET /auth/login-url
+
+R2a. `?state=<16–128 of A–Z, a–z, 0–9, _ or ->` → `{"url": "<Google's OAuth address>"}`, built by
+`api.google_oauth.authorize_url` exactly as the Streamlit login link. The front end makes `state`, keeps it, and
+checks it when Google sends the browser back to `GOOGLE_OAUTH_REDIRECT_URI` (production: the site root) with
+`?code=&state=`; then it posts the code to `/auth/callback` with `"session": "cookie"`. The API stores nothing, and
+uvicorn's access log records this path without its query, so the state is not logged either.
+
+R2b: an optional `&redirect_uri=` (at most 2048 characters) says where Google sends the browser back instead, and the
+front end posts the same value to `/auth/callback`. It must be a web front end's own address, an origin in
+`WEB_ORIGINS` followed by `/` (the browser's `location.origin + "/"`), and Google's OAuth client must list it as an
+authorized redirect URI. The web front end always sends its own; Streamlit sends none and keeps
+`GOOGLE_OAUTH_REDIRECT_URI`.
+
+- **422**: a missing or malformed `state` (not echoed), or a `redirect_uri` that is not a web front end's own address
+  (`redirect_uri must be the web front end's own address.`).
+- **503** `{"detail": "Login is not configured.", "error_type": "service_unavailable", "status_code": 503}`: no
+  Google client ID or client secret, or no `SESSION_SECRET` here (the same condition as `/config`'s
+  `login_available`). It comes before the check of `redirect_uri`.
+
+---
+
+## GET /privacy
+
+R2a. The 数据与隐私 page, built from this API's own settings (`QUERY_LOG_RETENTION_DAYS`, `ANSWER_FEEDBACK_ENABLED`,
+`PRIVACY_CONTACT_EMAIL`) by `api/privacy_text.py`, the same functions the Streamlit page uses:
+
+```json
+{"intro": "...", "sections": [{"heading": "记了什么", "sentences": ["..."]}, ...],
+ "delete_what": "...", "query_log_notice": "...", "capture_notice": "... or null"}
+```
+
+All plain text. `capture_notice` (next to the opt-in) is null while answer feedback is off. `query_log_notice` has no
+pointer to the page; each front end adds its own.
+
+---
+
+## GET /config
+
+R2a. `{"answer_feedback_enabled": bool, "login_available": bool}`. `login_available` means Google's client ID and
+client secret and a `SESSION_SECRET` are all configured, so `/auth/login-url` and the cookie login work.
 
 ---
 
@@ -498,9 +647,47 @@ curl -s -X POST https://compass.<zone>.com/api/auth/callback \
 - **Versioning**: this is v0.1. Breaking changes go in v0.2 with a
   parallel `/v2/*` prefix; never silent breaks.
 
+### Session cookie, CSRF and CORS (R2a)
+
+For the new web front end, which calls `api.<zone>` from `compass.<zone>` (the same site, two origins):
+
+- **Identity:** a non-empty `Authorization` header first, exactly as before (a bad one, or one that is not
+  `Bearer …`, is a 401, and the cookie is not looked at); an empty header counts as none. Without it, the cookie
+  `__Host-nc_api_session` from the cookie mode of `/auth/callback`. A cookie that no longer works (bad, expired,
+  account gone) counts as anonymous on public routes; `GET /auth/me` answers 401 and expires it. The 401 `detail`
+  texts for a missing or failed session predate the cookie and are kept for existing clients: `Unknown user.`,
+  `Missing bearer token.` and `Invalid or expired session token. Log in again.`; `POST /coop` has its own two,
+  `Unknown user. Log in again.` and
+  `Authentication required: log in and send Authorization: Bearer <session_token> (ADR-0021)`. Cookie callers get
+  them too, so the web front end goes by the status and must not show them.
+- **JSON only as JSON:** a JSON body is read only with a JSON `Content-Type` (FastAPI's `strict_content_type`,
+  written out in `create_app`); without one, or as `text/plain` or a form, the route answers 422 and reads nothing.
+  A page on another origin can send a JSON `Content-Type` only after a CORS preflight, which only `WEB_ORIGINS`
+  pass. This is the first barrier against cross-site writes that ride on the cookie; the origin checks below are
+  the second.
+- **CSRF** (`api/csrf.py`): a write (any method but GET, HEAD, OPTIONS) that carries the cookie and no non-empty
+  `Authorization` header (both read exactly as for identity) must have one `Origin`, in `WEB_ORIGINS`, and one header
+  `X-NEU-Compass: 1`. Otherwise a fixed
+  **403** `{"detail": "Cross-site request refused.", "error_type": "csrf_rejected", "status_code": 403}` with
+  `Cache-Control: no-store`, before the request guard, so it takes no place. The cookie mode of `/auth/callback`
+  and `POST /auth/logout` make the same check themselves, cookie or not.
+- **CORS:** only when `WEB_ORIGINS` is set: a JSON list of lowercase origins written as a browser sends `Origin`
+  (no `:443` for https or `:80` for http, no path or trailing slash). Unset or `[]` by default, which means no CORS
+  at all and every cookie write refused; `WEB_ORIGINS=` with nothing after it stops the API at startup. Allowed
+  origins get credentials, methods GET/POST/OPTIONS, request headers `Content-Type` and `X-NEU-Compass`, exposed
+  `x-request-id` and `Retry-After`, preflight cache 600 s.
+- **Caching:** every route that reads identity (`GET /coop`, `GET /auth/me`, `POST /coop`,
+  `POST /auth/delete-account`) sends `Cache-Control: private, no-store`, the guest's answer and the 401s too
+  (`api/private_cache.py`): RFC 9111 keeps shared caches off answers to `Authorization`, but not to `Cookie`.
+  Other answers keep the headers they had before (most have no `Cache-Control`). Starlette adds `Vary: Origin` only
+  to answers for an allowed origin, so `api.<zone>` must not get a cache rule.
+- **Layers**, from the outside in: CORS, request log, CSRF, request guard, private cache, routes. CORS is outermost,
+  so the guard's 429/503, the CSRF 403 and the logging's 500 are readable by the front end.
+
 ### Safe error exits (SAFE-02)
 
-The `{detail, error_type, status_code}` shape and existing HTTP status codes remain.
+The `{detail, error_type, status_code}` shape and existing HTTP status codes remain; an OAuth refusal's 401 also
+has `reason` (R2b, below).
 Uncaught 500 uses `internal_error`; other HTTP 5xx use `server_error` unless explicitly
 mapped (502 `upstream_error`, 503 `service_unavailable`); 429 is `rate_limited`.
 No request ID is added to the body. An inbound `x-request-id` is retained only if it
@@ -541,9 +728,11 @@ Malformed identity shapes (OAuth callback and cookie restore) fail without modif
 login state; a malformed restore keeps the cookie, like an outage. Streamlit defaults to
 `client.showErrorDetails="type"`; full details are opt-in for local development only.
 
-Boundaries: this does not remove successful query text logs or query_log contents, the
-Google sub in `auth.callback.success`, or potential sensitive data in request paths/access
-query strings. Exceptions after response headers are sent cannot be converted to this
+Boundaries: this does not remove successful query text logs or query_log contents, or
+potential sensitive data in request paths/access query strings (course reads and, since R2a,
+`/auth/login-url` are logged without theirs). (The Google sub that
+`auth.callback.success` used to carry was dropped in batch T: the line keeps only the
+domain and the contribution count.) Exceptions after response headers are sent cannot be converted to this
 500 body: they are logged once as a safe `unhandled_exception`, but uvicorn's own
 `Exception in ASGI application` traceback (its handler bypasses the root filter) still
 prints the message. `/chat` builds its first (meta) line before the response starts and
@@ -563,7 +752,7 @@ When the contract above is unambiguous, here are the recommended bindings:
 | Course detail panel        | `GET /course/{id}`      | navigation from any hit              |
 | Evidence bubble click      | (read from `/course`)   | source quote + field is in `evidence_snippets` |
 | Co-op tab on course page   | `GET /coop?…`           | tier-aware; degraded for anonymous   |
-| Submit Co-op modal         | `POST /coop`            | requires Bearer session token (ADR-0021)   |
+| Submit Co-op modal         | `POST /coop`            | requires the Bearer token (ADR-0021) or the session cookie (R2a) |
 | "Ask the advisor" chat     | `POST /chat`            | NDJSON; render meta first, then stream tokens |
 | Login button               | redirect → Google OAuth | callback → `POST /auth/callback`     |
 | Rejected search affordance | `matched_via='rejected'`| show `rejection_reason` + reword CTA |

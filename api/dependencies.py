@@ -26,6 +26,7 @@ sharing a connection across threads would require `check_same_thread=False`
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 from collections.abc import Iterator as _Iter
 from typing import Annotated, Any, Callable, Iterator
@@ -40,7 +41,7 @@ from db.coop_submission_repository import CoopSubmissionRepository
 from db.program_repository import ProgramRepository
 from db.repository import CourseRepository
 from db.user_repository import UserRepository
-from app.auth import exchange_code_for_token
+from api.google_oauth import exchange_code_for_token
 from llm.gemini_client import generate_text_stream
 from rag.embedder import EmbedderProtocol
 from rag.hybrid import BM25Corpus, HybridRetriever
@@ -125,32 +126,92 @@ def get_hyde_rescue_fn() -> Callable[[str], str | None] | None:
         return None
     from rag.hyde import rescue_expand  # noqa: PLC0415
 
-    return rescue_expand
+    budget = get_model_budget()
+    if budget is None:
+        return rescue_expand
+
+    # Only reached when the course-code guard let the query through, so a place is taken only for a real call.
+    # 中文：只有通过了课号规则才会走到这里，所以只为真正的调用占名额。
+    def budgeted_rescue(query: str) -> str | None:
+        if not budget.acquire():
+            from api.model_budget import ModelBudgetExhausted  # noqa: PLC0415
+
+            raise ModelBudgetExhausted
+        return rescue_expand(query)
+
+    return budgeted_rescue
+
+
+# Daily cap on Gemini calls (batch T, P5). None when MODEL_DAILY_CALL_LIMIT is 0. One object per process, so
+# every request counts against the same file. 中文：Gemini 调用的每日上限（T 批，P5）；MODEL_DAILY_CALL_LIMIT 为 0
+# 时返回 None。每个进程一个对象，所有请求都记在同一个文件上。
+def get_model_budget() -> Any:
+    limit = settings.model_daily_call_limit
+    if not limit:
+        return None
+    from api.model_budget import FILENAME  # noqa: PLC0415
+
+    return _model_budget(str(Path(settings.sqlite_path).expanduser().resolve().parent / FILENAME), limit)
+
+
+_BUDGETS: dict[tuple[str, int], Any] = {}
+_BUDGETS_LOCK = threading.Lock()  # Two first requests must not build two counters. 中文：别让两个首个请求建出两个计数器。
+
+
+def _model_budget(path: str, limit: int) -> Any:
+    from api.model_budget import ModelBudget  # noqa: PLC0415
+
+    with _BUDGETS_LOCK:
+        if (path, limit) not in _BUDGETS:
+            _BUDGETS[(path, limit)] = ModelBudget(Path(path), limit)
+        return _BUDGETS[(path, limit)]
 
 
 # === Session auth (ADR-0021) ===
 
 
 def get_current_user_id(request: Request) -> str | None:
-    """Resolve the caller's identity from `Authorization: Bearer <token>`.
+    """Resolve the caller's identity from `Authorization: Bearer <token>`, or else from the API's session cookie.
 
-    从 `Authorization: Bearer <token>` 解析调用者身份。
+    从 `Authorization: Bearer <token>` 解析调用者身份；没有这个头时，看 API 的会话 cookie。
 
-    - no Authorization header → None (anonymous — fine for public routes)
+    - no Authorization header and no session cookie → None (anonymous — fine for public routes)
     - header present but token invalid/expired → 401 (an explicit credential
-      that fails verification is an error, never silent anonymity)
+      that fails verification is an error, never silent anonymity); the cookie is not looked at
+    - no header, session cookie (R2a) valid → its user, and `request.state.session_from_cookie` is set; invalid or
+      expired → None: the browser sends the cookie by itself, so a stale one must not turn public pages into 401s.
+      /auth/me and /auth/delete-account answer 401 and expire it.
+    - every call marks the request (R2a), so its response, the guest's too, is sent `Cache-Control: private,
+      no-store` (api/private_cache.py).
 
-    - 没有 Authorization 请求头 → None（匿名 —— 公开路由可以接受）
+    - 没有 Authorization 请求头、也没有会话 cookie → None（匿名 —— 公开路由可以接受）
     - 请求头存在但令牌无效/过期 → 401（显式提供的凭证校验失败属于错误，
-      绝不能悄悄降级为匿名）
+      绝不能悄悄降级为匿名）；这时不看 cookie
+    - 没有请求头、有会话 cookie（R2a）：有效就是它的用户，并记下 `request.state.session_from_cookie`；无效或过期
+      就是 None：cookie 是浏览器自己带的，坏 cookie 不能让公开页面都变成 401。/auth/me 和 /auth/delete-account
+      会回 401 并让它过期。
+    - 每次调用都给请求做个记号（R2a），它的响应（游客的也算）就带上 `Cache-Control: private, no-store`
+      （api/private_cache.py）。
     """
     from fastapi import HTTPException, status  # noqa: PLC0415
 
-    from app.session_tokens import verify_session_token  # noqa: PLC0415
+    from api.private_cache import IDENTITY_READ  # noqa: PLC0415
+    from api.session_cookie import COOKIE_NAME  # noqa: PLC0415
+    from api.session_tokens import verify_session_token  # noqa: PLC0415
 
+    # First, before any 401: the answer depends on who is asking, whatever it turns out to be.
+    # 中文：放在最前面、任何 401 之前：不管结果是什么，回答都取决于是谁在问。
+    setattr(request.state, IDENTITY_READ, True)
     header = request.headers.get("Authorization", "")
     if not header:
-        return None
+        cookie = request.cookies.get(COOKIE_NAME, "")
+        if not cookie:
+            return None
+        payload = verify_session_token(cookie)
+        if payload is None:
+            return None
+        request.state.session_from_cookie = True
+        return str(payload["user_id"])
     token = header.removeprefix("Bearer ").strip()
     payload = verify_session_token(token)
     if payload is None:
@@ -250,6 +311,7 @@ __all__ = [
     "get_faiss_index",
     "get_hybrid_retriever",
     "get_hyde_rescue_fn",
+    "get_model_budget",
     "get_oauth_exchange_fn",
     "get_program_repo",
     "get_program_policy_reader",

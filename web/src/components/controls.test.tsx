@@ -98,6 +98,18 @@ describe('RequisiteTree', () => {
     expect(screen.getByText('都要')).toBeInTheDocument();
     expect(screen.getByText('满足其一')).toBeInTheDocument();
     expect(screen.getAllByRole('list')).toHaveLength(2);
+    // Each label must sit on its own kind of group: swapping them would tell a
+    // student that one course is enough where all are required.
+    const group = (label: string) => {
+      const parent = screen.getByText(label).parentElement;
+      if (!parent) throw new Error(`no group for ${label}`);
+      return within(parent);
+    };
+    expect(group('满足其一').getAllByRole('button')).toHaveLength(2);
+    expect(
+      group('满足其一').queryByRole('button', { name: /CS 5100/ }),
+    ).toBeNull();
+    expect(group('都要').getAllByRole('button')).toHaveLength(3);
     expect(
       within(screen.getByRole('button', { name: /CS 5800/ })).getByText(
         '最低 C-',

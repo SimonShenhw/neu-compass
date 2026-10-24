@@ -6,12 +6,20 @@ Hard rule: everyone uses their own independent API key — never shared.
 """
 
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# A browser origin as WEB_ORIGINS takes it, exactly as a browser sends it in `Origin`: lowercase http(s), host labels
+# that neither start nor end with "-", and a port only when it is not the scheme's default, 1-65535 without leading
+# zeros (A25 N2). 中文：网页来源的格式，和浏览器在 `Origin` 里发的一模一样：小写的 http(s)，主机的每一段不以「-」开头或
+# 结尾；端口只在不是默认端口时写，1–65535，不带前导零。
+_LABEL = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+_WEB_ORIGIN = re.compile(rf"(https?)://{_LABEL}(?:\.{_LABEL})*(?::([1-9][0-9]{{0,4}}))?")
+_DEFAULT_PORT = {"http": "80", "https": "443"}
 
 
 class Settings(BaseSettings):
@@ -55,6 +63,36 @@ class Settings(BaseSettings):
     # Release kill switch: table migration alone never enables private capture.
     # 中文：默认关闭；启用前确认告知、留存／备份与访问控制，重启 API/UI。
     answer_feedback_enabled: bool = False
+
+    # query_log text older than this many days becomes its keyed hash, and saved answers that old are deleted
+    # with their votes (batch T, P3; 0 = off, the code default; compose sets 90). Needs SESSION_SECRET.
+    # 中文：超过这么多天的 query_log 原文换成带密钥的哈希，同样天数的保存回答连同评价删除（T 批，P3；0 为关闭，
+    # 是代码默认；compose 设 90）。需要 SESSION_SECRET。
+    query_log_retention_days: int = Field(default=0, ge=0, le=3650)
+    # Gemini calls (chat answers and HyDE rescues) allowed per UTC day (batch T, P5; 0 = no cap, the code
+    # default; compose sets 200). 中文：每个 UTC 日允许的 Gemini 调用次数（聊天回答和 HyDE 救援；T 批，P5；
+    # 0 为不限，是代码默认；compose 设 200）。
+    model_daily_call_limit: int = Field(default=0, ge=0, le=100_000)
+
+    # Shown on the 数据与隐私 page for questions and deletion requests (batch T, P4); unset hides the line.
+    # 中文：「数据与隐私」页上用于提问和删除请求的联系邮箱（T 批，P4）；不设就不显示这一行。
+    privacy_contact_email: str | None = Field(default=None, pattern=r"^[^@\s<>()\[\]`*_]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
+
+    @field_validator('privacy_contact_email', mode='before')
+    @classmethod
+    def a_blank_contact_is_unset(cls, value):
+        # `PRIVACY_CONTACT_EMAIL=` (the .env.example line uncommented as written) means unset, not a bad address that
+        # stops the app from starting. 中文：照 .env.example 原样取消注释的空值是没设，不是写错的地址，不能让程序起不来。
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator('query_log_retention_days', 'model_daily_call_limit', mode='before')
+    @classmethod
+    def days_and_limits_are_not_booleans(cls, value):
+        if isinstance(value, bool):  # True would mean one. 中文：True 会被当成 1。
+            raise ValueError('invalid_whole_number_setting')
+        return value
 
     # Single-process search/chat admission, OFF until target/capacity review.
     # 中文：仅单进程总量保护，默认关闭；不是身份／多 worker／费用配额。
@@ -264,6 +302,28 @@ class Settings(BaseSettings):
     session_secret: str = Field(default="", repr=False)
     session_max_age_seconds: int = 604800  # 7 days
     # 中文:7 天
+
+    # === The new web front end (R2a) ===
+    # Browser origins that may call the API with the session cookie: CORS allows them with credentials, and a write that
+    # carries the cookie must come from one of them (api/csrf.py). A JSON list, like ALLOWED_EMAIL_DOMAINS:
+    # WEB_ORIGINS='["https://compass.neu-compass.me"]'. Lowercase scheme, host and optional port only, as a browser
+    # sends them in `Origin` (no :443 for https or :80 for http); no path, no trailing slash, no "*". Unset or [] (the
+    # default) keeps today's behaviour: no CORS, and every write that carries the session cookie is refused.
+    # `WEB_ORIGINS=` with nothing after it is not a JSON list, and the API does not start.
+    # 中文：新前端（R2a）里允许带会话 cookie 调用 API 的网页来源：CORS 只放行它们（允许带凭证），带 cookie 的写请求也
+    # 必须来自其中之一（api/csrf.py）。写法和 ALLOWED_EMAIL_DOMAINS 一样是 JSON 列表。只能是小写的协议、主机和可选端口，
+    # 和浏览器在 `Origin` 里发的一样（https 不写 :443，http 不写 :80），不带路径、结尾斜杠或「*」。不设或 []（默认）
+    # 就是今天的行为：不加 CORS，带会话 cookie 的写请求一律拒绝。`WEB_ORIGINS=` 后面什么都不写不是 JSON 列表，API 起不来。
+    web_origins: list[str] = Field(default_factory=list)
+
+    @field_validator('web_origins')
+    @classmethod
+    def web_origins_are_plain_origins(cls, value):
+        for origin in value:
+            match = _WEB_ORIGIN.fullmatch(origin)
+            if not match or (match[2] and (int(match[2]) > 65535 or match[2] == _DEFAULT_PORT[match[1]])):
+                raise ValueError('invalid_web_origin')
+        return value
 
 
 settings = Settings()

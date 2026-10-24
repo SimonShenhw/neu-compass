@@ -8,15 +8,18 @@ import {
   deleteOptions,
   privacyOptions,
 } from '../fixtures/privacyDemo';
+import { WithApi } from '../test/withApi';
 function Location() {
   return <output aria-label="演示网址">{useLocation().search}</output>;
 }
 function page(path = '/privacy') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-      <Location />
-    </MemoryRouter>,
+    <WithApi>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+        <Location />
+      </MemoryRouter>
+    </WithApi>,
   );
 }
 it('unknown parameters fall back to guest, 90-days and ok; global badge never contradicts the demo', () => {

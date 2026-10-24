@@ -9,7 +9,7 @@ import {
   symlinkSync,
   realpathSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
@@ -19,12 +19,16 @@ if (
   'neu-compass-web'
 )
   throw Error('Run from web/');
+// Everything the tests read besides src/; the baseline runs R2b's tests too, which read the last three.
 const config = [
   'package.json',
   'package-lock.json',
   'tsconfig.json',
   'vite.config.ts',
   'eslint.config.js',
+  'index.html',
+  'openapi.json',
+  'tools/openapi-types/package.json',
 ];
 const paths = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -51,7 +55,10 @@ const snapshot = mkdtempSync(
   join(realpathSync.native(tmpdir()), 'neu-search-'),
 );
 cpSync(join(root, 'src'), join(snapshot, 'src'), { recursive: true });
-for (const file of config) cpSync(join(root, file), join(snapshot, file));
+for (const file of config) {
+  mkdirSync(dirname(join(snapshot, file)), { recursive: true });
+  cpSync(join(root, file), join(snapshot, file));
+}
 symlinkSync(
   resolve(root, 'node_modules'),
   join(snapshot, 'node_modules'),

@@ -147,7 +147,7 @@ sequenceDiagram
     participant SL as Streamlit<br/>compass.neu-compass.me
     participant G as Google OAuth
     participant API as FastAPI<br/>api.neu-compass.me
-    participant Auth as app.auth<br/>(pure)
+    participant Auth as api.google_oauth<br/>(pure)
     participant Repo as user_repository
 
     U->>SL: 打开页面
@@ -186,7 +186,7 @@ flowchart LR
     api[api/<br/>FastAPI routes] --> rag[rag/<br/>retriever + reranker]
     api --> db[db/<br/>repositories]
     api --> llm[llm/<br/>gemini + prompts]
-    api --> app_auth[app/auth.py]
+    api --> google_oauth[api/google_oauth.py<br/>+ session_tokens]
 
     rag --> embedder[rag/embedder<br/>bge-m3]
     rag --> hybrid[rag/hybrid<br/>BM25+RRF]
@@ -210,7 +210,7 @@ flowchart LR
     classDef layer fill:#4a90e2,stroke:#333,color:#fff
     classDef sub fill:#7ed321,stroke:#333,color:#000
     class api,rag,db,llm layer
-    class embedder,hybrid,reranker,gemini_client,prompts,review_enrich,course_repo,alias_repo,coop_repo,user_repo,app_auth sub
+    class embedder,hybrid,reranker,gemini_client,prompts,review_enrich,course_repo,alias_repo,coop_repo,user_repo,google_oauth sub
 ```
 
 ### Test suite topology

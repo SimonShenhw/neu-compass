@@ -91,6 +91,25 @@ def test_callback_passes_redirect_uri_through(
     assert captured["redirect_uri"] == "https://compass.example.com/oauth/cb"
 
 
+def test_the_login_log_line_names_no_account(
+    api_client: TestClient, empty_db: sqlite3.Connection,
+) -> None:
+    """Deleting an account cannot reach the API log, so a login line names only the domain (batch T, A24 L1)."""
+    from structlog.testing import capture_logs  # noqa: PLC0415
+
+    def fake_exchange(code: str, *, redirect_uri: str | None = None) -> dict:
+        return {"user_id": "synthetic-sub-7", "email": "carol@husky.neu.edu", "name": "Carol"}
+
+    _override_exchange(api_client, fake_exchange)
+    with capture_logs() as logs:
+        assert api_client.post("/auth/callback", json={"code": "c"}).status_code == 200
+    events = [entry for entry in logs if entry["event"] == "auth.callback.success"]
+    assert len(events) == 1
+    assert {k: v for k, v in events[0].items() if k not in ("event", "log_level")} == {
+        "domain": "husky.neu.edu", "contribution_count": 0}
+    assert "synthetic-sub-7" not in repr(logs) and "carol" not in repr(logs).lower()
+
+
 # === GET /auth/me (cookie-restore path) ===
 
 
@@ -166,6 +185,28 @@ def test_callback_oauth_error_returns_401(api_client: TestClient) -> None:
     r = api_client.post("/auth/callback", json={"code": "x"})
     assert r.status_code == 401
     assert "not allowed" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("reason", sorted(OAuthError.MESSAGES))
+def test_a_refused_login_names_its_reason(api_client: TestClient, empty_db: sqlite3.Connection, reason) -> None:
+    """R2b: the web front end tells a wrong domain and an unverified email apart from the rest, by `reason`, never by
+    the detail text. The detail stays the fixed English one; nothing is written.
+    中文：R2b：新前端靠 `reason` 分清邮箱域名不对、邮箱没验证和其余情况，不读 detail；detail 照旧是固定英文，什么也不写。"""
+    # id_token_invalid keeps a type-only diagnostic as its message; the 401 still has only the fixed text.
+    # 中文：id_token_invalid 的消息里可以留一个只含类型名的诊断；401 照样只有固定文字。
+    message = ("ID token verification failed: ExpiredSignatureError" if reason == "id_token_invalid"
+               else "synthetic upstream text")
+
+    def refuse(code: str, **kw) -> dict:
+        raise OAuthError(message, reason=reason, email_domain="example.test")
+
+    _override_exchange(api_client, refuse)
+    r = api_client.post("/auth/callback", json={"code": "synthetic-code"})
+    assert r.status_code == 401
+    assert r.json() == {"detail": OAuthError.MESSAGES[reason], "error_type": "unauthorized", "status_code": 401,
+                        "reason": reason}
+    assert message not in r.text and "Expired" not in r.text and "example.test" not in r.text
+    assert empty_db.execute("SELECT count(*) FROM users").fetchone()[0] == 0
 
 
 def test_callback_missing_code_returns_422(api_client: TestClient) -> None:

@@ -3813,3 +3813,574 @@ API、检索、提示词、数据库和快照都没改。
 ### 发布状态
 
 分支 `fix/page-state-l`，基底 `ca41bdc`，也就是 10-21 上线的 main。第一个提交 `2fc5cf1` 是 L 本身，第二个提交是 A23 审查的修复，第三个提交只改本节（复核记录和复核的 NIT）。没有使用真实模型、账号、NAS 或生产库。L 只改页面，上线另行授权，可以等下一次上线一起上。
+
+## 32 — 小范围试用准备：数据与隐私页、到期清理、每天的模型调用上限、删除账号（T，2026-10-21）
+
+### 范围与原因
+
+10-21 下午的新一轮，用户定主线做小范围试用准备，由协调方来写。用户定的政策：
+- **P1 给谁用：** 先给 10–20 个认识的 NEU 研究生，私聊或小群发链接，不公开发帖。
+- **P2 告知：** 加「数据与隐私」页。
+- **P3 留多久：** 提问原文留 90 天，到期换成带密钥的哈希，行保留；勾选保存的回答和评价也是 90 天，到期删除。
+- **P4 怎么删：** 登录用户在页面上删除账号和投稿，页面上留用户的 NEU 邮箱。删号以后，同一组公开的投稿只剩一个投稿人时，撤回剩下那份。
+- **P5 费用和滥用：** 模型调用每天最多 200 次；打开限流。
+- **P6 反馈：** 打开 👍／👎，保存默认不勾选。
+- **P7 看数据：** 每周一次只读统计。
+
+开关和上线另要授权。本节只改代码、配置和文档，没有上线。
+
+### 已实现
+
+1. **「数据与隐私」页**（`app/privacy_view.py`）：导航末尾加第 5 页「🔒 数据与隐私 · Privacy」，前四页的位置和深链序号不变。
+   - 分四段：记了什么、谁能看、留多久、怎么删。每句话都对应代码现在的做法。
+   - 天数、反馈开关和联系邮箱取自 UI 的设置（`QUERY_LOG_RETENTION_DAYS`、`ANSWER_FEEDBACK_ENABLED`、`PRIVACY_CONTACT_EMAIL`），所以清理关着时页面不会承诺清理。
+   - 写明问题、这次对话最近几轮和检索到的课程信息会发给 Google Gemini；网站经 Cloudflare 转发，连接在 Cloudflare 那里解密，所以 Cloudflare 能看到传输的内容；公开的 Co-op 经验按贡献等级给访客看。
+   - 用户 10-21 确认 Gemini 的 key 是付费档，页面照 Google 的 Gemini API 附加条款（2026-03-23 生效、04-28 更新，核过原文）写了付费档的做法：不拿这些内容改进 Google 的产品；会保留一段有限的时间，只用来发现和防止违规使用、维护安全，以及法律或监管要求的披露；可能临时存放或缓存在 Google 或其代理设有设施的任何国家；具体仍以 Google 的条款为准。
+   - 换过哈希的那一行还留着时间、搜到的课程和检索方式；Co-op 要两个不同投稿人的投稿通过审核才一起公开；运行日志里登录只记学校域名和贡献数；账号那一行还记着第一次和最近一次登录的时间（删账号时一起删）。这几句是 A24 审查和复核以后改准的。
+   - 提问和保存的回答都不记账号（真实用户的 `user_id` 本来就是空），页面照实写：删账号删不到它们，只能等到期。
+   - 聊天里勾选「允许保存」旁边的说明（`capture_notice`）也读 `QUERY_LOG_RETENTION_DAYS`：设了天数就写「保存的回答和评价 N 天后删除，每日备份里最多再留大约两周」，和隐私页一致；设成 0 时照旧说不会自动删除（A24 M1）。
+   - 聊天顶部的提示后面加了一句「留多久、怎么删，见左侧「🔒 数据与隐私」。」。九个页面快照重新生成，逐个核对过，只有这一句变了。
+   - 只用纯文字，每句经过 `literal_markdown`。
+2. **提问原文到期换哈希**（`db/query_log_retention.py`）：`created_at` 早于期限、还没换过的行，`query` 换成 `redacted:<16 位十六进制>:<字符数>`，别的列都不动。
+   - 哈希就是 K 的 `query_hash`。派生和计算拆进新的 `api/query_hash.py`，它不读设置；`api/query_fields.py` 改成调用它，哈希值不变，K 的测试照过。
+   - 只有完全符合这个形状的文字才算已经换过，所以第二遍不会再改。SQLite 的 `length()`、`substr()`、`GLOB` 遇到 NUL 就停，所以还要求字节数等于字符数，「标记＋NUL＋原文」骗不过去（A24 L2）。
+   - 分批处理，每批一个短的写事务；每条 UPDATE 都核对读到的原文，中间被改过的行留给下一批，按改过的原文换。一整批一行也没换成时，这次就停，留给下一次。
+   - 没有 `SESSION_SECRET` 时不换：随机密钥会毁掉原文，留下的哈希又什么也对不上。
+   - 磁盘上的旧字节：`db/connection.py` 的每个连接都打开 `secure_delete`，换掉和删掉的内容用零覆盖；不然备份边车按页复制，会把旧字节带进之后的每一份备份（A24 L3：编译默认关闭时，40 条里有 39 条原文还在库文件里）。代价是删改时多一点 CPU、离线脚本批量删除多写一些 WAL，读和锁不变。跑完以后做一次 WAL checkpoint（`TRUNCATE`），失败了不算这次失败。它最多等 100 毫秒：等旧快照上的读者（备份边车、每周统计、导出）时，SQLite 会挡住新的写入，按连接默认的 5 秒等，API 的写入会失败（A24 复核 LOW-R1）。等不到就放弃，WAL 里的旧帧留到下一次运行截断，或者最后一个连接关闭；SQLite 自己的自动 checkpoint 不截断文件。
+3. **保存的回答到期删除**（同一模块的 `delete_expired_answers`）：`chat_answers` 里超过同一期限的回答，连同评价一起删除。
+   - 先删评价再删回答，所以不靠外键级联也不会留下孤立的评价。
+   - 没有 v1.7 表的旧库跳过这一步。
+4. **在哪里跑**（`api/query_log_retention_task.py`，接在 `api/main.py` 的 lifespan 上）：API 进程里的一个后台线程，启动时一次，之后每 24 小时一次。每次先换哈希，再删回答，最后 checkpoint。
+   - 原先的设计是放在备份边车里，那样要把能伪造登录的 `SESSION_SECRET` 交给备份容器，所以改在 API 里跑。
+   - `QUERY_LOG_RETENTION_DAYS` 为 0（代码默认）时关闭。没有密钥时只跳过换哈希，删回答照跑（它不需要密钥）：启动时记一条 `query_log.retention_skipped`，之后每次的日志里 `replaced` 是 null（A24 L4）。
+   - 某一次失败只记 `query_log.retention_failed` 和异常类型，下一次再试，不会让 API 停下。日志里只有计数。
+   - 手动命令 `scripts/redact_query_log.py`：`--dry-run` 只数，不要密钥；真跑要 `SESSION_SECRET`（没有时整个拒绝），跑完也 checkpoint；只输出计数。
+5. **每天的模型调用上限**（`api/model_budget.py`；设置 `MODEL_DAILY_CALL_LIMIT`，代码默认 0，不限）：API 每次真正调 Gemini 之前占一个名额。回答生成算一次；HyDE 救援只有过了课号规则、真去调模型才算；经过 API 的评测流量也算。`scripts/` 里的离线脚本直接调模型，不占名额（A24 L7）。
+   - 按 UTC 日期计数，存在数据库同目录的 `model_budget.json`，原子写入，有进程锁，重启不归零。
+   - 文件读不了就从 0 开始；写不了照样在内存里限制，只警告一次。
+   - 用完以后，`/chat` 在 meta 后面发固定的 `daily_limit` 错误事件和 done，不调模型；UI 把这句提示当作回答显示。提示写了恢复时间：UTC 零点，也就是波士顿时间晚上 8 点（冬令时晚上 7 点）；原来写的「明天」不对。救援抛 `ModelBudgetExhausted`，`attempt_hyde_rescue` 保留原来的拒答，记 `rescue.skipped reason=model_daily_limit`。
+   - 只有一个 API 进程，所以用进程锁就够了；这不是多进程或按用户的配额。
+6. **删除账号和投稿**（`POST /auth/delete-account`，`db/account_deletion.py`）：要 Bearer，body 正好是 `{"confirm": "delete"}`。一个事务里做完：
+   - 先删这个账号公开的 Co-op 经验，以及任何人对它们的解锁记录（外键只会把投稿人置空，内容会匿名留在公开列表里）；
+   - **k=2：** 同一组（公司、职位、学期）公开的投稿如果因此只剩一个投稿人，剩下那份撤回到 `approved`，从公开列表撤下（连同解锁记录）。之后同组再有通过审核的投稿，会一起重新公开，不重复记功；已经给的记功不收回。这是用户 10-21 选的；
+   - 最后删 `users` 这一行，级联删掉它的解锁记录、计划课程、全部 Co-op 投稿（任何审核状态）和贡献记功。
+   - 要求外键打开、调用方不在事务里；任何一步失败都整体回滚。返回各表删了几行，日志 `account.deleted` 只有这些计数。
+   - 删完以后，同一个 token 调 `/auth/me` 或再删一次都是 401。
+   - 页面上只有登录用户看得到：先勾选「我知道删除以后不能恢复」，按钮才能点。按钮用 `on_click` 回调：删完清 cookie、登出，并提示已删除；401 时也登出，提示登录已经失效。没收到服务器的回复（超时、连不上、网关错误，也就是 502／503／504）时，服务器可能已经删完了，所以只说不确定删没删，请刷新看看：变成游客就是删掉了（A24 L5）；别的错误才说什么也没删。
+7. **compose：**
+   - api：保留 90 天，每天 200 次，打开反馈，打开限流（容量 20，每秒补 0.5，同时最多 4 个；没在 NAS 上量过，估算写在 `docs/request-admission.md`）；
+   - ui：保留 90 天，打开反馈，联系邮箱是用户的 NEU 邮箱；
+   - 测试钉住 api 和 ui 的保留天数、反馈开关一致。
+8. **每周只读统计**（`scripts/weekly_stats.py`）：只读快照，输出最近 N 天（默认 7 天）的这些计数：
+   - 每天的提问数，按路由和流量分；
+   - unmarked 提问的检索方式；
+   - 👍／👎 和新保存的回答；
+   - 账号数和 Co-op 队列；
+   - 今天的模型调用次数。
+
+   不输出原文、邮箱或 ID。在 NAS 上跑也算碰 NAS，要先问用户。
+9. **设置的校验：** 两个整数设置不收布尔值（在代码里传 True 会被当成 1）；保留天数是 0–3650，上限是 0–100000；联系邮箱只收不含 Markdown 符号的普通地址。联系邮箱留空（照 `.env.example` 原样取消注释）等于没设，原来会让设置加载失败、程序起不来（B24 的笔记）。
+10. **登录日志**（`api/routes/auth.py`）：`auth.callback.success` 原来记 Google 账号 ID（sub）。API 日志按大小轮转、没有时限，删账号也删不到，所以现在只记学校域名和贡献数（A24 L1）。`docs/oauth_secret_rotation.md`、`docs/api_contract.md` 和 `pii_redaction.md` 第 12 节跟着改了。
+
+### 修改文件
+
+- 新建：`api/query_hash.py`、`api/query_log_retention_task.py`、`api/model_budget.py`、`db/query_log_retention.py`、`db/account_deletion.py`、`app/privacy_view.py`、`scripts/redact_query_log.py`、`scripts/weekly_stats.py`。
+- 改：`api/query_fields.py`、`api/main.py`、`api/dependencies.py`、`api/routes/chat.py`、`api/routes/common.py`、`api/routes/auth.py`、`api/models.py`、`app/streamlit_app.py`、`app/answer_feedback_view.py`、`app/api_client.py`、`config/settings.py`、`db/connection.py`（审查以后的修复：`secure_delete`，另给一个只有类型注解用到的名字补了 `TYPE_CHECKING` 导入，Ruff 第一次查这个文件时报了 F821）、`docker-compose.yml`、`.env.example`。
+- 文档：`docs/api_contract.md`、`docs/request-admission.md`、`docs/query-log-export.md`、`docs/pii_redaction.md` 第 12 节、`docs/answer-feedback.md`、`docs/oauth_secret_rotation.md`、`scripts/README.md`、本节。
+- 测试：
+  - 新建 `test_query_log_retention.py`、`test_model_budget.py`、`test_privacy_view.py`、`test_account_deletion.py`、`test_weekly_stats.py`，提交 T 时共 111 项，审查以后的修复加到 139 项，复核第 1 轮以后 141 项，B24 的报告以后 142 项；
+  - `test_compare_view.py` 的导航列表和 `test_page_orchestration.py` 的页面结尾数加上了隐私页；
+  - 审查以后的修复：`test_api_auth_route.py` 加了 1 项（登录日志）；`test_feedback_release_gate.py` 改成用 `capture_notice`；
+  - 九个页面快照只改了聊天提示那一句。快照用的保留天数是 0，所以勾选说明在快照里还是原来那句。
+
+数据库结构、检索和提示词都没改。
+
+### 验证记录
+
+- **新测试：** 111 项全过。同样的测试放在基底的副本上，五个新测试文件都在收集时失败，因为新模块还不存在。
+- **定向和静态检查：**
+  - 定向测试 **958 passed**。第一次跑时，K 的日志静态检查（`test_log_query_fields.py`）抓到删除账号的日志用了 `**counts`，键名看不出来；改成逐个写出键名，测试再钉住日志里的计数和返回的一样。
+  - Ruff F／E9／B 在 26 个改过的 Python 文件上通过，没有 CR。隐形字符检查只标出 `docs/api_contract.md` 开头的 BOM，基底里本来就有。
+- **快照和离线评测：** 九个快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+- **变异：190 个，杀掉 189 个**，被杀的都是对口的测试，没有只靠超时判定的。
+  - 新写 112 个。编号是 T01–T118；T34、T49、T50、T59、T75、T117 在写进工具之前就当成等价拿掉了，当时没把是哪几个、为什么记下来，现在找不回了（B24 指出）。以后拿掉的变异体，在工具里写一句理由。
+  - 锚点落在 T 改过的函数里的旧变异体 78 个：自动收集到 69 个；另外手动补了 9 个。其中 7 个是 K 的哈希变异体，锚点随派生代码搬进了 `api/query_hash.py`；还有 2 个来自两个加载不了的旧工具，它们各自只有一个落在 `chat` 里，手抄过来。
+  - 第一遍存活 3 个：
+    - 每周统计的窗口起点（`>=` 改成 `>`）：补了一行正好落在窗口第一秒的数据以后被杀；
+    - L 的 L24（`render()` 去掉 cookie flush）：第一遍的副本建在快进到 L 之前，换到现在的基底以后，被 L 自己的真实 flush 测试杀掉。第一遍的副本对 T 自己的页面变异体也一样是旧的；B24 在真实的 `86dae4e` 上重跑了 T83–T86 和 T116，原因照旧，都被杀；
+    - K 的 B17（问题文字里的孤立代理字符用 replace 编码）：照 K 当时的结论算等价，因为带孤立代理字符的请求在校验时就是 422。
+- **串行全量：** **4995 passed／7 warnings／550.40 秒**，退出码 0。比 main 的 4884 多出的 111 项就是新测试；全量前后 44 个改动文件一致。全量开始以后只补了本节的数字，没有测试读本文件。
+
+- **第 23 轮审查以后的修复**（A24 的报告，加上 B24 停下时笔记里的发现）：
+  - 改过的 7 个测试文件 **197 passed**。同样的测试放在 T 的提交 `86dae4e` 上跑，22 项失败，原因都对：删除没收到回复的五种情况、登录日志、勾选说明跟着天数走（90 天和 30 天两项；0 天那项在 `86dae4e` 上本来就过）、`test_feedback_release_gate.py` 的 4 项（改成调用新函数）、每日上限提示的恢复时间、空的联系邮箱 2 项、隐私页的措辞、带 NUL 的标记、没有密钥时也删回答、`secure_delete`、跑完以后磁盘上的旧文字（任务 2 项：原文在库文件里，或者还在 WAL 的旧帧里；手动命令 1 项）。其余新加的测试在 `86dae4e` 上就通过，它们钉的是原来就对、只是没测到的行为，是给 B24 存活的变异体补的（见下）。
+  - 定向测试 **1002 passed**；Ruff F／E9／B 在 29 个改过的 Python 文件上通过，没有 CR；隐形字符只有 `docs/api_contract.md` 开头基底就有的 BOM。快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+  - **变异 72/72 killed**，被杀的都是对口的测试，没有只靠超时判定的。第一遍 71/72：F09（checkpoint 用 `PASSIVE` 代替 `TRUNCATE`）存活，因为那条测试先把库 checkpoint 干净了，WAL 里本来就没有旧文字；生产上 WAL 文件不截断，很久以前的旧帧会一直留着，补了「原文还在 WAL 的旧帧里」那一种以后被杀。F15 第一遍是因为多出来的警告让等待提前结束、报 IndexError 才失败的；等待条件改成只数 `query_log.retention` 以后，用这条测试的三个变异体（F15、T33、T35）重跑，都由对口的断言杀掉。
+    - 新写 32 个：F01–F31，以及 T76b（T76 改锚到新的那句）；
+    - B24 的 14 个：它定向跑时存活的 11 个里，B12 不跑，算等价（`query_log.route` 从建表那次提交 `ac9d246` 起就有 `CHECK (route IN ('search', 'chat'))`，走不到那个分支），其余 10 个都补了测试；另外是 sim03 的 P02／P05／P09（B24 改锚成 B14–B16；sim03 的工具加载不了，T 第一遍变异漏了它们，本节原来也没写）和改锚的 IK11（B17：第一遍记成杀掉，其实是因为 `data` 这个名字没了、报 NameError 才失败的）；
+    - 锚点落在这次改过的代码里的旧变异体 26 个（T 自己的 24 个，加上 batch15 和 safe02 各 1 个）。这次收集把模块级和类里的语句也算进来，T 第一遍的收集只看函数（B24 指出 `query_fields.py` 模块级的 IK12、H3、H6 因此既没算受影响也没算被顶替；它们测的行为由 T02、T03 覆盖）。T28、T76 的锚点这次改掉了，由 F13 和 T76b 顶替。三个加载不了的旧工具（fix_a、sim03、k3）在这次改过的文件里没有变异体。
+  - 串行全量 **5024 passed／7 warnings／466.11 秒**，退出码 0。比 4995 多出的 29 项就是这次新加的测试；相对 `6395ee5` 的 48 个改动文件在全量前后一致。全量开始以后只补了这个数字。
+
+- **复核第 1 轮以后的修复**（第三个提交：A24 复核的 LOW-R1 和三条 NIT，加上 Gemini 付费档那句）：
+  - 改过的 2 个测试文件和上一轮的 7 个一起 **199 passed**。新加和改过的测试放在 `d06d059` 上跑，3 项失败，原因都对：checkpoint 等了 5.35 秒（要求 2 秒以内）；登录那两句；Gemini 付费档那句。
+  - 定向测试 **1004 passed**；Ruff F／E9／B 通过，没有 CR；快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+  - **变异 22/22 killed**，都是对口的测试：新写 10 个（F32–F40，以及 F23c：F23 改锚到新的那句）；锚点落在这次改过的代码里的旧变异体 12 个（T 的 6 个、上一轮的 6 个）。上一轮的 F10 锚点还在，但后面多了 `finally:`，变出来的代码不合语法，改锚成 F40。
+  - 串行全量 **5026 passed／7 warnings／478.20 秒**，退出码 0。比 5024 多的 2 项就是这次新加的测试；48 个改动文件在全量前后一致。全量开始以后只补了这个数字。
+
+- **B24 的报告和复核第 2 轮以后的修补**（第四个提交，只改测试和措辞）：
+  - 改过的 2 个测试文件和之前的 5 个一起 **200 passed**。放在 `4115247` 上跑，只有 Gemini 措辞那项失败，原因对；新补的磁盘测试（G02、G07）、导出那句和 0.75 秒的上限在 `4115247` 上就通过：它们钉的是原来就对、只是没测到的行为。
+  - 定向测试 **1005 passed**；Ruff F／E9／B 通过，没有 CR。
+  - **变异 27/27 killed**，都是对口的测试：新写 8 个（B24 的 G02、G07 和 G03、G04，Gemini 措辞的 H01–H03，以及 H04：F36 改锚到新的那句）；锚点落在这次改过的代码里的旧变异体 19 个（F10 照上一轮的理由不跑，由 F40 顶替）。
+  - 串行全量 **5027 passed／7 warnings／463.13 秒**，退出码 0。比 5026 多的 1 项就是新加的 G07 测试；48 个改动文件在全量前后一致。全量开始以后只补了这个数字。
+
+### 审查
+
+第 23 轮，两路只读审查，在 `86dae4e` 上做（10-21 夜），都不派子 agent：A24 看隐私和正确性，B24 看测试、变异和文档。
+
+A24 交了报告：没有 CRITICAL、HIGH，1 MEDIUM、8 LOW、若干 NIT。A24 在自己的副本里用合成库和真实代码做了三组探针，核过：K 的哈希逐字节没变；换哈希分批、核对原文、不会重复换；先删评价再删回答；API 只有两处调 Gemini，都先占名额；删账号覆盖了所有带用户 ID 的列，k=2 撤回在它试过的边界情况里都对。
+- **MEDIUM-1：** 勾选「允许保存」旁边的说明还写着「数据、备份和导出不会自动删除」，和隐私页、90 天删除矛盾，而且就在同意的地方。已修，见「已实现」第 1 条。
+- **LOW-1：** 登录日志记 Google 账号 ID，删账号删不到。已修，见第 10 条。
+- **LOW-2：** 「标记＋NUL＋原文」会被当成已经换过。已修，见第 2 条。
+- **LOW-3：** 旧字节还留不留在库文件里，取决于 SQLite 的 `secure_delete` 编译默认值。已修，见第 2 条；上线时还要在容器里核对一次。
+- **LOW-4：** 没有密钥时，连不需要密钥的删回答也跳过了。已修，见第 4 条。
+- **LOW-5：** 删除超时被说成「什么也没删」。已修，见第 6 条。
+- **LOW-6：** 页面把换过哈希的那一行说窄了。已修，见第 1 条。
+- **LOW-7：** 离线脚本直接调模型、不占名额；匿名请求大约六分钟就能用完全站一天的 200 次（B24 后来指出，够格救援的 `/chat` 一次占两个名额，最快大约三分钟）。写进了 `docs/request-admission.md` 和 `api/model_budget.py`，没改代码，见「已知」。
+- **LOW-8：** 联系邮箱写在 compose 里，push 以后就进了公开仓库。要用户定，见「已知」。
+- **NIT：** 「两份投稿」应该是两个不同投稿人；谁能看、Cloudflare 能看到内容；名额在调用之前就占掉；`model_budget.json` 没有 fsync；换了 `SESSION_SECRET` 以后标记就对不上；`daily_limit` 说「明天」不对。都改了文字。Gemini key 是哪一档要问用户，见「已知」。
+
+B24 中途停下了（用户 10-21 夜叫停了所有审查），还没有报告。它停下时的笔记里已经有下面这些，修复一并处理了：
+- 空的联系邮箱让设置加载失败（第 9 条）；
+- 它自己写的变异体有 11 个在定向测试上存活，都补了测试，或者说明了为什么等价（见「验证记录」）；
+- 变异收集的三处缺口：IK11 是因为 NameError 才失败的；sim03 的工具加载不了，它的三个变异体没跑；`query_fields.py` 模块级的锚点漏掉了（见「验证记录」）；
+- 每周统计只读打开 WAL 库也会留下 `-wal`／`-shm` 文件，写进了它的文档字符串和 `docs/query-log-export.md`。
+
+修复是第二个提交 `d06d059`。
+
+**复核第 1 轮**（A24，10-21 深夜，在 `d06d059` 的新副本上）：第 23 轮的问题全部修好（L7 照约定只改文档）。A24 用探针核过：带 NUL 的标记现在会换掉；编译默认关闭 `secure_delete` 时，库文件、WAL 和在线备份里都没有旧文字（原文在库文件里、只在 WAL 帧里，两种都试了）；没有密钥时只删回答，别的不动；删除的几种提示和实际知道的一致（500 照旧说什么也没删是对的：提交以前的错误都会回滚，提交以后只记计数、返回）；没有哪行日志还带账号 ID 或邮箱。修复带出 1 LOW、3 NIT，都在第三个提交里处理了：
+- **LOW-R1：** `TRUNCATE` checkpoint 碰上旧快照上的读者时，会等满连接的 5 秒，期间挡住新的写入；A24 量到一次插入 5.01 秒后报 database is locked。改成只在 checkpoint 时等 100 毫秒，见「已实现」第 2 条。
+- **NIT-R1：** 「库忙时留给 SQLite 下一次自动 checkpoint」不对，自动 checkpoint 不截断文件。改了 `checkpoint()` 的文档字符串、`docs/query-log-export.md` 和本节。
+- **NIT-R2：** `secure_delete` 对所有连接生效的代价，记进了文档。
+- **NIT-R3：** 登录那两句补上了贡献数和登录时间；删除说明也写上了登录时间。
+
+B24 续上以后、还没开始审修复，用户 10-21 深夜第二次叫停了所有审查；10-22 第三个提交以后接着审。
+
+**B24 的报告**（10-22，审 `86dae4e` 和两个修复提交）：没有 CRITICAL、HIGH。它在 `86dae4e` 上找到 1 MEDIUM（和 A24 的 M1 相同）、5 LOW：它自己写的 17 个变异体有 11 个在定向测试上存活；IK11 是 NameError 才失败的；收集漏了 sim03 的工具和模块级的锚点；空的联系邮箱让两个服务都起不来；每周统计会留下 `-wal`／`-shm`。这些 `d06d059` 都已经覆盖了，B24 对照代码和测试核过，不只看本节。两个修复提交里它新查出 2 LOW、若干 NIT，第四个提交都处理了：
+- **LOW G02：** 手动命令里，checkpoint 挪到删回答之前，没有测试会失败：那条磁盘测试没有保存的回答。测试改成带一条保存的回答。
+- **LOW G07：** 只删回答、没换原文的那次运行（没有密钥，或者没有到期的原文），没有测试去查磁盘上的文件，`if replaced: checkpoint()` 这样的变异体能存活。补了一条测试。
+- **NIT：** 勾选说明里「已经导出的文件不会自动删除」没钉住；100 毫秒只钉到 2 秒以内（改成 0.75 秒，等 1 秒的就会失败）；「最快约六分钟」其实约三分钟；本节的测试数没更新；`answer-feedback.md` 那句加粗的话没跟着改；`api_contract.md` 和本节的删账号步骤顺序和代码不一样。都改了。T 的六个变异体编号、收集只认 `mutate*.py` 文件名、CLI 测试的一秒窗口，写进了上面的验证记录和下面的「已知」。
+
+B24 还核过这些：每一轮红和绿的原因都对；它读了每个变异体的失败输出（190＋72＋22，加上重跑），被杀的都对口，两次误杀（IK11、F15 的第一遍）都已经更正；8 个跟时间有关的测试，在负载下 3 路并行跑了 18 遍都过；本节的数字除了 139 都对得上；列出的文档和代码一致。
+
+**复核第 2 轮**（A24，10-22，在 `4115247` 上）：LOW-R1 和三条 NIT 都修好了。
+- 有读者拿着旧快照时，checkpoint 0.103 秒就放弃，后面到的写入 0.104 秒就提交了（之前是等 5.01 秒以后报 database is locked）。
+- 等待时间在每条路径上都还原；只有还原本身失败时会留着短的那个，两个调用方都马上关连接，没有影响。没有读者时照样截断。
+- 新的 NIT-G：Gemini 那句比条款说得窄三处：存放地点漏了「或其代理」，把存放地点和保留期绑在一起，「维护服务安全」比 safety and security 窄。第四个提交改了。
+
+复核两轮到这里都用完了。
+
+### 已知、未处理
+
+- **上线后第一次启动就会清理：** 90 天以前的提问原文当场换成哈希，换了就改不回来，只有每日备份里还留大约两周。依赖旧原文的导出或评测，要在上线前做完。
+- 经过 API 的评测流量也占每天的名额：跑一次真实评测（几十个问题）会用掉当天的一部分。`scripts/` 里的离线脚本直接调模型，不占名额，也不受这个上限管。
+- 名额全站共用：匿名请求连着发，最快大约三分钟就能用完一天的 200 次（够格救援的 `/chat` 一次占两个名额：救援一个、回答一个；一次只占一个的大约六分钟），之后到 UTC 零点之前所有人都只拿到 `daily_limit`（A24 L7；B24 指出三分钟）。要防，得先有按身份的配额。
+- 限流的数值是估的，没在 NAS 上量过。被挡下的请求不写 query_log，所以每周统计看不到；要看就得数 API 日志里的 429／503。
+- 每天的上限只在一个 API 进程里有效；开多个 worker 或多个实例时会各算各的。
+- 清理只碰数据库。备份里的原文和回答最多再多留大约两周；已经写进 Docker、代理或隧道日志的内容不受影响。上线以前写下的登录日志行还记着账号 ID，要等轮转掉或者容器重建才会消失。
+- 没有 `SESSION_SECRET` 时不换哈希（删回答照跑）。生产一定有它（登录要用），上线时要核对。
+- `secure_delete` 现在由每个连接自己打开，不依赖编译默认值；上线时在容器里核对一次它真的生效（`PRAGMA secure_delete` 返回 1）。
+- 提问和保存的回答不记账号，所以想删某一条时挑不出是哪一条，只能等到期，或者写邮件说明。
+- **联系邮箱（A24 L8）：** 用户 10-21 定了留在 compose，push 以后进公开仓库（每个提交的作者信息里本来就有这个邮箱，隐私页上线以后也公开显示它）。
+- **Gemini 的档位：** 用户 10-21 确认是付费档，页面照付费档的条款写了。换成免费档的 key 时要改这句：免费档的内容会被拿去改进 Google 的产品，也可能有人工审阅。
+- checkpoint 碰上正在读库的备份、统计或导出时，这次不截断 WAL，旧帧要等下一次运行或者最后一个连接关闭才清掉（A24 复核 NIT-R1）；备份不受影响。
+- 旧变异体的收集只认 `mutate*.py` 这样的文件名，评审员用别的名字写的工具（`mutants_*.py`、`mut_*.py`、`b19_mutate.py`）收不进来。B24 静态扫过，落在 `chat()`／`render()` 里的锚点大多和收进来的重复，风险低。
+- CLI 的测试用真实的当前时间：2027-01-18 18:00:00 UTC 前后约一秒，`recent` 那行正好到期，期望和结果可能对不上；`test_rescue_takes_a_place_only_when_it_calls_the_model` 的两次调用如果正好跨过 UTC 零点也会失败（B24 NIT）。
+- 隐私页写的是实际做法，不是法律意义上的承诺。上线前要请用户读一遍。
+
+### 发布状态
+
+分支 `feat/trial-readiness`，基底是合并 L（#23）以后的 main `6395ee5`：先在 L 的第一个提交 `2fc5cf1` 上写，L 合并以后快进过来，两边没有重叠的文件。第一个提交 `86dae4e` 是 T 本身，第二个提交 `d06d059` 是第 23 轮审查的修复，第三个提交 `4115247` 是复核第 1 轮的修复和 Gemini 付费档那句，第四个提交是 B24 的报告和复核第 2 轮之后的修补（测试和措辞，没有再审）。没有使用真实模型、账号、NAS 或生产库。上线要另外授权；上线时要在容器里核对这些设置（只数不打印），并重新问 P6、P7 跑不跑。
+
+## 33 — 新前端的后端准备：会话 cookie、跨站防护、CORS 和公开接口（R2a，2026-10-22）
+
+### 范围与原因
+
+10-22 用户定了：前端换成 React；R2（接口层和登录）由协调方来写，分两批，先后端（R2a，本节），再前端（R2b）。新前端的 Google 登录照旧回站点根路径。
+
+新前端是在浏览器里直接调 API 的单页应用：compass 子域名上的页面调 api 子域名，同一个站点、两个来源。这一批给它准备后端：登录态放进 API 自己的 HttpOnly cookie，前端脚本碰不到令牌；带 cookie 的写请求要过跨站检查；CORS 只放行设好的来源；再加三个前端要用的公开接口。
+
+生产没有设 `WEB_ORIGINS`，所以这批代码上线以后，现有的行为都不变：没有 CORS，也没人用 cookie 模式。compose 只给 api 服务加了联系邮箱（见第 9 条）。
+
+### 已实现
+
+1. **搬模块，不改行为：** `app/auth.py` 搬到 `api/google_oauth.py`，`app/session_tokens.py` 搬到 `api/session_tokens.py`，内容照搬。
+   - `app/` 里的这两个文件改成转发同一批对象的壳，给 Streamlit 版用到它退役为止。
+   - `api/` 里原来从 `app/` 导入的三处（`dependencies.py`、`exceptions.py`、`routes/auth.py`）改成从新模块导入。一条测试扫描 `api/` 下的每个文件，钉住不再导入 `app`，切换以后删 `app/` 不会让 API 坏掉。
+2. **会话 cookie**（`api/session_cookie.py`）：`/auth/callback` 的请求体多一个可选字段 `session`。
+   - `"token"`（默认）：和以前一样，令牌在返回体的 `session_token` 里。Streamlit 和脚本照旧用它。
+   - `"cookie"`：令牌放进 cookie `__Host-nc_api_session`（HttpOnly、Secure、SameSite=Lax、Path=/、不带 Domain、Max-Age 等于 `SESSION_MAX_AGE_SECONDS`），返回体里的 `session_token` 是 null。用的是和 Bearer 同一种签名令牌。
+   - `__Host-` 前缀让浏览器强制 Secure、Path=/、不带 Domain，别的子域名设不了同名 cookie。compass 和 api 是同一个站点，所以 SameSite=Lax 的 cookie 在前端的请求里照样会带上。
+   - 没有 `SESSION_SECRET` 时两种模式都签不出令牌，也就不设 cookie。
+   - cookie 模式要来自 `WEB_ORIGINS`、带 `X-NEU-Compass: 1`（和第 5 条同一个判断），不管原来带没带 cookie；不然回同样的固定 403，而且在 code 交给 Google 之前就拒绝。
+   - 挡登录劫持（别的网站把浏览器登录成它选的账号）的第一道是严格的 Content-Type（第 12 条）：别的来源要发 JSON 请求体，得先过 CORS 预检。这个检查是第二道：哪天第一道没了（较早的 FastAPI 会把不带 Content-Type 的请求体照样按 JSON 读），别的网站用一个简单的 POST 就能做到。第一版这里写的理由（「FastAPI 照样按 JSON 解析」）对锁定的 FastAPI 0.136.1 不成立，审查指出以后改了（见「审查」）。
+   - token 模式不查（Streamlit 从服务器端调，没有 Origin）。
+3. **身份**（`get_current_user_id`）：有非空的 `Authorization` 头时和以前完全一样，无效（包括不是 `Bearer …` 的头）就 401，这时不看 cookie。没有这个头、或者它是空的时候才看 cookie：有效就是它的用户，无效或过期就当游客。cookie 是浏览器自己带的，坏 cookie 不能让公开接口都变成 401。
+4. **cookie 失效和登出：**
+   - `GET /auth/me`：cookie 坏了、过期了，或者它的账号已经不在了，401 的同时让 cookie 过期，浏览器就不再带它。
+   - `POST /auth/delete-account`：用 cookie 删号成功以后，让 cookie 过期；cookie 坏了、过期了，或者账号已经不在，401 的同时也让它过期，和 `/auth/me` 一样。用 Bearer 删号时不动 cookie。
+   - 让 cookie 过期的那条 `Set-Cookie` 也带着 Secure 和 Path=/、不带 Domain：浏览器对 `__Host-` 的名字只认这样的，不然删不掉。测试逐条核对这几个属性。
+   - 新加 `POST /auth/logout`：回 204，让 cookie 过期；从前端发来、没有 cookie 时也是 204。它只清 cookie，不吊销令牌（见「已知」）。
+   - 登出也要来自 `WEB_ORIGINS`、带 `X-NEU-Compass: 1`，带不带 cookie 都查，不然回同样的固定 403，什么也不过期。别的网站提交的表单不带 SameSite=Lax 的 cookie，第 5 条的中间件不拦它，可回答里让 cookie 过期的头照样能把人登出（A25 L1）。
+5. **跨站防护**（`api/csrf.py`，纯 ASGI 中间件）：只查写请求（GET、HEAD、OPTIONS 以外），而且只查带了会话 cookie、没带非空 `Authorization` 头的请求。
+   - 要求正好一个 `Origin`，它在 `WEB_ORIGINS` 里，并且正好一个 `X-NEU-Compass: 1`。不满足就回固定的 403 `{"detail": "Cross-site request refused.", "error_type": "csrf_rejected", "status_code": 403}`，不回显 Origin，不缓存。
+   - 别的来源的网页要带这个自定义头，得先过 CORS 预检，而 CORS 只给 `WEB_ORIGINS` 放行，所以它发不出能过检查的请求。
+   - Bearer 请求不查：浏览器从来不会自己带 Bearer。没带 cookie 的请求（比如游客提问）也不查，值是空的 cookie 不算会话。
+   - 带的是哪种凭证，和身份解析一样，用 Starlette 自己的请求头和 cookie 来读，两边不会不一致。空的 `Authorization` 头不算 Bearer（身份解析这时会转而用 cookie），所以照样要查；`=` 两边有空格、放在第二个 Cookie 头里的会话 cookie，Starlette 认得出，这里也认得出。
+   - `WEB_ORIGINS` 为空时，带 cookie 的写请求一律拒绝。
+6. **CORS：** 只有 `WEB_ORIGINS` 不空时才加 Starlette 的 `CORSMiddleware`：只放行这些来源，允许带凭证，方法是 GET、POST、OPTIONS，请求头是 `Content-Type` 和 `X-NEU-Compass`，暴露 `x-request-id` 和 `Retry-After`，预检缓存 600 秒。没设就完全不加，和以前一样。
+7. **中间件的顺序**（从外到内）：CORS → 请求日志 → 跨站防护 → 限流 → 防缓存头（第 13 条）→ 路由。CORS 在最外面，限流的 429 和 503、跨站防护的 403、请求日志兜底的 500 都带 CORS 头，前端读得到；跨站防护在限流外面，被拒的请求不占名额。
+8. **`GET /auth/login-url?state=`：** `state` 要是 16–128 个 `A–Z`、`a–z`、`0–9`、`_`、`-`，不合格就 422，也不回显它。测试钉住了两头（16、128 能过，15、129 不过）和带 `_` 的（R2b 照这个生成 state，base64url 里有 `_`）。
+   - 用现有的 `authorize_url(state_token=state)` 拼出 Google 的登录地址，和 Streamlit 的登录链接一样。API 不存 state，生成和核对都在前端（R2b）。
+   - Google 的 client ID、client secret 和 `SESSION_SECRET` 缺一样就回 503（`service_unavailable`），返回体是固定的，测试整个钉住：没有 client secret，每次回调都会在 Google 那边失败；没有 `SESSION_SECRET` 就签不出令牌，登录了也没用。client secret 是审查以后补的（A25 N4）。
+   - uvicorn 的访问日志记这个地址时去掉查询串，state 不进日志（A25 N3；课程读那几条原来就这样）。
+9. **`GET /privacy`：** 「数据与隐私」页的内容按 API 自己的设置生成：开头一句、四段（标题和纯文字的句子，按页面顺序）、删号会删掉什么，以及提问框旁边的两段说明。回答反馈关着时，勾选说明是 null。
+   - 文字搬进了 `api/privacy_text.py`（`privacy_sections`、`DELETE_WHAT`、`BACKUP_COPIES`、`capture_notice`、开头那句，以及聊天提示的前半句），`app/` 里的两个文件改成从那里导入。搬家前后在 24 种设置组合下逐字节比过，Streamlit 页显示的完全一样。
+   - 聊天提示指向隐私页的后半句（「见左侧「🔒 数据与隐私」」）是 Streamlit 的版面用语，留在 `app/`。接口只返回前半句，指向由前端自己加。
+   - 这样页面上写的就是保存数据的这个 API 实际用的设置。compose 里的联系邮箱原来只给了 ui 服务，现在 api 服务也加上了，不然上线以后接口返回的页面会少「写邮件到 …」那一句；钉住两边一致的那条测试也加上了它。
+10. **`GET /config`：** 返回 `{"answer_feedback_enabled", "login_available"}`。`login_available` 是「Google 的 client ID、client secret 和 `SESSION_SECRET` 都有」，和 `login-url` 回不回 503 用的是同一个函数（`login_configured()`）。
+11. **设置 `WEB_ORIGINS`**（`config/settings.py`）：JSON 列表，默认空。
+    - 每一项只能是小写的 `http` 或 `https`、主机和可选的端口，不带路径、查询或结尾的斜杠，也不能是 `*`（带凭证的 CORS 不许用通配）。不合格的设置起不来。
+    - 写法要和浏览器在 `Origin` 里发的一模一样，不然永远对不上：浏览器发的都是小写；主机的每一段不以 `-` 开头或结尾；端口是 1–65535、不带前导零，而且不写默认端口（https 的 `:443`、http 的 `:80`）。端口这几条和 `-` 是审查以后补的（A25 N2）。
+    - 不设或者 `[]` 就是没有 CORS。`WEB_ORIGINS=` 后面什么都不写不是 JSON 列表，API 起不来（`.env.example` 原来说「空」就是没有 CORS，改了）。
+    - `.env.example` 加了一行注释掉的例子（本机开发用的 `http://127.0.0.1:5173`）。
+12. **严格的 Content-Type**（A25 L2）：`create_app` 里明写 `strict_content_type=True`。这是 FastAPI 0.136.1 的默认值，明写出来是怕升级或改动时悄悄关掉。
+    - JSON 请求体要带 JSON 的 Content-Type：不带、`text/plain` 或表单都回 422，什么也不读。
+    - 别的来源要发 JSON 的 Content-Type 得先过 CORS 预检，而预检只给 `WEB_ORIGINS` 放行。所以它是挡借 cookie 的跨站写请求的第一道，第 2、4、5 条的来源检查是第二道。
+    - 测试钉住：两种登录模式下，不带 Content-Type 和 `text/plain` 的请求体都是 422，不调交换函数；从前端自己的来源发来也一样。
+13. **按身份的回答不进共享缓存**（`api/private_cache.py`，A25 L3）：
+    - `get_current_user_id` 每次调用都给请求做个记号，在任何 401 之前。小中间件给这些请求的响应写上 `Cache-Control: private, no-store`，游客的回答和 401 也写。
+    - 用到它的接口是 `GET /coop`、`GET /auth/me`、`POST /coop`、`POST /auth/delete-account`。
+    - RFC 9111 只禁止共享缓存复用带 `Authorization` 的回答，不管 `Cookie`；身份从 Bearer 换成 cookie 以后，这层保护要自己补上。游客的也写，缓存才不会把游客版给登录的人。
+    - 对谁都一样的回答不动，带不带 cookie 都一样。
+14. **Streamlit 删号「没收到确认」那句**（`app/privacy_view.py`）改成和新前端一样的说法（R5c，用户定的）：「这次没收到服务器的确认，不确定删除有没有完成。刷新后若仍是登录状态，可以再试；若已变成游客但需要确认，请联系维护者。」原来那句说「变成游客了，就是已经删掉了」，可登录自己过期也会变成游客。
+
+### 修改文件
+
+- 新建：`api/session_cookie.py`、`api/csrf.py`、`api/privacy_text.py`、`api/routes/public.py`，以及第二个提交的 `api/private_cache.py`。
+- 搬家：`api/google_oauth.py`（原 `app/auth.py`）、`api/session_tokens.py`（原 `app/session_tokens.py`）；`app/auth.py`、`app/session_tokens.py` 改成转发的壳。
+- 改：`api/dependencies.py`、`api/exceptions.py`、`api/routes/auth.py`、`api/models.py`、`api/main.py`、`app/privacy_view.py`、`app/answer_feedback_view.py`、`config/settings.py`、`.env.example`、`docker-compose.yml`（只加了 api 服务的联系邮箱）；第二个提交另改了 `api/logging.py`（访问日志去掉登录地址的查询串）和 `db/user_repository.py`（文档字符串里的模块路径；另外去掉了基底就有、没用到的 `datetime` 导入：这个文件进了 Ruff 检查的范围以后报 F401）。
+- 文档：
+  - `docs/api_contract.md`：路由表（第二个提交补上了原来就漏掉的七个接口）、鉴权方式、`/auth/callback` 的 `session` 字段、四个新接口，以及「Session cookie, CSRF and CORS」一节；
+  - `docs/adr/0021-session-token-auth.md` 的补充；
+  - `docs/oauth_secret_rotation.md` 和 `docs/cloudflare_tunnel.md` 里的模块路径，第二个提交加上 `docs/system_architecture.md` 两张图里的；
+  - 本节。
+- 测试：新建 `test_session_cookie.py`、`test_csrf_cors.py`、`test_public_routes.py`，第一个提交 79 项，第二个提交以后 133 项；`test_privacy_view.py` 的 compose 测试加上了联系邮箱。第二个提交另改了 `test_account_deletion.py`（钉住「没收到确认」那句）和 `test_request_admission.py`（中间件顺序那条不再受开发者的 `.env` 影响）。
+
+数据库结构、检索、提示词和 Streamlit 版的登录都没改。Streamlit 版只改了删号「没收到确认」那一句（第 14 条）。
+
+### 验证记录
+
+- **新测试：** 三个新测试文件 79 项全过。同样的测试放在基底 `3a08ebd` 的副本上：`test_session_cookie.py` 和 `test_csrf_cors.py` 在收集时就失败，因为新模块还不存在；`test_public_routes.py` 的 30 项全部失败。
+- **定向和静态检查：**
+  - 冒烟 **360 passed**（登录、令牌、Co-op、删号、隐私页、反馈开关、错误出口、日志和限流的测试）；定向 **1081 passed**。
+  - Ruff F／E9／B 在 20 个改过的 Python 文件上通过，没有 CR。隐形字符只有 `docs/api_contract.md` 开头的 BOM，基底里本来就有。
+  - 九个快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+  - 隐私页的文字搬家前后逐字节相同（`same_words.py`）：`privacy_sections` 比了 24 种设置组合（保留天数 0、1、90，反馈开关 true、false、null、1，有没有联系邮箱），勾选说明比了 5 种天数，另外是删号说明、备份说明和查询日志提示。
+- **变异：98 个，全部杀掉**（mut4）。
+  - 新写 60 个：R01–R58，以及 T61b、T91b（T 的 T61、T91 跟着代码搬家以后改锚）。
+    - R36（没设 `WEB_ORIGINS` 也加 CORS）第一次被当成等价拿掉，是错的：一个谁都不放行的 CORS 层照样会加 `access-control-allow-credentials` 和暴露的头，预检也回 400。收紧那条测试以后加回来了。
+    - R32 第一次写错了，把请求日志删掉了；现在是真的把日志挪到 CORS 外面。
+    - 跨站防护改用 Starlette 读凭证、又抽出 `from_web_origin()` 以后，R23–R30 改了锚点；补了 R47–R49（空的 `Authorization` 也免查、按子串找 cookie、只看第一个 Cookie 头）和 R56–R58（cookie 登录不查来源、换完 code 才查、token 模式也查）。
+  - 锚点落在 R2a 改过或搬走的代码里的旧变异体 38 个：`collect_old_mutants_r2a.py` 按 diff 收集，受影响 9 个，跟着代码搬家、改到新位置的 29 个（搬家用 `--no-renames` 加一张搬家表对上）；T 的 T61、T91 由 T61b、T91b 顶替。
+  - 每个变异体日志的第一条错误都逐个看过：除了 R06，都是对口的测试杀的；没有只靠超时判定的，也没有因为时钟跳变失败的。
+    - R04、R32、R33、R35 是测试按名字取那个属性或响应头时报 KeyError，取的正是变异去掉的那个，算对口。
+    - R06（让 cookie 过期的函数什么都不做）两轮都是被 `/auth/me` 的 500 杀的：过期用的那条头 `expired_session_cookie_header()` 就是靠这个函数生成的，它一坏，每次 `/auth/me` 都报 KeyError。这算真杀（谁都登录不了），但不是对口的那条检查；对口的是 R15（登出不让 cookie 过期）和 R55（过期时留下一个空值 cookie），都被对口的测试杀了。
+  - 第一轮 mut1（第一版代码）85/85。mut2 中途停掉，作废；mut3 的基线没过，也作废，原因见下一条。
+- **测试机的时钟：** 10-22 晚这台机器的 Windows 时间服务没开，本机比 NTP 快 2.75 秒，WSL 的时钟每 20–30 秒被来回拨一次。往回拨以后，刚签的令牌会被 itsdangerous 当成「签发时间在未来」（`Signature age -3 < 0 seconds`）而拒绝。mut3 的基线就是这样失败的：同一个令牌 `/auth/me` 刚回 200，下一步删号回 401。同样的测试在 worktree 里重跑全过。这是这台测试机的时钟问题，和本节的代码无关；令牌的这条规则（签发时间在未来就拒绝）也不是 R2a 加的。
+- **串行全量：** **5106 passed／7 warnings／485.35 秒**，退出码 0。比 main `3a08ebd` 的 5027 多出的 79 项就是新测试；27 个改动文件在全量前后一致。全量开始以后只改了本节：补上这些数字，以及「发布状态」里关于 main 的一句。
+
+- **第 24 轮审查以后的修复**（第二个提交：A25 和 B25 的报告，加上 Streamlit 那一句）：
+  - 改过的 5 个测试文件 **257 passed**。同样的测试放在第一个提交 `2d5ebdf` 上跑，24 项失败，原因都对：没带 cookie 的跨站登出（5 项）、防缓存头、缺 client secret 时的 `/config` 和 503（2 项）、访问日志里的 state（2 项）、`WEB_ORIGINS` 的九种写法、Streamlit 那句（5 项）。其余新加的测试在 `2d5ebdf` 上就通过：它们钉的是原来就对、只是没测到的行为（B25 的 L1–L4 和 N1，以及严格的 Content-Type，它本来就是 FastAPI 的默认值）。
+  - 冒烟 **360 passed**，定向 **1135 passed**（比第一个提交多的 54 项，就是三个新测试文件里新加的）。Ruff F／E9／B 第一次在 `db/user_repository.py` 报了一处 F401：基底就有、没用到的 `datetime` 导入（这个文件只改了文档字符串，才进了检查的范围）；去掉以后 25 个改过的 Python 文件都通过。没有 CR，隐形字符只有 `docs/api_contract.md` 开头基底就有的 BOM。九个快照 9/9 match；C 的离线 CLI 47／53 complete，route 53／0，隔离计数为 0。
+  - **变异 131/131 killed**（mut6），被杀的都是对口的测试，没有只靠超时判定的。
+    - 新写 22 个：R59–R80。改锚 5 个：R16b、R39b–R41b、R45b（代码挪进 `login_configured()` 和新的来源写法以后，原来的 R16、R39–R41、R45 锚不上了）。R42（端口放宽到六位）不再跑：六位的端口都大于 65535，现在照样按数字拒绝，它和没改的代码等价。「按身份的回答保留路由自己写的 Cache-Control」也是等价的，没写：没有这样的路由自己写这个头。
+    - 第一个提交的其余 54 个照样重跑：好几个测试文件改了，杀死它们的测试可能跟着变。
+    - 锚点落在改过的代码里的旧变异体 50 个：受影响的 21 个（比第一个提交多了访问日志过滤器的 5 个和 Streamlit 删号回调的 7 个），跟着代码搬家的 29 个。去掉 `datetime` 导入以后重新收集，还是这 50 个。
+    - R80（Streamlit 那句改回旧的）第一遍是被 `test_coop_moderation.py` 的 `KeyError: 'coop_id'` 杀的：WSL 的时钟又往回跳了（这段时间 journalctl 里有 17 次），刚签的令牌被拒，和 R80 无关。单独重跑，被对口的 `test_page_delete_failure_says_what_is_known` 杀掉。
+  - 串行全量 **5160 passed／7 warnings／484.36 秒**，退出码 0。比第一个提交的 5106 多出的 54 项就是这次新加的测试；相对 `3a08ebd` 的 33 个改动文件在全量前后一致。全量开始以后只补了本节的数字。
+
+### 审查
+
+第 24 轮，两路只读审查，在 `2d5ebdf` 上做（10-22 夜到 10-23），都不派子 agent：A25 看安全和正确性，B25 看测试、变异和文档。
+
+**A25 的报告：** 没有 CRITICAL、HIGH、MEDIUM，3 LOW、5 NIT。它在自己的副本里用合成密钥、内存库、不联网，做了三组探针，核过：
+- 方法的各种写法、`Origin` 和标记头的各种形式、各种 Content-Type，都过不了跨站检查；中间件和身份解析读到的凭证一致，空的、重复的头和 cookie 也一样；
+- cookie 登录在 code 交给 Google 之前就拒绝；让 cookie 过期的头带着 `__Host-` 要的属性；
+- CORS 只让 `WEB_ORIGINS` 读到东西，层的顺序和文档一致；
+- 搬家的模块除了文档字符串逐字节相同，`api/` 不再导入 `app`；隐私页的文字在 48 种设置组合下逐字节相同。
+
+它的发现：
+- **LOW-1：** 别的网站能把人登出：不带 cookie 的登出不过跨站检查，照样回 204 和让 cookie 过期的头。已修，见第 4 条。
+- **LOW-2：** 第 2 条给的理由不对：锁定的 FastAPI 0.136.1 默认严格检查 Content-Type，不带 Content-Type 的 JSON 是 422，根本不读。改了第 2 条，加了第 12 条。
+- **LOW-3：** 按身份返回的 GET 没有防缓存的头。已修，见第 13 条。
+- **NIT：**
+  - 隐私页文字里两句是 Streamlit 的版面用语，`CAPTURE_OFF_NOTICE` 留在 `app/`：记进「已知」，是 R2b 的事。
+  - `WEB_ORIGINS` 放过浏览器不会发的写法，`.env.example` 说「空」就是没有 CORS：见第 11 条。
+  - state 进了 uvicorn 的访问日志：见第 8 条。
+  - `login_available` 和 503 没看 client secret：见第 8、10 条。
+  - `api_contract.md` 的几处旧说法（回调「不需要头」、匿名接口清单少了四个、401 的文字还写着 Bearer）：改了文档；401 的文字为了兼容不改，文档写明前端别显示它。
+
+**B25 的报告：** 没有 CRITICAL、HIGH、MEDIUM，6 LOW、6 NIT。它核过本节的每个数字和日志，mut4 的 98 个杀死都对口，它的副本上全量也是 5106；搬家的模块和所有导入都对；隐私页的 24 种设置组合走到了每个分支。它自己写了 24 个变异体：4 个被杀，2 个等价，18 个存活。缺口都在新约定的边上：
+- **LOW-1：** 同时带 Bearer 和 cookie 的测试没确认 cookie 真在：把 cookie 登录改成不设 cookie，`test_session_cookie.py` 的 27 项里还有 21 项通过；「有 cookie 就过期」（应该是「用了 cookie 才过期」）能存活。补了 `logged_in()`（登录以后确认 jar 里真有 cookie），删号和 `/auth/me` 都加了「Bearer 旁边带着别的账号的 cookie」的情况。
+- **LOW-2：** `state` 的边界没钉住，补了（见第 8 条）。
+- **LOW-3：** login-url 的 503 返回体没钉住，改成整个返回体相等。
+- **LOW-4：** 身份解析读 `Authorization` 的方式没钉住：「不是 `Bearer …` 的头就用 cookie」和「空的头算坏的 Bearer」两种变异都能存活。补了两条测试。
+- **LOW-5：** 和 A25 的 LOW-2 相同。
+- **LOW-6：** `docs/system_architecture.md` 还画着 API 依赖 `app/auth.py`，`db/user_repository.py` 的文档字符串也这样写。改了。
+- **NIT：**
+  - 没钉住的反例：拒绝时不带 `no-store`、两个标记头、HEAD 和 OPTIONS 也查、CORS 放行 `Origin: null`、方法和请求头放开成 `*`。都补了测试。`Vary: Origin` 是 Starlette 加的，记进「已知」。
+  - 同一个检查函数（`from_web_origin`）两个调用方：有的变异体只被其中一个调用方的测试杀掉；回调要是不再调这个共用的函数、自己另写一套（B25 的 M16），没有测试会发现。只要都调它就没问题；现在登出也调它。
+  - `/config` 和 `/privacy` 用 `is True`：设置本来就转成 bool，生产上和 `bool(...)` 一样，没改。
+  - 旧变异体收集的盲区，记进「已知」。B25 核过，这些盲区没漏掉存活的变异体。
+  - 措辞：`api_contract.md` 第 49 行、ADR-0021 和第 3 条说「有 `Authorization` 头时」，应该是非空的头；新接口哪些是匿名的、`/auth/me` 要凭证，没写；路由表漏了 R2a 以前的七个接口。都改了。
+  - 两条测试读当前目录的 `.env`：开发者在 `.env` 里设了 `WEB_ORIGINS` 时会失败。改成不读。
+
+修复是第二个提交。
+
+**复核第 1 轮**（10-23，还是 A25 和 B25，在 `6b98209` 的新副本上，只读、不派子 agent）：两边都没有新的 CRITICAL、HIGH、MEDIUM、LOW。第 24 轮的问题都按本节说的修好了，记进「已知」的几条也属实。
+- A25 用探针核过：登出只在来自 `WEB_ORIGINS`、带标记头时回 204，带不带 cookie 都一样；防缓存头只加在那四个按身份的接口上（依赖里抛的 401 也有），别的接口的头和 `2d5ebdf` 一样；`WEB_ORIGINS` 试了 31 种写法。它第 24 轮的探针在两个提交上跑，只有这几处不同。修复没有让别的网站多做到什么，也没有多漏什么。
+- B25 在 `2d5ebdf` 上重跑改过的测试，失败的正是那 24 项，原因都对。它第 24 轮写的 19 个变异体有 15 个被新测试杀掉；剩下 4 个（M09、M10、M16，以及新写的 M16L：登出那边的同一种改法）在全量下存活，和上面不改的那几条一致。本节第二组验证的数字都和日志或它的重跑对得上。它复核时 WSL 的时钟还是每半分钟往回跳 2.5 秒左右：这只会多出假的失败，通过的结果都算数。
+- NIT 共五处（401 的文字两边都报了），都是文字，第三个提交都改了：
+  - `api_contract.md` 的 401 文字清单漏了 `POST /coop` 的两句（A25、B25）；
+  - 「已知」里 `Vary: Origin` 那条拿 `/search` 举例，可它是 POST，没有明确的新鲜度和对应的 `Content-Location`，共享缓存本来就不存；改成 GET 的接口（A25）；
+  - 「发布状态」里 main 的提交号过时了（B25）；
+  - `.env.example` 新加的那句说明以 `# WEB_ORIGINS=` 开头，去掉注释就成了一个不合格的设置；改了开头（B25）；
+  - 变异那段说 R42 和 R75 等价，应该是和没改的代码等价（B25）。
+- 第三个提交只改 `docs/api_contract.md`、`.env.example` 的那行注释和本节。没有测试读这几个文件，所以没有重跑测试，也不再开第 2 轮复核。
+
+### 已知、未处理
+
+- **登出不吊销令牌：** 登出只让 cookie 过期，令牌本身到期以前一直有效，和 Bearer 一样没有服务器端吊销。cookie 是 HttpOnly 的，前端脚本偷不到；万一被偷（比如设备被别人拿到），登出也挡不住，只能等 7 天到期，或者换 `SESSION_SECRET`（所有人都要重新登录）。
+- **state 只在前端核对：** `/auth/login-url` 不存 state。别的网站直接调回调已经被来源检查挡住，但它还可以把人引到站点根路径、带上它自己的 `?code=`，让我们自己的前端去提交；挡这一种全靠 R2b 的前端核对 state。
+- 生产没有设 `WEB_ORIGINS`。R7 上线新前端时要设成生产的 compass 子域名，并且核对 compass 和 api 在同一个站点下，不然 SameSite=Lax 的 cookie 不会带上。
+- `eval/route_eval.py`、`scripts/answer_render_check.py` 还从 `app/` 导入 UI 模块（`app.state_manager`、`app.api_client`、`app.chat_view`、`app.answer_evidence_view`），到切换（R7）时再处理。
+- 跨站防护只看 `Origin`，不看 `Referer`：不带 `Origin` 的、带 cookie 的写请求一律拒绝。新前端用 fetch，现代浏览器都会带上它。
+- 被跨站防护拒掉的请求不写 query_log，每周统计看不到；要看就数 API 日志里的 403。
+- 隐私页的文字只有中文。
+- **隐私页里两句是 Streamlit 的版面用语**（A25 N1）：「登录以后，可以在本页最下面删除…」说的是页面位置，「选课草案和课程对比只在这次会话里，刷新或登出就清空」说的是 Streamlit 的会话，`GET /privacy` 照样返回。新前端要让这两句也成立（删除放在页面最下面；草案和对比刷新或登出就清空），做不到就把这两句挪到各个前端。回答反馈关着时提问框旁边那句（`CAPTURE_OFF_NOTICE`）留在 `app/`，接口返回 null，新前端要自己写一份。这是 R2b、R3 的事。
+- **`Vary: Origin`**（B25 N1）：Starlette 只给放行的来源加 `Vary: Origin`，给别的来源和不带 `Origin` 的回答都不加。对谁都一样的 GET 回答（比如 `/programs`、`/course/{course_id}`、`/privacy`、`/config`）要是被共享缓存存下来，可能把不带 CORS 头的那份给了前端。今天 api 子域名没有缓存规则；R7 上线时核对，不要加。
+- **FastAPI 的版本：** pyproject 写的是 `fastapi>=0.110`，锁定的是 0.136.1。较早的 FastAPI 会把不带 Content-Type 的请求体照样按 JSON 读，那时第一道就没了，只剩来源检查。测试钉住了 422，换版本时会失败。
+- **旧变异体的收集**（B25 N4）：只认 `mutate*.py` 这样的文件名（T 那一节已经记了）；只看 `.py` 文件，R2a 在 compose 里加的那一行让 T 的 T100 的锚点出现了两次，它跑不了，也没算成被顶替；作用域从 `def` 算起，只改装饰器的地方（路由的说明文字）不算。B25 核过，这些盲区没漏掉存活的变异体，它为 compose 那一行写的三个变异体都被杀了。
+
+### 发布状态
+
+分支 `feat/api-cookie-session`，基底是合并 T（#24）以后的 main `3a08ebd`。之后 main 又合并了 R1（#25）、Co-op 页（#26）、课程对比页（#27）和隐私页（#28），现在是 `30cfbae`；四次都只改 `web/`（R1 另改了 CI），和本节的文件不重叠。第一个提交 `2d5ebdf` 是 R2a 本身，第二个提交 `6b98209` 是第 24 轮审查（A25、B25）的修复和 Streamlit 那一句，第三个提交是复核第 1 轮的五处措辞，只改文档和 `.env.example` 的一行注释。没有使用真实模型、账号、NAS 或生产库，也没有连真实的 Google（测试用现有的替身）。上线要另外授权。
+
+## 34 — 新前端接上真实 API：接口层、登录和聊天流（R2b，2026-10-23）
+
+### 范围与原因
+
+R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）。第 33 节（R2a）给了 cookie 登录、跨站防护、CORS 和三个公开接口；这一批让 React 前端第一次真的请求 API：接口类型从 OpenAPI 生成，请求和错误统一处理，cookie 登录和登出，`/chat` 的流式客户端，外加一个只给本机开发和验收用的 API 外壳。各页的内容还是假数据：隐私、Co-op、对比三页在 R5d 接，搜索和聊天页在 R3。
+
+线上不变：新前端还没部署，生产也没设 `WEB_ORIGINS`。后端只多了两样（第 6、7 条），Streamlit 版不受影响：`/auth/login-url` 它不调用；回调的 token 模式不查 `redirect_uri`；401 多一个字段，它不读。
+
+### 已实现
+
+**第一步：接口层**
+
+1. **导出 OpenAPI**（`scripts/export_openapi.py`）：`create_app(run_startup=False).openapi()` 写成 `web/openapi.json`，键排序、不转义中文、缩进 2、一个 LF 结尾；不起服务、不加载模型。`--check` 只比较不写，不一致就退出 1。设置（`WEB_ORIGINS`、反馈开关、限流、保留天数）不影响导出的内容。除了 `POST /chat` 的 200（NDJSON，第 11 条手写类型），每个接口的回答都有类型。
+2. **生成类型**（`web/tools/openapi-types/`）：openapi-typescript 7.13.0 的 peer 只声明 TypeScript 5，主包用 6.0.3，直接装会 ERESOLVE；规矩不许 `--legacy-peer-deps`／`--force`，所以生成器单独一个包（自带 TypeScript 5.9.3 和 lockfile），用主包的 Prettier 排版。`npm run gen:api` 生成 `web/src/api/schema.ts`，`gen:api:check` 比较。原来手写的 `api/coop.ts`、`privacy.ts`、`course.ts` 的接口形状改成从生成的类型取（`CoopRecord` 从 `CoopOut` 收窄 industry 和 visibility_level，`CoopUploadRequest` 用 `Required<>`，表单总是发全部字段）。
+3. **API 地址**（`web/src/api/apiBase.ts` 的 `chooseApiBase`、`vite.config.ts`）：构建时定，`VITE_API_BASE_URL`。正式构建（`npm run build`）默认 `https://api.neu-compass.me`，换成别的也只能是 https，本机的 http 让构建失败，免得给学生的页面去连他们自己的电脑；`npm run build:dev-api`（模式 `dev-api`）和开发服务器默认 `http://127.0.0.1:8000`，前者输出到 `dist-dev-api/`、用 `npm run preview:dev-api` 预览，所以 `dist/` 里只会有连正式 API 的构建（测试钉住这几个脚本）；别的构建模式（比如以后的 beta）必须写明地址；测试一律用本机的，不管环境里设了什么。地址只认 https 或本机的 http（localhost、127.0.0.1、[::1]），不带路径、查询、`#`、账号密码，坏值让构建失败。代码里读 `__API_BASE_URL__`，不从 `window.location` 推。`web/.env.local` 这类文件加进了 `.gitignore`。
+   - 本机地址用 127.0.0.1，不用方案写的 localhost：开发服务器在 127.0.0.1:5173，主机名不同浏览器就当成两个站点，SameSite=Lax 的 cookie 不跟着 fetch 走。
+4. **请求函数**（`web/src/api/client.ts`）：
+   - 每个请求 `credentials: 'include'`、`cache: 'no-store'`、`redirect: 'manual'`；写请求加 `X-NEU-Compass: 1`，有请求体才加 JSON 的 Content-Type，读请求两样都不加，不触发预检。
+   - `apiPath` 按 OpenAPI 的路径模板填参数、逐个编码：接口改名或删掉，重新生成 `schema.ts` 以后就编译不过。空值、`.`、`..` 直接报错：编码以后 URL 会把它们读成另一条路径。
+   - 四档超时照 Streamlit（5／8／15／30 秒，读完回答也算在内）；什么都不自动重试；调用方取消时原样抛出它的原因。
+   - 失败一律是 `ApiError {status, errorType, retryAfter, invalidFields, reason}`：`error_type` 和 `reason` 只认小写名字，`Retry-After` 只认 1–3600 的整数秒，422 只取被拒字段的名字。**不带 `detail` 原文**（R2a 的约定，原文是英文、可能说出内部细节）。2xx 不是 JSON、重定向都算 502 `invalid_response`；连不上 503 `transport_error`，超时 504 `transport_timeout`。
+   - `apiErrorMessage` 照 Streamlit 的中文：429 带秒数、503 分忙和不可用、408／504「处理可能仍在进行」、502 无法识别、其余 5xx、其余一句通用的。4xx 由各页按状态和 `error_type` 说自己的话。Streamlit 版 4xx 会显示 `detail`，React 版不显示，是有意的不同。
+5. **取数**（`web/src/api/queries.ts`，新依赖 `@tanstack/react-query` 5.104.5）：不重试，切回窗口、网络恢复都不重取；`networkMode: 'always'`：断网时请求照样发出、照样失败，不排队等网络回来再自己发出去（TanStack 默认会这样，写请求不能）；`shownData`：暂时的失败（408、429、5xx、断线）继续显示同一访客上次的内容，明确的答复不留。`useConfig`（`/config`，5 分钟内算新鲜）、`useMe`（`/auth/me`，401 就是游客，不自己过期）；身份照 Streamlit 的 `valid_identity` 检查，格式不对算失败，不会半登录。
+
+**第二步：登录**
+
+6. **回调的 401 带上原因**（`api/exceptions.oauth_rejection_response`，用户定的第 1 条）：回调和全局处理器回同一个返回体，原来的三个字段之外加 `reason`（`OAuthError` 的七种稳定原因之一）。`detail` 照旧是固定英文；`reason` 本来就能从 `detail` 看出来，没有多告诉浏览器什么。
+7. **回调地址**（用户定的第 2 条，beta 上要能登录）：`GET /auth/login-url` 多一个可选的 `redirect_uri`（最多 2048 个字符），`authorize_url` 用它代替 `GOOGLE_OAUTH_REDIRECT_URI`；cookie 模式的回调也查请求体里的 `redirect_uri`。login-url 只认 `WEB_ORIGINS` 里的来源加 `/`（`auth.web_redirect_uris()`）；回调更严，只认这次请求的 `Origin`（上一步刚查过它在 `WEB_ORIGINS` 里）加 `/`，Google 送到哪个前端的 code 只有那个前端能兑换。别的回固定的 422 `redirect_uri must be the web front end's own address.`，不回显；回调在 code 交给 Google 之前就拒绝。没有登录配置时，login-url 的 503 先于这个检查。token 模式不查（Streamlit 自己发）。
+8. **前端登录**（`web/src/api/login.ts`、`web/src/layout/useSession.ts`）：
+   - 先看 `/config` 的 `login_available`，false 就禁用按钮、说「暂时不能登录」。
+   - 点按钮：32 字节随机 state（base64url，43 个字符）和「回来以后去哪」放进 sessionStorage（本站唯一往 storage 里放的东西，用一次就删；存不进去就说「这个浏览器不让本页暂存登录信息」，也不发请求），`GET /auth/login-url?state=&redirect_uri=` 拿地址，整页跳过去。地址只认 Google 的登录页（`https://accounts.google.com`，不带账号密码）；页面连的是本机的 http API 时，也认那个 API 自己的页面（开发 API 的假 Google）。拿地址失败就删掉存的 state。
+   - 回到站点根路径：先 `navigate('/', {replace})` 把 code 和 state 从地址栏和历史里去掉（两步都是 replace，后退回不到带 code 的地址），这时 `/config` 和 `/auth/me` 都还不问；再取出存的 state（取出即删，要是 43 位 base64url）核对：没存、不一致、code 是空的，都不发请求，说「登录没有完成，请重新登录」（R2a「已知」里只能靠前端挡的那种登录劫持）。对上了才用 cookie 模式提交回调，带上同一个 `redirect_uri`。Google 自己的错误（如 `access_denied`）也要 state 对上，并且是小写名字才说出来；state 对不上的 `error=` 链接一样说「请重新登录」，不显示链接里的字。
+   - 回调成功：先换成新身份，再重读一次 `/auth/me`（方案 3.1），只有它能说明浏览器收下了 cookie。读到游客就说「登录状态没有保存下来（可能是浏览器不让本站使用 cookie），请再登录一次。」：多半是浏览器拦了 cookie（比如隐私设置，或者跨站的 beta），也可能是 API 不认它刚发的令牌（比如服务器的时钟往回跳了）。重读失败就保留回调给的身份，并把它放回缓存；不然失败的那次会显示成「暂时无法确认」，还会自己再发一次。回来的路上不问 `/auth/me`，旧 cookie 的那次 401 也就不会晚于新 cookie 到达、把它删掉。登出时仍先取消还在路上的 `/auth/me`，晚到的回答改不回已登录。登录、登出都清掉按身份取的查询（键以 `['viewer']` 开头），登出另清课程对比。
+   - 失败分开说：外校邮箱「只能用 husky.neu.edu 或 northeastern.edu 邮箱登录」，邮箱没验证单说一句，暂时的失败用第 4 条的话，其余「登录没有完成，请再试一次」。登出失败（断网、503）说「没能退出登录，请再试一次」，不假装已经登出：cookie 是 HttpOnly 的，只有 API 能结束会话。
+   - 回来的路径只认本站的路径：不以 `/` 开头的、解析出别的来源的，或者结果以 `//` 开头的（`/.//evil.test` 解析后就是 `//evil.test`），都换成 `/`。
+9. **侧栏**（`Sidebar.tsx`、`TopBar.tsx`、`AppShell.tsx`）：账号框只负责显示：确认中、游客（可登录／去 Google 的路上／暂时不能登录／暂时无法确认）、已登录（名字，没有名字时显示邮箱，贡献数，登出）。手机菜单用同一个。「游客」标签只给游客。
+   - **焦点**（浏览器验收时发现）：用键盘登出时，按钮先被禁用、再被登录按钮换掉，焦点掉到页面最前面。现在按下的按钮忙完以后，焦点如果落在页面或菜单本身，就放回账号框现在的按钮上，和显示结果在同一次渲染里（`useLayoutEffect`，结果上屏时焦点已经在按钮上）；用户自己移到别处的不动；只有被按的那个账号框（桌面侧栏或手机菜单）会动。
+   - **后退**：从 Google 页按「后退」，浏览器可能原样恢复本页，按钮停在「正在前往 Google…」。现在听 `pageshow`（`persisted`）清掉这个状态。
+10. **开发用的 API**（`tests/support/dev_api.py`，`python -m tests.support.dev_api`）：真的 `create_app()`，临时文件里的合成数据库（`db/init.sql` 加 `tests/conftest.py` 的三门课），测试套件的替身模型。Google 换成本机的假登录页 `/__dev/google`：三个合成账号，三种被拒，一个 state 不对、一个取消的链接；只认前端自己的地址，转义它回显的东西，不缓存；没见过的 code 照 Google 拒绝换 code 那样回。除了没有默认值的 Gemini key，每个设置都先恢复成代码里的默认值，`.env` 和环境变量里的限流、数据路径之类改不了它的行为；装上 API 自己的日志设置（生产在启动时装，这里不跑启动），uvicorn 的访问日志去掉登录地址的查询串、课程只记路径模板；假登录页那条也带着 state，由它自己的过滤器去掉查询串（生产里没有这一页，生产代码不管它）。每次启动换一个会话密钥，重启以后旧 cookie 就失效。不部署，部署的包（从 `pyproject.toml` 读 wheel 的包清单）不 import `tests`（测试钉住），API 里也没有测试模式。前端和它都在 127.0.0.1，两个前端的端口和 `vite.config.ts` 的开发服务器、预览一致（测试读那个文件去对），它自己也只监听 127.0.0.1。
+
+**第三步：聊天流**
+
+11. **`streamChat`**（`web/src/api/chatStream.ts`，异步生成器，R3 的搜索和聊天页用）：`client.ts` 以外唯一调 fetch 的文件，两边共用请求选项、请求头和错误转换（`FETCH_OPTIONS`、`requestHeaders`、`plainName`、`failureFrom`）。
+    - 请求和别的写请求一样；流开始前的失败（422、404、409、429、503，连不上，超时）是同样的 `ApiError`，4xx、5xx 各按自己的状态，读它们的正文也最多等 30 秒；别的 2xx、重定向、没有正文的 200，都不是这个接口的流（502 `invalid_response`）。
+    - 按行切 NDJSON：一行被切在两块里、一个汉字的字节被切开、最后一行没有换行、CRLF 和空行都对。第一件必须是 meta（`matched_via` 是字符串、`results` 是数组；其余由 R3 的页面检查），meta 只有一次；token 的 `text` 是字符串；error 要有小写的 `error_type` 和非空的 `detail`；done 的反馈凭证原样交给页面，由页面照 Streamlit 的做法和显示的回答核对。遇到 error 或 done 就结束。
+    - error 的 `detail` 是 API 给学生看的固定中文（约定里写明给界面接在半截回答后面），照样显示；这和 HTTP 错误的 `detail` 不同。
+    - 等回答开始、等下一块各最多 30 秒（照 Streamlit 的读超时）；读完一块就停表，页面处理事件时不计。断线或 30 秒没动静：在已经收到的内容后面补一个 error 事件「连接中断。仅保留部分回答，未完整结束；请稍后手动重试。」（Streamlit 的英文开头换成了中文）；没有 done 或 error 就结束、有一行不是这四种事件、或者一行（包括还没收完的一行）不算行尾的 `\r` 长过 100 万个字符（API 最长的 meta 也就几十 KB）：Streamlit 的「回答流未完整结束；仅保留部分内容，请稍后手动重试。」。不带换行的一块不再把整个缓冲重新切一遍，长行不会越收越慢。**和 Streamlit 不同**：它跳过读不懂的行，这里当作流坏了（照方案）。
+    - 不自动重发：每问一次都算模型的每日次数、写 query_log。调用方取消时停止读取，抛出它的原因；页面不再读（`break`）或者流结束时，剩下的请求放掉。
+12. **开发 API 的聊天**：`/chat` 按脚本回答（七块，每块之间停 50 毫秒），从不调用 Gemini；会调用它的 HyDE 补救也关掉，每日上限只在问题里点名时才有。问题里带 `dev:model-error`、`dev:no-answer`、`dev:daily-limit`、`dev:no-done`、`dev:cut`、`dev:stall`，分别是模型中途出错、没有回答、今天的次数用完、流没有 done 就正常结束、连接中途断开（中间件不再发送也不结束响应，uvicorn 断开连接）、停 35 秒（比前端等的 30 秒久）。
+
+**其他**
+
+13. **测试的约定**：渲染整个 App 的测试套 `web/src/test/withApi.tsx` 的 `WithApi`，预先放好 `/config` 和游客身份，测试里不发请求（四个页面测试文件改了）。`contracts.test.ts`：只有 `client.ts` 和 `chatStream.ts` 能用 fetch，提到就算、不只是调用（别名 `const send = globalThis.fetch`、`globalThis['fetch']`、`window.navigator.sendBeacon`、XMLHttpRequest、WebSocket、EventSource 都查）；TanStack 只许 `@tanstack/react-query`，不许 devtools 和别的 HTTP 客户端（axios、ky、got、superagent、ofetch、wretch、node-fetch、cross-fetch、undici、socket.io 等）；两个包的依赖都要精确版本；`index.html` 设了 Referrer-Policy `strict-origin-when-cross-origin`（R0 14.15，发给别的站点的只有本站来源；R7 在服务器上再设一次）。
+    - 项目自己的 `npm run test:mutations` 的副本原来只拷 `src/` 和五个配置文件，这一批的测试要读 `index.html`、`openapi.json` 和生成器的 `package.json`，基线一跑就失败（B26 M4）；现在一起拷，基线的时限放宽到 120 秒。
+14. **CI**（`.github/workflows/ci.yml`）：前端 job 装生成器、查 `schema.ts` 和 `openapi.json` 一致；Python job 跑 `scripts/export_openapi.py --check`。
+15. `api/models.py` 里 `login_available` 的注释改成三样都要（client ID、client secret、`SESSION_SECRET`），R2a 第 24 轮以后漏改的。`tests/test_public_routes.py` 里 R2a 留下的一处 `zip()` 补上 `strict=True`（Ruff B905）。
+16. **合进 main 的 R3a（#30）：**
+    - R3a 的 `web/src/api/requisites.ts` 保留手写。面板要的是按 kind、status 分开的窄类型，生成的类型只有一个扁平的形状，换过去会丢掉这层收窄。文件顶上加了一句说明。
+    - 新文件 `web/src/api/requisites.types.test.ts` 只在类型检查时起作用，对照生成的类型查三样：
+      - 面板读的字段 API 都有；
+      - API 可能给的标量值面板都收，成绩、种类、状态这些固定取值也算在内，null 不算；值是对象的字段各有自己的那条去查，只有方案节点的 `areas` 没有，单独对一次（复核第 2 轮补的）；
+      - 课程详情里放先修列表和旧边的两个字段，类型对得上。
+    - API 删了或改名了面板读的字段，或者给出面板不收的值，`npm run typecheck` 就失败。
+    - R3a 的演示页测试包上 `WithApi`。README 里两节都留，R3a 一节在前。
+17. **合进 main 的 R3b（#31）：**
+    - R3b 的课程详情类型（`web/src/api/course.ts` 的 `CourseDetailBody`、`CatalogSnapshot`、`AnswerEvidence`、`EvidenceSnippet`）也留手写。R3b 原来在 R5b 手写的 `CourseDetail` 上 `extends`；这一批把 `CourseDetail` 换成了生成的类型，有默认值的字段都成了可选，自动合并以后 R3b 的页面和检查有 13 处编译不过。现在 `CourseDetailBody` 自己把字段写全，形状和 R3b 原来得到的一样，R3b 的代码一行没改。
+    - 新文件 `web/src/api/course.types.test.ts` 照第 16 条的办法对照生成的类型：课程详情本身，加上成绩构成、方案关系、AI 政策、证据片段、来源说明、目录快照各一条（值是对象的字段要各自对照）。两份对照共用的类型挪到 `web/src/test/misfits.ts`。
+    - R3b 的演示页测试包上 `WithApi`。README 里 R3b 一节放在 R2b 一节前面；`test:mutations` 那一条两边合在一起（152 个；副本照 R2b 多拷几个文件，基线等 120 秒）。
+
+### 修改文件
+
+- 后端：改 `api/exceptions.py`、`api/google_oauth.py`、`api/models.py`（注释）、`api/routes/auth.py`；新建 `scripts/export_openapi.py`、`tests/support/dev_api.py`。
+- 前端：新建 `web/src/api/` 下的 `apiBase.ts`、`client.ts`、`queries.ts`、`login.ts`、`chatStream.ts`、`types.ts`、`env.d.ts`，生成的 `schema.ts` 和 `web/openapi.json`，`web/src/layout/useSession.ts`、`web/src/test/withApi.tsx`，生成器 `web/tools/openapi-types/`；改 `web/src/api/coop.ts`、`course.ts`、`privacy.ts`，`layout/AppShell.tsx`、`Sidebar.tsx`、`TopBar.tsx`，`main.tsx`，`web/index.html`（第二个提交），`vite.config.ts`、`package.json`、`package-lock.json`、`eslint.config.js`、`.prettierignore`，`web/scripts/mutations.mjs`（第二个提交）。
+- CI：`.github/workflows/ci.yml`。根目录 `.gitignore`（第二个提交）。
+- 文档：`docs/api_contract.md`（回调的 `reason` 和 `redirect_uri`、login-url 的 `redirect_uri`，`/chat` 的 done 凭证和流开始前的错误，后两样是原来就落后于代码的），`web/README.md`（R2b 一节，和几句已经不对的话），本节。
+- 测试：新建 `tests/test_export_openapi.py`、`tests/test_dev_api.py`；改 `tests/test_api_auth_route.py`、`test_api_errors.py`、`test_public_routes.py`、`test_session_cookie.py`。前端新建 `apiBase.test.ts`、`client.test.ts`、`queries.test.tsx`、`schema.test.ts`、`login.test.ts`、`chatStream.test.ts`、`layout/session.test.tsx`；改 `layout/navigation.test.tsx`、`test/contracts.test.ts`、`test/setup.ts` 和四个页面测试文件。
+- 合并 main 时：新建 `web/src/api/requisites.types.test.ts`；改 R3a 的 `web/src/api/requisites.ts`（只加注释）、`web/src/pages/RequisitesDemoPage.test.tsx`（包 `WithApi`），`web/README.md`（两边的改动都留）。
+- 复核第 1 轮的修复（第四个提交）：
+  - 前端改 `web/src/layout/useSession.ts`、`web/src/api/login.ts`、`chatStream.ts`，`web/package.json`、`scripts/check-bundle.mjs`、`eslint.config.js`、`.gitignore`、`.prettierignore`；
+  - 前端测试改 `layout/session.test.tsx`、`api/login.test.ts`、`chatStream.test.ts`、`test/contracts.test.ts`；
+  - 后端改 `tests/support/dev_api.py`、`tests/test_dev_api.py`；
+  - 文档改 `web/README.md` 和本节。
+- 复核第 2 轮以后（第五个提交）：前端测试改 `web/src/api/requisites.types.test.ts`，文档改本节。
+- 合并 main（R3b）时：改 `web/src/api/course.ts`（R3b 的类型写全）、`web/src/api/requisites.types.test.ts`（共用的类型挪走）、`web/src/pages/CourseDetailDemoPage.test.tsx`（包 `WithApi`）、`web/README.md`；新建 `web/src/api/course.types.test.ts`、`web/src/test/misfits.ts`；文档改本节。
+
+数据库结构、检索、提示词和 Streamlit 版都没改。
+
+### 验证记录
+
+- **浏览器验收**（内置浏览器，开发用的 API 加 `npm run dev`，都在 127.0.0.1）：
+  - 登录：点按钮到假 Google 页，选账号回来已登录；刷新以后 `/auth/me` 还是 200，也就是 **Chromium 在 http://127.0.0.1 上收下了 `__Host-` 开头、带 Secure 的 cookie**（第一步时还没验证的一点）。登出 204，刷新以后 401。
+  - 失败：state 不对（不发回调）、外校域名、没验证、Google 拒绝、取消，各一次，中文都对，地址栏都干净，存的 state 都删了。
+  - 从 `/privacy?tab=export#export` 登录回到原地址；没有名字的账号显示邮箱；登出把课程对比从 4 门清到 0。
+  - 390 宽的手机菜单登录、登出；键盘：焦点框看得见，登出以后焦点在登录按钮上（修第 9 条以前掉到页面最前面）。
+  - 聊天流：在页面里直接 `import` 开发服务器提供的 `chatStream.ts`，用真的 fetch 问：每 50 毫秒到一块；六种脚本、空问题（422）、取消都对；`dev:stall` 在最后一块之后 30.0 秒给出「连接中断」；登录以后带着 cookie 也过跨站检查。正常结束的请求在 DevTools 里显示「已中止」：读到 done 就把剩下的放掉（Streamlit 的 httpx 也这样关），服务器那时已经发完。
+  - 「后退」的修复在这里复现不了：开发服务器和按本机 API 构建的正式预览都试过，这个浏览器面板的后退都是重新加载（页面上做的记号没了），不会原样恢复页面。只有单测。
+- **前端检查：** check（类型、零警告 lint、Vitest、构建）全过，**433 项**（25 个测试文件）；首屏 JavaScript gzip **158,231 字节**（预算 250,000；聊天流还没有页面用到）；格式、生成的类型都一致。
+- **后端：** Ruff F／E9／B 在 12 个改过和新建的 Python 文件上通过（第一次报了 R2a 留下的那处 B905）；改动和新建的文件里没有 CR。
+- **变异：** 都在副本里跑，被杀的都看了是对口的测试。
+  - 第一步：前端 83 个杀 82 个，存活的 C14（`Retry-After` 不去空白）：fetch 的 Headers 本来就去掉首尾空白，只有直接调用才看得出，补了一例以后杀掉；Python 7／7。
+  - 第二步：前端 98 个（新写 69 个，另 29 个是第一步里函数改过的，改锚重跑），全部杀掉。中间存活过三个：S04（「Google 跳回只处理一次」的标记去掉）——测试到了原页面就判过了，补了「停一会儿还在原页、没有失败提示」；L06、L07（回来的路径去掉 `//`、`/\` 的字符串检查）——第 8 条对解析结果的检查已经挡住这两种，这两条多余，删了。Python 24 个杀 23 个，存活的 X04（401 的 `detail` 改用 `str(exc)`）不是等价的：`id_token_invalid` 带诊断时会把异常类型名带出去，测试补了这种情况以后杀掉。
+  - 第三步：前端 K01–K34 34／34；第一步里跟着代码挪了位置的 C01–C06、C22、R01、R02 加一个新的 C06b，10／10。K23（预先取消时不早退）第一遍是靠测试超时失败的，改了测试以后由断言直接杀掉。Python H01–H14（开发 API 的聊天脚本）连同补了测试的 X04，15／15。
+  - 合计：前端 187 个（第一步 83、第二步新写 69、第三步新写 35；代码改动波及的旧变异体都改锚重跑了），Python 45 个；最后都被对口的测试杀掉。中途存活的 5 个（C14、S04、L06、L07、X04）按上面说的补了测试或删了多余的代码。
+- **串行全量：** **5206 passed／7 warnings／515.02 秒**，退出码 0。比 R2a 第二个提交时的 5160 多 46 项，就是这次新加的测试。全量开始以后只加了本节。
+- **第二个提交（第 25 轮审查的修复）：**
+  - 前端：check 全过，**454 项**（25 个测试文件）；首屏 JavaScript gzip **158,411 字节**；格式、生成的类型都一致。正式构建配本机的 http API 会停下来，报「A production build needs an https API…」；`build:dev-api` 照常构建。
+  - 后端：Ruff 在改过的 5 个 Python 文件上通过；改动的 30 个文件里没有 CR；改过的 3 个测试文件，加上跟着 `auth.py` 一起跑的 `test_api_auth_route.py`，共 163 项都过。
+  - 开发 API 在 8000 上短跑一次：访问日志只记了 `/auth/login-url`（不带查询参数）和 `/course/{course_id}`，state 和课程 ID 都不在日志里；停下以后端口空出来。那次只请求了登录地址和课程；假登录页那一条当时还带着 state，复核第 1 轮才找到。
+  - 变异（都在副本里；判法改成读 Vitest 的 JSON 报告，只撞上超时的不算杀）：前端新写 50 个（W 组 31 个，W25 这个编号空着；V 组 19 个，由 B26 存活的变异移植过来，它的 B03 随回环判断一起删掉了），10 个旧变异跟着代码改锚，连同函数改过的旧变异一共 184 个，**183 个由断言杀掉**，C26、C28、C32、Q10 也在内。剩下的 W03（去掉 `refetchOnReconnect: false`）是等价的：探针去掉这一行以后，`networkMode: 'always'` 下网络恢复时也不重取。Python 新写 P01–P12，连同代码改过、要重跑的 A01–A09、D01–D09 和 H01、H02、H14，33／33，都由对口的测试杀掉。项目自己的 `npm run test:mutations` 基线通过，110／110。
+  - **串行全量：** **5213 passed／7 warnings／545.56 秒**，退出码 0；比第一个提交多 7 项，就是这次新加的 7 个测试。
+- **合并 main（R3a）以后：**
+  - 合并只有 `web/README.md` 冲突；R3a 的 19 项演示页测试没包 `WithApi`，报「No QueryClient set」，包上以后都过。
+  - check 全过，**662 项**（32 个测试文件，多出来的是 R3a 的和这次的类型检查）；首屏 JavaScript gzip **173,177 字节**（R3a 的演示页连同 16 份假数据是静态 import 的，都算在首屏里；预算 250,000）；格式、生成的类型都一致。
+  - 类型检查的检查也试了：在 R3a 的类型上做四处改动，分别是去掉成绩 `S`、文档的 `catalog_year` 改名、列表的 `unusable_records` 改成字符串、方案去掉 `bridge`。每一处都让 `tsc` 在对应的那条检查上失败。把 `minimum` 放宽成 `string | number` 作对照，照样通过。改完文件都原样还原。
+- **第四个提交（复核第 1 轮的修复）：**
+  - 前端：check 全过，**667 项**（32 个测试文件）；首屏 JavaScript gzip **173,198 字节**；格式、生成的类型都一致。`build:dev-api` 输出到 `dist-dev-api/`，体积检查读的也是这个目录，`dist-dev-api/` 被 git 忽略。
+  - 后端：Ruff 在改过的 2 个 Python 文件上通过；改动的 16 个文件里没有 CR；`test_dev_api.py` 24 项都过。
+  - 变异（都由对口的测试杀掉）：
+    - 前端：去掉放回缓存那一行，新加的 3 条正好失败；`build:dev-api`、体积检查、`preview:dev-api` 三处改回 `dist/`，3/3；
+    - 前端：行长上限的三处边界、`useLayoutEffect` 改回 `useEffect`、`notKept` 改措辞，5/5，连跑三遍都一样；
+    - Python：D01–D09、P01–P14 23/23（新加的 P13、P14 是假登录页那条日志），P15（复位挪回 import 之后）也杀掉。
+  - **串行全量：** **5214 passed／7 warnings／532.39 秒**，退出码 0；比第二个提交多 1 项，就是另开进程查复位的那条。
+- **第二个提交在真浏览器里重验**（另开的会话做的，这个会话里的浏览器面板用不了；`3ebc04d` 的副本，开发 API 和合成数据，1440×900 和 390×844）：
+  - 从 `/privacy?tab=export#export` 登录，回来还在原地址，查询串和 `#` 都在；地址栏和历史里都没有 code 和 state，`sessionStorage` 用完就空。
+  - 请求顺序（浏览器的网络记录和开发 API 的访问日志对得上）：回来以后先回调，再 `/auth/me`，然后才 `/config`，回调之前这两个都不问。
+  - 刷新还是登录状态；登出 204，刷新以后 401。
+  - state 不对、取消、不带 state 的 `error=` 链接，三种都不发回调；state 对不上时链接里的字不上页面。外校、没验证、Google 拒绝三种被拒也对。
+  - 手机菜单里登录、用键盘登出，焦点落在菜单里的登录按钮上。
+  - `<meta name="referrer">` 是 `strict-origin-when-cross-origin`；`build:dev-api` 的正式预览里每个请求只发一次，顺序一样。
+  - 之后的提交改过的几处（重读失败时放回身份、没保存住登录的那句话、`build:dev-api` 的输出目录）没有再在浏览器里看，由前端测试钉住。
+- **第五个提交（复核第 2 轮的 NIT）：** 只多了一条类型检查。把生成的 `areas` 改成数字数组、把面板的 `areas` 收窄成两种前缀，`tsc` 都在这条上失败；把面板的放宽作对照，照样通过。check 全过，667 项（32 个测试文件），首屏 JavaScript gzip 173,198 字节；格式、生成的类型都一致。
+- **合并 main（R3b）以后：**
+  - 只有 `web/README.md` 冲突，`course.ts`、`mutations.mjs` 自动合并。自动合并的结果 `tsc` 报 13 处错（第 17 条），R3b 演示页的 18 项测试报「No QueryClient set」；改完都过。
+  - check 全过，**909 项**（39 个测试文件）；首屏 JavaScript gzip **181,908 字节**（R3b 的演示页连同假数据也是静态 import 的；预算 250,000）；格式、生成的类型都一致。
+  - 新对照的检查：在 R3b 的类型上做 8 处改动（快照 ID 改名、交付方式去掉 `async`、置信度改成字符串、成绩权重改成字符串、方案关系的字段改名、AI 政策的布尔改成字符串、来源说明的警告改成数字、抓取时间改成数字），再把生成的交付方式多加一个取值，`tsc` 都在新文件上失败；把证据原文放宽成 `string | number` 作对照，照样通过。第 16 条的 R3a 对照（四处改动加 `areas` 两处，各带对照）重跑，结果不变。
+  - 项目自己的 `npm run test:mutations`：基线通过，**152／152** 都由对口的测试杀掉，R3b 的 M131–M152 也在内。
+
+### 审查
+
+第 25 轮，两路只读审查，在第一个提交 `6d054f5` 上做，都不派子 agent：A26 看安全和正确性，B26 看测试、变异和文档。中途按用户的意思暂停过一次，两路都把进度写进各自的 `PROGRESS.md`，续审从原处接着做。
+
+- **A26：** 没有 CRITICAL、HIGH、MEDIUM；4 LOW、11 NIT，没有能直接利用的漏洞。核过、没问题的：前端的 state 检查和 cookie 模式要的 Origin 加标记挡住了登录劫持；`safeReturnPath` 35 种写法、两端 `redirect_uri` 各 26 种都跳不到别处；游客、已登录、坏 cookie 三种情况下的 cookie、CORS 和跨站检查；登出失败不假装；流里 error 的 `detail` 可以显示；开发 API 不会被部署，也碰不到真的 Gemini 和 Google。
+- **B26：** 4 MEDIUM、9 LOW、6 NIT。本节的数字都核对上了（433 项、158,231 字节、5160→5206、变异 187 和 45）。用更严的判法重跑前端 187 个变异：183 个由断言杀掉，4 个（C26、C28、C32、Q10）只是撞上 Vitest 的 5 秒超时，所以原来那句「最后都被对口的测试杀掉」不准；Python 45 个都由对口的测试杀掉。它自己写的变异：前端 19 个存活 18 个、Python 6 个存活 5 个（各有一个对照组被杀）。
+
+修复在第二个提交里，正文各条已经改成修完的样子：
+
+1. **登录回来（A26 L1、N1）：** 回来的路上不问 `/config` 和 `/auth/me`；回调成功以后重读 `/auth/me`，浏览器没收下 cookie 就说出来（第 8 条）。`index.html` 设 Referrer-Policy（第 13 条）。
+2. **断网（A26 L2）：** `networkMode: 'always'`，网络恢复也不重取（第 5 条）。
+3. **构建用的 API（A26 L3，B26 L3、L4）：** `chooseApiBase`：正式构建只认 https，`build:dev-api` 连本机，别的模式要写明，测试不受环境影响；`.gitignore` 加 `.env.*`（第 3 条）。
+4. **几处收紧（A26 N2、N3、N4、N6、N7、N11）：** `error=` 链接要 state 对上才说出 Google 的错误码；存的 state 要是 43 位 base64url；聊天流一行最多 100 万个字符，不带换行的一块不再重切整个缓冲；cookie 模式的回调只认请求自己的 `Origin` 加 `/`；`apiPath` 拒绝空值、`.`、`..`；登录地址只认 Google 的登录页，连本机 API 时才认它自己的页面。
+5. **开发 API（A26 N5，B26 L8）：** 设置从代码里的默认值开始，装上 API 自己的日志设置（第 10 条）；短跑一次，访问日志里没有 state，也没有课程 ID。测试钉住它只监听 127.0.0.1、两个前端的端口和 `vite.config.ts` 一致、没见过的 code 怎么拒、`main()` 用的主机和端口。
+6. **测试缺口（B26 M1、M2、L1、L6、L7、L8、L9、N1、N5、N6）：**
+   - code 和 state 不留在历史里：用 BrowserRouter 测 `history.length` 不变（后退回不到带 code 的地址），同时记下每个请求发出时地址栏的样子；
+   - 手机菜单里的账号框：显示和桌面一样；在菜单里登出以后，焦点落在菜单里的登录按钮上；
+   - C26、C28、C32、Q10 的测试改成断言请求已经结束，由断言杀掉；变异判法改成读 Vitest 的 JSON 报告，只撞上超时的不算杀掉；
+   - 聊天流：两句原话写死比对，错误正文最多等 30 秒，第一行是 error 当作坏流；
+   - 登录：取消时 state 也用掉，存的回来路径再过一遍检查，state 来自 `crypto.getRandomValues`，回来时清掉上一个人的按身份数据，回来的路径保留 `#`；
+   - Python：login-url 的 2048 上限（先于 503 查）；部署包清单改从 `pyproject.toml` 读（原来手写的漏了 `scrapers`）；重启以后旧 cookie 是 401；
+   - 网络约定改成「提到就算」，补上 HTTP 客户端的清单；schema 的第一项也给 60 秒；几个测试名改成和断言一致。
+7. **两条焦点测试不稳（B26 M3）：** 根子是焦点放回去在 passive effect 里，提示先上了屏；改成 `useLayoutEffect`，和结果同一次渲染（第 9 条），测试也就稳了。
+8. **`test:mutations` 坏了（B26 M4）：** 副本补上测试要读的文件，基线时限 120 秒（第 13 条）。
+9. **文档（A26 N9，B26 L5、N2、N3）：** README 的 CI 一句、安装和检查两节、「登录时也清课程对比」；`api_contract.md` 的 SAFE-02 提到 `reason`；本节 `dev:stall` 的「30.1 秒」改回工作记录里的 30.0 秒，「200 以外的回答都是 502」改准。
+
+没改、记进「已知」的：A26 L4（没有 PKCE）、N8（登出不清问题和方案）、N10（回来的路径带查询串和 `#`），B26 N4（两处固定等 20 毫秒）。
+
+**复核第 1 轮**（只看 `6d054f5..3ebc04d`，两路还是 A26、B26，续用原来的上下文；中途按用户的意思停过一晚）：
+
+- **A26：** 0/0/0/0，NIT 5 条。原来 15 条里 11 条确认修好；N5 修了一半（就是下面第 4 条）；L4、N8、N10 的「已知」写得准。它用探针核过：回调没有 Origin 时先 403，不会变成 500；真实构建配本机 http 停下，`--mode staging` 不写地址也停下。
+- **B26：** 0/0/0，LOW 2 条、NIT 4 条。上一轮的 19 条都修好了，M3、M4、L3 也自己确认过：M3 在负载下跑 60 次都没失败，`test:mutations` 110/110，设了 `VITE_API_BASE_URL` 也全过。它用自己的判法重跑了前端 86 个、Python 33 个变异，结果和本节一样；W03 等价是对的。
+
+修复分两处：两处措辞在合并提交里，其余在第四个提交里。正文各条已经改成修完的样子。
+
+1. **重读 `/auth/me` 失败（A26 N-A）：** 原来失败的那次留在缓存里，404 时侧栏显示「暂时无法确认」，开门以后 `/auth/me` 还会自己再发一次。现在把回调给的身份放回缓存（第 8 条）；测试换成 503、404、断网三种，各查只发了一次 `/auth/me`、缓存里是成功的那份。
+2. **没保存住登录的提示（A26 N-B，B26 N4）：** 重读读到游客也可能是 API 不认刚发的令牌（比如时钟往回跳），原来那句只怪浏览器，改成「登录状态没有保存下来（可能是浏览器不让本站使用 cookie），请再登录一次。」。登录、登出的八句话加了一条写死原文的测试。
+3. **连本机 API 的构建（A26 N-C）：** 原来和正式构建都写 `dist/`，手边的 `dist/` 可能是连本机的那份。现在输出到 `dist-dev-api/`，用 `preview:dev-api` 预览，`check-bundle.mjs` 收目录参数；contracts 测试钉住这几个脚本，三个忽略清单也加上了（第 3 条）。
+4. **开发 API 的日志（A26 新的一条）：** 假登录页那一行带着 state，生产的过滤器不管这一页。开发 API 自己加一个过滤器，测试也查这一行（第 10 条）。
+5. **开发 API 有一个设置没复位（B26 LOW 1）：** `api/routes/common.py` 在第一次 import 时就拷走了 `rerank_pool_size`，复位在那之后，所以环境里的 `RERANK_POOL_SIZE` 还管用。现在复位挪到 import 路由之前；新测试另开一个进程、设好这个变量再起，查三处拷贝都是默认值。
+6. **焦点的修法没钉住（B26 LOW 2）：** 两条失败路径的焦点测试加一个断言：提示第一次出现在页面上的那一刻，焦点就已经回到按钮上（MutationObserver 记下那一刻）。改回 `useEffect` 现在每次都失败。
+7. **行长上限两处量法不一样（B26 NIT 3，也是 A26 的 CRLF 边界）：** 收完的一行先去空白再量，没收完的不去，`\r\n` 正好切在两块之间时结果会变。现在两处都量「去掉行尾的 `\r`」以后的长度；加了测试：恰好上限的一行带 `\r\n`，切不切开都读得出来；没收完的一行恰好上限时等它收完，多一个字符就结束（第 11 条）。
+8. **文档（B26 NIT 1、2）：** 第二个提交的新变异是 50 个，不是 51 个；跑的测试是改过的 3 个文件加 `test_api_auth_route.py`。这两处在合并提交里改了。
+
+**复核第 2 轮**（最后一轮，看 `67f9fdd..56ce5e1`，B26 另看合并提交里给 R3a 加的东西；中途撞过一次额度上限，接着做完）：
+
+- **A26：** 0/0/0/0/0，上一轮的 5 条都修对了。点名要它查的四处都没找到问题：重读失败时把身份放回缓存，中间不会有别的回答插进来（回来的路上 `useMe`、`useConfig` 都关着，忙的时候不收登出，同一个查询的请求会合并成一个）；行长的量法怎么切开都一样；开发 API 复位以前，没有别的模块在 import 时读设置（另开进程、设了三个变量去试）；假登录页的过滤器不碰别的行。
+- **B26：** 0/0/0/0，NIT 1：先修类型的对照漏了方案节点的 `areas`（`Misfits` 不比值是对象的字段），API 把它的值改成数字，类型检查照样通过。上一轮的 4 条它都用变异和对照复现过，本节的数字和日志都对得上。这条只要补一条类型检查，第五个提交补了（第 16 条），没有再开一轮。
+
+### 已知、未处理
+
+- **R7 上线前：** Google OAuth 客户端要把新前端的地址（来源加 `/`）加进 Authorized redirect URI，API 的 `WEB_ORIGINS` 也要设成它（第 33 节已记），不然 Google 或 API 会拒绝。
+- **`/chat` 的 409：** 选方案没选成、专业前缀对应多个项目、选的项目和问题里的前缀不一致，这三种 `detail` 都是给学生看的中文，Streamlit 原样显示。新前端不显示 `detail`，R3 要按情况自己说，或者后端给 409 加一个稳定的原因。
+- **会话在页面开着时过期：** `useMe` 不自己过期，侧栏会一直显示已登录。R5d 的按身份请求收到 401 时要把身份改回游客。
+- **「后退」以后的一种情况：** 登录成功以后连按两次后退回到 Google 的页面，Google 要是直接再跳回来，存的 state 已经用掉，会说「登录没有完成，请重新登录」，可人其实还登录着。没处理。
+- 坏行的处理和 Streamlit 不同（见第 11 条）。生成的 `ChatRequest` 把有默认值的 `k`、`allow_feedback_capture` 也当作必填，调用方要明确给出（是否允许保存回答本来就该由页面明确给）。
+- openapi-typescript 支持 TypeScript 6 以后，生成器可以并回主包。
+- 隐私、Co-op、对比三页还用自己的演示身份，侧栏登录了它们也不知道；R5d 接上。
+- **没有 PKCE（A26 L4，原有设计）：** code 不绑浏览器。state 对不上时 code 不会被兑换，但会留在浏览器的全局历史里，有效期内能用到这台电脑的人可以拿它走 token 模式换令牌。R7 前后考虑：`code_verifier` 和 state 一起放进 sessionStorage，兑换时由 API 交给 Google。
+- **登出清得不全（A26 N8）：** 问题、项目和方案（PrototypeContext）和 MutationCache 登出时都不清；Streamlit 会清对话、项目和方案。R2b 里还是演示数据，R3／R4 要留一个统一的「重置会话」钩子。
+- **回来的路径带查询串和 `#`（A26 N10）：** 现在只有演示参数；R3 以后要是把学生自己写的东西放进网址，就只存路径（R0 14.6）。
+- 两条测试在固定等 20 毫秒以后做否定断言（B26 N4）：负载很大时可能漏掉变异体，不会误报。
+- 变异 W03（去掉 `refetchOnReconnect: false`）是等价的：`networkMode: 'always'` 下 TanStack 默认就不在网络恢复时重取（本节验证记录里有探针）。这一行留着，以后要是有人把 `networkMode` 改回去，它还能兜底。
+- **浏览器里重验的是第二个提交 `3ebc04d`**（见验证记录）；之后改的几处只有前端测试。
+- **合并 R3b 的改动（第 17 条）在复核第 2 轮之后，没有再审：** 两轮复核的上限已经用完。它只动类型和测试，由上面的类型变异、全部前端测试和项目自己的变异核过。
+- **账号的提示放在页面最底下（浏览器重验时发现，MINOR）：** 登录、登出的提示写在外壳 `<main>` 后面那个 `role="status"` 里（R1 原型的提示区）。长页面上第一屏看不见；手机菜单开着时，它在 Radix 给菜单外面加的 `aria-hidden` 里，所以在菜单里登出失败什么提示都看不到，像是按了没反应（焦点回到「退出登录」是对的）。R3 接线时外壳的这个提示区要改（原型的 PrototypeContext 会去掉），到时候把账号的话放进账号框里（桌面侧栏和手机菜单各显示自己的），回来时的结果放在页面顶上。
+- **取消登录的说法：** 显示「登录没有完成（access_denied），请再试一次。」，照 Streamlit 把 Google 的错误码放进括号，字面上没有「取消」。要改成「你取消了登录」这类说法的话，Streamlit 和新前端一起改。
+- 正式构建写明 `https://localhost:8443` 这样的地址也能过（A26 记下的，不算问题）：本机 http 拦住了，https 的本机地址只能是有意写的。
+
+### 发布状态
+
+分支 `feat/web-api-client`，基底是合并 R2a（#29）以后的 main `2aa2327`。第一个提交是 R2b 本身，第二个提交是第 25 轮审查的修复。R3a（#30）10-23 已经合并（main `7363572`），第三个提交把 main 合了进来（见第 16 条），第四个提交是复核第 1 轮的修复，第五个提交是复核第 2 轮（最后一轮）的那条 NIT 和本节。R3b（#31）10-24 已经合并（main `fe9203f`），第六个提交把 main 合了进来，给 R3b 的类型加了对照（第 17 条）。没有使用真实模型、账号、NAS 或生产库；登录和聊天都对着本机的开发 API 和合成数据。上线要另外授权。

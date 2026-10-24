@@ -9,12 +9,16 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && node scripts/check-bundle.mjs",
+    "build:dev-api": "tsc --noEmit && vite build --mode dev-api --outDir dist-dev-api && node scripts/check-bundle.mjs dist-dev-api",
     "preview": "vite preview --host 127.0.0.1",
+    "preview:dev-api": "vite preview --host 127.0.0.1 --outDir dist-dev-api",
     "test": "vitest run",
     "test:mutations": "node scripts/mutations.mjs",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check .",
+    "gen:api": "node tools/openapi-types/generate.mjs",
+    "gen:api:check": "node tools/openapi-types/generate.mjs --check",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
@@ -22,6 +26,7 @@
     "@fontsource/ibm-plex-sans": "5.3.0",
     "@radix-ui/react-dialog": "1.3.1",
     "@radix-ui/react-select": "2.4.1",
+    "@tanstack/react-query": "5.104.5",
     "lucide-react": "1.61.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",

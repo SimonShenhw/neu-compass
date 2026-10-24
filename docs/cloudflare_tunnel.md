@@ -206,7 +206,7 @@ curl -s https://compass.<your-zone>.com -o /dev/null -w "%{http_code}\n"  # 200
 
 - systemd unit 把 cloudflared 做成开机自启
 - pre-warm hook 把 ready 时间从 70s 缩短 (改 BGEM3 模型放在共享 volume, 跨进程 mmap)
-- Cloudflare Access 加 SSO 网关, 限定 husky.neu.edu 才能访问页面 (双层防护: app/auth.py 的 OAuth + CF Access)
+- Cloudflare Access 加 SSO 网关, 限定 husky.neu.edu 才能访问页面 (双层防护: api/google_oauth.py 的 OAuth + CF Access)
 - 真实 query log 收齐后做 PromQL/Grafana 看板
 
 ---

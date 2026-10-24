@@ -4,7 +4,7 @@
 
 ## 1. 起点、范围与当前交付
 
-- worktree：`H:\neu-compass-web`，WSL `/mnt/h/neu-compass-web`。
+- worktree：本机单独的 web worktree（本机路径不写进仓库）。
 - 从 `6b633b9e814565b9c990bb578fab5384b733bf19` 新建 `feat/web-compare`；保留 `feat/web-coop`，不在 main checkout 运行测试。
 - 仅修改 `web/`。不改 Python、后端、Streamlit、Docker、nginx、CI、依赖版本或 lockfile；不接真实接口、登录、缓存、查询日志或模型。
 - 交付为本地代码与提交；没有 push、PR、合并或部署。R3 详情页的「加入对比」由另一边接入本批 store；R4 的方案筛选不在此轮。
