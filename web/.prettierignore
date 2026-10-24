@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-dev-api/
 package-lock.json
 coverage/
 artifacts/

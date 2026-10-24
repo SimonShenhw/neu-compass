@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && node scripts/check-bundle.mjs",
-    "build:dev-api": "tsc --noEmit && vite build --mode dev-api && node scripts/check-bundle.mjs",
+    "build:dev-api": "tsc --noEmit && vite build --mode dev-api --outDir dist-dev-api && node scripts/check-bundle.mjs dist-dev-api",
     "preview": "vite preview --host 127.0.0.1",
+    "preview:dev-api": "vite preview --host 127.0.0.1 --outDir dist-dev-api",
     "test": "vitest run",
     "test:mutations": "node scripts/mutations.mjs",
     "lint": "eslint . --max-warnings 0",

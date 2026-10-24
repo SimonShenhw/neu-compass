@@ -33,7 +33,7 @@ export const LOGIN_MESSAGES = {
   unverified: '这个 Google 账号的邮箱还没有验证，验证以后再登录。',
   storage: '这个浏览器不让本页暂存登录信息，所以没法登录。',
   notKept:
-    '这个浏览器没有保存登录状态（可能不让本站使用 cookie），所以没法登录。',
+    '登录状态没有保存下来（可能是浏览器不让本站使用 cookie），请再登录一次。',
   logoutFailed: '没能退出登录，请再试一次。',
   loggedOut: '已退出登录。',
 } as const;

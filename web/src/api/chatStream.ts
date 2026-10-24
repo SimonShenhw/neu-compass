@@ -33,6 +33,10 @@ export const STREAM_WAIT_MS = 30_000;
 // No line the API sends comes near this (meta, the longest, is some tens of KB). A longer one, or a piece of one that
 // has not ended yet, means the stream is broken, and the buffer never grows without end.
 export const MAX_LINE_CHARS = 1_000_000;
+// A line's length without its line ending, measured the same way whether the line has ended or is still arriving: a
+// `\r\n` cut between two pieces must not change the answer (B26).
+const lineLength = (line: string) =>
+  line.endsWith('\r') ? line.length - 1 : line.length;
 
 export const STREAM_MESSAGES = {
   lost: '连接中断。仅保留部分回答，未完整结束；请稍后手动重试。',
@@ -170,10 +174,13 @@ export async function* streamChat(
         chunk.done || text.includes('\n') ? buffer.split('\n') : [buffer];
       buffer = chunk.done ? '' : (lines.pop() ?? '');
       for (const raw of lines) {
+        if (lineLength(raw) > MAX_LINE_CHARS) {
+          yield broken;
+          return;
+        }
         const line = raw.trim();
         if (line === '') continue;
-        const event =
-          line.length > MAX_LINE_CHARS ? null : readEvent(line, first);
+        const event = readEvent(line, first);
         if (event === null) {
           yield broken;
           return;
@@ -182,7 +189,7 @@ export async function* streamChat(
         yield event;
         if (event.type === 'error' || event.type === 'done') return;
       }
-      if (buffer.length > MAX_LINE_CHARS) {
+      if (lineLength(buffer) > MAX_LINE_CHARS) {
         yield broken;
         return;
       }

@@ -50,16 +50,24 @@ export function useSession(
     [queryClient],
   );
 
-  // After the callback, /auth/me is read again (plan 3.1): only that shows the browser kept the cookie. A browser that
-  // refused it answers as a guest; a read that fails for a moment leaves the callback's answer standing.
-  const kept = useCallback(async () => {
-    try {
-      const viewer = await queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
-      return viewer.kind === 'member';
-    } catch {
-      return true;
-    }
-  }, [queryClient]);
+  // After the callback, /auth/me is read again (plan 3.1): only that shows the cookie was kept. A browser that refused
+  // it answers as a guest. A read that fails says nothing about the cookie, so the callback's answer stands; it goes
+  // back into the cache, or the failed read would show as 「暂时无法确认」 and go out again by itself.
+  const kept = useCallback(
+    async (member: Viewer) => {
+      try {
+        const viewer = await queryClient.fetchQuery({
+          ...meQuery,
+          staleTime: 0,
+        });
+        return viewer.kind === 'member';
+      } catch {
+        queryClient.setQueryData(meQuery.queryKey, member);
+        return true;
+      }
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     if (handled.current) return;
@@ -71,7 +79,7 @@ export function useSession(
     void finishLogin(search).then(async (result) => {
       if (result.kind === 'done') {
         await becomes(result.member);
-        if (!(await kept())) announce(LOGIN_MESSAGES.notKept);
+        if (!(await kept(result.member))) announce(LOGIN_MESSAGES.notKept);
       }
       if (result.kind === 'failed') announce(result.message);
       if (result.kind !== 'none')

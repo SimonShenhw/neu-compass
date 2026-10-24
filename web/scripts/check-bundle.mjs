@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-const manifest = JSON.parse(readFileSync('dist/.vite/manifest.json', 'utf8'));
+// The build to measure: dist/ by default, dist-dev-api/ for npm run build:dev-api.
+const dir = process.argv[2] ?? 'dist';
+const manifest = JSON.parse(
+  readFileSync(resolve(dir, '.vite/manifest.json'), 'utf8'),
+);
 const files = new Set();
 const visited = new Set();
 function collect(key) {
@@ -18,7 +22,7 @@ for (const [key, chunk] of Object.entries(manifest))
 if (!files.size) throw new Error('No entry JavaScript was measured');
 const compressed = [...files].reduce(
   (total, file) =>
-    total + gzipSync(readFileSync(resolve('dist', file))).byteLength,
+    total + gzipSync(readFileSync(resolve(dir, file))).byteLength,
   0,
 );
 console.info(

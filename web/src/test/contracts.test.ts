@@ -8,9 +8,14 @@ const root = process.cwd();
 function files(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (
-      ['node_modules', 'dist', 'coverage', '.vite', 'artifacts'].includes(
-        entry.name,
-      )
+      [
+        'node_modules',
+        'dist',
+        'dist-dev-api',
+        'coverage',
+        '.vite',
+        'artifacts',
+      ].includes(entry.name)
     )
       return [];
     const path = resolve(directory, entry.name);
@@ -35,6 +40,21 @@ it('direct dependencies are exact, stable pins; TanStack Query is the only data 
       if (name.includes('tanstack')) expect(name).toBe('@tanstack/react-query');
     }
   }
+});
+
+it('the build for the API on this machine never lands where the production build does', () => {
+  // dist/ only ever holds a build for the real API, so a dist/ handed to a deployment cannot point at a laptop (A26).
+  const { scripts } = JSON.parse(
+    readFileSync(resolve(root, 'package.json'), 'utf8'),
+  ) as { scripts: Record<string, string> };
+  expect(scripts.build).not.toContain('--outDir');
+  expect(scripts['build:dev-api']).toContain(
+    'vite build --mode dev-api --outDir dist-dev-api ',
+  );
+  expect(scripts['build:dev-api']).toMatch(
+    / node scripts\/check-bundle\.mjs dist-dev-api$/,
+  );
+  expect(scripts['preview:dev-api']).toMatch(/ --outDir dist-dev-api$/);
 });
 
 it('fixtures contain only the five approved course codes', () => {

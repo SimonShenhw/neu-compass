@@ -317,6 +317,35 @@ describe('a broken stream', () => {
     expect(signalOf(fetch).aborted).toBe(true);
   });
 
+  it('measures a line without its line ending, the same whether it has ended or is still arriving', async () => {
+    const content = (length: number) =>
+      `{"type":"token","text":"${'x'.repeat(length - 26)}"}`;
+    // A line of exactly the limit ended by \r\n: cut between \r and \n or not, it is read.
+    for (const pieces of [
+      [line(META), `${content(MAX_LINE_CHARS)}\r\n`, line({ type: 'done' })],
+      [
+        line(META),
+        `${content(MAX_LINE_CHARS)}\r`,
+        `\n${line({ type: 'done' })}`,
+      ],
+    ]) {
+      serve(pieces);
+      expect(
+        (await collect(streamChat(REQUEST))).map((event) => event.type),
+      ).toEqual(['meta', 'token', 'done']);
+    }
+    // Still arriving: exactly the limit waits for its newline, one character more ends the stream at once.
+    for (const [length, events] of [
+      [MAX_LINE_CHARS, ['meta', 'token', 'done']],
+      [MAX_LINE_CHARS + 1, ['meta', 'error']],
+    ] as const) {
+      serve([line(META), content(length), `\n${line({ type: 'done' })}`]);
+      expect(
+        (await collect(streamChat(REQUEST))).map((event) => event.type),
+      ).toEqual(events);
+    }
+  });
+
   it('that drops mid-answer keeps what arrived', async () => {
     const body = pipe();
     const fetch = answerWith(body);

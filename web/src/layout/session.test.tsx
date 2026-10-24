@@ -71,6 +71,23 @@ async function pressAndDropFocus(name: string, busyName: string) {
   document.body.removeAttribute('tabindex');
   expect(document.body).toHaveFocus();
 }
+// Where focus is at the moment a text first appears in the page. The button must have it back by then, in the same
+// commit as the result, not a moment later: a later move is what made two focus tests flaky (B26).
+function focusWhenShown(text: string) {
+  const seen: { focus?: Element | null } = {};
+  const observer = new MutationObserver(() => {
+    if (!('focus' in seen) && document.body.textContent?.includes(text)) {
+      seen.focus = document.activeElement;
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+  return seen;
+}
 
 beforeEach(() => sessionStorage.clear());
 afterEach(() => {
@@ -192,23 +209,46 @@ describe('coming back from Google', () => {
     expect(accountButton('用 NEU 邮箱登录')).toBeEnabled();
   });
 
-  it('an /auth/me that fails for a moment after the login leaves the member shown', async () => {
-    pendingLogin('/compare');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn<Fetch>(async (url) =>
-        url.endsWith('/auth/callback')
-          ? json(identity)
-          : json({ error_type: 'service_unavailable' }, 503),
-      ),
-    );
-    page(`/?code=c&state=${STATE}`);
-    await waitFor(() => expect(where()).toHaveTextContent('/compare'));
-    expect(
-      within(sidebar()).getByText('Synthetic Student'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(LOGIN_MESSAGES.notKept)).not.toBeInTheDocument();
-  });
+  it.each([
+    [
+      'fails for a moment (503)',
+      async () => json({ error_type: 'service_unavailable' }, 503),
+    ],
+    [
+      'gets a definite error (404)',
+      async () => json({ error_type: 'not_found' }, 404),
+    ],
+    [
+      'loses the connection',
+      () => Promise.reject(new TypeError('Failed to fetch')),
+    ],
+  ])(
+    'an /auth/me that %s after the login leaves the member shown and is not sent again by itself',
+    async (_, reread: () => Promise<Response>) => {
+      pendingLogin('/compare');
+      const fetch = vi.fn<Fetch>(async (url) =>
+        url.endsWith('/auth/callback') ? json(identity) : reread(),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const client = page(`/?code=c&state=${STATE}`);
+      await waitFor(() => expect(where()).toHaveTextContent('/compare'));
+      expect(
+        within(sidebar()).getByText('Synthetic Student'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(LOGIN_MESSAGES.notKept),
+      ).not.toBeInTheDocument();
+      // The failed read is not left in the cache: an error there would mark the query for a refetch of its own.
+      expect(client.getQueryState(meQuery.queryKey)).toMatchObject({
+        status: 'success',
+        isInvalidated: false,
+      });
+      expect(client.getQueryData(meQuery.queryKey)).toEqual(MEMBER);
+      expect(
+        fetch.mock.calls.filter(([url]) => url.endsWith('/auth/me')),
+      ).toHaveLength(1);
+    },
+  );
 
   it('a wrong state is refused before anything is sent', async () => {
     pendingLogin('/coop');
@@ -390,22 +430,26 @@ describe('focus in the account box', () => {
     const calls = held();
     page('/', seededQueryClient({ viewer: MEMBER }));
     await pressAndDropFocus('退出登录', '正在退出…');
+    const shown = focusWhenShown('没能退出登录，请再试一次。');
     calls[0]!.fail(new TypeError('Failed to fetch'));
     await waitFor(() =>
       expect(notice()).toHaveTextContent('没能退出登录，请再试一次。'),
     );
     expect(accountButton('退出登录')).toHaveFocus();
+    expect(shown.focus).toBe(accountButton('退出登录'));
   });
 
   it('a login start that fails puts focus back on the login button', async () => {
     const calls = held();
     page('/compare');
     await pressAndDropFocus('用 NEU 邮箱登录', '正在前往 Google…');
+    const shown = focusWhenShown('请求过于频繁，请稍后手动重试。');
     calls[0]!.answer(json({ error_type: 'rate_limited' }, 429));
     await waitFor(() =>
       expect(notice()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
     );
     expect(accountButton('用 NEU 邮箱登录')).toHaveFocus();
+    expect(shown.focus).toBe(accountButton('用 NEU 邮箱登录'));
   });
 
   it('a box that was not pressed leaves focus alone', () => {

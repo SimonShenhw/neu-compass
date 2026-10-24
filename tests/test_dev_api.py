@@ -8,7 +8,10 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import os
 import re
+import subprocess
+import sys
 import tomllib
 from html import unescape
 from pathlib import Path
@@ -96,14 +99,45 @@ def test_settings_start_from_the_codes_defaults(settings_back, tmp_path):
     assert set(fields) - set(dev_api.pinned(settings)) == {"gemini_api_key"}
 
 
+def test_a_setting_the_routes_copy_on_import_starts_from_its_default_too(tmp_path):
+    """api/routes/common.py copies rerank_pool_size when it is first imported, which in the dev API's own process
+    happens inside build_dev_app; a fresh process shows whether the reset came first (B26). 中文：api/routes/common.py
+    第一次被 import 时就拷走 rerank_pool_size，在开发 API 自己的进程里这发生在 build_dev_app 里面；新开一个进程才看得出复位
+    是不是在它之前（B26）。"""
+    script = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from tests.support import dev_api\n"
+        "dev_api.build_dev_app(Path(sys.argv[1]), base='https://dev-api.test')\n"
+        "import api.routes.chat, api.routes.common, api.routes.search\n"
+        "from config import settings\n"
+        "field = type(settings).model_fields['rerank_pool_size']\n"
+        "print('pool', field.get_default(call_default_factory=True), api.routes.common.RERANK_POOL_SIZE,\n"
+        "      api.routes.chat.RERANK_POOL_SIZE, api.routes.search.RERANK_POOL_SIZE)\n"
+    )
+    done = subprocess.run([sys.executable, "-c", script, str(tmp_path / "dev.sqlite3")], cwd=ROOT,
+                          env={**os.environ, "RERANK_POOL_SIZE": "3"}, capture_output=True, text=True, timeout=300,
+                          check=False)
+    assert done.returncode == 0, done.stderr[-2000:]
+    # Log lines may share stdout; the answer is the line the script printed. 中文：日志也可能写到 stdout，只看脚本打的那行。
+    [line] = [line for line in done.stdout.splitlines() if line.startswith("pool ")]
+    default, *copies = line.split()[1:]
+    assert default != "3" and copies == [default] * 3
+
+
 def test_the_access_log_is_filtered_as_in_production(settings_back, tmp_path):
     access = logging.getLogger("uvicorn.access")
     for installed in list(access.filters):  # Whatever an earlier test installed. 中文：之前的测试装上的。
         access.removeFilter(installed)
     dev_api.build_dev_app(tmp_path / "dev.sqlite3", base="https://dev-api.test")
-    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
-                               ("127.0.0.1:50000", "GET", f"/auth/login-url?state={STATE}", "1.1", 200), None)
-    assert access.filter(record) and STATE not in record.getMessage()
+    # The login address (production's filter) and the sign-in page Google is replaced by (the dev API's own) both
+    # carry the state. 中文：登录地址（生产的过滤器）和代替 Google 的登录页（开发 API 自己的）都带着 state。
+    for target, kept in ((f"/auth/login-url?state={STATE}", "/auth/login-url"),
+                         (f"/__dev/google?state={STATE}&redirect_uri=x", "/__dev/google")):
+        record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 0, '%s - "%s %s HTTP/%s" %d',
+                                   ("127.0.0.1:50000", "GET", target, "1.1", 200), None)
+        assert access.filter(record)
+        assert STATE not in record.getMessage() and f"GET {kept} HTTP" in record.getMessage()
 
 
 def test_the_dev_api_listens_on_this_machine_only(settings_back, monkeypatch, capsys):

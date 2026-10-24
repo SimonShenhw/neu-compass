@@ -16,8 +16,9 @@ stand-ins put together:
     end waits).
 
 Every setting starts from the code's default, whatever .env or the environment says, and the session secret is new on
-every start, so a restart logs everyone out. The access log is filtered as in production. Both this and the dev server
-are on 127.0.0.1: one host name keeps them one site for the browser, so the SameSite=Lax session cookie goes along.
+every start, so a restart logs everyone out. The access log is filtered as in production, and the sign-in page's line
+loses its query too (it carries the state). Both this and the dev server are on 127.0.0.1: one host name keeps them one
+site for the browser, so the SameSite=Lax session cookie goes along.
 
 Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8000]
 
@@ -27,7 +28,7 @@ import 它，API 里也没有任何测试模式；这里只是把测试套件自
 state 不对的链接和一个「取消」；模型换成 tests/conftest.py 的替身；/chat 按脚本回答，从不调用 Gemini，会调用它的 HyDE
 补救也关掉。问题里带上面那几个词，就换成对应的脚本：模型中途出错、没有回答、今天的次数用完、流没有 done 就结束、连接中途
 断开、停得比前端等的还久。每个设置都从代码里的默认值开始，不管 .env 或环境变量怎么写；每次启动换一个会话密钥，所以重启
-就都登出了。访问日志和生产一样过滤。它和开发服务器都在 127.0.0.1，同一个主机名，
+就都登出了。访问日志和生产一样过滤，假登录页那条也去掉查询串（里面有 state）。它和开发服务器都在 127.0.0.1，同一个主机名，
 浏览器才把它们算作同一个站点，SameSite=Lax 的会话 cookie 才会跟着请求走。
 """
 
@@ -35,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import logging
 import secrets
 import tempfile
 import time
@@ -67,11 +69,27 @@ REFUSALS = {
     "dev-refused": ("Google refuses the code (refused)", "token_exchange_rejected"),
 }
 WRONG_STATE = "dev-wrong-state-0123456789abcdef"
+SIGN_IN_PATH = "/__dev/google"
 # The scripted answer, in pieces. 中文：脚本里的回答，分成几块。
 ANSWER = ("按合成目录，", "CS 5800 ", "是算法课，", "CS 6140 ", "是机器学习。", "（这是开发用的假回答，", "没有调用模型。）")
 PIECE_SECONDS = 0.05  # Between pieces, so the page shows the answer arriving. 中文：块与块之间停一下，页面上看得出在流。
 STALL_SECONDS = 35  # Longer than the web front end's 30 s wait. 中文：比前端的 30 秒等得久。
 CUT_AFTER_LINES = 3  # dev:cut and dev:no-done stop after meta and two pieces. 中文：meta 和两块以后就停。
+
+
+class _SignInAccessFilter(logging.Filter):
+    """The sign-in page's access line loses its query, as the login address's does in production: it carries the
+    state (A26). 中文：假登录页那条访问日志也去掉查询串，和生产里登录地址那条一样：里面有 state（A26）。"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple) and len(record.args) == 5 and isinstance(record.args[2], str):
+            path = record.args[2].partition("?")[0]
+            if path.rstrip("/") == SIGN_IN_PATH:
+                record.args = (*record.args[:2], path, *record.args[3:])
+        return True
+
+
+_SIGN_IN_ACCESS_FILTER = _SignInAccessFilter()
 
 
 def pinned(settings) -> list[str]:
@@ -218,6 +236,13 @@ class CutChat:
 def build_dev_app(db_path: Path, *, base: str) -> FastAPI:
     """The real app (create_app) over the synthetic world; `base` is where this API answers, for the sign-in page.
     中文：真正的应用（create_app），跑在合成的那一套上；`base` 是这个 API 的地址，给登录页用。"""
+    from config import settings  # noqa: PLC0415
+
+    # Before anything imports the routes: api/routes/common.py copies rerank_pool_size when it is first imported, and
+    # in this API's own process that happens just below (B26). 中文：要在任何东西 import 路由之前：api/routes/common.py
+    # 第一次被 import 时就把 rerank_pool_size 拷走了，在这个 API 自己的进程里那就发生在下面几行（B26）。
+    configure(settings, db_path)
+
     import api.google_oauth  # noqa: PLC0415
     from api.dependencies import (  # noqa: PLC0415
         get_chat_stream_fn,
@@ -227,29 +252,29 @@ def build_dev_app(db_path: Path, *, base: str) -> FastAPI:
     )
     from api.logging import configure_logging  # noqa: PLC0415
     from api.main import create_app  # noqa: PLC0415
-    from config import settings  # noqa: PLC0415
     from db.connection import connect  # noqa: PLC0415
     from db.repository import CourseRepository  # noqa: PLC0415
     from rag.hybrid import BM25Corpus  # noqa: PLC0415
     from rag.index import FaissIndex  # noqa: PLC0415
     from tests.conftest import FixtureEmbedder, FixtureReranker  # noqa: PLC0415
 
-    configure(settings, db_path)
     # The API's own logging, which production sets up at startup (skipped here): uvicorn's access log loses the login
-    # address's query and names course reads by their template (R2a). 中文：生产在启动时装上的 API 日志（这里不跑启动）：
-    # uvicorn 的访问日志去掉登录地址的查询串，课程读取只记路径模板（R2a）。
+    # address's query and names course reads by their template (R2a). The sign-in page's line, which production never
+    # has, loses its query here (A26). 中文：生产在启动时装上的 API 日志（这里不跑启动）：uvicorn 的访问日志去掉登录地址的
+    # 查询串，课程读取只记路径模板（R2a）；生产里没有的假登录页那条，在这里去掉查询串（A26）。
     configure_logging()
+    logging.getLogger("uvicorn.access").addFilter(_SIGN_IN_ACCESS_FILTER)
     make_database(db_path)
 
     def authorize_url(*, state_token: str = "", redirect_uri: str | None = None) -> str:
         query = urlencode({"state": state_token, "redirect_uri": redirect_uri or settings.google_oauth_redirect_uri})
-        return f"{base}/__dev/google?{query}"
+        return f"{base}{SIGN_IN_PATH}?{query}"
 
     # /auth/login-url looks the function up on every call. 中文：/auth/login-url 每次调用时才取这个函数。
     api.google_oauth.authorize_url = authorize_url
     app = create_app(run_startup=False)
     app.dependency_overrides[get_oauth_exchange_fn] = lambda: exchange
-    app.add_api_route("/__dev/google", sign_in_page, methods=["GET"], include_in_schema=False)
+    app.add_api_route(SIGN_IN_PATH, sign_in_page, methods=["GET"], include_in_schema=False)
     # No question reaches a model: the answer is scripted, and HyDE's rescue (Gemini rewriting the question) is off.
     # 中文：没有问题会到模型那里：回答按脚本来，HyDE 的补救（让 Gemini 改写问题）关掉。
     app.dependency_overrides[get_chat_stream_fn] = lambda: chat_stream
@@ -282,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="nc-dev-api-") as directory:
         base = f"http://{HOST}:{args.port}"
         app = build_dev_app(Path(directory) / "dev.sqlite3", base=base)
-        print(f"Dev API on {base} for {', '.join(FRONT_ENDS)}. Synthetic data; fake Google at {base}/__dev/google.")
+        print(f"Dev API on {base} for {', '.join(FRONT_ENDS)}. Synthetic data; fake Google at {base}{SIGN_IN_PATH}.")
         uvicorn.run(app, host=HOST, port=args.port, log_level="info")
     return 0
 

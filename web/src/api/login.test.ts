@@ -40,6 +40,21 @@ const pending = (state = STATE, returnTo = '/compare') =>
 beforeEach(() => sessionStorage.clear());
 afterEach(() => sessionStorage.clear());
 
+// The other tests compare with these constants, so only this one notices a sentence that changed (B26).
+it('says everything about logging in and out in these words', () => {
+  expect(LOGIN_MESSAGES).toEqual({
+    failed: '登录没有完成，请再试一次。',
+    forged: '登录没有完成，请重新登录。',
+    domain: '只能用 husky.neu.edu 或 northeastern.edu 邮箱登录。',
+    unverified: '这个 Google 账号的邮箱还没有验证，验证以后再登录。',
+    storage: '这个浏览器不让本页暂存登录信息，所以没法登录。',
+    notKept:
+      '登录状态没有保存下来（可能是浏览器不让本站使用 cookie），请再登录一次。',
+    logoutFailed: '没能退出登录，请再试一次。',
+    loggedOut: '已退出登录。',
+  });
+});
+
 describe('the state', () => {
   it('is 32 random bytes as 43 base64url characters, new every time', () => {
     const states = new Set(Array.from({ length: 200 }, makeState));
