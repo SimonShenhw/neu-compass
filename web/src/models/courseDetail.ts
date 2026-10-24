@@ -42,7 +42,7 @@ function timestamp(v: unknown): v is string {
     return false;
   }
 }
-function catalog(value: unknown): CatalogState {
+export function catalog(value: unknown): CatalogState {
   if (
     value == null ||
     value === '' ||
@@ -95,7 +95,7 @@ function catalog(value: unknown): CatalogState {
     },
   };
 }
-function evidence(v: unknown): ParsedAnswerEvidence | null {
+export function evidence(v: unknown): ParsedAnswerEvidence | null {
   if (!object(v)) return null;
   const missing = strings(v.missing_fields ?? []),
     warnings = strings(v.warnings ?? []),
