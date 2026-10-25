@@ -33,11 +33,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import DbConn, get_course_repo, get_program_policy_reader, get_program_repo
-from db.program_plan_repository import ProgramPlanRepository
+from api.dependencies import DbConn, get_alias_repo, get_course_repo, get_program_policy_reader, get_program_repo
+from api.exceptions import PlanSelectionConflict
+from api.plan_draft import DraftCheckIn, DraftCheckOut, check_draft
+from db.alias_repository import AliasRepository
+from db.program_plan_repository import ProgramPlanRepository, content_hash
 from db.program_repository import ProgramNotFound, ProgramRepository
 from db.repository import CourseRepository
 from schemas.program_plan import ProgramPlan
@@ -45,6 +49,17 @@ from schemas.program_policy_view import ProgramPolicyView
 from rag.program_policy_evidence import ProgramPolicyReader
 
 router = APIRouter(prefix="/programs", tags=["programs"])
+
+log = structlog.get_logger("neu_compass.program")
+
+
+def _revisions(plans: list[ProgramPlan]) -> dict[str, str]:
+    """{plan_id: plan_content_sha256} for the plans in an answer (R4b): the web front end sends a plan's content
+    version back with a draft check or a question and never recomputes Python's JSON hash. Kept at the top level, not
+    in each plan, because the Streamlit page validates every plan against ProgramPlan (extra="forbid").
+    中文：回答里每份方案的内容版本（R4b）：新前端在草案核对或提问时原样带回，不用自己重算 Python 的 JSON 摘要。放在顶层
+    而不放进每份方案，因为 Streamlit 页面按 ProgramPlan（extra="forbid"）校验每份方案。"""
+    return {plan.plan_id: content_hash(plan) for plan in plans}
 
 
 # === Response models (route-private — api/models.py stays untouched) ===
@@ -103,6 +118,7 @@ class ProgramCurriculumOut(BaseModel):
     notes: str | None = None
     semesters: list[CurriculumSemesterOut]
     plans: list[ProgramPlan] = Field(default_factory=list)
+    plan_revisions: dict[str, str] = Field(default_factory=dict)
     plan_schema_available: bool = False
     warnings: list[str] = Field(default_factory=lambda: ["legacy_seed_unverified", "legacy_scope_unknown"])
 
@@ -111,6 +127,7 @@ class ProgramPlansOut(BaseModel):
     program_id: str
     schema_available: bool
     plans: list[ProgramPlan]
+    plan_revisions: dict[str, str] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=lambda: ["personal_catalog_applicability_unconfirmed", "not_an_eligibility_evaluator"])
 
 
@@ -219,6 +236,7 @@ def get_program_curriculum(
             )
         )
 
+    plans = ProgramPlanRepository(conn).list_for_program(program_id)
     return ProgramCurriculumOut(
         program_id=program.program_id,
         full_name=program.full_name,
@@ -228,7 +246,8 @@ def get_program_curriculum(
             CurriculumSemesterOut(semester=sem, courses=cs)
             for sem, cs in groups.items()
         ],
-        plans=ProgramPlanRepository(conn).list_for_program(program_id),
+        plans=plans,
+        plan_revisions=_revisions(plans),
         plan_schema_available=ProgramPlanRepository(conn).available(),
     )
 
@@ -251,8 +270,9 @@ def get_program_plans(
         if end != start + 1:
             raise HTTPException(status_code=422, detail="Catalog year must be consecutive")
     repo = ProgramPlanRepository(conn)
-    return ProgramPlansOut(program_id=program_id, schema_available=repo.available(),
-                           plans=repo.list_for_program(program_id, campus=campus, catalog_year=catalog_year, pathway=pathway))
+    plans = repo.list_for_program(program_id, campus=campus, catalog_year=catalog_year, pathway=pathway)
+    return ProgramPlansOut(program_id=program_id, schema_available=repo.available(), plans=plans,
+                           plan_revisions=_revisions(plans))
 
 
 @router.get("/{program_id}/plans/{plan_id}/policies", response_model=ProgramPolicyView,
@@ -274,3 +294,45 @@ def get_selected_program_policies(
         raise HTTPException(status_code=404, detail="No usable current plan with this ID in the selected program")
     response.headers["Cache-Control"] = "no-store"
     return policy_reader.read(plan)
+
+
+@router.post(
+    "/{program_id}/plans/{plan_id}/draft",
+    response_model=DraftCheckOut,
+    summary="Check a session-only course draft against one exact source-checked plan (computes only)",
+    description=(
+        "The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly "
+        "typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in "
+        "`added`), the notices for that input in order (plain-text sentences, the Streamlit page's wording), and the "
+        "plan's rule tree evaluated on those courses — recorded rules only, not eligibility.\n\n"
+        "`plan_content_sha256` must be the version the page shows (`plan_revisions`); otherwise a 409 whose `reason` "
+        "is `missing`, `stale`, `draft`, `unusable` or `unavailable`, and the page clears the plan choice.\n\n"
+        "Stores nothing: no database row, no `query_log`, no course code or ID in the logs. Guests may use it."
+    ),
+    responses={
+        404: {"description": "`program_id` not in `programs`."},
+        409: {"description": "The exact plan could not be confirmed; `reason` says why."},
+        422: {"description": "Body not valid: more than 20 or repeated course IDs, `input` over 4000 characters."},
+    },
+)
+def check_plan_draft(
+    program_id: Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")],
+    plan_id: Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9-]{0,99}$")],
+    body: DraftCheckIn, conn: DbConn, response: Response,
+    program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
+    course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
+    alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
+) -> DraftCheckOut:
+    try:
+        program_repo.get_program(program_id)
+    except ProgramNotFound as exc:
+        raise HTTPException(status_code=404, detail="program_id not found") from exc
+    resolution = ProgramPlanRepository(conn).resolve_by_id(program_id, plan_id, body.plan_content_sha256)
+    if resolution.outcome != "selected" or resolution.plan is None:
+        log.warning("draft.plan_selection", plan_outcome=resolution.outcome, plan_id=plan_id)
+        raise PlanSelectionConflict(resolution.outcome if resolution.outcome != "selected" else "unusable")
+    out = check_draft(resolution.plan, body.plan_content_sha256, body, course_repo=course_repo, alias_repo=alias_repo)
+    response.headers["Cache-Control"] = "no-store"
+    # Counts only: no course code, ID or typed text. 中文：只记个数，不记课号、课程 ID 或输入的文字。
+    log.info("draft.checked", courses=len(out.courses), added=len(out.added), notices=len(out.notices))
+    return out

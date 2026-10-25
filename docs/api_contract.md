@@ -37,6 +37,7 @@
 | GET    | `/programs/{program_id}` | Curriculum by recommended semester  |
 | GET    | `/programs/{program_id}/plans` | Requirement documents by version |
 | GET    | `/programs/{program_id}/plans/{plan_id}/policies` | Policy evidence for one plan |
+| POST   | `/programs/{program_id}/plans/{plan_id}/draft` | Check a session course draft (R4b) |
 | POST   | `/coop`               | Submit Co-op (k=2 anonymity gated)     |
 | GET    | `/coop`               | List Co-op visible to user             |
 | POST   | `/chat`               | Streamed grounded chat (NDJSON)        |
@@ -52,7 +53,8 @@
 The routes without a section below are described in their OpenAPI docstrings (`/docs`).
 
 Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}` (and its requisites), `/resolve/course`,
-`/programs…`, `/chat`, `/feedback` (a vote carries its own receipt), `/privacy`, `/config`, `/auth/login-url`, and
+`/programs…` (the draft check included), `/chat`, `/feedback` (a vote carries its own receipt), `/privacy`, `/config`,
+`/auth/login-url`, and
 `GET /coop` (degraded view). `GET /auth/me`, `POST /coop` and `POST /auth/delete-account` need
 `Authorization: Bearer <session_token>`, or, without a non-empty `Authorization` header, the API's session cookie
 (R2a; see "Session cookie, CSRF and CORS" under Conventions); without either they answer 401.
@@ -626,6 +628,46 @@ pointer to the page; each front end adds its own.
 
 R2a. `{"answer_feedback_enabled": bool, "login_available": bool}`. `login_available` means Google's client ID and
 client secret and a `SESSION_SECRET` are all configured, so `/auth/login-url` and the cookie login work.
+
+---
+
+## POST /programs/{program_id}/plans/{plan_id}/draft
+
+R4b. The program page's session-only course draft, checked against one exact source-checked plan. It computes only:
+no database row, no `query_log`, nothing shared with chat, and no course code, course ID or typed text in the logs
+(the route logs counts). Guests may use it; a request with the session cookie passes the R2a cross-site check.
+
+```json
+{"plan_content_sha256": "<64 hex>", "course_ids": ["neu-cs-5800"], "input": "CS 5010, CS 5800"}
+```
+
+- `plan_content_sha256`: the version the page shows, from the top-level `plan_revisions` of `GET /programs/{id}` or
+  `GET /programs/{id}/plans` (`{plan_id: plan_content_sha256}`, added for R4b next to `plans`).
+- `course_ids`: the draft now, at most 20, distinct. `input`: codes to add, at most 4000 characters, optional. Both
+  strict; anything else in the body is a 422.
+
+Answer (200, `Cache-Control: no-store`):
+
+```json
+{"plan_content_sha256": "...", "courses": [{"course_id": "...", "code": "CS 5010", "name": "...", "credits": 4}],
+ "added": ["CS 5010"], "notices": [{"kind": "...", "level": "warning", "text": "...", "candidates": [],
+ "candidates_omitted": 0}], "result": {"root": {...}, "unplaced": [], "summary_counts": {...}}}
+```
+
+- `courses` is the whole draft after this request, as the server records the courses now (a gone, invalid or doubled
+  record leaves with a notice); `added` lists the codes newly added.
+- `notices` come in processing order, each a plain-text sentence (the Streamlit page's wording) with a stable `kind`:
+  `course_gone`, `duplicate_code`, `too_many_codes`, `invalid_format`, `invalid_format_more`, `all_present`,
+  `over_limit`, `not_found`, `ambiguous` (with up to 10 `candidates`, the rest in `candidates_omitted`),
+  `cross_listed_twin`, `also_matches`, `primary_code`, `invalid_record`, `nothing_new`. Typed text quoted in a
+  sentence is plain text, never markup.
+- `result` is `evaluate_draft` on those courses: the rule tree with statuses, `unplaced` codes and `summary_counts`.
+  Recorded rules only, not eligibility.
+
+Errors: **404** program not found (`program_id not found`); **409** when the exact plan cannot be confirmed, with the
+SAFE-02 fields plus `reason`, one of `missing` (no such plan in this program), `stale` (scope or content version
+changed), `draft` (not source-checked), `unusable`, `unavailable`, and a fixed English detail; **422** body or path IDs
+out of bounds (not echoed).
 
 ---
 

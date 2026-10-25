@@ -198,6 +198,36 @@ async def oauth_error_handler(
     return oauth_rejection_response(exc)
 
 
+class PlanSelectionConflict(Exception):
+    """The draft check (R4b) could not confirm the exact plan it was asked about. Answered as a 409 with a fixed
+    English detail plus `reason`, one of resolve_selection's five outcomes other than `selected`, the way the login 401
+    carries its reason: the web front end words it itself and clears the plan choice, as for /chat.
+    中文：草案核对（R4b）确认不了请求里那份确切的方案。回 409：固定的英文 detail 加 `reason`（resolve_selection 除
+    `selected` 以外的五种结果之一），和登录 401 带 reason 一样；新前端自己写句子、清掉方案选择，和 /chat 一样。"""
+
+    DETAILS = {
+        "missing": "The selected plan is not available.",
+        "stale": "The selected plan's scope or content version has changed.",
+        "draft": "The selected plan has not been checked against its sources.",
+        "unusable": "The selected plan cannot be verified.",
+        "unavailable": "The selected plan cannot be checked right now.",
+    }
+
+    def __init__(self, reason: str):
+        if reason not in self.DETAILS:
+            raise ValueError("unknown plan selection outcome")
+        super().__init__(reason)
+        self.reason = reason
+
+
+async def plan_selection_conflict_handler(
+    request: Request, exc: PlanSelectionConflict,
+) -> JSONResponse:
+    body = ErrorResponse(detail=exc.DETAILS[exc.reason], error_type="conflict", status_code=409).model_dump()
+    body["reason"] = exc.reason
+    return JSONResponse(status_code=409, content=body, headers={"cache-control": "no-store"})
+
+
 async def course_not_found_handler(
     request: Request, exc: CourseNotFound,
 ) -> JSONResponse:
@@ -296,6 +326,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(OAuthError, oauth_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(PlanSelectionConflict, plan_selection_conflict_handler)  # type: ignore[arg-type]
     app.add_exception_handler(CourseNotFound, course_not_found_handler)  # type: ignore[arg-type]
     app.add_exception_handler(GeminiError, gemini_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_exception_handler)
@@ -303,6 +334,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 __all__ = [
     "ErrorResponse",
+    "PlanSelectionConflict",
     "oauth_rejection_response",
     "register_exception_handlers",
 ]

@@ -4559,3 +4559,44 @@ R2 的前端一半（方案 `R2B_PLAN.md`，10-23 用户定了第 6 节四条）
 ### 发布状态
 
 分支 `feat/web-pages-api`，从 main `4797a32`（#33 合并以后）开。第一个提交 `81f2c84` 是 R5d 本身，第二个提交 `5f040ef` 是第 26 轮审查的修复，第三个提交 `63c183e` 是复核第 1 轮的修复，第四个提交是复核第 2 轮补的一条测试和本节的记录。没有使用真实模型、账号、NAS 或生产库；三页都对着本机的开发 API 和合成数据。上线要另外授权。
+
+## 36 — 选课草案的核对搬进 API（R4b 的后端，2026-10-25）
+
+### 范围与原因
+
+10-25 用户同意 R4b 这样分：草案判断的接口由协调方做，培养方案页里的草案界面和离线演示由用户照说明书做（和 R4a 一样）。PLAN 第 2 节第 2 条：判断逻辑只留一份，放进 API，新前端不再写一遍。
+
+Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就串行发 `/resolve/course` 和 `/course/{id}`，核对流程和 `evaluate_draft` 都在页面里跑。这一批加一个只计算、不存储的接口，把同样的核对和计算放到 API 里；Streamlit 版的行为不变。
+
+### 已实现
+
+1. **`POST /programs/{program_id}/plans/{plan_id}/draft`**（`api/plan_draft.py`，路由在 `api/routes/program.py`）。请求体 `{"plan_content_sha256", "course_ids", "input"}`：页面显示的方案版本、草案现在的课（最多 20 个、不重复）、这次要加的文字（最多 4000 字，可以没有）。都是严格类型，多出的字段是 422。
+2. **方案要确切：** 新加的 `ProgramPlanRepository.resolve_by_id` 用路径里的两个 ID 找到存的那一行，拿它的范围和请求里的内容版本组成 `PlanSelection`，再交给 F 的 `resolve_selection` 做全部检查，所以过时与否由内容版本决定；别的项目的方案算 missing。不是 `selected` 就回 409，带 SAFE-02 的三个字段、固定的英文 detail 和 `reason`（`missing`、`stale`、`draft`、`unusable`、`unavailable`），和 R2a 登录 401 带 reason 一样；新前端照 `reason` 自己写句子、清掉方案选择。program 不存在照旧 404。路径里的两个 ID 照 `PlanSelection` 的格式查，不合格是 422。
+3. **草案以服务器为准：** `course_ids` 逐个从课程表取回，课号、课名、学分都按现在的记录。记录没了（`course_gone`）、放不进草案（`invalid_record`，比如课名超过 500 字）、两个 ID 现在是同一个课号（`duplicate_code`，留第一个）的，从草案拿掉并各加一条提示。
+4. **加课的规则和 Streamlit 一一对应**（`app.plan_draft_view._add`）：一次超过 20 个课号一个都不加、也不核对；格式不对的逐条报最多 10 条，其余报个数；全都已在草案里；加上会超过 20 门就不核对并说要减几门；查不到；对上多门（列出最多 10 个候选，其余报个数）；交叉列出的两个课号只算一次；同一引用还匹配别的课号；输入的课号对应另一个主课号；记录放不进草案。课号走 `resolve_course_ref` 和 `get_batch`，直接查库，没有「连接中断，后面几门没核对」这种情况；库出错就整个请求 503。Streamlit 在合并时再查一次 20 门上限（它的会话状态可能被别处改），这里每个课号最多加一门、前面已经限住，合并不会超过 20，所以没有那一条。
+5. **回答**：`courses`（加完以后的整份草案）、`added`（这次新加的课号）、`notices`（按处理顺序，每条有稳定的 `kind`、`level` 和 Streamlit 页面同一情况的那句话，对上多门时带候选）、`result`（`evaluate_draft` 的结果：树、`unplaced`、`summary_counts`）。回答 `Cache-Control: no-store`。提示里引用的输入是纯文字。
+6. **`plan_revisions`：** `GET /programs/{id}` 和 `GET /programs/{id}/plans` 的回答顶层加 `{plan_id: plan_content_sha256}`（R4a 说明书第 2 节的建议）。新前端带回去，不用在 TypeScript 里重算 Python 的 JSON 摘要。放在顶层而不放进每份方案，因为 Streamlit 用 `ProgramPlan`（`extra="forbid"`）校验每份方案；Streamlit 读这两个回答用 `.get()`，多一个顶层键不影响它。
+7. **隐私：** 不写数据库、不写 query_log、不交给聊天。路由只记个数（`draft.checked`：草案几门、这次加了几门、几条提示）；方案不确定时记 `draft.plan_selection`（结果和 plan_id，和 `/chat` 一样）。请求体里的课号、课程 ID 和输入的文字都不进日志，访问日志里只有 program 和 plan 的路径。游客也能用；带会话 cookie 的请求照 R2a 过跨站检查。
+8. **`parse_course_codes` 搬到 `schemas/plan_draft.py`：** API 和 Streamlit 读输入用同一个函数；`app/plan_draft_view.py` 从那里导入，原来的名字照样能导入。
+9. **新前端的类型：** 重新导出 `web/openapi.json`，`npm run gen:api` 重新生成 `web/src/api/schema.ts`（只多不改）。
+
+### 修改文件
+
+- 新建：`api/plan_draft.py`、`tests/test_api_plan_draft.py`。
+- 改：`api/routes/program.py`（新路由、`plan_revisions`）、`api/exceptions.py`（`PlanSelectionConflict` 和它的 409）、`db/program_plan_repository.py`（`resolve_by_id`）、`schemas/plan_draft.py`（`parse_course_codes`）、`app/plan_draft_view.py`（改成导入）、`web/openapi.json`、`web/src/api/schema.ts`。
+- 文档：`docs/api_contract.md`（路由表、鉴权、新接口一节）和本节。
+
+数据库结构、检索、提示词和 Streamlit 版的行为都没改。
+
+### 验证记录
+
+（待补）
+
+### 已知、未处理
+
+- Streamlit 版的加课流程和这里各有一份，直到 Streamlit 版退役：两边的句子和顺序由 `test_the_api_says_what_the_streamlit_page_says_and_keeps_the_same_draft` 在同一个库上逐行对照。
+- 「记录放不进草案」那句沿用 Streamlit 的「返回的课程身份或字段无效」，在 API 里「返回的」不太贴切；为了两边一字不差，先不改。
+
+### 发布状态
+
+分支 `feat/api-plan-draft`，从 main `5c1f1b9`（#35 合并以后）开。没有使用真实模型、账号、NAS 或生产库，测试只用合成课程和仓库里的策展方案。上线要另外授权（和 React 前端一起）。

@@ -4,43 +4,15 @@
 
 from __future__ import annotations
 
-import re
-import unicodedata
-
 from pydantic import ValidationError
 
 from app.state_manager import add_draft_courses, clear_draft, remove_draft_course
 from app.text_render import literal_markdown
-from schemas.plan_draft import MAX_DRAFT_COURSES, DraftCourse, DraftNode, evaluate_draft
-from schemas.program_plan import ProgramPlan, normalize_code
-
-
-def parse_course_codes(raw: str) -> tuple[list[str], list[str]]:
-    """NFKC folds full-width letters, digits and spaces; `、`, `/` and `。` separate codes too. Invisible
-    characters copied from a web page (zero-width ones, the left-to-right and right-to-left marks, the soft hyphen)
-    are dropped, and a sentence's closing `.` is ignored. A dash or underscore joins subject and number only at the
-    start of a token, so an internal ID such as `neu-cs-6130` stays one invalid token. 中文：全角字母、数字、空格
-    先归一；「、」「/」「。」也能分隔；从网页复制来的隐形字符（零宽字符、左右方向标记、软连字符）去掉，句末的「.」
-    不算课号的一部分；内部 ID 只报一条格式错误。
-    """
-    raw = unicodedata.normalize("NFKC", raw)
-    raw = re.sub(r"[\N{SOFT HYPHEN}\N{ZERO WIDTH SPACE}-\N{RIGHT-TO-LEFT MARK}\N{WORD JOINER}\N{ZERO WIDTH NO-BREAK SPACE}]", "", raw)
-    raw = re.sub(r"(?i)(?<![\w-])([a-z]{2,4})[-_](?=\d{4}[a-z]?\b)", r"\1 ", raw)
-    tokens = [token.rstrip(".") for token in re.split(r"[,，;；、/。\s]+", raw.strip())]
-    codes, invalid = [], []
-    i = 0
-    while i < len(tokens):
-        token = tokens[i]
-        if re.fullmatch(r"[A-Za-z]{2,4}", token) and i + 1 < len(tokens) and re.fullmatch(r"\d{4}[A-Za-z]?", tokens[i+1]):
-            token += " " + tokens[i+1]
-            i += 1
-        if token:
-            try:
-                codes.append(normalize_code(token))
-            except ValueError:
-                invalid.append(token[:200])
-        i += 1
-    return list(dict.fromkeys(codes)), invalid
+# parse_course_codes lives in schemas/plan_draft.py since R4b (the API's draft check reads input the same way); it
+# stays importable from here. 中文：R4b 起 parse_course_codes 放在 schemas/plan_draft.py（API 的草案核对同样读输入），
+# 这里照样能导入。
+from schemas.plan_draft import MAX_DRAFT_COURSES, DraftCourse, DraftNode, evaluate_draft, parse_course_codes
+from schemas.program_plan import ProgramPlan
 
 
 def _courses(state) -> list[DraftCourse]:
