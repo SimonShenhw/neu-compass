@@ -415,6 +415,32 @@ it.each([
   },
 );
 
+// Unlike the deletion, an upload goes out when the check cannot say: a review and the duplicate check stand behind it
+// (A27 recheck; B27's last recheck asked for this rule's own test).
+it('when /auth/me cannot answer before an upload, the upload still goes out and its result shows', async () => {
+  const api = fakeApi(({ method, path }) =>
+    method === 'POST' && path === '/coop'
+      ? json(pending.body, 201)
+      : path === '/coop'
+        ? json(member0.body)
+        : path === '/auth/me'
+          ? apiError(503, 'service_unavailable', 'down')
+          : json(null, 404),
+  );
+  livePage('/coop', seededQueryClient({ viewer: member(0) }));
+  await screen.findAllByRole('article');
+  await fillRequired();
+  await submit();
+  expect(
+    await screen.findByRole('status', { name: '投稿结果' }),
+  ).toHaveTextContent('已私有收集');
+  expect(api.calls.map(asked)).toEqual([
+    'GET /coop',
+    'GET /auth/me',
+    'POST /coop',
+  ]);
+});
+
 it('a count that grew since login comes from the server: the account box, the level and the list follow, and the result stays', async () => {
   let lists = 0;
   const api = fakeApi(({ method, path }) =>
