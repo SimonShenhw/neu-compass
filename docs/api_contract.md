@@ -672,8 +672,9 @@ Errors: **404** program not found (`program_id not found`); **409** when the exa
 SAFE-02 fields plus `reason`, one of `stale` (another content version or scope), `missing` (no such plan in this
 program), `draft` (not source-checked), `unusable` (cannot be verified) or `unavailable` (the plans cannot be read
 now), and a fixed English detail; **422** body or path IDs out of bounds (not echoed); **503**
-`The course records cannot be read right now.` when a program or course read fails (the log has
-`draft.storage_failed` with the error's type only). The 409 and the 503 carry `Cache-Control: no-store`.
+`The course records cannot be read right now.` when a program or course read fails, any sqlite3 error included (the
+log has `draft.storage_failed` with the error's type and location only). The 409 and the 503 carry
+`Cache-Control: no-store`.
 
 ---
 

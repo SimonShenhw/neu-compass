@@ -4572,12 +4572,12 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
 
 1. **`POST /programs/{program_id}/plans/{plan_id}/draft`**（`api/plan_draft.py`，路由在 `api/routes/program.py`）。请求体 `{"plan_content_sha256", "course_ids", "input"}`：页面显示的方案版本、草案现在的课（最多 20 个、不重复）、这次要加的文字（最多 4000 字，可以没有）。都是严格类型，多出的字段是 422。
 2. **方案要确切：** 新加的 `ProgramPlanRepository.resolve_by_id` 用路径里的两个 ID 找到存的那一行（查库时就按项目过滤，所以别的项目的方案不论那一行坏没坏都算 missing），拿它的范围和请求里的内容版本组成 `PlanSelection`，再交给 F 的 `resolve_selection` 做全部检查，所以过时与否由内容版本决定。不是 `selected` 就回 409，带 SAFE-02 的三个字段、固定的英文 detail 和 `reason`（`missing`、`stale`、`draft`、`unusable`、`unavailable`），和 R2a 登录 401 带 reason 一样；新前端照 `reason` 处理（R4b 说明书：前四种清掉方案选择，`unavailable` 可以重试）。program 不存在照旧 404。路径里的两个 ID 照 `PlanSelection` 的格式查，不合格是 422。
-3. **草案以服务器为准：** `course_ids` 每次请求都从课程表重读，课号、课名、学分都按现在的记录。记录没了（`course_gone`）、读不出来（`invalid_record`：「草案里有 1 门课的课程记录无法读取，已从草案移除。」；整批读取失败时逐个再读，只拿掉读不了的那门）、放不进草案（`invalid_record`：「草案里的 {课号} 课程身份或字段无效，已从草案移除。」，比如课名超过 500 字）、两个 ID 现在是同一个课号（`duplicate_code`，留第一个）的，从草案拿掉并各加一条提示。
-4. **加课的规则和 Streamlit 一一对应**（`app.plan_draft_view._add`）：一次超过 20 个课号一个都不加、也不核对；格式不对的逐条报最多 10 条，其余报个数；全都已在草案里；加上会超过 20 门就不核对并说要减几门；查不到；对上多门（列出最多 10 个候选，其余报个数）；交叉列出的两个课号只算一次；同一引用还匹配别的课号；输入的课号对应另一个主课号；记录放不进草案。课号走 `resolve_course_ref` 和 `get_batch`，直接查库，没有「连接中断，后面几门没核对」这种情况。Streamlit 在合并时再查一次 20 门上限（它的会话状态可能被别处改），这里每个课号最多加一门、前面已经限住，合并不会超过 20，所以没有那一条。多了一条：匹配到的课的 ID 不合请求里 `course_ids` 的格式就不加（`invalid_record`），页面拿到的草案总能原样发回来（目录里的 ID 都是 `neu-{学科}-{课号}`，碰不到）。
+3. **草案以服务器为准：** `course_ids` 每次请求都从课程表重读，课号、课名、学分都按现在的记录。记录没了（`course_gone`）、读不出来（`invalid_record`：「草案里有 1 门课的课程记录无法读取，已从草案移除。」；整批读取失败时逐个再读，只拿掉读不了的那门；逐个读时每个 ID 只认自己名下的记录，记录里写的是别的请求 ID 时不顶替任何一门）、放不进草案（`invalid_record`：「草案里的 {课号} 课程身份或字段无效，已从草案移除。」，比如课名超过 500 字）、两个 ID 现在是同一个课号（`duplicate_code`，留第一个）的，从草案拿掉并各加一条提示。
+4. **加课的规则和 Streamlit 一一对应**（`app.plan_draft_view._add`）：一次超过 20 个课号一个都不加、也不核对；格式不对的逐条报最多 10 条，其余报个数；全都已在草案里；加上会超过 20 门就不核对并说要减几门；查不到；对上多门（列出最多 10 个候选，其余报个数）；交叉列出的两个课号只算一次；同一引用还匹配别的课号；输入的课号对应另一个主课号；记录放不进草案。课号走 `resolve_course_ref` 和 `get_batch`，直接查库，没有「连接中断，后面几门没核对」这种情况。Streamlit 在合并时再查一次 20 门上限（它的会话状态可能被别处改），这里每个课号最多加一门、前面已经限住，合并不会超过 20，所以没有那一条。多了一条：匹配到的课的 ID 不合请求里 `course_ids` 的格式就不加（`invalid_record`），页面拿到的草案总能原样发回来（目录里的 ID 都是 `neu-{学科}-{课号}`，碰不到）。这时和 Streamlit 不同：Streamlit 会加上这门课，同一次输入里和它交叉列出的另一个课号在 Streamlit 里算作同一门、不加，在这里会加上。
 5. **回答**：`courses`（加完以后的整份草案）、`added`（这次新加的课号）、`notices`（按处理顺序，每条有稳定的 `kind`、`level` 和一句话：按课号的是 Streamlit 页面同一情况的那句话，重读草案的三种是自己的；对上多门时带候选）、`result`（`evaluate_draft` 的结果：树、`unplaced`、`summary_counts`）。回答 `Cache-Control: no-store`。提示里引用的输入是纯文字。回答的每个字段总是带着，OpenAPI 里也都标成必有（`json_schema_serialization_defaults_required`），生成的类型和说明书手写的一致。
-6. **读库出错：** 项目和课程读库出错回 503 `The course records cannot be read right now.`（`no-store`；日志 `draft.storage_failed` 只记错误的类型和位置）；方案那一步读库出错照 F 回 409 `unavailable`。
+6. **读库出错：** 项目和课程读库出错回 503 `The course records cannot be read right now.`（`no-store`；日志 `draft.storage_failed` 只记错误的类型和位置）；方案那一步读库出错照 F 回 409 `unavailable`。路由接的是所有 sqlite3 错误，代码自己的错误（比如 `ProgrammingError`）也答成 503，见「已知」。
 7. **`plan_revisions`：** `GET /programs/{id}` 和 `GET /programs/{id}/plans` 的回答顶层加 `{plan_id: plan_content_sha256}`（R4a 说明书第 2 节的建议），回答里列出的每份方案都有（草稿方案也有；带过滤条件时只有过滤后的）。新前端带回去，不用在 TypeScript 里重算 Python 的 JSON 摘要。放在顶层而不放进每份方案，因为 Streamlit 用 `ProgramPlan`（`extra="forbid"`）校验每份方案；Streamlit 读这两个回答用 `.get()`，多一个顶层键不影响它。
-8. **隐私：** 不写数据库、不写 query_log、不交给聊天。路由只记个数（`draft.checked`：草案几门、这次加了几门、几条提示）；方案不确定时记 `draft.plan_selection`（结果和 plan_id，和 `/chat` 一样）。请求体里的课号、课程 ID 和输入的文字都不进日志，访问日志里只有 program 和 plan 的路径。草案路由的事件也走 I 批课程读的日志白名单（`api/logging.py`：只留代码定义的字段——计数、方案结果、plan_id、错误类型和位置），以后共用的查找代码里加的日志也带不出课号。游客也能用；带会话 cookie 的请求照 R2a 过跨站检查。
+8. **隐私：** 不写数据库、不写 query_log、不交给聊天。路由只记个数（`draft.checked`：草案几门、这次加了几门、几条提示）；方案不确定时记 `draft.plan_selection`（结果和 plan_id，和 `/chat` 一样）。请求体里的课号、课程 ID 和输入的文字都不进日志，访问日志里只有 program 和 plan 的路径。草案路由的事件也走 I 批课程读的日志白名单（`api/logging.py`：只留代码定义的字段——计数、方案结果、plan_id、错误类型和位置；方案结果只收六种之一，plan_id 必须和路径里的一样），以后共用的查找代码里加的日志也带不出课号和课程 ID。游客也能用；带会话 cookie 的请求照 R2a 过跨站检查。
 9. **`parse_course_codes` 搬到 `schemas/plan_draft.py`：** API 和 Streamlit 读输入用同一个函数；`app/plan_draft_view.py` 从那里导入，原来的名字照样能导入。
 10. **新前端的类型：** 重新导出 `web/openapi.json`，`npm run gen:api` 重新生成 `web/src/api/schema.ts`（只多不改；草案回答的字段都是必有）。
 
@@ -4587,7 +4587,8 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
 - 改：`api/routes/program.py`（新路由、`plan_revisions`）、`api/exceptions.py`（`PlanSelectionConflict` 和它的 409）、`db/program_plan_repository.py`（`resolve_by_id`）、`schemas/plan_draft.py`（`parse_course_codes`，草案模型的 OpenAPI 必有字段）、`api/logging.py`（草案路由走课程读的日志白名单）、`app/plan_draft_view.py`（改成导入）、`web/openapi.json`、`web/src/api/schema.ts`。
 - 文档：`docs/api_contract.md`（路由表、鉴权、新接口一节、SAFE-02 的 `reason`）和本节。
 - 第二个提交（变异存活的补测）：只改 `tests/test_api_plan_draft.py`。
-- 第三个提交（第 30 轮审查的修复）：改 `api/plan_draft.py`、`api/routes/program.py`、`api/logging.py`、`db/program_plan_repository.py`、`schemas/plan_draft.py`、`tests/test_api_plan_draft.py`、`web/openapi.json`、`web/src/api/schema.ts`；文档改 `docs/api_contract.md` 和本节。
+- 第三个提交 `89f6bce`（第 30 轮审查的修复）：改 `api/plan_draft.py`、`api/routes/program.py`、`api/logging.py`、`db/program_plan_repository.py`、`schemas/plan_draft.py`、`tests/test_api_plan_draft.py`、`web/openapi.json`、`web/src/api/schema.ts`；文档改 `docs/api_contract.md` 和本节。
+- 第四个提交（复核第 1 轮的修复）：改 `api/plan_draft.py`、`api/logging.py`、`api/routes/program.py`、`api/exceptions.py`（只改说明）、`tests/test_api_plan_draft.py`、`web/openapi.json`、`web/src/api/schema.ts`；文档改 `docs/api_contract.md` 和本节。
 
 数据库结构、检索、提示词和 Streamlit 版的行为都没改。
 
@@ -4600,11 +4601,16 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
   - 前端：类型、零警告 lint、Vitest **64 个文件 2007 项**、构建、格式、`gen:api:check` 都过（前端只有生成的两份类型文件变了）。
 - **变异第一轮**（`ff35231`，51 个，16 路并行，每个在自己的 `git archive` 副本里跑，只有具名测试 FAILED 或 ERROR 才算杀掉）：42 个杀，9 个存活，没有可疑的。8 个是测试缺口：D03（正好 20 个课号）、D05（正好 10 个格式错）、D07（没解析出课号时也说「已在草案里」）、D12（两条记录同一个课号时取第一条）、D15／D16／D17（交叉列出的 `twins` 和 `taken` 互相兜底：两门课的记录互相写了对方时，去掉哪一个都看不出来，只有单向写的交叉列出才分得出）、D22（别名对到草案里已有的课，`accepted` 里有重复）。D31 等价，见「已知」。
 - **第二个提交 `4186ddb`**（这 8 个缺口的 12 项测试；和 Streamlit 的对照提成 `same_as_streamlit`，表里加了这 8 种输入）：新测试 55 项、邻近 642 项都过，Ruff 过。这 9 个重跑：8 个都由对口的新测试杀掉，D31 照旧存活。
-- **第三个提交（第 30 轮审查的修复）：**
+- **第三个提交 `89f6bce`（第 30 轮审查的修复）：**
   - 新测试 69 项、邻近 656 项都过；Ruff 在改过的 8 个 Python 文件上通过；没有 CR，隐形字符只有 `docs/api_contract.md` 开头那个 main 上本来就有的 BOM。
   - 前端：类型、零警告 lint、Vitest 64 个文件 2007 项、构建、格式、`gen:api:check` 都过。
   - 串行全量 **5289 passed／7 warnings／534.06 秒**，退出码 0，比第一个提交多 26 项，就是第二、第三个提交新加的；全量前后 12 个改动文件的哈希一样。全量开始以后只改了本节。
-  - 变异（把 worktree 里还没提交的文件叠在 `4186ddb` 的副本上跑）：修复让 5 个旧变异的锚点对不上（R01、R02、P01、P02、D29），重新对上；连同函数改过的 6 个（D23、D24、R03、R04、R05、P03）、新写的 15 个（N01–N15：逐个再读、读不了的那句、ID 守卫、503 和它的日志、草案路径的日志白名单、OpenAPI 的必有字段、「已从草案移除」）和 B30 存活的 14 个缺口，共 40 个，**40／40 杀**。P03 第一次记成 ERROR（「没计算」那条测试的探针用了 `pytest.fail`，它不算断言失败），改成抛 AssertionError 以后重跑是 FAILED。脚本现在共 80 个。
+  - 变异（把 worktree 里还没提交的文件叠在 `4186ddb` 的副本上跑）：修复让 5 个旧变异的锚点对不上（R01、R02、P01、P02、D29），重新对上；连同函数改过的 6 个（D23、D24、R03、R04、R05、P03）、新写的 15 个（N01–N15：逐个再读、读不了的那句、ID 守卫、503 和它的日志、草案路径的日志白名单、OpenAPI 的必有字段、「已从草案移除」）和 B30 存活的 14 个缺口，共 40 个，**40／40 杀**。P03 第一次记成 ERROR（「没计算」那条测试的探针用了 `pytest.fail`），改成抛 AssertionError 以后重跑是 FAILED。脚本现在共 80 个。
+- **第四个提交（复核第 1 轮的修复）：**
+  - 新测试 70 项、邻近 657 项都过；Ruff 在改过的 8 个 Python 文件上通过；没有 CR，隐形字符照旧只有那个 BOM。
+  - 前端：类型、零警告 lint、Vitest 64 个文件 2007 项、构建、格式、`gen:api:check` 都过。
+  - 串行全量 **5290 passed／7 warnings／526.41 秒**，退出码 0，比第三个提交多 1 项，就是新加的那条；全量前后 12 个改动文件的哈希一样。全量开始以后只改了本节。
+  - 变异（照旧叠在副本上跑）：受影响的 N01、N02、N09–N12（N01、N09 重新对了锚点）和新写的 4 个（N16 逐个再读时把取回的整个结果并进去、N17 方案结果收任何标识符、N18 plan_id 不和路径比、N19 plan_id 一律去掉），共 10 个，**10／10 杀**。脚本现在共 84 个。
 
 ### 审查
 
@@ -4613,7 +4619,7 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
 - **A30：** 没有 CRITICAL、HIGH；1 MEDIUM、3 LOW、5 NIT。核过、没问题的：两边的 `_add` 逐行一致（顺序、各个上限、文字和 level）；随机 1500 例在服务器重读后的草案上和 Streamlit 比，提示和最终草案没有一处不同，每例都不超过 20 门、课号和 ID 都不重复；去掉的「合并后超过 20」那一支确实到不了；方案确认不会串项目、绕不过内容版本，409 的文字和 `reason` 都来自固定的集合；请求体只会 422、不会 500，`evaluate_draft` 在 10 份策展方案上各跑 300 份随机草案从不抛异常；日志只有计数和方案结果，不写库；带 cookie 的 POST 照 R2a 过跨站检查；每次请求最多约 87 次走索引的查询；`plan_revisions` 不影响 Streamlit；生成的类型只加不删；D31 等价。
 - **B30：** 没有 CRITICAL、HIGH；2 MEDIUM、9 LOW、8 NIT。核过、没问题的：用 `4186ddb` 重新生成的假数据逐字节一致；5 份方案和 R4a 的一样；55 项新测试在 `5c1f1b9` 上全部失败；`mut2` 的 8 个都由对口的测试杀掉；D31 换一种办法（经真实路由发 28 种原始请求体和 9 个边界请求）也等价；和 Streamlit 的逐行对照是真判据（改坏 Streamlit 一侧的两个变异都被抓到）；标准答案的规则和向量和说明书一致。它自己写了 34 个变异：13 个杀，21 个存活，其中 14 个是测试缺口，7 个等价（见「已知」）。
 
-修复在第三个提交里，正文各条已经改成修完的样子：
+修复在第三个提交 `89f6bce` 里，正文各条已经改成修完的样子：
 
 1. **草案里有一门课的记录读不出来，整个请求 500，之后每次都 500（A30 M1，B30 L7 的一半）：** `get_batch` 只要有一行校验不过，整批都抛，`_current` 原来没接住，页面每次都发回同一份草案，就一直失败。现在整批失败就逐个再读，只拿掉读不了的那门，加一条「草案里有 1 门课的课程记录无法读取，已从草案移除。」（第 3 条）。测试用两种坏记录：`generated_json` 不是一门课，和多一个字段（相当于旧镜像读到新写的行）。
 2. **读库出错回 500，本节原来写的是 503（A30 L1，B30 L7、L9）：** 改成照文档：项目和课程读库出错回 503，方案那一步照旧 409 `unavailable`（第 6 条）。补了课程、别名、项目三处读库出错都回 503、不带输入的测试，和方案读库出错回 409 `unavailable` 的测试。
@@ -4630,6 +4636,18 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
    - 路由说明逐个说 409 的 `reason`，模块说明改了；`docs/api_contract.md` 的 SAFE-02 一节加上草案的 409 也带 `reason`。
    - A30 的 L3、N4 的第二种和 N5 进「已知」。
 
+**复核第 1 轮**（只看 `4186ddb..89f6bce`，两路还是 A30、B30，续用原来的上下文；中途按用户的意思停过一次，存下进度以后接着做完）：
+
+- **A30：** 0/0/0/0，NIT 4。上一轮 9 条都照本节处理了。它用探针核过：几门坏记录、全部坏、`generated_json` 是 NULL 都只拿掉读不了的那门，逐个读时遇到库错误回 503；404、409、422 都没变，三处读库出错和缺 `v_course_lookup` 视图都回 503，日志里没有课号；路径写成转义形式也一样走白名单；旧表缺 `program_id` 列时回 409 `unavailable`（以前是 500）；ID 守卫和请求模型的判断一致。上一轮的 21 个探针在新副本上全过，和 Streamlit 的随机对照 1500 例没有一处不同，相邻的 26 个测试文件 662 项全过。
+- **B30：** 0/0/0/0，NIT 3。上一轮 19 条都照本节处理了。它在自己的目录用 `89f6bce` 重新生成假数据，逐字节一致，和改前副本的差别正好是说明书开头写的那些；新测试在 `4186ddb` 上正好 9 项失败，都是测这次修复的；它上一轮存活的 14 个缺口都只被对口的新测试杀掉，7 个等价照旧存活；`mut3` 里抽查的 20 个都是对口的测试杀的；本节的数字和日志都对得上。
+
+修复在第四个提交里，正文各条已经改成修完的样子：
+
+1. **逐个再读时，记录挂到别的 ID 上（A30 NIT 1）：** 记录的 JSON 里写的是另一个请求 ID 时，原来的 `records.update` 让那个 ID 拿到哪条记录取决于请求里的顺序。现在逐个读时每个 ID 只认自己名下的记录（第 3 条），补了一条测试，两种顺序结果一样。不走逐个再读时按 SQL 返回的顺序，是 `get_batch` 原来就有的。
+2. **日志白名单的两个方案键（A30 NIT 3）：** `plan_outcome` 只收六种结果，`plan_id` 必须和路径里的一样（第 8 条）；嵌套日志那条测试把课程 ID 那样的值放在这两个键下，都过不去。
+3. **503 接得宽（A30 NIT 2）：** 接受，写进「已知」；路由里加了注释，契约写明任何 sqlite3 错误都算。
+4. **文字和行为对不上（A30 NIT 4，B30 NIT 1–3）：** `PlanSelectionConflict` 的说明改成前四种清掉方案选择、`unavailable` 保留选择；契约里 503 的日志写成「类型和位置」；路由的 description 和模块说明写明按课号的是 Streamlit 的句子、重读草案的三种是自己的；说明书第 10 节第 3 条（仓库外）也改了。
+
 ### 已知、未处理
 
 - Streamlit 版的加课流程和这里各有一份，直到 Streamlit 版退役：两边的句子和顺序由 `test_the_api_says_what_the_streamlit_page_says_and_keeps_the_same_draft` 在同一个库上逐行对照。
@@ -4637,10 +4655,12 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
 - **单向交叉列出的两门课分两次加，会算成两门**（A30 L3）：「交叉列出只算一次」只在同一次输入里成立。只有 A 的记录写了 B 时，先加 B、再发一次请求加 A，草案里两门都在、没有提示，`result` 也按两门算。Streamlit 一样（每次提交核对一次），是原来就有的。要修得用草案里已有的课预填 `twins`，那样就和 Streamlit 不一致了，等 Streamlit 退役再做。
 - **同一次请求的两次读库之间课号变了**（A30 N4 的第二种）：`_current` 和 `_add` 各读一次课程表，中间要是有人改了某门课的课号，同一个 course_id 可能以两个课号进草案，页面发回来就是 422（「超出了限制…请清空草案」）。要课程表恰好在一次请求中途被改才会发生（课程表由更新数据的脚本写，API 不写）；要堵的话，`_add` 跳过 course_id 已在草案里的候选。
 - **方案每次请求解析两次、内容摘要算三次**（A30 N5）：`resolve_by_id` 的 `_verified` 一次，`resolve_selection` 又一次，`plan_revisions` 还重算 `_verified` 已经比过的摘要。量很小，不改。
+- **读库出错的 503 接得宽**（复核第 1 轮 A30 NIT）：路由接的是 `sqlite3.Error`，代码自己的错误（`ProgrammingError`，或者方案那一步漏出来的 `InterfaceError`）也答成 503「暂时读不了」，页面会让人再试一次。这和 F 的方案那一步把所有 `DatabaseError` 都当作 `unavailable` 一样；日志里有错误的类型和位置，查得到。方案那一步的参数都是字符串，碰不到 `InterfaceError`。
+- **旧表缺 `document` 或 `content_hash` 列时回 500**（复核第 1 轮 A30 提到，不是新问题）：sqlite 的行对象缺键抛 `IndexError`，`resolve_by_id` 和原来的 `resolve_selection`、`list_for_program` 一样。现在的表结构（v1.5 起）这两列都在。
 - **等价的变异体：**
   - D31（请求模型去掉 `strict=True`）：请求体是 JSON，严格和宽松只在 JSON 给不出的值（比如 tuple）上不同。`probe_strict.py` 每个字段用 180 种 JSON 形状的值比两个模型，Python 模式和 JSON 模式都没有差别；B30 又经真实路由发了 28 种原始请求体和 9 个边界请求，两边回答一样。`strict=True` 留着当保险。
   - B30 认定的 7 个：B08（去掉身份核对：API 里候选和匹配来自同一条记录，这段到不了）、B11（空输入也走加课流程：空串解析出来什么都没有）、B19／B20（`selected` 的结果一定带方案）、B27（路由只会传五种原因，守卫本身到不了）、B30／B31（`resolve_selection` 会再做一遍同样的检查）。
 
 ### 发布状态
 
-分支 `feat/api-plan-draft`，从 main `5c1f1b9`（#35 合并以后）开。第一个提交 `ff35231` 是 R4b 的 API，第二个提交 `4186ddb` 是第一轮变异存活的 8 个缺口的测试，第三个提交是第 30 轮审查的修复和本节的记录。没有使用真实模型、账号、NAS 或生产库，测试只用合成课程和仓库里的策展方案。上线要另外授权（和 React 前端一起）。
+分支 `feat/api-plan-draft`，从 main `5c1f1b9`（#35 合并以后）开。第一个提交 `ff35231` 是 R4b 的 API，第二个提交 `4186ddb` 是第一轮变异存活的 8 个缺口的测试，第三个提交 `89f6bce` 是第 30 轮审查的修复，第四个提交是复核第 1 轮的修复和本节的记录。没有使用真实模型、账号、NAS 或生产库，测试只用合成课程和仓库里的策展方案。上线要另外授权（和 React 前端一起）。

@@ -311,8 +311,9 @@ def get_selected_program_policies(
     description=(
         "The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly "
         "typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in "
-        "`added`), the notices for that input in order (plain-text sentences, the Streamlit page's wording), and the "
-        "plan's rule tree evaluated on those courses — recorded rules only, not eligibility.\n\n"
+        "`added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed "
+        "codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those "
+        "courses — recorded rules only, not eligibility.\n\n"
         "`plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be "
         "confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` "
         "for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one "
@@ -346,8 +347,10 @@ def check_plan_draft(
         out = check_draft(resolution.plan, body.plan_content_sha256, body, course_repo=course_repo,
                           alias_repo=alias_repo)
     except sqlite3.Error as exc:
-        # The plan step answers its own read errors with a 409 `unavailable`; the program and course reads end here.
-        # 中文：方案那一步自己把读库错误答成 409 `unavailable`；项目和课程的读库错误在这里接住。
+        # The plan step answers its own read errors (any DatabaseError) with a 409 `unavailable`; every other sqlite3
+        # error ends here as a 503, a programming error included, and the log keeps its type (A30 recheck).
+        # 中文：方案那一步自己把读库错误（所有 DatabaseError）答成 409 `unavailable`；别的 sqlite3 错误都在这里答 503，
+        # 代码自己的错误也算在内，日志里有它的类型。
         log.warning("draft.storage_failed", **safe_error_fields(exc))
         raise HTTPException(status_code=503, detail="The course records cannot be read right now.",
                             headers={"Cache-Control": "no-store"}) from exc

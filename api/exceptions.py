@@ -201,9 +201,11 @@ async def oauth_error_handler(
 class PlanSelectionConflict(Exception):
     """The draft check (R4b) could not confirm the exact plan it was asked about. Answered as a 409 with a fixed
     English detail plus `reason`, one of resolve_selection's five outcomes other than `selected`, the way the login 401
-    carries its reason: the web front end words it itself and clears the plan choice, as for /chat.
+    carries its reason: the web front end words it itself, clears the plan choice for the first four (as for /chat) and
+    keeps it for `unavailable`, which may be retried.
     中文：草案核对（R4b）确认不了请求里那份确切的方案。回 409：固定的英文 detail 加 `reason`（resolve_selection 除
-    `selected` 以外的五种结果之一），和登录 401 带 reason 一样；新前端自己写句子、清掉方案选择，和 /chat 一样。"""
+    `selected` 以外的五种结果之一），和登录 401 带 reason 一样；新前端自己写句子，前四种清掉方案选择（和 /chat
+    一样），`unavailable` 保留选择、可以重试。"""
 
     DETAILS = {
         "missing": "The selected plan is not available.",

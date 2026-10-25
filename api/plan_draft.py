@@ -1,8 +1,9 @@
 """The draft check behind POST /programs/{program_id}/plans/{plan_id}/draft (R4b): compute only, store nothing.
 
 The React program page keeps the draft (course IDs) in memory and sends it with each change; this module turns that
-list plus any newly typed codes into the draft the server stands behind, the notices the Streamlit page shows for the
-same input, and `evaluate_draft`'s result for one exact source-checked plan. The per-code rules mirror
+list plus any newly typed codes into the draft the server stands behind, the notices for that input (for typed codes
+the Streamlit page's sentences, three of its own for re-reading the draft), and `evaluate_draft`'s result for one exact
+source-checked plan. The per-code rules mirror
 `app.plan_draft_view._add` step for step (unique match, exact primary code, a cross-listed twin counted once, an alias
 under another primary code, identity and field checks, the 20-course limit), but run on the
 repositories directly, so a lookup can never half-fail the way an HTTP call can. One addition: a course whose ID the
@@ -10,8 +11,8 @@ request model would refuse is not taken, so the page can always send back what i
 row, query_log or a log line with a course code or ID: the route logs counts only.
 
 中文：草案核对（R4b）：只计算、不存储。React 的培养方案页把草案（课程 ID）放在内存里，每次变化都带过来；这里把它和这次
-新输入的课号变成服务器认可的草案、Streamlit 对同样输入会显示的提示，以及按一份确切的已核对方案算出的 `evaluate_draft`
-结果。每个课号的规则和 `app.plan_draft_view._add` 一步一步对应，但直接查仓库，不会像 HTTP 请求那样核对到一半失败。
+新输入的课号变成服务器认可的草案、这次输入的提示（按课号的是 Streamlit 页面的原句，重读草案的三种是自己的句子），以及按
+一份确切的已核对方案算出的 `evaluate_draft` 结果。每个课号的规则和 `app.plan_draft_view._add` 一步一步对应，但直接查仓库，不会像 HTTP 请求那样核对到一半失败。
 多了一条：请求模型不收的课程 ID 不加进草案，页面拿到的草案总能原样发回来。
 这里不写数据库、不写 query_log，日志里也没有课号和课程 ID：路由只记个数。
 """
@@ -105,8 +106,10 @@ def _draft_course(course: Course) -> DraftCourse:
 
 def _records(course_ids: list[str], course_repo: CourseRepository) -> tuple[dict[str, Course], set[str]]:
     """get_batch, or one ID at a time when a stored record no longer reads as a Course (get_batch then fails for the
-    whole batch): those IDs come back as unreadable. 中文：一次取回；有一条存的记录读不成 Course 时（整批都会失败）
-    就逐个再取，读不了的单独列出来。"""
+    whole batch): those IDs come back as unreadable. One at a time, each ID keeps only the record filed under it, so a
+    record whose JSON names another sent ID stands in for nothing, whatever the order (A30 recheck).
+    中文：一次取回；有一条存的记录读不成 Course 时（整批都会失败）就逐个再取，读不了的单独列出来。逐个取时每个 ID
+    只认自己名下的记录，记录里写的是别的请求 ID 时不顶替任何一门，和顺序无关。"""
     try:
         return course_repo.get_batch(course_ids), set()
     except (ValueError, TypeError):  # ValidationError is a ValueError. 中文：ValidationError 也是 ValueError。
@@ -114,9 +117,12 @@ def _records(course_ids: list[str], course_repo: CourseRepository) -> tuple[dict
         unreadable: set[str] = set()
         for course_id in course_ids:
             try:
-                records.update(course_repo.get_batch([course_id]))
+                record = course_repo.get_batch([course_id]).get(course_id)
             except (ValueError, TypeError):
                 unreadable.add(course_id)
+                continue
+            if record is not None:
+                records[course_id] = record
         return records, unreadable
 
 

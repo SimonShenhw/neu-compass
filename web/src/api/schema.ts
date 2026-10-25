@@ -365,7 +365,7 @@ export interface paths {
     put?: never;
     /**
      * Check a session-only course draft against one exact source-checked plan (computes only)
-     * @description The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences, the Streamlit page's wording), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.
+     * @description The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.
      *
      *     `plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one that cannot be verified, `unavailable` when the plans cannot be read now.
      *

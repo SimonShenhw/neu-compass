@@ -170,6 +170,21 @@ def test_a_sent_course_whose_record_no_longer_reads_leaves_with_a_notice(client,
     assert notices(typed) == [("invalid_record", "warning", "CS 5010 返回的课程身份或字段无效，未加入。")]
 
 
+def test_read_one_at_a_time_a_record_naming_another_sent_id_stands_in_for_nothing(client, empty_db):
+    # One record no longer reads, so the draft is read one ID at a time; another record's JSON names a different sent
+    # ID. Each ID keeps only its own record, in either order. 中文：一条记录读不了，草案逐个再读；另一条记录里写的是
+    # 别的请求 ID。每个 ID 只认自己的记录，两种顺序都一样。
+    edit_record(empty_db, "c-cs-5100", lambda data: {"not": "a course"})
+    edit_record(empty_db, "c-cs-5010", lambda data: data | {"course_id": "c-cs-5200"})
+    for ids in (["c-cs-5100", "c-cs-5010", "c-cs-5200"], ["c-cs-5100", "c-cs-5200", "c-cs-5010"]):
+        r = check(client, ids=ids)
+        assert r.status_code == 200
+        assert r.json()["courses"] == [{"course_id": "c-cs-5200", "code": "CS 5200",
+                                        "name": "Database Management Systems", "credits": 4}]
+        assert notices(r) == [("invalid_record", "warning", "草案里有 1 门课的课程记录无法读取，已从草案移除。"),
+                              ("course_gone", "warning", "草案里有 1 门课在课程记录里找不到了，已从草案移除。")]
+
+
 # === Notices: each kind with its exact sentence ===
 
 
@@ -640,14 +655,18 @@ def test_a_nested_log_line_on_the_draft_route_keeps_only_allowlisted_fields(clie
     original = AliasRepository.resolve
 
     def chatty(self, term):
-        structlog.get_logger("neu_compass.alias").info("alias.resolve", term=term, courses=["c-cs-5010"], count=1)
+        log = structlog.get_logger("neu_compass.alias")
+        log.info("alias.resolve", term=term, courses=["c-cs-5010"], count=1)
+        # Course-shaped values under the two plan keys: only the six outcomes and the path's own plan ID pass.
+        # 中文：两个方案键下放课程 ID 那样的值：只有六种结果和路径里那个方案 ID 过得去。
+        log.info("alias.plan_keys", plan_id="c-cs-5010", plan_outcome="c_cs_5010")
         return original(self, term)
 
     monkeypatch.setattr(AliasRepository, "resolve", chatty)
     with caplog.at_level(logging.INFO):
         assert check(client, text="CS 5010").status_code == 200
-    assert "alias.resolve" in caplog.text and "draft.checked" in caplog.text
-    assert "CS 5010" not in caplog.text and "c-cs-5010" not in caplog.text
+    assert "alias.resolve" in caplog.text and "alias.plan_keys" in caplog.text and "draft.checked" in caplog.text
+    assert all(value not in caplog.text for value in ["CS 5010", "c-cs-5010", "c_cs_5010"])
 
 
 # === Session cookie: the R2a cross-site check applies; guests need no headers ===
