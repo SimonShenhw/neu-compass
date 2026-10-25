@@ -63,6 +63,9 @@ def library(conn) -> None:
     add_course(conn, "c-eece-7397", "EECE 7397", "Advanced Machine Learning")
     add_alias(conn, "CS 7140", "c-eece-7397")  # cross-listed both ways. 中文：互为交叉列出。
     add_alias(conn, "EECE 7397", "c-cs-7140")
+    add_course(conn, "c-xla-7001", "XLA 7001", "Synthetic one-way cross-listing A")
+    add_course(conn, "c-xlb-7002", "XLB 7002", "Synthetic one-way cross-listing B")
+    add_alias(conn, "XLB 7002", "c-xla-7001")  # only A's record names B. 中文：只有 A 的记录写了 B。
     add_alias(conn, "CS 5810", "c-cs-5800", AliasType.RENAME)  # renumbered. 中文：改过课号。
     for i in range(12):  # one ref, twelve courses: ambiguous. 中文：一个引用对上十二门课。
         add_course(conn, f"c-amb-{i:02d}", f"AMB {6001 + i}", f"Synthetic ambiguous {i:02d}")
@@ -139,6 +142,8 @@ def test_more_than_twenty_codes_add_nothing_and_check_nothing(client):
     r = check(client, text=" ".join(ZZ) + " Q1")
     assert notices(r) == [("too_many_codes", "warning", "一次最多填写 20 门；本次没有加入课程。")]
     assert codes(r) == [] and r.json()["added"] == []
+    twenty = check(client, text=" ".join(ZZ[:20]))  # exactly twenty are all checked. 中文：正好 20 门都核对。
+    assert notices(twenty) == [] and twenty.json()["added"] == ZZ[:20]
 
 
 def test_badly_formatted_tokens_ten_by_name_then_a_count(client):
@@ -146,12 +151,21 @@ def test_badly_formatted_tokens_ten_by_name_then_a_count(client):
     assert notices(r) == [("invalid_format", "warning", f"课号格式不正确，未加入：Q{i}") for i in range(1, 11)] + [
         ("invalid_format_more", "warning", "另有 2 项格式不正确；未加入。")]
     assert codes(r) == ["CS 5010"]
+    ten = check(client, text=" ".join(f"Q{i}" for i in range(1, 11)))  # ten by name, no count line. 中文：正好 10 个。
+    assert notices(ten) == [("invalid_format", "warning", f"课号格式不正确，未加入：Q{i}") for i in range(1, 11)]
 
 
 def test_codes_already_in_the_draft_are_an_info_line(client):
     r = check(client, ids=["c-cs-5800"], text="CS5800 cs-5800")
     assert notices(r) == [("all_present", "info", "这些课号已在草案里，不会重复加入。")]
     assert codes(r) == ["CS 5800"]
+
+
+def test_input_without_a_code_in_it_says_nothing_about_the_draft(client):
+    r = check(client, ids=["c-cs-5800"], text="Q1")
+    assert notices(r) == [("invalid_format", "warning", "课号格式不正确，未加入：Q1")] and codes(r) == ["CS 5800"]
+    blank = check(client, ids=["c-cs-5800"], text=" \n ")  # not empty, so it goes through the add flow. 中文：不是空串。
+    assert notices(blank) == [] and codes(blank) == ["CS 5800"] and blank.json()["added"] == []
 
 
 def test_going_over_twenty_checks_nothing_and_says_by_how_much(client):
@@ -185,6 +199,20 @@ def test_a_cross_listed_pair_counts_once_under_the_first_code(client):
     assert codes(later) == ["CS 7140"]
 
 
+def test_a_one_way_cross_listing_counts_once_in_either_order(client):
+    # Only XLA 7001's record names XLB 7002: "XLB 7002" finds both courses, "XLA 7001" only its own.
+    # 中文：只有 XLA 7001 的记录写了 XLB 7002：输入「XLB 7002」找到两门，输入「XLA 7001」只找到自己。
+    b_first = check(client, text="XLB 7002, XLA 7001")
+    assert notices(b_first) == [
+        ("also_matches", "warning", "按输入主课号核对 XLB 7002；同一引用也匹配 XLA 7001（可能交叉列出）；方案按哪个课号算，请向项目核实。"),
+        ("cross_listed_twin", "warning", "XLA 7001 和 XLB 7002 可能是同一门交叉列出的课，只按 XLB 7002 计入；如果是两门不同的课，请向项目核实。")]
+    assert codes(b_first) == ["XLB 7002"]
+    a_first = check(client, text="XLA 7001, XLB 7002")
+    assert notices(a_first) == [
+        ("cross_listed_twin", "warning", "XLB 7002 和 XLA 7001 可能是同一门交叉列出的课，只按 XLA 7001 计入；如果是两门不同的课，请向项目核实。")]
+    assert codes(a_first) == ["XLA 7001"]
+
+
 def test_a_renumbered_code_is_checked_under_its_primary_code(client):
     r = check(client, text="CS 5810")
     assert notices(r) == [("primary_code", "warning", "输入的 CS 5810 对应主课号 CS 5800，按 CS 5800 核对；方案按哪个课号算，请向项目核实。")]
@@ -192,6 +220,16 @@ def test_a_renumbered_code_is_checked_under_its_primary_code(client):
     again = check(client, ids=["c-cs-5800"], text="CS 5810")
     assert notices(again)[-1] == ("nothing_new", "info", "没有新增课程；重复课号不会重复加入。")
     assert codes(again) == ["CS 5800"] and again.json()["added"] == []
+
+
+def test_an_old_code_of_a_course_already_there_adds_only_the_new_courses(client):
+    primary = ("primary_code", "warning", "输入的 CS 5810 对应主课号 CS 5800，按 CS 5800 核对；方案按哪个课号算，请向项目核实。")
+    r = check(client, ids=["c-cs-5800"], text="CS 5810 CS 5010")
+    assert notices(r) == [primary]
+    assert codes(r) == ["CS 5800", "CS 5010"] and r.json()["added"] == ["CS 5010"]
+    both = check(client, text="CS 5810 CS 5800")  # one course under its old and its new code. 中文：新旧课号同一门。
+    assert notices(both) == [primary]
+    assert codes(both) == ["CS 5800"] and both.json()["added"] == ["CS 5800"]
 
 
 def test_a_record_the_draft_cannot_hold_is_refused_by_code(client):
@@ -274,16 +312,10 @@ def as_streamlit(answer):
     return lines
 
 
-@pytest.mark.parametrize("ids,text", [
-    ([], " ".join(f"Q{i}" for i in range(1, 13)) + " CS5010"),
-    ([], " ".join(ZZ)),
-    (["c-cs-5800"], "CS5800"),
-    ([f"c-zz-{i:02d}" for i in range(19)], "CS 5010 CS 5200"),
-    ([], "CS 9999 CS 6999 CS 7140 EECE 7397 CS 5810 LNG 6000 CS 5010 CS 5100"),
-    (["c-cs-5800"], "CS 5810"),
-    (["c-cs-7140"], "EECE 7397 CS 5200"),
-])
-def test_the_api_says_what_the_streamlit_page_says_and_keeps_the_same_draft(client, monkeypatch, ids, text):
+def same_as_streamlit(client, monkeypatch, ids, text):
+    """Streamlit's `_add` on the same draft and input, reading the same app and database, shows the API's notices
+    and ends with the API's draft. 中文：Streamlit 的 `_add` 在同样的草案和输入上、读同一个应用和库，显示的提示和
+    最后的草案都和 API 一样。"""
     import app.api_client as clients
     from app.plan_draft_view import _add
 
@@ -294,6 +326,38 @@ def test_the_api_says_what_the_streamlit_page_says_and_keeps_the_same_draft(clie
     _add(st, text, existing)
     assert st.lines == as_streamlit(answer)
     assert st.session_state["plan_draft_courses"] == answer["courses"]
+
+
+@pytest.mark.parametrize("ids,text", [
+    ([], " ".join(f"Q{i}" for i in range(1, 13)) + " CS5010"),
+    ([], " ".join(f"Q{i}" for i in range(1, 11))),
+    (["c-cs-5800"], "Q1"),
+    (["c-cs-5800"], " \n "),
+    ([], " ".join(ZZ)),
+    ([], " ".join(ZZ[:20])),
+    (["c-cs-5800"], "CS5800"),
+    ([f"c-zz-{i:02d}" for i in range(19)], "CS 5010 CS 5200"),
+    ([], "CS 9999 CS 6999 CS 7140 EECE 7397 CS 5810 LNG 6000 CS 5010 CS 5100"),
+    (["c-cs-5800"], "CS 5810"),
+    (["c-cs-5800"], "CS 5810 CS 5010"),
+    ([], "CS 5810 CS 5800"),
+    (["c-cs-7140"], "EECE 7397 CS 5200"),
+    ([], "XLB 7002, XLA 7001"),
+    ([], "XLA 7001, XLB 7002"),
+])
+def test_the_api_says_what_the_streamlit_page_says_and_keeps_the_same_draft(client, monkeypatch, ids, text):
+    same_as_streamlit(client, monkeypatch, ids, text)
+
+
+def test_two_records_under_the_typed_code_are_ambiguous_on_both_pages(client, empty_db, monkeypatch):
+    add_course(empty_db, "c-cs-5010-copy", "CS 5010", "Programming Design Paradigm (second record)")
+    empty_db.commit()
+    r = check(client, text="CS 5010")
+    assert notices(r) == [("ambiguous", "warning", "对上多门，未加入；请核对完整课号：CS 5010")]
+    assert [(c["code"], c["name"]) for c in r.json()["notices"][0]["candidates"]] == [
+        ("CS 5010", "Programming Design Paradigm"), ("CS 5010", "Programming Design Paradigm (second record)")]
+    assert codes(r) == []
+    same_as_streamlit(client, monkeypatch, [], "CS 5010")
 
 
 # === The plan: exact version or a 409 with a reason ===
