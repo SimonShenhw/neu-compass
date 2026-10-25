@@ -93,6 +93,31 @@ describe('the Co-op list', () => {
     expect(query.staleTime).toBe(0);
   });
 
+  // The API answers by the cookie, which a guest's page or an unsure one may not match (A27 recheck).
+  it.each([
+    ['member:u-1:2', true],
+    ['guest', false],
+    ['unsure', false],
+  ] as const)(
+    'asked as %s, keeps the details the cookie unlocked: %s',
+    async (scope, kept) => {
+      fakeApi(() => json(member2.body));
+      const records = await createQueryClient().fetchQuery(
+        coopListQuery(scope),
+      );
+      expect(records).toEqual(
+        kept
+          ? member2.body
+          : member2.body.map((record) => ({
+              ...record,
+              interview_summary: null,
+              technical_questions: null,
+              salary_range_usd: null,
+            })),
+      );
+    },
+  );
+
   it('is asked for with GET /coop and waits 30 seconds', async () => {
     const api = fakeApi(() => json(guest.body));
     expect(

@@ -140,13 +140,17 @@ export function parseCoopList(value: unknown): CoopRecord[] {
 // The Co-op list as this viewer may see it: the API leaves out what the viewer's level does not unlock, so the key
 // carries who is asking (account.ts viewerScope; R0 14.9) and the whole group goes at login and logout (VIEWER_KEY).
 // Streamlit's Co-op page asks every time it is drawn, so nothing is fresh for long here: every visit asks again.
+// The API answers by the cookie, which every tab shares, so a page that shows a guest, or cannot tell ('unsure'), may
+// be answered at a member's level: it keeps only what a guest is shown, in the page and under its key (A27).
 export function coopListQuery(scope: string) {
   return queryOptions({
     queryKey: ['viewer', scope, 'coop'],
-    queryFn: async ({ signal }) =>
-      parseCoopList(
+    queryFn: async ({ signal }) => {
+      const records = parseCoopList(
         await apiGet(apiPath('/coop'), { timeout: 'slow', signal }),
-      ),
+      );
+      return scope.startsWith('member:') ? records : records.map(asGuest);
+    },
     staleTime: 0,
   });
 }

@@ -21,7 +21,7 @@ import {
   parseIdentity,
   refreshReads,
   shownData,
-  stillSignedInAs,
+  signedInNow,
   useConfig,
   useMe,
   useShowingOld,
@@ -354,17 +354,23 @@ describe('GET /auth/me', () => {
 describe('asking again before a write acts on the account (R5d, A27)', () => {
   const shown = parseIdentity(member);
 
+  // The count is not who is signed in: a review may have published an earlier upload since (B27 recheck).
   it.each([
-    ['the same member', true, json(member)],
-    ['someone else', false, json({ ...member, user_id: 'u-2' })],
-    ['nobody', false, json({ error_type: 'unauthorized' }, 401)],
-    ['an answer the page cannot read', true, json({ user_id: '' })],
-    ['a failure', true, json({ error_type: 'service_unavailable' }, 503)],
+    ['the same member', 'same', json(member)],
+    [
+      'the same member, with a count grown since,',
+      'same',
+      json({ ...member, contribution_count: 3 }),
+    ],
+    ['someone else', 'other', json({ ...member, user_id: 'u-2' })],
+    ['nobody', 'other', json({ error_type: 'unauthorized' }, 401)],
+    ['an answer the page cannot read', 'unknown', json({ user_id: '' })],
+    ['a failure', 'unknown', json({ error_type: 'service_unavailable' }, 503)],
   ] as const)(
-    'with %s signed in now, the write may go out: %s',
-    async (_name, same, answer) => {
+    'with %s signed in now, the page is told %s',
+    async (_name, now, answer) => {
       const fetch = serve(answer);
-      expect(await stillSignedInAs(shown)).toBe(same);
+      expect(await signedInNow(shown)).toBe(now);
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(fetch.mock.calls[0]![0]).toBe('http://127.0.0.1:8000/auth/me');
       expect(fetch.mock.calls[0]![1]).toMatchObject({ credentials: 'include' });
@@ -373,16 +379,16 @@ describe('asking again before a write acts on the account (R5d, A27)', () => {
 
   it('a page that shows nobody signed in never writes as anyone, and asks nothing', async () => {
     const fetch = serve(json(member));
-    expect(await stillSignedInAs(GUEST)).toBe(false);
-    expect(await stillSignedInAs(undefined)).toBe(false);
+    expect(await signedInNow(GUEST)).toBe('other');
+    expect(await signedInNow(undefined)).toBe('other');
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('waits 8 seconds at most for /auth/me, then lets the write go out', async () => {
+  it('waits 8 seconds at most for /auth/me, then cannot say', async () => {
     await expectTimeout(
-      () => stillSignedInAs(shown),
+      () => signedInNow(shown),
       'read',
-      (settled) => expect(settled).toBe(true),
+      (settled) => expect(settled).toBe('unknown'),
     );
   });
 });

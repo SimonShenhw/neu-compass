@@ -182,20 +182,24 @@ export const meQuery = queryOptions({
 });
 
 // Every tab shares the cookie, and a tab asks who is looking only at login, logout and a reload, so another tab may
-// have logged out, or in as someone else, since. A write that acts on the account (an upload, the deletion) asks again
-// first and goes out only while the member this page shows is still the one signed in (A27). When /auth/me gives no
-// answer this page can read within 8 seconds, the write goes out and its own answer says what happened.
-export async function stillSignedInAs(
+// have logged out, or in as someone else, since. A write that acts on the account asks again first (A27): 'same' while
+// the member this page shows is still the one signed in, 'other' when /auth/me says someone else, or nobody, is now,
+// 'unknown' when it gives no answer this page can read within 8 seconds. An upload goes out unless it is 'other' (a
+// review and the API's duplicate check stand behind it); the deletion, which cannot be undone, only when it is 'same'.
+export type SignedInNow = 'same' | 'other' | 'unknown';
+export async function signedInNow(
   viewer: Viewer | undefined,
-): Promise<boolean> {
-  if (viewer?.kind !== 'member') return false;
+): Promise<SignedInNow> {
+  if (viewer?.kind !== 'member') return 'other';
   let asking: Viewer;
   try {
     asking = await whoIsAsking('read');
   } catch {
-    return true;
+    return 'unknown';
   }
-  return asking.kind === 'member' && asking.userId === viewer.userId;
+  return asking.kind === 'member' && asking.userId === viewer.userId
+    ? 'same'
+    : 'other';
 }
 
 export function useMe(enabled = true) {

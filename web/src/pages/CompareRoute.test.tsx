@@ -119,6 +119,49 @@ it('a failed column says why on its own, and 重新加载 asks again for the fai
   ).toBeInTheDocument();
 });
 
+// A column still on its way is not asked again (B27, X16). For a course that answered before, TanStack would cancel
+// the request and send another (a query with no data yet just keeps the request it has), so this one answers first,
+// fails on a later visit, and is still on its way when 重新加载 is pressed again for the course that keeps failing.
+it('重新加载 again leaves alone a column still on its way', async () => {
+  const user = userEvent.setup();
+  const third = held();
+  const answers = [
+    () => json(cs5800.body),
+    () => apiError(404, 'not_found', 'Course not found'),
+    () => third.response,
+  ];
+  const api = fakeApi(({ path }) =>
+    path === '/course/c-cs-5800' ? answers.shift()!() : catalog({ path }),
+  );
+  choose('c-gone', 'c-cs-5800');
+  livePage('/compare');
+  await screen.findByRole('link', { name: '查看 CS 5800' });
+  await user.click(within(sidebar()).getByRole('link', { name: /培养方案/ }));
+  await user.click(within(sidebar()).getByRole('link', { name: /课程对比/ }));
+  expect(
+    await screen.findByText('课程加载失败（c-cs-5800）：没有找到这门课。'),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '重新加载' }));
+  await waitFor(() => {
+    expect(api.count('GET', '/course/c-gone')).toBe(3);
+    expect(
+      screen.getByText('课程加载失败（c-gone）：没有找到这门课。'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('课程加载失败（c-cs-5800）：没有找到这门课。'),
+    ).not.toBeInTheDocument();
+  });
+  expect(api.count('GET', '/course/c-cs-5800')).toBe(3);
+  await user.click(screen.getByRole('button', { name: '重新加载' }));
+  await waitFor(() => expect(api.count('GET', '/course/c-gone')).toBe(4));
+  expect(api.count('GET', '/course/c-cs-5800')).toBe(3);
+  third.answer(json(cs5800.body));
+  expect(
+    await screen.findByRole('link', { name: '查看 CS 5800' }),
+  ).toBeInTheDocument();
+  expect(api.count('GET', '/course/c-cs-5800')).toBe(3);
+});
+
 it('a column asked again shows as loading until its answer', async () => {
   const user = userEvent.setup();
   const second = held();

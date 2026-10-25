@@ -158,6 +158,33 @@ it('when /auth/me fails for a moment the list is still asked for, as unsure, and
   ).toHaveLength(2);
 });
 
+// Every tab shares the cookie: another tab may have logged in, or this one may have been signed out while the cookie
+// moved to someone else (A27 recheck). A guest's page keeps only what a guest is shown, in the page and in the cache.
+it('a guest’s page answered at a member’s level shows, and keeps, only what a guest is shown', async () => {
+  fakeApi(({ path }) =>
+    path === '/coop' ? json(member2.body) : json(null, 404),
+  );
+  const client = livePage('/coop');
+  expect(await screen.findAllByRole('article')).toHaveLength(4);
+  expect(screen.getByRole('region', { name: '查看权限' })).toHaveTextContent(
+    '你现在是游客',
+  );
+  expect(screen.queryByText('$40-45/hr')).not.toBeInTheDocument();
+  expect(screen.queryByText('面试经过')).not.toBeInTheDocument();
+  expect(
+    screen.getAllByText('这条有薪资区间：你分享的经验有 2 条公开后解锁'),
+  ).toHaveLength(2);
+  expect(
+    client
+      .getQueryData<{ salary_range_usd: string | null }[]>([
+        'viewer',
+        'guest',
+        'coop',
+      ])!
+      .map((record) => record.salary_range_usd),
+  ).toEqual([null, null, null, null]);
+});
+
 it('every visit asks again, and the last list shows at once meanwhile', async () => {
   const user = userEvent.setup();
   const second = held();

@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { asGuest, coopListQuery, submitFailure, uploadCoop } from '../api/coop';
+import { coopListQuery, submitFailure, uploadCoop } from '../api/coop';
 import type {
   CoopListState,
   CoopUploadRequest,
   CoopViewer,
   SubmitOutcome,
 } from '../api/coop';
-import { shownData, stillSignedInAs } from '../api/queries';
+import { shownData, signedInNow } from '../api/queries';
 import { useAccount, viewerOwner, viewerScope } from '../layout/account';
 import { CoopPage } from './CoopPage';
 
@@ -24,11 +24,8 @@ export function CoopRoute() {
         正在加载
       </p>
     );
-  const shown = shownData(list);
-  // When /auth/me could not say who is looking, the page reads as a guest's; the API answered by the cookie, which may
-  // unlock more, so the page is given what a guest is shown (A27).
-  const records =
-    shown && account.viewer === undefined ? shown.map(asGuest) : shown;
+  // A page that shows a guest gets the rows as a guest is shown them, whatever the cookie unlocks (coopListQuery).
+  const records = shownData(list);
   const state: CoopListState =
     records !== undefined
       ? { status: 'ready', records }
@@ -42,7 +39,7 @@ export function CoopRoute() {
   async function submit(request: CoopUploadRequest): Promise<SubmitOutcome> {
     // An upload counts for whoever the cookie belongs to now: when another tab has since logged out, or in as someone
     // else, it is not sent, and the form says this login no longer works, keeping the draft (A27).
-    if (!(await stillSignedInAs(account.viewer)))
+    if ((await signedInNow(account.viewer)) === 'other')
       return {
         ok: false,
         status: 401,

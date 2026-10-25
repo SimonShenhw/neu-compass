@@ -233,15 +233,24 @@ it.each([
   },
 );
 
-it('when /auth/me gives no answer the page can read, the deletion goes out and its own answer says what happened', async () => {
-  const calls = api(undefined, () =>
-    apiError(503, 'service_unavailable', 'down'),
-  );
-  livePage('/privacy', seededQueryClient({ viewer: MEMBER }));
-  expect(await deleteAccount()).toHaveTextContent(deleteMessages.success);
-  expect(calls.count('POST', '/auth/delete-account')).toBe(1);
-  await signedOut();
-});
+// The deletion cannot be undone, so it waits until the account can be confirmed (A27 recheck).
+it.each([
+  ['a failure', () => apiError(503, 'service_unavailable', 'down')],
+  ['an answer the page cannot read', () => json({ user_id: '' })],
+])(
+  'when /auth/me gives %s, nothing is deleted: said, and the member stays',
+  async (_name, me) => {
+    const calls = api(undefined, me);
+    livePage('/privacy', seededQueryClient({ viewer: MEMBER }));
+    expect(await deleteAccount()).toHaveTextContent(deleteMessages.refused);
+    expect(calls.count('GET', '/auth/me')).toBe(1);
+    expect(calls.count('POST', '/auth/delete-account')).toBe(0);
+    expect(sidebar()).toHaveTextContent('Synthetic Student');
+    expect(
+      screen.getByRole('checkbox', { name: '我知道删除以后不能恢复' }),
+    ).toBeInTheDocument();
+  },
+);
 
 it.each([
   [
