@@ -1,0 +1,145 @@
+[
+  {
+    "failure": {
+      "status": 404,
+      "errorType": "not_found",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求未完成，请稍后手动重试。",
+    "curriculum": "找不到这个培养方案，可能已经下线。"
+  },
+  {
+    "failure": {
+      "status": 429,
+      "errorType": null,
+      "retryAfter": 30,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求过于频繁，请30 秒后手动重试。",
+    "curriculum": "无法加载课程表。请求过于频繁，请30 秒后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 429,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求过于频繁，请稍后手动重试。",
+    "curriculum": "无法加载课程表。请求过于频繁，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 503,
+      "errorType": "service_busy",
+      "retryAfter": 2,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。服务正忙，请2 秒后手动重试。",
+    "curriculum": "无法加载课程表。服务正忙，请2 秒后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 503,
+      "errorType": "transport_error",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。服务暂不可用，请稍后手动重试。",
+    "curriculum": "无法加载课程表。服务暂不可用，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 408,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。",
+    "curriculum": "无法加载课程表。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。"
+  },
+  {
+    "failure": {
+      "status": 504,
+      "errorType": "transport_timeout",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。",
+    "curriculum": "无法加载课程表。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。"
+  },
+  {
+    "failure": {
+      "status": 502,
+      "errorType": "invalid_response",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。服务返回了无法识别的内容，请稍后手动重试。",
+    "curriculum": "无法加载课程表。服务返回了无法识别的内容，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 502,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。服务暂时出错，请稍后手动重试。",
+    "curriculum": "无法加载课程表。服务暂时出错，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 500,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。服务暂时出错，请稍后手动重试。",
+    "curriculum": "无法加载课程表。服务暂时出错，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 400,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求未完成，请稍后手动重试。",
+    "curriculum": "无法加载课程表。请求未完成，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 401,
+      "errorType": "unauthorized",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求未完成，请稍后手动重试。",
+    "curriculum": "无法加载课程表。请求未完成，请稍后手动重试。"
+  },
+  {
+    "failure": {
+      "status": 0,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "list": "无法加载培养方案列表。请求未完成，请稍后手动重试。",
+    "curriculum": "无法加载课程表。请求未完成，请稍后手动重试。"
+  }
+]

@@ -1,0 +1,180 @@
+[
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": null,
+    "url": "https://compass.example.test/?program=cs-ms"
+  },
+  {
+    "base": "https://compass.example.test/",
+    "program_id": "cs-ms",
+    "link": null,
+    "url": "https://compass.example.test/?program=cs-ms"
+  },
+  {
+    "base": "https://compass.example.test//",
+    "program_id": "cs-ms",
+    "link": null,
+    "url": "https://compass.example.test/?program=cs-ms"
+  },
+  {
+    "base": "https://compass.example.test/beta/",
+    "program_id": "cs-ms",
+    "link": null,
+    "url": "https://compass.example.test/beta/?program=cs-ms"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": null,
+      "plan_content_sha256": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=null&plan_revision=ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "Synthetic AI concentration",
+      "plan_content_sha256": "b4170722440087937c8f9e9b48a1e0dd19ac72e61700e171cbabc20f02fd84b9"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22Synthetic+AI+concentration%22&plan_revision=b4170722440087937c8f9e9b48a1e0dd19ac72e61700e171cbabc20f02fd84b9"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "a~b*c'd!e(f)g",
+      "plan_content_sha256": "e27e3df75ebf179eb327834f5e99283f8c2dae07dd336b89b03e623c22ed2e64"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22a~b%2Ac%27d%21e%28f%29g%22&plan_revision=e27e3df75ebf179eb327834f5e99283f8c2dae07dd336b89b03e623c22ed2e64"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "中文 方向",
+      "plan_content_sha256": "697eacd5057aa11eb9a69ba84d678c0363dbe99fd72c62b05a48462ce9536378"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22%E4%B8%AD%E6%96%87+%E6%96%B9%E5%90%91%22&plan_revision=697eacd5057aa11eb9a69ba84d678c0363dbe99fd72c62b05a48462ce9536378"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "emoji 😀 end",
+      "plan_content_sha256": "df81b2d4a1eb4b1a52e425bfe0a303cedce7c0530bb63f4828f5b4e056a71e04"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22emoji+%F0%9F%98%80+end%22&plan_revision=df81b2d4a1eb4b1a52e425bfe0a303cedce7c0530bb63f4828f5b4e056a71e04"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "quote \" and \\ backslash",
+      "plan_content_sha256": "2b2b5b78805e11c1440dcf8d115537120152746fe7400f2d75324a84f3a9e09e"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22quote+%5C%22+and+%5C%5C+backslash%22&plan_revision=2b2b5b78805e11c1440dcf8d115537120152746fe7400f2d75324a84f3a9e09e"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "slash/amp&eq=plus+percent%",
+      "plan_content_sha256": "92d558ff49bdcb86c7b32e72fab2bf68e1fe9f5000d52a946f07f0fbbf1111f8"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22slash%2Famp%26eq%3Dplus%2Bpercent%25%22&plan_revision=92d558ff49bdcb86c7b32e72fab2bf68e1fe9f5000d52a946f07f0fbbf1111f8"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "tab\there",
+      "plan_content_sha256": "30201f2ad556f15e752d11710c632bc9c00c7dc4f738f756047779ad127c8d8c"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22tab%5Cthere%22&plan_revision=30201f2ad556f15e752d11710c632bc9c00c7dc4f738f756047779ad127c8d8c"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "line\nbreak",
+      "plan_content_sha256": "4f49a80075db463af3060fb13a7ff365a823f1958313084caf439918315e9838"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22line%5Cnbreak%22&plan_revision=4f49a80075db463af3060fb13a7ff365a823f1958313084caf439918315e9838"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "null",
+      "plan_content_sha256": "c2816da13beb17bd1252a7ce4abd7312275aff6951a4d42aac504de474de992c"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22null%22&plan_revision=c2816da13beb17bd1252a7ce4abd7312275aff6951a4d42aac504de474de992c"
+  },
+  {
+    "base": "https://compass.example.test",
+    "program_id": "cs-ms",
+    "link": {
+      "program_id": "cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-align",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "  spaced  out  ",
+      "plan_content_sha256": "bcba4a221032e3f856eabe2cf463359d2cb5e678d3d954b1ed740f7209c77630"
+    },
+    "url": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-align&campus=boston&catalog_year=2026-2027&pathway=align&concentration=%22++spaced++out++%22&plan_revision=bcba4a221032e3f856eabe2cf463359d2cb5e678d3d954b1ed740f7209c77630"
+  }
+]

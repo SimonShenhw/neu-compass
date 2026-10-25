@@ -1,0 +1,34 @@
+{
+  "case": "policies-cs-ms-2025-stale",
+  "notes": "GET /programs/cs-ms/plans/cs-ms-boston-2025-2026-standard/policies. The bundle links an older revision of this plan: stale.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2025-2026-standard/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "cs-ms-boston-2025-2026-standard",
+    "scope": {
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2025-2026",
+      "pathway": "standard",
+      "concentration": null
+    },
+    "plan_content_sha256": "8d769db5672591d0980041ff4f77764b0a1ab3b9b9c24ee650e1c675438acf71",
+    "status": "stale",
+    "coverage": "selected_fragments_only",
+    "link": null,
+    "checked_by": null,
+    "checked_on": null,
+    "policies": [],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics",
+      "policy_plan_scope_or_revision_changed"
+    ]
+  },
+  "failure": null
+}

@@ -1,0 +1,34 @@
+{
+  "case": "policies-cs-ms-standard-unusable",
+  "notes": "GET /programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/policies. The bundle fails its own checks: unusable.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "cs-ms-boston-2026-2027-standard",
+    "scope": {
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": null
+    },
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "status": "unusable",
+    "coverage": "selected_fragments_only",
+    "link": null,
+    "checked_by": null,
+    "checked_on": null,
+    "policies": [],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics",
+      "policy_bundle_invalid"
+    ]
+  },
+  "failure": null
+}

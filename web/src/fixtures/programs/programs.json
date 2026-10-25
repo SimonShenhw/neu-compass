@@ -1,0 +1,64 @@
+{
+  "case": "programs",
+  "notes": "GET /programs: cs-ms with four usable plans, ds-ms with one, info-ms and pjm-ms with none; cs-ms counts an edge whose course has no row.",
+  "request": {
+    "method": "GET",
+    "path": "/programs"
+  },
+  "status": 200,
+  "body": [
+    {
+      "program_id": "cs-ms",
+      "full_name": "MS in Computer Science (synthetic)",
+      "prefix": "CS",
+      "department": null,
+      "college": null,
+      "course_count": 6,
+      "plan_count": 4,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    },
+    {
+      "program_id": "ds-ms",
+      "full_name": "MS in Data Science (synthetic)",
+      "prefix": "DS",
+      "department": null,
+      "college": null,
+      "course_count": 3,
+      "plan_count": 1,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    },
+    {
+      "program_id": "info-ms",
+      "full_name": "MS in Information Systems (synthetic)",
+      "prefix": "INFO",
+      "department": null,
+      "college": null,
+      "course_count": 0,
+      "plan_count": 0,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    },
+    {
+      "program_id": "pjm-ms",
+      "full_name": "MS in Project Management (synthetic)",
+      "prefix": "PJM",
+      "department": null,
+      "college": null,
+      "course_count": 2,
+      "plan_count": 0,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    }
+  ],
+  "failure": null
+}

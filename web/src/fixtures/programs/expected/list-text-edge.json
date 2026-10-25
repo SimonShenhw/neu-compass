@@ -1,0 +1,163 @@
+{
+  "name": "list-text-edge",
+  "notes": "HTML, a Markdown link and a line break in a prefix and a full name: plain text, one line.",
+  "props": {
+    "view": "list",
+    "programs": "programs-text-edge"
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span style=\"color:#1677FF;font-weight:800;font-size:1.6rem;letter-spacing:0.5px;\">CS &lt;i&gt;MS&lt;/i&gt;</span><p class=\"nc-card-name\">MS in &lt;b&gt;Computer&lt;/b&gt; Science [note](https://example.com/x)</p><span class=\"nc-pill\">6 门课程</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "旧 seed 标签未核验 · 可用版本化规则 4 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看课程表",
+      "key": "prog-cs-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span style=\"color:#1677FF;font-weight:800;font-size:1.6rem;letter-spacing:0.5px;\">DS</span><p class=\"nc-card-name\">MS in Data Science (synthetic)</p><span class=\"nc-pill\">3 门课程</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "旧 seed 标签未核验 · 可用版本化规则 1 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看课程表",
+      "key": "prog-ds-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span style=\"color:#1677FF;font-weight:800;font-size:1.6rem;letter-spacing:0.5px;\">INFO</span><p class=\"nc-card-name\">MS in Information Systems (synthetic)</p><span class=\"nc-pill\">0 门课程</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "旧 seed 标签未核验 · 可用版本化规则 0 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看课程表",
+      "key": "prog-info-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span style=\"color:#1677FF;font-weight:800;font-size:1.6rem;letter-spacing:0.5px;\">PJM</span><p class=\"nc-card-name\">MS in Project Management (synthetic)</p><span class=\"nc-pill\">2 门课程</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "旧 seed 标签未核验 · 可用版本化规则 0 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看课程表",
+      "key": "prog-pjm-ms"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "program_card",
+      "prefix": "CS <i>MS</i>",
+      "name": "MS in <b>Computer</b> Science [note](https://example.com/x)",
+      "count": "6 门课程"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "旧课程表标签未核验 · 可用版本化规则 4 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看课程表",
+      "program_id": "cs-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "program_card",
+      "prefix": "DS",
+      "name": "MS in Data Science (synthetic)",
+      "count": "3 门课程"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "旧课程表标签未核验 · 可用版本化规则 1 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看课程表",
+      "program_id": "ds-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "program_card",
+      "prefix": "INFO",
+      "name": "MS in Information Systems (synthetic)",
+      "count": "0 门课程"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "旧课程表标签未核验 · 可用版本化规则 0 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看课程表",
+      "program_id": "info-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "program_card",
+      "prefix": "PJM",
+      "name": "MS in Project Management (synthetic)",
+      "count": "2 门课程"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "旧课程表标签未核验 · 可用版本化规则 0 份"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看课程表",
+      "program_id": "pjm-ms"
+    }
+  ]
+}

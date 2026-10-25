@@ -1,0 +1,90 @@
+{
+  "name": "nothing-at-all",
+  "notes": "No programs and no public Co-op rows: only the title and the samples, and no notice.",
+  "sources": {
+    "programs": "programs-empty",
+    "curricula": {
+      "aai-ms": "curriculum-aai-ms",
+      "cs-ms": "curriculum-cs-ms",
+      "ds-ms": "curriculum-ds-ms"
+    },
+    "coop": "coop-empty"
+  },
+  "requested": [
+    "GET /programs",
+    "GET /coop"
+  ],
+  "react_refuses": [],
+  "raw": [
+    {
+      "kind": "divider",
+      "value": null
+    },
+    {
+      "kind": "markdown",
+      "value": "**🔍 试试这样问**"
+    },
+    {
+      "kind": "button",
+      "value": "📘 CS 5800",
+      "key": "sample-0"
+    },
+    {
+      "kind": "button",
+      "value": "🤖 适合入门的 AI 选修课",
+      "key": "sample-1"
+    },
+    {
+      "kind": "button",
+      "value": "📊 数据库方向的课",
+      "key": "sample-2"
+    },
+    {
+      "kind": "button",
+      "value": "⚖️ 课业最轻的 ML 课",
+      "key": "sample-3"
+    },
+    {
+      "kind": "caption",
+      "value": "💡 也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
+    },
+    {
+      "kind": "divider",
+      "value": null
+    }
+  ],
+  "visible": [
+    {
+      "kind": "title",
+      "text": "问一门课，或者一个选课问题"
+    },
+    {
+      "kind": "heading",
+      "text": "试试这样问"
+    },
+    {
+      "kind": "sample",
+      "text": "CS 5800",
+      "query": "CS 5800"
+    },
+    {
+      "kind": "sample",
+      "text": "适合入门的 AI 选修课",
+      "query": "easy AI elective for ML beginner"
+    },
+    {
+      "kind": "sample",
+      "text": "数据库方向的课",
+      "query": "database management systems"
+    },
+    {
+      "kind": "sample",
+      "text": "课业最轻的 ML 课",
+      "query": "lightest workload ML class"
+    },
+    {
+      "kind": "note",
+      "text": "也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
+    }
+  ]
+}

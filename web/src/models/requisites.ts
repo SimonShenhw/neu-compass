@@ -145,7 +145,7 @@ function document(v: unknown): v is RequisiteDocument {
         (v.credit_hours.kind === 'fixed' || v.credit_hours.kind === 'range')))
   );
 }
-function programTree(value: unknown): value is ProgramNode {
+export function programTree(value: unknown): value is ProgramNode {
   let nodes = 0;
   function visit(v: unknown, depth: number): boolean {
     if (

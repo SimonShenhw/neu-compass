@@ -1,0 +1,144 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { expect, it } from 'vitest';
+const frozen = {
+  'chat-sample-1.json':
+    '0dcc9e8dbd0562879672eb8bfddbe222be515735bfc561416d3782b6c4e37976',
+  'chat-sample-2.json':
+    '6355eaca09b02020fc730547e95fd35db335d8b59e5415d8c094ea80874adee2',
+  'chat-sample-3.json':
+    '50494fa56cdf9e395c93c70692bc8c408dcf299fea913ee3306463cd80e2c0bd',
+  'chat-sample-4.json':
+    'e1dddb9249586f876bf5be3e2d79bc7503c6cab27839b20f7e952f10c28258b3',
+  'coop-401.json':
+    'c69a6b3ae6b68837a0eb44b6e34ad0ec33b978ca1122c9aced17ed9ab928ca06',
+  'coop-bad-level.json':
+    'd40f8b6c54569705777f9c90a8a34a954183d45d0b8d3345a90c62bf304e8140',
+  'coop-empty-interview.json':
+    '8e3d0d2cb7e6bb4f0e9ab533ee8a4d1c7e9ac0f22713770e06c92fdf16aa0a8a',
+  'coop-empty.json':
+    '3a1436b135eca5264c055422c30ad014e7fa93a5592312161393b8a9ef1f1361',
+  'coop-guest.json':
+    '285a28563385590130c60897926e1a3039d8b675943bb7817803c2fb7f273cdd',
+  'coop-malformed.json':
+    'fd558c60bbe613351e04ccb05ade791c3b88b371599ab74115ef91f631c551c0',
+  'coop-member-0.json':
+    'ac6e83fce20ab56dca17f9aa72337e0308ddfd5093b4093cc47a2ab5fb186a43',
+  'coop-member-1.json':
+    '6671c1e7c13450e1b688c5c0e7aa6bf5e45d2bfa4a1947b8319261d69b645514',
+  'coop-member-2.json':
+    '4913a75f493efb305ea9206c763bf74eabad3d9877591f81937d50f2af289bfd',
+  'coop-one-row.json':
+    'e7d8bf4ad224e41255f2715ac307a8e43a20e361c11019b9d1b4ef05c7ef671b',
+  'coop-text-edge.json':
+    '7d73c7e99917195f31415a5624060353a8922a415c29e6788a82639410d877d3',
+  'coop-third-row-malformed.json':
+    'b98eb5964fdf987e3e8fcb1fe91af8f06337fa7e189ef25b4084266bc9826a1f',
+  'curriculum-404.json':
+    '6a2de6bdf129b64f7cad0faadafb736d229946af6e285f8b5695f013b851f4cf',
+  'curriculum-aai-ms.json':
+    '6fde52db1a8d1dffe75fced593b099cd75c2916a3917bd3503a7b55056bf7f66',
+  'curriculum-cs-ms-malformed.json':
+    '5687235018384a54e358acf9760975247109d41a3eff72c851ddac5b9766da3c',
+  'curriculum-cs-ms-text-edge.json':
+    'dceb38b5f370958414a8b78d0e2b6e42456e11c482a1b2ded3a045d9a39c0dbe',
+  'curriculum-cs-ms.json':
+    'd7b5222ce4b8d907c9c5899c3683d64d6f9a8e5afff06fd3a71b760e9e3cdde3',
+  'curriculum-ds-ms.json':
+    '1ec39fe5b57bd06d26cb957f380e7aa6ba9b48ad67cdefda8eda8171ccae3dfa',
+  'failure-429.json':
+    '4734fd44a5b7e03ad5eb5fd1462f3f9eb2d57990f727fb0f0f5c82c32039344f',
+  'failure-502-unreadable.json':
+    '2129b5e8daa583e30602d1aa69595c1b42daa52eb0171170a66f95f7830f913b',
+  'failure-503-transport.json':
+    '381caecb5dd541c3b4ead3cc5167f8e394c31e217bd908a85ca156305fcd2d2c',
+  'failure-504-timeout.json':
+    '0d34970586106a14bc42b8c485b504af543f97de2f3b11d7b1b3b66fb18ba885',
+  'programs-empty.json':
+    '84636fd0fee55eaa8170fd0c2a535f9b1255c08c3d9f3733cce8aeaf7076f4e5',
+  'programs-malformed.json':
+    '3ce1000532c7b7d868109dc765615a7c225d1071f9d564373b855f67e655c35c',
+  'programs-reversed.json':
+    '977d86e174fc7f2110a96f94dabce1b4dde3d9c4d6f2aaac8238f131ad8c4bc9',
+  'programs-without-aai.json':
+    '3a38dba084879ff7864be9695de562fcc479cb92bee832f2e3b45a4a9854e956',
+  'programs.json':
+    'd1b89212e8ad3874c26b278e18cf443684d633fcbe15dcef36c3ff92d9aa4600',
+  'expected/aai-not-listed.json':
+    '580f56092cabeff3b62e3e372e7d34f04db73c3c1e512407e11ca97362be86c2',
+  'expected/all-curricula-504.json':
+    '22a1b8622960da4ab3431662c11fc8a9905fea601ff473ac9be92225e7c7d28a',
+  'expected/coop-401.json':
+    '098a174c004cf3faa95bfc3bf33384b8c3a5c910fa6bb8347e964fbbabf20ec3',
+  'expected/coop-502-unreadable.json':
+    '6815a558e09c62290683352891b42d69adcc3ade8e688d9033de43c02f46c1cb',
+  'expected/coop-503.json':
+    'f2ed014281b6583c89835b2fc6421ae46d8fae7c95c8b7252f10fb3f07723fc5',
+  'expected/coop-bad-level.json':
+    '4d3bcdbe71c985eb688fe12a3e17882ade1c913621a034afda4f05a193e9bc63',
+  'expected/coop-empty-interview.json':
+    '52c904c31304cc17305e81816a63c61300d4f3c4acd5fed1946d69538ded77dd',
+  'expected/coop-empty.json':
+    '64e5089d8ed1ca1e56227bbe0b28990f61022ada2dceb57139f13c3649d4bd16',
+  'expected/coop-malformed.json':
+    'c8e0415537dd11c54d99506c984da72c434194ac8ea49acf9bc80c2e96301704',
+  'expected/coop-one-row.json':
+    'b68f2b42ce1064b178db0e3c9e7a18226fbe7f077ba1f92622670ede215f6e3a',
+  'expected/coop-text-edge.json':
+    '9c94dec3bf409d9c46820215f2c883dd2a3ddd40cf8367caffee1e2160acd1c4',
+  'expected/coop-third-row-malformed.json':
+    'b7d96dae868555584424cf4c028d27bbfcf32e99786777a3c34a47a04837362b',
+  'expected/cs-curriculum-404.json':
+    '26f9e06ce6ce50d092de3adfed90bcce11674e08844a14caf7245f0d5f6dc108',
+  'expected/cs-curriculum-503.json':
+    '863966de28ef408ff97c692892bbe5a64785a279fdc1ea1cc3e95caffc2c0f21',
+  'expected/cs-curriculum-malformed.json':
+    'da66c1c4462941a0346d16b10937e6ebe6d05e99879197de551487b1daa4b8ff',
+  'expected/cs-curriculum-text-edge.json':
+    'e59f8811991e1d90949d3bfb4a1ab9d016b61da9e6bc378e62d16ab057415b42',
+  'expected/featured-order.json':
+    '39a7f327162eff1231db2982ae405f8aaf570d20fa996553422f11ccbad711e9',
+  'expected/guest.json':
+    '36206638875ed66b05047263c9cb86b391da97e3bbfc43b067c5c9b1bb078e37',
+  'expected/lock-vectors.json':
+    '81038b0bad0a5188de6d1349b59fa2b28d0fd9435d7c8f6ea24a1f032c5d8710',
+  'expected/member-0.json':
+    '0faf8b34c19067e1634b712ebd6bf3c9d4284aa55abf2e54265e7474a1e429af',
+  'expected/member-1.json':
+    '00b608819a2f5278f347f2a4e8176bcdf2a67f979704bfe086eeffd1d5f80e35',
+  'expected/member-2.json':
+    '489baa6c30f2625cf905742f2e16faa02eac56c9e48b99bcf25f5bc9847ba259',
+  'expected/no-programs.json':
+    'ce680bc58f729f7cd9975f7f9fa4ed6dde07c01a7d663c858640f30f19a842cc',
+  'expected/nothing-at-all.json':
+    '3a57ba9fe6e9d7d66135613bf9a54bcdbfdd099abe395b13286e6e9c1e6fb350',
+  'expected/programs-429.json':
+    'd7b99209635ebd6d069f8de2439c39cdbf41e8233179d4c0623a676bac9af57c',
+  'expected/programs-503.json':
+    '245ff78b55b4f4a78f6b6919597a8c0e01db16465e37bb9a8a0096db457a4437',
+  'expected/programs-malformed.json':
+    '335a5f3c075e36c9cf4d475aeb4a95313e4e127db5df2861268f9a838e914568',
+  'expected/semester1-vectors.json':
+    '4fe17db966c5f532e251841199354af4fa5a0b0a7082ae33e1df319433e252de',
+  'expected/transient-vectors.json':
+    '26e80df4c83159fdceadcd5d36b534bb679a7e2563fc4f84454e6cfb8fbb6cc9',
+  'expected/two-failures-one-notice.json':
+    'c7cf34055c709cd2f5c7a68a29bb20328f98599848450aced23706c1b6fc7034',
+};
+it('freezes all 61 landing fixture names and original bytes', () => {
+  const base = 'src/fixtures/landing/';
+  const names = ['', 'expected/'].flatMap((dir) =>
+    readdirSync(base + dir)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => dir + f),
+  );
+  expect(names.sort()).toEqual(Object.keys(frozen).sort());
+  expect(names).toHaveLength(61);
+  for (const [name, hash] of Object.entries(frozen))
+    expect(
+      createHash('sha256')
+        .update(readFileSync(base + name))
+        .digest('hex'),
+      name,
+    ).toBe(hash);
+});

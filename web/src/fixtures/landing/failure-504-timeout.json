@@ -1,0 +1,20 @@
+{
+  "case": "failure-504-timeout",
+  "notes": "No answer in time (R2b: 504 transport_timeout).",
+  "derived_from": null,
+  "edit": "No answer in time (R2b: 504 transport_timeout).",
+  "request": {
+    "method": "GET",
+    "path": null,
+    "viewer": null
+  },
+  "status": null,
+  "body": null,
+  "failure": {
+    "status": 504,
+    "errorType": "transport_timeout",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": null
+  }
+}

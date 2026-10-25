@@ -1,0 +1,213 @@
+.page,
+.demo {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.page {
+  overflow-wrap: anywhere;
+}
+.page h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  margin: 0;
+}
+.page h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+.page p {
+  margin: 0;
+}
+.page a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--ink3);
+}
+.info,
+.warning {
+  padding: var(--space-4);
+  background: var(--accent-soft);
+  border-left: var(--focus-width) solid var(--accent);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.card,
+.header,
+.plan {
+  border: var(--border) solid var(--line);
+  background: var(--surface);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.card,
+.plan,
+.policy,
+.policyItem,
+.semester,
+.fragment {
+  display: grid;
+  gap: var(--space-4);
+}
+.card > button,
+.page > button {
+  justify-self: start;
+}
+.card [data-kind='program_card'] {
+  display: grid;
+  gap: var(--space-3);
+}
+.badge {
+  width: fit-content;
+  border-radius: var(--radius-sm);
+  background: var(--code);
+  color: var(--ink2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+.core {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.elective_pool {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.foundation {
+  background: var(--code);
+  color: var(--ink2);
+}
+.capstone {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.header {
+  border-top: var(--focus-width) solid var(--accent);
+}
+.header p {
+  margin-top: var(--space-2);
+  color: var(--ink2);
+}
+.actions,
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.rules,
+.share_url {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.rules {
+  padding: var(--space-4);
+  background: var(--canvas);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+}
+.disclosure {
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  min-width: 0;
+  background: var(--surface);
+}
+.disclosure summary {
+  display: list-item;
+  list-style-position: inside;
+  cursor: pointer;
+  padding: var(--space-4);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+.disclosure > div {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: var(--border) solid var(--line);
+}
+.policyItem {
+  padding-top: var(--space-4);
+  border-top: var(--border) solid var(--line);
+}
+.courseRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.course {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+.course p {
+  width: 100%;
+  color: var(--ink3);
+  font-size: var(--text-sm);
+}
+.courseRow > button {
+  flex-shrink: 0;
+}
+.page [role='combobox'] {
+  max-width: 100%;
+  white-space: pre-wrap;
+  height: auto;
+  min-height: var(--control);
+}
+.controls label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--ink3);
+}
+.controls select {
+  min-height: var(--control);
+  max-width: 100%;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  font: inherit;
+}
+@media (max-width: 767px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .card,
+  .header,
+  .plan {
+    padding: var(--space-4);
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .courseRow {
+    align-items: flex-start;
+  }
+}

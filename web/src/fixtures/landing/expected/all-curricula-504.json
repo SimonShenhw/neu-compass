@@ -1,0 +1,205 @@
+{
+  "name": "all-curricula-504",
+  "notes": "Every featured curriculum timed out: no starter section, the notice; the program buttons stay.",
+  "sources": {
+    "programs": "programs",
+    "curricula": {
+      "aai-ms": "failure-504-timeout",
+      "cs-ms": "failure-504-timeout",
+      "ds-ms": "failure-504-timeout"
+    },
+    "coop": "coop-guest"
+  },
+  "requested": [
+    "GET /programs",
+    "GET /programs/aai-ms",
+    "GET /programs/cs-ms",
+    "GET /programs/ds-ms",
+    "GET /coop"
+  ],
+  "react_refuses": [],
+  "raw": [
+    {
+      "kind": "markdown",
+      "value": "**🎓 按培养方案浏览**"
+    },
+    {
+      "kind": "button",
+      "value": "AAI · 4 门课",
+      "key": "disc-prog-aai-ms"
+    },
+    {
+      "kind": "button",
+      "value": "CS · 6 门课",
+      "key": "disc-prog-cs-ms"
+    },
+    {
+      "kind": "button",
+      "value": "DS · 3 门课",
+      "key": "disc-prog-ds-ms"
+    },
+    {
+      "kind": "button",
+      "value": "PJM · 1 门课",
+      "key": "disc-prog-pjm-ms"
+    },
+    {
+      "kind": "markdown",
+      "value": "**💼 最近的 Co-op 经验**"
+    },
+    {
+      "kind": "html",
+      "value": "<div class=\"nc-line\">• <b>Example Quant LLC</b> · Quant Developer Co-op</div>"
+    },
+    {
+      "kind": "caption",
+      "value": "🔒 这条有薪资区间：你分享的经验公开后解锁"
+    },
+    {
+      "kind": "html",
+      "value": "<div class=\"nc-line\">• <b>Sample Health Inc.</b> · Data Science Co-op</div>"
+    },
+    {
+      "kind": "caption",
+      "value": "🔒 这条有面试细节：你分享的经验公开后解锁"
+    },
+    {
+      "kind": "button",
+      "value": "去看看 →",
+      "key": "disc-coop"
+    },
+    {
+      "kind": "caption",
+      "value": "部分内容暂时没加载出来：稍后再操作页面时会重新获取，也可以点侧边栏的「🔄 刷新页面内容」。"
+    },
+    {
+      "kind": "divider",
+      "value": null
+    },
+    {
+      "kind": "markdown",
+      "value": "**🔍 试试这样问**"
+    },
+    {
+      "kind": "button",
+      "value": "📘 CS 5800",
+      "key": "sample-0"
+    },
+    {
+      "kind": "button",
+      "value": "🤖 适合入门的 AI 选修课",
+      "key": "sample-1"
+    },
+    {
+      "kind": "button",
+      "value": "📊 数据库方向的课",
+      "key": "sample-2"
+    },
+    {
+      "kind": "button",
+      "value": "⚖️ 课业最轻的 ML 课",
+      "key": "sample-3"
+    },
+    {
+      "kind": "caption",
+      "value": "💡 也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
+    },
+    {
+      "kind": "divider",
+      "value": null
+    }
+  ],
+  "visible": [
+    {
+      "kind": "title",
+      "text": "问一门课，或者一个选课问题"
+    },
+    {
+      "kind": "heading",
+      "text": "按培养方案浏览"
+    },
+    {
+      "kind": "program",
+      "text": "AAI · 4 门课",
+      "program_id": "aai-ms"
+    },
+    {
+      "kind": "program",
+      "text": "CS · 6 门课",
+      "program_id": "cs-ms"
+    },
+    {
+      "kind": "program",
+      "text": "DS · 3 门课",
+      "program_id": "ds-ms"
+    },
+    {
+      "kind": "program",
+      "text": "PJM · 1 门课",
+      "program_id": "pjm-ms"
+    },
+    {
+      "kind": "heading",
+      "text": "最近的 Co-op 经验"
+    },
+    {
+      "kind": "coop",
+      "company": "Example Quant LLC",
+      "role": "Quant Developer Co-op"
+    },
+    {
+      "kind": "lock",
+      "text": "这条有薪资区间：你分享的经验公开后解锁"
+    },
+    {
+      "kind": "coop",
+      "company": "Sample Health Inc.",
+      "role": "Data Science Co-op"
+    },
+    {
+      "kind": "lock",
+      "text": "这条有面试细节：你分享的经验公开后解锁"
+    },
+    {
+      "kind": "coop_link",
+      "text": "去看看"
+    },
+    {
+      "kind": "notice",
+      "text": "部分内容暂时没加载出来。"
+    },
+    {
+      "kind": "button",
+      "text": "重新加载",
+      "action": "retry"
+    },
+    {
+      "kind": "heading",
+      "text": "试试这样问"
+    },
+    {
+      "kind": "sample",
+      "text": "CS 5800",
+      "query": "CS 5800"
+    },
+    {
+      "kind": "sample",
+      "text": "适合入门的 AI 选修课",
+      "query": "easy AI elective for ML beginner"
+    },
+    {
+      "kind": "sample",
+      "text": "数据库方向的课",
+      "query": "database management systems"
+    },
+    {
+      "kind": "sample",
+      "text": "课业最轻的 ML 课",
+      "query": "lightest workload ML class"
+    },
+    {
+      "kind": "note",
+      "text": "也可以直接用一句话问，比如「工作量最轻的 3 学分 ML 课」或「讲反向传播的课」。"
+    }
+  ]
+}

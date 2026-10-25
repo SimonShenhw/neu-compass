@@ -1,0 +1,65 @@
+{
+  "case": "programs",
+  "notes": "GET /programs: four programs, three of them featured on the landing (aai-ms, cs-ms, ds-ms); cs-ms counts an edge whose course has no row.",
+  "request": {
+    "method": "GET",
+    "path": "/programs",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": [
+    {
+      "program_id": "aai-ms",
+      "full_name": "MS in Applied Artificial Intelligence (synthetic)",
+      "prefix": "AAI",
+      "department": null,
+      "college": null,
+      "course_count": 4,
+      "plan_count": 0,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    },
+    {
+      "program_id": "cs-ms",
+      "full_name": "MS in Computer Science (synthetic)",
+      "prefix": "CS",
+      "department": null,
+      "college": null,
+      "course_count": 6,
+      "plan_count": 0,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    },
+    {
+      "program_id": "ds-ms",
+      "full_name": "MS in Data Science (synthetic)",
+      "prefix": "DS",
+      "department": null,
+      "college": null,
+      "course_count": 3,
+      "plan_count": 0,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    },
+    {
+      "program_id": "pjm-ms",
+      "full_name": "MS in Project Management (synthetic)",
+      "prefix": "PJM",
+      "department": null,
+      "college": null,
+      "course_count": 1,
+      "plan_count": 0,
+      "warnings": [
+        "legacy_seed_unverified",
+        "legacy_scope_unknown"
+      ]
+    }
+  ],
+  "failure": null
+}

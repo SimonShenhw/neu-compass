@@ -1,0 +1,119 @@
+{
+  "case": "policies-cs-ms-standard-ready",
+  "notes": "GET /programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/policies. Ready: two policies (university and Khoury), each with a paragraph and a list fragment; one list has no heading.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "cs-ms-boston-2026-2027-standard",
+    "scope": {
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": null
+    },
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "status": "ready",
+    "coverage": "selected_fragments_only",
+    "link": {
+      "plan_id": "cs-ms-boston-2026-2027-standard",
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": null,
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "home_college": "khoury",
+      "policy_ids": [
+        "university-minimum-gpa",
+        "khoury-academic-probation"
+      ]
+    },
+    "checked_by": "synthetic-policy-reviewer",
+    "checked_on": "2026-10-04",
+    "policies": [
+      {
+        "policy_id": "university-minimum-gpa",
+        "authority": "university",
+        "source": {
+          "format_version": 1,
+          "url": "https://catalog.northeastern.edu/graduate/academic-policies-procedures/minimum-gpa/",
+          "catalog_year": "2026-2027",
+          "captured_at": "2026-10-02T10:00:00Z",
+          "sha256": "bbf1a6e612c261c8766d28ce10972a6c8d72dd852c954945e191db958672afce",
+          "byte_count": 309,
+          "page_title": "Minimum GPA (synthetic)"
+        },
+        "coverage": "selected_fragments_only",
+        "fragments": [
+          {
+            "fragment_id": "minimum-gpa-standing",
+            "source_kind": "paragraph",
+            "paragraph_index": 0,
+            "heading": "Requirement",
+            "paragraph_sha256": "f2c98256b1a09204f0790100d7b71d19e80d4284b458c3d293f313d3c66fe2eb",
+            "summary": "合成摘要：保持累计 GPA 不低于 3.000 才算良好学业状态。",
+            "limitation": "合成说明：只是选定的一段，不是完整政策。",
+            "source_paragraph": "Synthetic paragraph: a graduate student keeps a cumulative GPA of at least 3.000 to remain in good standing."
+          },
+          {
+            "fragment_id": "minimum-gpa-list",
+            "source_kind": "list",
+            "paragraph_index": 0,
+            "heading": "Requirement",
+            "paragraph_sha256": "03afc518f8f2dfa50b2853360ecd61e4f44b0d81b16109d163c431e9a17f9ddc",
+            "summary": "合成摘要：列出了两种情况。",
+            "limitation": "合成说明：列表里的例外没有逐条核对。",
+            "source_paragraph": "Synthetic list item one. Synthetic list item two."
+          }
+        ]
+      },
+      {
+        "policy_id": "khoury-academic-probation",
+        "authority": "khoury",
+        "source": {
+          "format_version": 1,
+          "url": "https://catalog.northeastern.edu/graduate/computer-information-science/academic-policies-procedures/academic-probation/",
+          "catalog_year": "2026-2027",
+          "captured_at": "2026-10-02T10:00:00Z",
+          "sha256": "3425a5a3d05c9637e2afd0a8d59a824cd5c5540902b6815fe01b81a296211567",
+          "byte_count": 240,
+          "page_title": "Academic Probation (synthetic)"
+        },
+        "coverage": "selected_fragments_only",
+        "fragments": [
+          {
+            "fragment_id": "probation-intro",
+            "source_kind": "list",
+            "paragraph_index": 0,
+            "heading": null,
+            "paragraph_sha256": "aa378985bd58a634d88eb88fd3ad2cee673ce1291647b8ccfd7f4066f808fc21",
+            "summary": "合成摘要：小节标题之前的一个列表。",
+            "limitation": "合成说明：没有小节标题。",
+            "source_paragraph": "Synthetic list before any heading."
+          },
+          {
+            "fragment_id": "probation-standing",
+            "source_kind": "paragraph",
+            "paragraph_index": 0,
+            "heading": "Standing",
+            "paragraph_sha256": "89b938a2680df523e6c2bed29ddf205fbe29d89136c639f771763ca75f476899",
+            "summary": "合成摘要：留校察看和学业状态。",
+            "limitation": "合成说明：不判断个人情况。",
+            "source_paragraph": "Synthetic paragraph about probation & standing ."
+          }
+        ]
+      }
+    ],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics"
+    ]
+  },
+  "failure": null
+}

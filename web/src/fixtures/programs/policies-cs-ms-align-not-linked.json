@@ -1,0 +1,34 @@
+{
+  "case": "policies-cs-ms-align-not-linked",
+  "notes": "GET /programs/cs-ms/plans/cs-ms-boston-2026-2027-align/policies. The bundle does not link this exact plan: not_linked.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-align/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "cs-ms-boston-2026-2027-align",
+    "scope": {
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": null
+    },
+    "plan_content_sha256": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+    "status": "not_linked",
+    "coverage": "selected_fragments_only",
+    "link": null,
+    "checked_by": null,
+    "checked_on": null,
+    "policies": [],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics",
+      "no_policy_link_for_exact_plan"
+    ]
+  },
+  "failure": null
+}

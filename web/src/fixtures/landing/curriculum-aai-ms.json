@@ -1,0 +1,63 @@
+{
+  "case": "curriculum-aai-ms",
+  "notes": "GET /programs/aai-ms. Semester 1 lists an elective, then a foundation course, then a core one: the pick is the foundation course (the first core or foundation course, in the API's order).",
+  "request": {
+    "method": "GET",
+    "path": "/programs/aai-ms",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "aai-ms",
+    "full_name": "MS in Applied Artificial Intelligence (synthetic)",
+    "prefix": "AAI",
+    "notes": null,
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-aai-5025",
+            "primary_code": "AAI 5025",
+            "primary_name": "Introduction to AI Programming",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-aai-6600",
+            "primary_code": "AAI 6600",
+            "primary_name": "Applied AI",
+            "requirement_type": "foundation",
+            "notes": null
+          },
+          {
+            "course_id": "c-cs-5100",
+            "primary_code": "CS 5100",
+            "primary_name": "Foundations of Artificial Intelligence",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-aai-7980",
+            "primary_code": "AAI 7980",
+            "primary_name": "Applied AI Capstone",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null
+}

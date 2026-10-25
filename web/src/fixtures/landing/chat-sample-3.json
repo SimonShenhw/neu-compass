@@ -1,0 +1,750 @@
+{
+  "case": "chat-sample-3",
+  "notes": "Sample 3 (database management systems): the hybrid route.",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "body": {
+      "query": "database management systems",
+      "k": 10,
+      "allow_feedback_capture": false
+    }
+  },
+  "status": 200,
+  "retry_after": null,
+  "lines": [
+    {
+      "type": "meta",
+      "matched_via": "hybrid",
+      "retrieval_ms": 4.57,
+      "prompt_version": "4.5",
+      "results": [
+        {
+          "course_id": "c-cs-5200",
+          "primary_code": "CS 5200",
+          "primary_name": "Database Management Systems",
+          "score": 2.7335361328055585,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-pjm-5900",
+          "primary_code": "PJM 5900",
+          "primary_name": "Foundations of Project Management",
+          "score": 1.3971892578557243,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-ds-5220",
+          "primary_code": "DS 5220",
+          "primary_name": "Supervised Machine Learning and Learning Theory",
+          "score": -0.3396922518525789,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-ds-5110",
+          "primary_code": "DS 5110",
+          "primary_name": "Essentials of Data Science",
+          "score": -0.35579124540502677,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-7990",
+          "primary_code": "CS 7990",
+          "primary_name": "Thesis",
+          "score": -0.37138714540896056,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-6140",
+          "primary_code": "CS 6140",
+          "primary_name": "Machine Learning",
+          "score": -0.3865031715666195,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-5800",
+          "primary_code": "CS 5800",
+          "primary_name": "Algorithms",
+          "score": -0.40116113632556155,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-5100",
+          "primary_code": "CS 5100",
+          "primary_name": "Foundations of Artificial Intelligence",
+          "score": -0.4291837160117743,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-cs-5010",
+          "primary_code": "CS 5010",
+          "primary_name": "Programming Design Paradigm",
+          "score": -0.4425858193399629,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        },
+        {
+          "course_id": "c-aai-7980",
+          "primary_code": "AAI 7980",
+          "primary_name": "Applied AI Capstone",
+          "score": -0.4556050054302034,
+          "answer_evidence": {
+            "catalog": null,
+            "field_evidence": [],
+            "source_review_ids": [],
+            "missing_fields": [
+              "catalog_description",
+              "credits",
+              "term",
+              "delivery_mode",
+              "professor",
+              "prereqs",
+              "topics_covered",
+              "skill_tags",
+              "workload_hours_per_week",
+              "difficulty_score",
+              "grading_components",
+              "career_relevance"
+            ],
+            "warnings": [
+              "catalog_source_unavailable"
+            ],
+            "requisites": {
+              "storage": "available",
+              "editions": [],
+              "editions_omitted": 0,
+              "unusable_records": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "token",
+      "text": "和数据库相关的是 **CS 5200 Database Management Systems**，"
+    },
+    {
+      "type": "token",
+      "text": "讲 SQL 和关系模型。\n\n"
+    },
+    {
+      "type": "token",
+      "text": "这是合成的示例回答。"
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "events": [
+    {
+      "type": "meta",
+      "meta": {
+        "type": "meta",
+        "matched_via": "hybrid",
+        "retrieval_ms": 4.57,
+        "prompt_version": "4.5",
+        "results": [
+          {
+            "course_id": "c-cs-5200",
+            "primary_code": "CS 5200",
+            "primary_name": "Database Management Systems",
+            "score": 2.7335361328055585,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-pjm-5900",
+            "primary_code": "PJM 5900",
+            "primary_name": "Foundations of Project Management",
+            "score": 1.3971892578557243,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-ds-5220",
+            "primary_code": "DS 5220",
+            "primary_name": "Supervised Machine Learning and Learning Theory",
+            "score": -0.3396922518525789,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-ds-5110",
+            "primary_code": "DS 5110",
+            "primary_name": "Essentials of Data Science",
+            "score": -0.35579124540502677,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-7990",
+            "primary_code": "CS 7990",
+            "primary_name": "Thesis",
+            "score": -0.37138714540896056,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "score": -0.3865031715666195,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "score": -0.40116113632556155,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-5100",
+            "primary_code": "CS 5100",
+            "primary_name": "Foundations of Artificial Intelligence",
+            "score": -0.4291837160117743,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-cs-5010",
+            "primary_code": "CS 5010",
+            "primary_name": "Programming Design Paradigm",
+            "score": -0.4425858193399629,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          },
+          {
+            "course_id": "c-aai-7980",
+            "primary_code": "AAI 7980",
+            "primary_name": "Applied AI Capstone",
+            "score": -0.4556050054302034,
+            "answer_evidence": {
+              "catalog": null,
+              "field_evidence": [],
+              "source_review_ids": [],
+              "missing_fields": [
+                "catalog_description",
+                "credits",
+                "term",
+                "delivery_mode",
+                "professor",
+                "prereqs",
+                "topics_covered",
+                "skill_tags",
+                "workload_hours_per_week",
+                "difficulty_score",
+                "grading_components",
+                "career_relevance"
+              ],
+              "warnings": [
+                "catalog_source_unavailable"
+              ],
+              "requisites": {
+                "storage": "available",
+                "editions": [],
+                "editions_omitted": 0,
+                "unusable_records": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "token",
+      "text": "和数据库相关的是 **CS 5200 Database Management Systems**，"
+    },
+    {
+      "type": "token",
+      "text": "讲 SQL 和关系模型。\n\n"
+    },
+    {
+      "type": "token",
+      "text": "这是合成的示例回答。"
+    },
+    {
+      "type": "done",
+      "feedback": null
+    }
+  ],
+  "failure": null
+}

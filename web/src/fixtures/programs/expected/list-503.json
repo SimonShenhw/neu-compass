@@ -1,0 +1,43 @@
+{
+  "name": "list-503",
+  "notes": "The list could not be fetched: the failure line and 重新加载.",
+  "props": {
+    "view": "list",
+    "programs": "failure-503-transport"
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "error",
+      "value": "无法加载培养方案列表: 服务暂不可用，请稍后手动重试。"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "warning",
+      "text": "无法加载培养方案列表。服务暂不可用，请稍后手动重试。"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "重新加载",
+      "action": "retry"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "case": "coop-one-row",
+  "notes": "Only one public row.",
+  "request": {
+    "method": "GET",
+    "path": "/coop",
+    "viewer": "guest"
+  },
+  "status": 200,
+  "body": [
+    {
+      "coop_id": "coop-seed-quant",
+      "company": "Example Quant LLC",
+      "role": "Quant Developer Co-op",
+      "industry": "quant_fintech",
+      "coop_term": "Spring 2026",
+      "duration_months": 6,
+      "related_courses": [
+        "CS 5800",
+        "DS 5220"
+      ],
+      "interview_summary": null,
+      "technical_questions": null,
+      "salary_range_usd": null,
+      "visibility_level": 2
+    }
+  ],
+  "failure": null,
+  "derived_from": "coop-guest",
+  "edit": "Only one public row."
+}

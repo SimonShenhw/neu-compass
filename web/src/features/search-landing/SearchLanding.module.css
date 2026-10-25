@@ -1,0 +1,142 @@
+.landing,
+.discovery,
+.section,
+.card,
+.starter,
+.demo {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.landing {
+  gap: var(--space-8);
+}
+.title {
+  font-size: var(--text-hero);
+}
+.section h3 {
+  font-size: var(--text-lg);
+}
+.programs,
+.starters,
+.samples {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.programs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.starters {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.samples {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.programs button,
+.samples button {
+  white-space: pre-wrap;
+  height: auto;
+  min-height: var(--control);
+}
+.card {
+  padding: var(--space-4);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  justify-items: start;
+  align-content: space-between;
+}
+.starter {
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  white-space: pre-line;
+}
+.starter [data-code] > span {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.starter [data-name] {
+  grid-column: 1 / -1;
+  font-weight: var(--weight-medium);
+}
+.pill {
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--space-0) var(--space-2);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--accent);
+}
+.coop {
+  display: grid;
+  gap: var(--space-3);
+  padding-left: var(--space-5);
+}
+.plain {
+  white-space: pre-line;
+}
+.note {
+  color: var(--ink3);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+.section > button {
+  justify-self: start;
+}
+.retry,
+.controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.controls {
+  padding: var(--space-4);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.controls label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+}
+.controls select {
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--space-2);
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.conversation {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.conversation > button {
+  justify-self: start;
+}
+.conversation:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--focus-offset);
+}
+@media (max-width: 767px) {
+  .programs,
+  .starters,
+  .samples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .controls {
+    display: grid;
+  }
+  .title {
+    font-size: var(--text-title);
+  }
+}

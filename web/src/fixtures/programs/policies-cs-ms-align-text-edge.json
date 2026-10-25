@@ -1,0 +1,36 @@
+{
+  "case": "policies-cs-ms-align-text-edge",
+  "notes": "not_linked for the edited align plan of curriculum-cs-ms-text-edge (its scope and revision).",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-align/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "cs-ms-boston-2026-2027-align",
+    "scope": {
+      "program_id": "cs-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "align",
+      "concentration": "Synthetic <b>AI</b>  concentration\nline"
+    },
+    "plan_content_sha256": "cc6920019b3cbbb79e132fefeb2945de035f6fc656b742b83f071c8c9c5feaad",
+    "status": "not_linked",
+    "coverage": "selected_fragments_only",
+    "link": null,
+    "checked_by": null,
+    "checked_on": null,
+    "policies": [],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics",
+      "no_policy_link_for_exact_plan"
+    ]
+  },
+  "failure": null,
+  "derived_from": "policies-cs-ms-align-not-linked",
+  "edit": "not_linked for the edited align plan of curriculum-cs-ms-text-edge (its scope and revision)."
+}

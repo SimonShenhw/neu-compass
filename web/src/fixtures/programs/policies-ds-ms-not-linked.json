@@ -1,0 +1,34 @@
+{
+  "case": "policies-ds-ms-not-linked",
+  "notes": "GET /programs/ds-ms/plans/ds-ms-boston-2026-2027-standard-ai/policies. Not linked (the plan with a concentration).",
+  "request": {
+    "method": "GET",
+    "path": "/programs/ds-ms/plans/ds-ms-boston-2026-2027-standard-ai/policies"
+  },
+  "status": 200,
+  "body": {
+    "plan_id": "ds-ms-boston-2026-2027-standard-ai",
+    "scope": {
+      "program_id": "ds-ms",
+      "campus": "boston",
+      "catalog_year": "2026-2027",
+      "pathway": "standard",
+      "concentration": "Synthetic AI concentration"
+    },
+    "plan_content_sha256": "852443e7c562b023a5fb374b0f056fa3dc3b1d6d0ef6728ba8fffce68d9cd5ee",
+    "status": "not_linked",
+    "coverage": "selected_fragments_only",
+    "link": null,
+    "checked_by": null,
+    "checked_on": null,
+    "policies": [],
+    "warnings": [
+      "selected_fragments_not_complete_policy",
+      "not_personal_applicability_or_eligibility",
+      "university_and_college_rules_not_merged",
+      "archive_check_not_source_authenticity_or_summary_semantics",
+      "no_policy_link_for_exact_plan"
+    ]
+  },
+  "failure": null
+}

@@ -1,0 +1,58 @@
+[
+  {
+    "text": "a  b",
+    "collapsed": "a b"
+  },
+  {
+    "text": " lead and trail ",
+    "collapsed": "lead and trail"
+  },
+  {
+    "text": "a\tb\nc\r\nd",
+    "collapsed": "a b c d"
+  },
+  {
+    "text": "a  b",
+    "collapsed": "a b"
+  },
+  {
+    "text": "a\u001cb\u001dc\u001ed\u001fe",
+    "collapsed": "a b c d e"
+  },
+  {
+    "text": "ab",
+    "collapsed": "a b"
+  },
+  {
+    "text": "a　b",
+    "collapsed": "a b"
+  },
+  {
+    "text": "a b c",
+    "collapsed": "a b c"
+  },
+  {
+    "text": "a​b",
+    "collapsed": "a​b"
+  },
+  {
+    "text": "a﻿b",
+    "collapsed": "a﻿b"
+  },
+  {
+    "text": "a⁠b",
+    "collapsed": "a⁠b"
+  },
+  {
+    "text": "\n\n",
+    "collapsed": ""
+  },
+  {
+    "text": "",
+    "collapsed": ""
+  },
+  {
+    "text": "x y z",
+    "collapsed": "x y z"
+  }
+]

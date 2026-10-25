@@ -1,0 +1,322 @@
+[
+  {
+    "name": "aai-ms (fixture)",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-aai-5025",
+            "primary_code": "AAI 5025",
+            "primary_name": "Introduction to AI Programming",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-aai-6600",
+            "primary_code": "AAI 6600",
+            "primary_name": "Applied AI",
+            "requirement_type": "foundation",
+            "notes": null
+          },
+          {
+            "course_id": "c-cs-5100",
+            "primary_code": "CS 5100",
+            "primary_name": "Foundations of Artificial Intelligence",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-aai-7980",
+            "primary_code": "AAI 7980",
+            "primary_name": "Applied AI Capstone",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": "c-aai-6600"
+  },
+  {
+    "name": "cs-ms (fixture)",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-cs-5010",
+            "primary_code": "CS 5010",
+            "primary_name": "Programming Design Paradigm",
+            "requirement_type": "core",
+            "notes": "Synthetic edge note: usually taken first."
+          },
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-5200",
+            "primary_code": "CS 5200",
+            "primary_name": "Database Management Systems",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-cs-7990",
+            "primary_code": "CS 7990",
+            "primary_name": "Thesis",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": "c-cs-5010"
+  },
+  {
+    "name": "ds-ms (fixture)",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-ds-5110",
+            "primary_code": "DS 5110",
+            "primary_name": "Essentials of Data Science",
+            "requirement_type": "elective_pool",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-ds-5220",
+            "primary_code": "DS 5220",
+            "primary_name": "Supervised Machine Learning and Learning Theory",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": null
+  },
+  {
+    "name": "no semesters",
+    "semesters": [],
+    "pick": null
+  },
+  {
+    "name": "semester 2 only",
+    "semesters": [
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": null
+  },
+  {
+    "name": "semester 1 without core or foundation",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-b",
+            "primary_code": "C-B",
+            "primary_name": "Synthetic course",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": null
+  },
+  {
+    "name": "core before foundation",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "core",
+            "notes": null
+          },
+          {
+            "course_id": "c-b",
+            "primary_code": "C-B",
+            "primary_name": "Synthetic course",
+            "requirement_type": "foundation",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": "c-a"
+  },
+  {
+    "name": "a second semester-1 group",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "elective_pool",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-b",
+            "primary_code": "C-B",
+            "primary_name": "Synthetic course",
+            "requirement_type": "foundation",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": "c-b"
+  },
+  {
+    "name": "no recommended semester",
+    "semesters": [
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": null
+  },
+  {
+    "name": "names are exact",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "Core",
+            "notes": null
+          },
+          {
+            "course_id": "c-b",
+            "primary_code": "C-B",
+            "primary_name": "Synthetic course",
+            "requirement_type": "core ",
+            "notes": null
+          },
+          {
+            "course_id": "c-c",
+            "primary_code": "C-C",
+            "primary_name": "Synthetic course",
+            "requirement_type": "foundation",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": "c-c"
+  },
+  {
+    "name": "semester 1 after 2",
+    "semesters": [
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-a",
+            "primary_code": "C-A",
+            "primary_name": "Synthetic course",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-b",
+            "primary_code": "C-B",
+            "primary_name": "Synthetic course",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "pick": "c-b"
+  }
+]

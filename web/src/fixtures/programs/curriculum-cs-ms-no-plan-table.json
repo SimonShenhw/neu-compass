@@ -1,0 +1,75 @@
+{
+  "case": "curriculum-cs-ms-no-plan-table",
+  "notes": "GET /programs/cs-ms when the plan table is missing: no plans, plan_schema_available false.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/cs-ms"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "cs-ms",
+    "full_name": "MS in Computer Science (synthetic)",
+    "prefix": "CS",
+    "notes": "Synthetic program notes: the per-semester list below is an early table, not checked against the catalog.",
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-cs-5010",
+            "primary_code": "CS 5010",
+            "primary_name": "Programming Design Paradigm",
+            "requirement_type": "core",
+            "notes": "Synthetic edge note: usually taken first."
+          },
+          {
+            "course_id": "c-cs-5800",
+            "primary_code": "CS 5800",
+            "primary_name": "Algorithms",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-5200",
+            "primary_code": "CS 5200",
+            "primary_name": "Database Management Systems",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": null,
+        "courses": [
+          {
+            "course_id": "c-cs-7990",
+            "primary_code": "CS 7990",
+            "primary_name": "Thesis",
+            "requirement_type": "capstone",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [],
+    "plan_schema_available": false,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null,
+  "proposed_plan_revisions": {}
+}

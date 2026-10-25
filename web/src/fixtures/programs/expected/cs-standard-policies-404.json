@@ -1,0 +1,440 @@
+{
+  "name": "cs-standard-policies-404",
+  "notes": "The policy request answered 404: the same line.",
+  "props": {
+    "view": "curriculum",
+    "programId": "cs-ms",
+    "curriculum": "curriculum-cs-ms",
+    "selectedPlanId": "cs-ms-boston-2026-2027-standard",
+    "policies": "policies-404",
+    "planRevised": false,
+    "publicBaseUrl": "https://compass.example.test",
+    "planRevisions": {
+      "cs-ms-boston-2026-2027-align": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+      "cs-ms-boston-2026-2027-bridge": "974b3a8bb7d77e49c1e2933d78e2756d53097feeab8ac5c73c78b779de9376fd",
+      "cs-ms-boston-2026-2027-standard": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "cs-ms-boston-2025-2026-standard": "8d769db5672591d0980041ff4f77764b0a1ab3b9b9c24ee650e1c675438acf71"
+    }
+  },
+  "raw": [
+    {
+      "depth": 0,
+      "kind": "subheader",
+      "value": "🎓 培养方案 · Programs"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "版本化规则与旧 seed 分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "← 所有培养方案",
+      "key": "prog-back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "刷新方案及政策证据",
+      "key": "prog-refresh-cs-ms"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-card\"><span class=\"nc-card-code\" style=\"font-size:1.35rem;\">CS</span><p class=\"nc-card-name\">MS in Computer Science (synthetic)</p></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "Synthetic program notes\\:⁠ the per\\-semester list below is an early table\\, not checked against the catalog\\."
+    },
+    {
+      "depth": 0,
+      "kind": "select",
+      "value": "选择目录版本与路径（不自动判定你的适用年度）",
+      "options": [
+        "请明确选择；不默认最新版本",
+        "boston · Catalog 2026-2027 · Align · 共同部分／未限定 concentration",
+        "boston · Catalog 2026-2027 · Bridge · 共同部分／未限定 concentration",
+        "boston · Catalog 2026-2027 · 普通 MS · 共同部分／未限定 concentration",
+        "boston · Catalog 2025-2026 · 普通 MS · 共同部分／未限定 concentration"
+      ],
+      "selected": "boston · Catalog 2026-2027 · 普通 MS · 共同部分／未限定 concentration"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "boston · Catalog 2026-2027 · 普通 MS · 共同部分／未限定 concentration"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "入学年份／Spring-Fall 学期需另行确认；此处只展示规则，不判断注册或毕业资格。"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "仅规则片段，不是完整培养方案 · 来源片段已对照"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "value": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "value": "- 全部分支（AND）：Synthetic core and electives\n  - CS 5010：Programming design core (synthetic)\n  - CS 5800：Algorithms core (synthetic)\n  - 组选：Synthetic elective pool（至少 2 门；不是所有候选均必修）\n    候选：CS 6140、CS 5200、CS 6220\n  - 组选：Synthetic breadth（至少 8 学分；不是所有候选均必修）\n    科目前缀：DS（仍需核实级别、先修与开课）\n    编号范围：CS 5000–CS 5999（不证明每个编号都有课程或当前开课）\n    排除：CS 5010\n  - 尚未建模：Further rules not modeled yet (synthetic)"
+    },
+    {
+      "depth": 0,
+      "kind": "markdown",
+      "value": "[官方目录来源](https://catalog.northeastern.edu/graduate/computer-information-science/computer-science-mscs-boston/)"
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "来源版次 2026-2027 · 摘录日期 2026-10-01 · 不证明当前班次开课"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "value": "来源 HTML 字节摘要：08c62055adf2aca99adb142870d8d51a405050d3ba8b2bd88d7f79ce53af2ddd（不证明来源真实或个人适用性）"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "value": "对照记录：synthetic-reviewer · 2026-10-03"
+    },
+    {
+      "depth": 0,
+      "kind": "expander",
+      "value": "来源摘录（非完整页面存档）"
+    },
+    {
+      "depth": 1,
+      "kind": "text",
+      "value": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)"
+    },
+    {
+      "depth": 0,
+      "kind": "policy_start",
+      "value": null
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "无法加载所选方案的政策证据；未使用旧缓存，方案规则仍可浏览。"
+    },
+    {
+      "depth": 0,
+      "kind": "policy_end",
+      "value": null
+    },
+    {
+      "depth": 0,
+      "kind": "draft",
+      "value": null
+    },
+    {
+      "depth": 0,
+      "kind": "caption",
+      "value": "以下是旧 seed 的课程分类与学期建议，未经官方核验；校区/年度/路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "expander",
+      "value": "🔗 分享这个培养方案 · Share"
+    },
+    {
+      "depth": 1,
+      "kind": "code",
+      "value": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-standard&campus=boston&catalog_year=2026-2027&pathway=standard&concentration=null&plan_revision=d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e"
+    },
+    {
+      "depth": 1,
+      "kind": "caption",
+      "value": "链接定位已选方案的完整范围和当前内容版本；不是个人适用性或资格证明。"
+    },
+    {
+      "depth": 0,
+      "kind": "markdown",
+      "value": "**旧 seed：第 1 学期建议（未核验）**"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">CS 5010</span> <span class=\"nc-result-name\">Programming Design Paradigm</span> <span class=\"nc-badge\" style=\"background:#FFF1E6;color:#E8731A;\">核心 · core</span><div style=\"color:#8A94A6;font-size:0.78rem;margin-top:2px;\">Synthetic edge note: usually taken first.</div></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-cs-ms-c-cs-5010"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">CS 5800</span> <span class=\"nc-result-name\">Algorithms</span> <span class=\"nc-badge\" style=\"background:#FFF1E6;color:#E8731A;\">核心 · core</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-cs-ms-c-cs-5800"
+    },
+    {
+      "depth": 0,
+      "kind": "markdown",
+      "value": "**旧 seed：第 2 学期建议（未核验）**"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">CS 5200</span> <span class=\"nc-result-name\">Database Management Systems</span> <span class=\"nc-badge\" style=\"background:#E6F7EE;color:#18A058;\">选修池 · elective</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-cs-ms-c-cs-5200"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">CS 6140</span> <span class=\"nc-result-name\">Machine Learning</span> <span class=\"nc-badge\" style=\"background:#FFF1E6;color:#E8731A;\">核心 · core</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-cs-ms-c-cs-6140"
+    },
+    {
+      "depth": 0,
+      "kind": "markdown",
+      "value": "**未提供推荐学期（不等于任意学期都可修）**"
+    },
+    {
+      "depth": 0,
+      "kind": "html",
+      "value": "<div class=\"nc-result-card\"><span class=\"nc-result-code\">CS 7990</span> <span class=\"nc-result-name\">Thesis</span> <span class=\"nc-badge\" style=\"background:#F0EBFF;color:#7B61FF;\">毕业项目 · capstone</span></div>"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "value": "查看",
+      "key": "progcourse-cs-ms-c-cs-7990"
+    }
+  ],
+  "visible": [
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "版本化规则与旧课程表分开浏览；规则展示不是个人选课资格审核"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "所有培养方案",
+      "action": "back"
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "刷新方案及政策证据",
+      "action": "refresh"
+    },
+    {
+      "depth": 0,
+      "kind": "header",
+      "prefix": "CS",
+      "name": "MS in Computer Science (synthetic)"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "Synthetic program notes: the per-semester list below is an early table, not checked against the catalog."
+    },
+    {
+      "depth": 0,
+      "kind": "select",
+      "label": "选择目录版本与路径（不自动判定你的适用年度）",
+      "options": [
+        "请明确选择；不默认最新版本",
+        "boston · Catalog 2026-2027 · Align · 共同部分／未限定 concentration",
+        "boston · Catalog 2026-2027 · Bridge · 共同部分／未限定 concentration",
+        "boston · Catalog 2026-2027 · 普通 MS · 共同部分／未限定 concentration",
+        "boston · Catalog 2025-2026 · 普通 MS · 共同部分／未限定 concentration"
+      ],
+      "value": "boston · Catalog 2026-2027 · 普通 MS · 共同部分／未限定 concentration"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "boston · Catalog 2026-2027 · 普通 MS · 共同部分／未限定 concentration"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "入学年份／Spring-Fall 学期需另行确认；此处只展示规则，不判断注册或毕业资格。"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "仅规则片段，不是完整培养方案 · 来源片段已对照"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "text": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "text": "- 全部分支（AND）：Synthetic core and electives\n  - CS 5010：Programming design core (synthetic)\n  - CS 5800：Algorithms core (synthetic)\n  - 组选：Synthetic elective pool（至少 2 门；不是所有候选均必修）\n    候选：CS 6140、CS 5200、CS 6220\n  - 组选：Synthetic breadth（至少 8 学分；不是所有候选均必修）\n    科目前缀：DS（仍需核实级别、先修与开课）\n    编号范围：CS 5000–CS 5999（不证明每个编号都有课程或当前开课）\n    排除：CS 5010\n  - 尚未建模：Further rules not modeled yet (synthetic)"
+    },
+    {
+      "depth": 0,
+      "kind": "link",
+      "text": "官方目录来源",
+      "href": "https://catalog.northeastern.edu/graduate/computer-information-science/computer-science-mscs-boston/"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "来源版次 2026-2027 · 摘录日期 2026-10-01 · 不证明当前班次开课"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "text": "来源 HTML 字节摘要：08c62055adf2aca99adb142870d8d51a405050d3ba8b2bd88d7f79ce53af2ddd（不证明来源真实或个人适用性）"
+    },
+    {
+      "depth": 0,
+      "kind": "text",
+      "text": "对照记录：synthetic-reviewer · 2026-10-03"
+    },
+    {
+      "depth": 0,
+      "kind": "disclosure",
+      "text": "来源摘录（非完整页面存档）"
+    },
+    {
+      "depth": 1,
+      "kind": "text",
+      "text": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "无法加载所选方案的政策证据；未使用旧缓存，方案规则仍可浏览。"
+    },
+    {
+      "depth": 0,
+      "kind": "note",
+      "text": "以下是旧课程表的课程分类与学期建议，未经官方核验；校区/年度/路径未知。"
+    },
+    {
+      "depth": 0,
+      "kind": "disclosure",
+      "text": "分享这个培养方案"
+    },
+    {
+      "depth": 1,
+      "kind": "share_url",
+      "text": "https://compass.example.test/?plan_v=1&program=cs-ms&plan=cs-ms-boston-2026-2027-standard&campus=boston&catalog_year=2026-2027&pathway=standard&concentration=null&plan_revision=d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e"
+    },
+    {
+      "depth": 1,
+      "kind": "note",
+      "text": "链接定位已选方案的完整范围和当前内容版本；不是个人适用性或资格证明。"
+    },
+    {
+      "depth": 0,
+      "kind": "heading",
+      "text": "旧课程表：第 1 学期建议（未核验）"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "CS 5010",
+      "name": "Programming Design Paradigm",
+      "badge": "核心 · core",
+      "notes": "Synthetic edge note: usually taken first."
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-cs-5010"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "CS 5800",
+      "name": "Algorithms",
+      "badge": "核心 · core",
+      "notes": null
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-cs-5800"
+    },
+    {
+      "depth": 0,
+      "kind": "heading",
+      "text": "旧课程表：第 2 学期建议（未核验）"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "CS 5200",
+      "name": "Database Management Systems",
+      "badge": "选修池 · elective",
+      "notes": null
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-cs-5200"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "CS 6140",
+      "name": "Machine Learning",
+      "badge": "核心 · core",
+      "notes": null
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-cs-6140"
+    },
+    {
+      "depth": 0,
+      "kind": "heading",
+      "text": "未提供推荐学期（不等于任意学期都可修）"
+    },
+    {
+      "depth": 0,
+      "kind": "course",
+      "code": "CS 7990",
+      "name": "Thesis",
+      "badge": "毕业项目 · capstone",
+      "notes": null
+    },
+    {
+      "depth": 0,
+      "kind": "button",
+      "text": "查看",
+      "course_id": "c-cs-7990"
+    }
+  ]
+}

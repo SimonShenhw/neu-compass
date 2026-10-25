@@ -253,6 +253,24 @@ npm.cmd run preview -- --port 4173 --strictPort
 
 修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 35 节。
 
+## R3d 搜索落地内容与演示（2026-10-24）
+
+从已合并 R3c / R2b 的 `4797a32` 开 `feat/web-search-landing`，仅 `web/`，无新增依赖。R3a–R3c 的模型、组件、测试及数据只 import，不改。独立修改记录与验收边界见 [LANDING_WORKLOG.md](LANDING_WORKLOG.md)。
+
+入口 `/search-landing-demo?scenario=guest&speed=instant` 不加入导航，页面与演示外壳均 `React.lazy`。`scenario` 为顶部「数据」里的 27 个场景，缺省／未知回退 `guest`；`speed` 为 `normal`（缺省）、`slow`、`instant`、`forever`，未知回退正常。正常项目列表 300ms、有效精选课程表在它之后再 300ms、Co-op 450ms；慢速乘四，立即零延迟，一直加载不安排计时器。
+
+- **共享边界：** `api/load.ts` 是三态 Load 与基于 R2b 的 ApiFailure；`api/programs.ts` 和 `models/programs.ts` 放完整项目消费类型及列表／课程表校验，给 R4a 原样复用。`programs.types.test.ts` 将四层消费类型逐一对照生成 schema，不能只测顶层而遗漏数组元素。
+- **展示与派生：** `SearchLanding` 无状态，只接数据和回调；`landingView` 一次派生区块、pending、单一重试提示。项目和 Co-op 独立；入门推荐等所有「精选且在列表里」的课程表有结果再画。只挑第 1 学期的第一门 core / foundation；Co-op 仅校验并显示前两条，不读取第三条。
+- **失败处理：** 普通 fixture failure 先构造 ApiError 再复用 `isTransientError`，没有用强制断言冒充实例。只对 408、429、5xx 显示一次重试；明确失败、空数据、坏形状不显示重试，其他已就绪区块照常显示。
+- **演示会话：** 来源调度在 `useLandingDemo`，不进入产品组件；换任一控件／重试／返回都用 key 重建会话并取消旧计时器。重试重播同一份合成失败，不假装联网成功。项目、课程、Co-op 按钮只写 status；四个示例发送 query 而非 label，以 R3c 的真实钩子／展示组件播放四份 chat-sample，正常速度、允许保存 false、反馈关。第一轮一创建即隐藏落地内容并接续焦点，被拒／出错也不会重新显示落地内容。
+- **演示壳隔离：** 新增 `features/demo/OfflineDemoShell` 复用原侧栏、顶栏及布局 CSS，固定游客与不可登录状态，完全不挂载 useSession。这样生产构建的本演示路由不会因外壳读取 `/config` / `/auth/me` 而访问公网；不依赖测试 WithApi 的预填缓存，也不改真实 AppShell 或全局 fetch。member 场景仅模拟 Co-op 返回体，不改变真实账号或共享缓存。
+- **纯文本与排版：** 沿用浅色 tokens 和 CourseCode，项目标签用现有 oneLine；卡片／Co-op 值仅去 CR，LF 保留为换行，其余文本不解析 HTML 或 Markdown。本区没有链接。桌面最多四列项目、三列课程、两列示例，手机一列；长课号、课名与公司可折行。列数照说明书第 8 节的上限固定为 4／3／2（Streamlit 按项目数分列），不满一排时右边留空。加载时只有一行「正在加载推荐内容…」，发现区带 `aria-busy`，没有转动的图标或骨架，先到的块先画。
+- **固定数据：** 31 份导出、30 份 expected 原字节冻结，独立 SHA-256 测试；expected 只供测试，生产场景来源映射单独手写并与 27 个参考场景核对，不从标准答案生成页面。27 个 DOM 场景及 11 / 11 / 16 个向量之外另测坏形状、时序、焦点、取消和冷启动无请求。
+
+使用已有 Node 24 环境：`npm.cmd run check`、`npm.cmd run format:check`、`node scripts/landing-mutations.mjs`。本轮新增变异工具在临时副本验证行为与生成类型漂移，副本包含 R2b 生成器、独立依赖链接和 Prettier 配置；超时、导入失败或无具名断言不能冒充 kill。预览为 `npm.cmd run preview -- --port 4173 --strictPort`。
+
+R1 原型首页、真实请求／缓存、允许保存勾选、路由跳转、R4a 培养方案页均留给后续约定批次。浏览器控制没有完整网络瀑布接口，不能把无请求组件／空 QueryClient 测试替代为完整网络面板验收；详细证据与限制见独立记录。本轮仅本地提交，无 push、PR 或部署。
+
 ## 设计选择及差异
 
 - 用户确认：沿用第一版白底细线与钴蓝强调色；导航以中文为主；R1 只做浅色，不做主题切换。原 R1 的「默认只看不同的行」已被 R5b 的「本轮不做行筛选」取代。
@@ -287,3 +305,15 @@ Radix Select / Dialog 保留原生键盘和焦点管理；测试不替换这些�
 已知限制：当前浏览器控制接口没有完整请求瀑布读取能力，不把可读到的请求列表等同于完整网络面板验收。R2b 起页面只经 `src/api/client.ts` 请求 API（`contracts.test.ts` 钉住别处不许调 fetch），最终验收仍需确认此外只有同源静态资源。
 
 R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLOG.md](WORKLOG.md)，Co-op 独立记在 [COOP_WORKLOG.md](COOP_WORKLOG.md)，R5b 记在 [COMPARE_WORKLOG.md](COMPARE_WORKLOG.md)，R5c 记在 [PRIVACY_WORKLOG.md](PRIVACY_WORKLOG.md)。本轮不执行 push、PR、合并或部署。
+
+## R4a 培养方案与政策证据演示（2026-10-24）
+
+入口 `/programs-demo?scenario=cs-standard-ready&speed=instant`；默认 `scenario=list&speed=normal`。37 个场景，速度为 normal（300ms）、slow（1200ms）、instant（0ms 定时器）、forever。未知参数回默认；场景／速度变化重建演示会话。演示页懒加载并复用 R3d 的 OfflineDemoShell，不挂真实 useSession，所有数据来自原字节冻结的 75 份合成 JSON。`/programs` 正式占位页保持原状。
+
+`features/programs/ProgramList` 和 `ProgramCurriculum` 只消费 Load 和回调，项目、方案选择及内容版本由外层控制；只让原生 details 保存展开状态。用 R1 Select 明确选择，单个方案也不默认选中；内部空选项使用不可能成为合法 plan_id 的 `__none__`，避免与真实 ID 冲突。演示的选择和请求计时放在外层：每次读取带一个只往上加的请求号，钩子只显示为当前名字、速度和请求号读到的结果，别的时候给加载中，所以选方案和刷新都在原地重新读取、不重建课程表，焦点留在选择框和按钮上（所选方案那一块按方案重建，它自己的折叠框重新关着，「分享这个培养方案」不变）；每选一次方案都重新读政策证据，选回之前选过的也一样。打开项目、回到列表、重试会换掉按下的按钮，焦点移到新显示的那一块（列表和课程表的 section 带 `tabIndex=-1`）。刷新清掉选择，重试重放同一份失败；换场景或速度仍用 key 从头来。
+
+沿用 R3d 项目检查、R3a programTree / programRuleLines 与 R3b oneLine。`models/programGuard` 放日期、官方目录 URL 和范围比较；`programPlans` 做逐份检查与整组去重；`programPolicy` 查来源路径、身份、版本和顺序，忽略未来额外字段。政策 UI 先检查响应再核对所选方案，失败时保留方案规则。版本直接使用 planRevisions，不在 TS 重算 Python JSON 哈希。
+
+`programFormat` 集中 Python 空白集合、范围文字和分享编码。空白集合含 Python 的控制分隔符，所以只对该正则局部关闭 no-control-regex；不使用 JS 的 `\s`。失败对象显式转成 ApiError 复用 R2b 文案。分享文字支持选中复制，只有已检查的官方目录／政策来源成为链接；所有数据文本保持原样，不解析 HTML 或 Markdown。
+
+使用既有浅色 tokens，列表桌面两列／手机一列；规则、摘要、长网址和课程文本折行；手机上折叠框照 R3a、R3b 设回 `display: list-item`，保留 ▶/▼。加载时只有一行 `role="status"` 的文字（「正在加载培养方案…」「正在加载课程表…」「正在加载政策证据…」），没有转动的图标或骨架；政策还在加载时，所选方案的规则照常显示。组件中的标题、按钮、说明、链接、折叠框带 data-kind，测试读取实际 DOM 与 37 份标准答案比较，不用标准答案生成组件。修改索引与验证记录见 `PROGRAMS_WORKLOG.md`。本批不含草案判断、真实缓存／路由接线或后端 plan_revisions 改动。

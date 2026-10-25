@@ -1,0 +1,127 @@
+{
+  "case": "curriculum-ds-ms",
+  "notes": "GET /programs/ds-ms. One checked plan with a concentration.",
+  "request": {
+    "method": "GET",
+    "path": "/programs/ds-ms"
+  },
+  "status": 200,
+  "body": {
+    "program_id": "ds-ms",
+    "full_name": "MS in Data Science (synthetic)",
+    "prefix": "DS",
+    "notes": null,
+    "semesters": [
+      {
+        "semester": 1,
+        "courses": [
+          {
+            "course_id": "c-ds-5110",
+            "primary_code": "DS 5110",
+            "primary_name": "Essentials of Data Science",
+            "requirement_type": "foundation",
+            "notes": null
+          }
+        ]
+      },
+      {
+        "semester": 2,
+        "courses": [
+          {
+            "course_id": "c-cs-6140",
+            "primary_code": "CS 6140",
+            "primary_name": "Machine Learning",
+            "requirement_type": "elective_pool",
+            "notes": null
+          },
+          {
+            "course_id": "c-ds-5220",
+            "primary_code": "DS 5220",
+            "primary_name": "Supervised Machine Learning and Learning Theory",
+            "requirement_type": "core",
+            "notes": null
+          }
+        ]
+      }
+    ],
+    "plans": [
+      {
+        "plan_id": "ds-ms-boston-2026-2027-standard-ai",
+        "program_id": "ds-ms",
+        "campus": "boston",
+        "catalog_year": "2026-2027",
+        "pathway": "standard",
+        "concentration": "Synthetic AI concentration",
+        "coverage": "partial",
+        "review_status": "source_checked",
+        "checked_by": "synthetic-reviewer",
+        "checked_on": "2026-10-03",
+        "source_url": "https://catalog.northeastern.edu/graduate/computer-information-science/data-science-ms-boston/",
+        "source_title": "Data Science, MS (synthetic)",
+        "source_catalog_year": "2026-2027",
+        "source_excerpt": "Students complete the synthetic core and choose electives from the listed pool. (Synthetic text for interface tests.)",
+        "source_html_sha256": null,
+        "captured_on": "2026-10-01",
+        "notes": "Synthetic plan notes: the pool and the minimums are invented for interface tests. (Synthetic text for interface tests.)",
+        "requirements": {
+          "kind": "all_of",
+          "label": "Synthetic data science core",
+          "course_code": null,
+          "children": [
+            {
+              "kind": "course",
+              "label": "Supervised learning core (synthetic)",
+              "course_code": "DS 5220",
+              "children": [],
+              "course_codes": [],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": null,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            },
+            {
+              "kind": "select",
+              "label": "Synthetic data science electives",
+              "course_code": null,
+              "children": [],
+              "course_codes": [
+                "CS 6140",
+                "DS 5110"
+              ],
+              "subject_codes": [],
+              "course_ranges": [],
+              "excluded_course_codes": [],
+              "activate_when": null,
+              "min_courses": 1,
+              "min_credits": null,
+              "min_areas": null,
+              "areas": {}
+            }
+          ],
+          "course_codes": [],
+          "subject_codes": [],
+          "course_ranges": [],
+          "excluded_course_codes": [],
+          "activate_when": null,
+          "min_courses": null,
+          "min_credits": null,
+          "min_areas": null,
+          "areas": {}
+        }
+      }
+    ],
+    "plan_schema_available": true,
+    "warnings": [
+      "legacy_seed_unverified",
+      "legacy_scope_unknown"
+    ]
+  },
+  "failure": null,
+  "proposed_plan_revisions": {
+    "ds-ms-boston-2026-2027-standard-ai": "852443e7c562b023a5fb374b0f056fa3dc3b1d6d0ef6728ba8fffce68d9cd5ee"
+  }
+}
