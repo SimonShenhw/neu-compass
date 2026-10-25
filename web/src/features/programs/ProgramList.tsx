@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import type { Load } from '../../api/load';
 import { Button } from '../../components/Button';
 import { parseProgramList } from '../../models/programs';
@@ -10,16 +11,23 @@ export interface ProgramListProps {
   programs: Load;
   onOpenProgram: (programId: string) => void;
   onRetry: () => void;
+  ref?: Ref<HTMLElement>;
 }
 export function ProgramList({
   programs,
   onOpenProgram,
   onRetry,
+  ref,
 }: ProgramListProps) {
   const parsed =
     programs.status === 'ready' ? parseProgramList(programs.data) : null;
   return (
-    <section className={styles.page} aria-label="培养方案列表">
+    <section
+      ref={ref}
+      tabIndex={-1}
+      className={styles.page}
+      aria-label="培养方案列表"
+    >
       <Line kind="note">{PROGRAM_INTRO}</Line>
       {programs.status === 'loading' && <p role="status">正在加载培养方案…</p>}
       {programs.status === 'failed' && (

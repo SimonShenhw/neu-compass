@@ -290,10 +290,10 @@ R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLO
 
 入口 `/programs-demo?scenario=cs-standard-ready&speed=instant`；默认 `scenario=list&speed=normal`。37 个场景，速度为 normal（300ms）、slow（1200ms）、instant（0ms 定时器）、forever。未知参数回默认；场景／速度变化重建演示会话。演示页懒加载并复用 R3d 的 OfflineDemoShell，不挂真实 useSession，所有数据来自原字节冻结的 75 份合成 JSON。`/programs` 正式占位页保持原状。
 
-`features/programs/ProgramList` 和 `ProgramCurriculum` 只消费 Load 和回调，项目、方案选择及内容版本由外层控制；只让原生 details 保存展开状态。用 R1 Select 明确选择，单个方案也不默认选中；内部空选项使用不可能成为合法 plan_id 的 `__none__`，避免与真实 ID 冲突。演示的选择／请求计时放在外层，key 隔离旧请求并清理定时器；刷新清掉选择，重试重放同一份失败。
+`features/programs/ProgramList` 和 `ProgramCurriculum` 只消费 Load 和回调，项目、方案选择及内容版本由外层控制；只让原生 details 保存展开状态。用 R1 Select 明确选择，单个方案也不默认选中；内部空选项使用不可能成为合法 plan_id 的 `__none__`，避免与真实 ID 冲突。演示的选择和请求计时放在外层：每次读取带一个请求号，号变了钩子先给加载中、不显示旧结果，所以选方案和刷新都在原地重新读取、不重建组件，焦点留在选择框和按钮上；每选一次方案都重新读政策证据，选回之前选过的也一样。打开项目、回到列表、重试会换掉按下的按钮，焦点移到新显示的那一块（列表和课程表的 section 带 `tabIndex=-1`）。刷新清掉选择，重试重放同一份失败；换场景或速度仍用 key 从头来。
 
 沿用 R3d 项目检查、R3a programTree / programRuleLines 与 R3b oneLine。`models/programGuard` 放日期、官方目录 URL 和范围比较；`programPlans` 做逐份检查与整组去重；`programPolicy` 查来源路径、身份、版本和顺序，忽略未来额外字段。政策 UI 先检查响应再核对所选方案，失败时保留方案规则。版本直接使用 planRevisions，不在 TS 重算 Python JSON 哈希。
 
 `programFormat` 集中 Python 空白集合、范围文字和分享编码。空白集合含 Python 的控制分隔符，所以只对该正则局部关闭 no-control-regex；不使用 JS 的 `\s`。失败对象显式转成 ApiError 复用 R2b 文案。分享文字支持选中复制，只有已检查的官方目录／政策来源成为链接；所有数据文本保持原样，不解析 HTML 或 Markdown。
 
-使用既有浅色 tokens，列表桌面两列／手机一列；规则、摘要、长网址和课程文本折行。加载时只有一行 `role="status"` 的文字（「正在加载培养方案…」「正在加载课程表…」「正在加载政策证据…」），没有转动的图标或骨架；政策还在加载时，所选方案的规则照常显示。组件中的标题、按钮、说明、链接、折叠框带 data-kind，测试读取实际 DOM 与 37 份标准答案比较，不用标准答案生成组件。修改索引与验证记录见 `PROGRAMS_WORKLOG.md`。本批不含草案判断、真实缓存／路由接线或后端 plan_revisions 改动。
+使用既有浅色 tokens，列表桌面两列／手机一列；规则、摘要、长网址和课程文本折行；手机上折叠框照 R3a、R3b 设回 `display: list-item`，保留 ▶/▼。加载时只有一行 `role="status"` 的文字（「正在加载培养方案…」「正在加载课程表…」「正在加载政策证据…」），没有转动的图标或骨架；政策还在加载时，所选方案的规则照常显示。组件中的标题、按钮、说明、链接、折叠框带 data-kind，测试读取实际 DOM 与 37 份标准答案比较，不用标准答案生成组件。修改索引与验证记录见 `PROGRAMS_WORKLOG.md`。本批不含草案判断、真实缓存／路由接线或后端 plan_revisions 改动。

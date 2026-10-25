@@ -62,7 +62,8 @@
   display: grid;
   gap: var(--space-4);
 }
-.card > button {
+.card > button,
+.page > button {
   justify-self: start;
 }
 .card [data-kind='program_card'] {
@@ -128,6 +129,8 @@
   background: var(--surface);
 }
 .disclosure summary {
+  display: list-item;
+  list-style-position: inside;
   cursor: pointer;
   padding: var(--space-4);
   font-size: var(--text-md);

@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import type { Ref } from 'react';
 import type { Load } from '../../api/load';
 import { Button } from '../../components/Button';
 import { CourseCode } from '../../components/CourseCode';
@@ -35,6 +36,7 @@ export interface ProgramCurriculumProps {
   onBack: () => void;
   onRefresh: () => void;
   onViewCourse: (courseId: string) => void;
+  ref?: Ref<HTMLElement>;
 }
 function CurriculumBody(props: ProgramCurriculumProps) {
   const { curriculum, programId } = props;
@@ -97,7 +99,11 @@ function CurriculumBody(props: ProgramCurriculumProps) {
         </div>
       )}
       {plan && (
-        <section className={styles.plan} aria-label="已选方案的版本化规则">
+        <section
+          key={plan.plan_id}
+          className={styles.plan}
+          aria-label="已选方案的版本化规则"
+        >
           <h2 data-kind="note">
             {scopeLabel({
               ...plan,
@@ -183,9 +189,14 @@ function CurriculumBody(props: ProgramCurriculumProps) {
     </>
   );
 }
-export function ProgramCurriculum(props: ProgramCurriculumProps) {
+export function ProgramCurriculum({ ref, ...props }: ProgramCurriculumProps) {
   return (
-    <section className={styles.page} aria-label="项目课程表">
+    <section
+      ref={ref}
+      tabIndex={-1}
+      className={styles.page}
+      aria-label="项目课程表"
+    >
       <Line kind="note">{PROGRAM_INTRO}</Line>
       <div className={styles.actions}>
         <Button

@@ -71,6 +71,21 @@ it.each([
   act(() => vi.advanceTimersByTime(delay > 0 ? 1 : 0));
   expect(result.current?.status).toBe('ready');
 });
+it('a new request reads again from loading, and an earlier result never shows for it', () => {
+  vi.useFakeTimers();
+  const { result, rerender } = renderHook(
+    ({ request }) => useProgramDemoLoad('programs', 'normal', request),
+    { initialProps: { request: 0 } },
+  );
+  act(() => vi.advanceTimersByTime(300));
+  expect(result.current?.status).toBe('ready');
+  rerender({ request: 1 });
+  expect(result.current?.status).toBe('loading');
+  act(() => vi.advanceTimersByTime(299));
+  expect(result.current?.status).toBe('loading');
+  act(() => vi.advanceTimersByTime(1));
+  expect(result.current?.status).toBe('ready');
+});
 it('forever schedules nothing, unmount cancels pending timers and StrictMode does not duplicate work', () => {
   vi.useFakeTimers();
   const { unmount } = renderHook(
@@ -224,6 +239,66 @@ it('a newly chosen plan starts with its own loading line, never the previous pla
     ),
   ).toBeInTheDocument();
 }, 20000);
+it('choosing the same plan again after the placeholder reads its policies again', async () => {
+  page('?scenario=cs-standard-ready&speed=slow');
+  expect(
+    await screen.findAllByText('官方政策来源', {}, { timeout: 5000 }),
+  ).toHaveLength(2);
+  await choose(PLAN_PLACEHOLDER);
+  await choose(/2026-2027 · 普通 MS/);
+  expect(screen.getByText('正在加载政策证据…')).toBeInTheDocument();
+  expect(
+    await screen.findAllByText('官方政策来源', {}, { timeout: 5000 }),
+  ).toHaveLength(2);
+}, 20000);
+it('the first render takes no focus; opening a program and going back move it to the view now shown', async () => {
+  page('?speed=instant');
+  const cs = await screen.findByRole('button', { name: '查看 CS 的课程表' });
+  expect(document.body).toHaveFocus();
+  await userEvent.click(cs);
+  expect(screen.getByRole('region', { name: '项目课程表' })).toHaveFocus();
+  await userEvent.click(screen.getByRole('button', { name: '所有培养方案' }));
+  expect(screen.getByRole('region', { name: '培养方案列表' })).toHaveFocus();
+});
+it('choosing a plan keeps focus on the select and the same curriculum; only the plan’s own disclosure starts closed', async () => {
+  page('?scenario=cs-standard-ready&speed=instant');
+  await screen.findAllByText('官方政策来源');
+  const region = screen.getByRole('region', { name: '项目课程表' });
+  const disclosure = (title: string) =>
+    screen.getByText(title).closest('details')!;
+  const share = disclosure('分享这个培养方案');
+  share.open = true;
+  disclosure('来源摘录（非完整页面存档）').open = true;
+  await choose(/2026-2027 · Align/);
+  expect(
+    screen.getByRole('combobox', { name: /选择目录版本与路径/ }),
+  ).toHaveFocus();
+  expect(screen.getByRole('region', { name: '项目课程表' })).toBe(region);
+  expect(share.isConnected && share.open).toBe(true);
+  expect(disclosure('来源摘录（非完整页面存档）').open).toBe(false);
+});
+it('refresh keeps focus on its button while the curriculum replays', async () => {
+  page('?scenario=cs-standard-ready&speed=instant');
+  const refresh = await screen.findByRole('button', {
+    name: '刷新方案及政策证据',
+  });
+  await userEvent.click(refresh);
+  expect(refresh).toHaveFocus();
+  expect(
+    await screen.findByRole('combobox', { name: /选择目录版本与路径/ }),
+  ).toHaveTextContent(PLAN_PLACEHOLDER);
+  expect(refresh).toHaveFocus();
+});
+it('retry moves focus to the list while the same failure replays', async () => {
+  page('?scenario=list-503&speed=instant');
+  await userEvent.click(
+    await screen.findByRole('button', { name: '重新加载' }),
+  );
+  expect(screen.getByRole('region', { name: '培养方案列表' })).toHaveFocus();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    '无法加载培养方案列表。',
+  );
+});
 it.each(['/programs-demo', '/PROGRAMS-DEMO/'])(
   'whole App at %s uses no API session requests or prefilled cache',
   async (path) => {

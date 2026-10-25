@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Load } from '../api/load';
-import { ProgramList } from '../features/programs/ProgramList';
+import {
+  ProgramList,
+  type ProgramListProps,
+} from '../features/programs/ProgramList';
 import {
   ProgramCurriculum,
   type ProgramCurriculumProps,
@@ -16,20 +19,11 @@ import {
 import { programScenarios } from '../fixtures/programsScenarios';
 import styles from '../features/programs/Programs.module.css';
 
-function PolicyRequest({
-  name,
-  speed,
-  ...props
-}: Omit<ProgramCurriculumProps, 'policies'> & {
-  name: string | null;
-  speed: string;
-}) {
-  const policies = useProgramDemoLoad(name, speed);
-  return <ProgramCurriculum {...props} policies={policies} />;
-}
 function DemoCurriculum({
   spec,
   speed,
+  replay,
+  pick,
   ...props
 }: Omit<
   ProgramCurriculumProps,
@@ -39,21 +33,25 @@ function DemoCurriculum({
   | 'publicBaseUrl'
   | 'planRevisions'
   | 'planRevised'
-> & { spec: Extract<ProgramScenario, { view: 'curriculum' }>; speed: string }) {
-  const curriculum = useProgramDemoLoad(spec.curriculum, speed) as Load;
+> & {
+  spec: Extract<ProgramScenario, { view: 'curriculum' }>;
+  speed: string;
+  replay: number;
+  pick: number;
+}) {
+  const curriculum = useProgramDemoLoad(spec.curriculum, speed, replay) as Load;
   const name =
     props.selectedPlanId === null
       ? null
       : props.selectedPlanId === spec.selectedPlanId && spec.policies
         ? spec.policies
         : defaultProgramPolicy(props.selectedPlanId);
+  const policies = useProgramDemoLoad(name, speed, pick);
   return (
-    <PolicyRequest
-      key={`${props.selectedPlanId}:${name}`}
-      name={name}
-      speed={speed}
+    <ProgramCurriculum
       {...props}
       curriculum={curriculum}
+      policies={policies}
       programId={spec.programId}
       publicBaseUrl={spec.publicBaseUrl}
       planRevisions={spec.planRevisions}
@@ -64,14 +62,14 @@ function DemoCurriculum({
 function DemoList({
   name,
   speed,
+  replay,
   ...props
-}: {
+}: Omit<ProgramListProps, 'programs'> & {
   name: string;
   speed: string;
-  onOpenProgram: (id: string) => void;
-  onRetry: () => void;
+  replay: number;
 }) {
-  const programs = useProgramDemoLoad(name, speed) as Load;
+  const programs = useProgramDemoLoad(name, speed, replay) as Load;
   return <ProgramList {...props} programs={programs} />;
 }
 function DemoSession({
@@ -82,14 +80,24 @@ function DemoSession({
   speed: string;
 }) {
   const [spec, setSpec] = useState(initial);
-  const [selected, setSelected] = useState(
-    initial.view === 'curriculum' ? initial.selectedPlanId : null,
-  );
+  // Every choice reads its policies again (pick), even for a plan chosen before; refresh and retry replay in place.
+  const [selection, setSelection] = useState({
+    planId: initial.view === 'curriculum' ? initial.selectedPlanId : null,
+    pick: 0,
+  });
   const [replay, setReplay] = useState(0);
   const [notice, setNotice] = useState('');
+  // Opening a program, going back and retrying take away the pressed button: focus goes to the view now shown.
+  const view = useRef<HTMLElement>(null);
+  const [moved, setMoved] = useState(0);
+  useEffect(() => {
+    if (moved > 0) view.current?.focus({ preventScroll: true });
+  }, [moved]);
+  const select = (planId: string | null) =>
+    setSelection((s) => ({ planId, pick: s.pick + 1 }));
   const open = (id: string) => {
     const name = `curriculum-${id}`;
-    setSelected(null);
+    select(null);
     setNotice('');
     setSpec({
       view: 'curriculum',
@@ -101,31 +109,40 @@ function DemoSession({
       publicBaseUrl: 'https://compass.example.test',
       planRevisions: programFixture(name).proposed_plan_revisions ?? {},
     });
+    setMoved((n) => n + 1);
   };
   return (
     <>
       {spec.view === 'list' ? (
         <DemoList
-          key={`list:${replay}`}
+          ref={view}
           name={spec.programs}
           speed={speed}
+          replay={replay}
           onOpenProgram={open}
-          onRetry={() => setReplay((n) => n + 1)}
+          onRetry={() => {
+            setReplay((n) => n + 1);
+            setMoved((n) => n + 1);
+          }}
         />
       ) : (
         <DemoCurriculum
-          key={`${spec.curriculum}:${replay}`}
+          key={spec.curriculum}
+          ref={view}
           spec={spec}
           speed={speed}
-          selectedPlanId={selected}
-          onSelectPlan={setSelected}
+          replay={replay}
+          pick={selection.pick}
+          selectedPlanId={selection.planId}
+          onSelectPlan={select}
           onBack={() => {
             setSpec({ view: 'list', programs: 'programs' });
-            setSelected(null);
+            select(null);
             setNotice('');
+            setMoved((n) => n + 1);
           }}
           onRefresh={() => {
-            setSelected(null);
+            select(null);
             setSpec({ ...spec, planRevised: false });
             setReplay((n) => n + 1);
           }}
