@@ -147,12 +147,9 @@ function CoopContent({
     </div>
   );
 }
-// Changing demo viewer/level unmounts private drafts and open record details.
-// R2 must additionally key the page by its real session owner, not only this viewer DTO.
+// Becoming a guest or a member unmounts private drafts and open record details. The live page keys this by the
+// session's owner as well (CoopRoute), so another person starts afresh; the same person's level going up after an
+// upload keeps the upload's result on screen (R5d).
 export function CoopPage(props: CoopPageProps) {
-  const scope =
-    props.viewer.kind === 'guest'
-      ? 'guest'
-      : `member:${props.viewer.contributionCount}`;
-  return <CoopContent {...props} key={scope} />;
+  return <CoopContent {...props} key={props.viewer.kind} />;
 }

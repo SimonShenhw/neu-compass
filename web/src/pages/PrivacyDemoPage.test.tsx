@@ -12,7 +12,7 @@ import { WithApi } from '../test/withApi';
 function Location() {
   return <output aria-label="演示网址">{useLocation().search}</output>;
 }
-function page(path = '/privacy') {
+function page(path = '/privacy-demo') {
   return render(
     <WithApi>
       <MemoryRouter initialEntries={[path]}>
@@ -23,7 +23,7 @@ function page(path = '/privacy') {
   );
 }
 it('unknown parameters fall back to guest, 90-days and ok; global badge never contradicts the demo', () => {
-  page('/PRIVACY/?viewer=unknown&privacy=unknown&delete=unknown');
+  page('/PRIVACY-DEMO/?viewer=unknown&privacy=unknown&delete=unknown');
   expect(screen.getByRole('combobox', { name: '演示访客' })).toHaveValue(
     'guest',
   );
@@ -47,7 +47,7 @@ it('unknown parameters fall back to guest, 90-days and ok; global badge never co
 it.each(privacyOptions)(
   'privacy parameter maps to the expected response: %s',
   (choice) => {
-    page(`/privacy?viewer=member&privacy=${choice}`);
+    page(`/privacy-demo?viewer=member&privacy=${choice}`);
     const expected = demoPrivacy(choice);
     if (expected.status === 'ready' && choice !== 'unrecognised') {
       expect(screen.getAllByRole('list')).toHaveLength(4);
@@ -68,7 +68,7 @@ it.each(deleteOptions)(
   async (choice) => {
     vi.useFakeTimers();
     try {
-      page(`/privacy?viewer=member&delete=${choice}`);
+      page(`/privacy-demo?viewer=member&delete=${choice}`);
       fireEvent.click(screen.getByRole('checkbox'));
       fireEvent.click(
         screen.getByRole('button', { name: '删除我的账号和投稿' }),
@@ -118,7 +118,7 @@ it.each(deleteOptions)(
 it('demo retry returns the same error after 400ms and cancels on explicit scenario change', async () => {
   vi.useFakeTimers();
   try {
-    page('/privacy?viewer=member&privacy=error');
+    page('/privacy-demo?viewer=member&privacy=error');
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(399);
@@ -153,7 +153,7 @@ it.each([
   async (label, value) => {
     vi.useFakeTimers();
     try {
-      page('/privacy?viewer=member');
+      page('/privacy-demo?viewer=member');
       fireEvent.click(screen.getByRole('checkbox'));
       fireEvent.click(
         screen.getByRole('button', { name: '删除我的账号和投稿' }),

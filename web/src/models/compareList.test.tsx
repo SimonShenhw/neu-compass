@@ -5,7 +5,9 @@ import {
   clearCompare,
   getCompareList,
   removeFromCompare,
+  createCompareList,
   useCompareList,
+  useList,
 } from './compareList';
 
 it('store preserves ID order, prioritises already over full, and never persists or logs', () => {
@@ -53,4 +55,27 @@ it('multiple subscribers receive removals and clear; no-op operations keep snaps
   const empty = getCompareList();
   clearCompare();
   expect(getCompareList()).toBe(empty);
+});
+
+it('another list made the same way is apart from the page’s, and useList follows its own (R5d)', () => {
+  const demo = createCompareList();
+  const { result } = renderHook(() => ({
+    page: useCompareList(),
+    demo: useList(demo),
+  }));
+  act(() => {
+    expect(demo.add('c-demo')).toBe('added');
+  });
+  expect(result.current).toEqual({ page: [], demo: ['c-demo'] });
+  act(() => {
+    addToCompare('c-page');
+  });
+  act(() => demo.clear());
+  expect(result.current).toEqual({ page: ['c-page'], demo: [] });
+  expect(getCompareList()).toEqual(['c-page']);
+  for (const id of ['a', 'b', 'c', 'd']) demo.add(id);
+  expect(demo.add('e')).toBe('full');
+  expect(demo.add('a')).toBe('already');
+  act(() => demo.remove('b'));
+  expect(demo.get()).toEqual(['a', 'c', 'd']);
 });

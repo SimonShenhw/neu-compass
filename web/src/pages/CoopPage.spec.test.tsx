@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
+import { failureFrom } from '../api/client';
+import { submitFailure } from '../api/coop';
 import type { CoopPageProps, CoopRecord, SubmitOutcome } from '../api/coop';
 import guest from '../fixtures/coop/list-guest.json';
 import member0 from '../fixtures/coop/list-member-0.json';
@@ -399,47 +401,67 @@ for (const [fixture, message] of [
     expect(screen.getAllByText(salaryLock)).toHaveLength(2);
   });
 }
+// A fixture's failed upload as the live page has it: R2b's failureFrom keeps the status, error_type and the refused
+// fields, never the detail (R5d).
+function failedUpload(fixture: { status: number; body: unknown }) {
+  const text = JSON.stringify(fixture.body);
+  return submitFailure(
+    failureFrom(new Response(text, { status: fixture.status }), text),
+  );
+}
+const unavailableLine = '投稿暂时提交不了，请稍后再试。你填的内容还在。';
+const noFields: readonly string[] = [];
 for (const [name, outcome, message] of [
-  [
-    '401',
-    { ok: false, status: 401, body: unauthorized.body },
-    '登录已经失效，请重新登录后再提交。',
-  ],
-  [
-    '422',
-    { ok: false, status: 422, body: invalid.body },
-    '有一项不符合要求，请检查后再提交。',
-  ],
-  [
-    '503',
-    { ok: false, status: 503, body: unavailable.body },
-    '投稿暂时提交不了，请稍后再试。你填的内容还在。',
-  ],
+  ['401', failedUpload(unauthorized), '登录已经失效，请重新登录后再提交。'],
+  ['422', failedUpload(invalid), '有一项不符合要求，请检查后再提交。'],
+  ['503', failedUpload(unavailable), unavailableLine],
   [
     'network',
-    { ok: false, status: 503, body: null },
-    '投稿暂时提交不了，请稍后再试。你填的内容还在。',
+    {
+      ok: false,
+      status: 503,
+      errorType: 'transport_error',
+      invalidFields: noFields,
+    },
+    unavailableLine,
   ],
   [
     '504',
-    { ok: false, status: 504, body: null },
-    '投稿暂时提交不了，请稍后再试。你填的内容还在。',
+    {
+      ok: false,
+      status: 504,
+      errorType: 'transport_timeout',
+      invalidFields: noFields,
+    },
+    unavailableLine,
+  ],
+  [
+    'proxy page',
+    { ok: false, status: 502, errorType: null, invalidFields: noFields },
+    unavailableLine,
+  ],
+  [
+    'unreadable 201',
+    {
+      ok: false,
+      status: 502,
+      errorType: 'invalid_response',
+      invalidFields: noFields,
+    },
+    unavailableLine,
   ],
   [
     'other',
     {
-      ok: false as const,
+      ok: false,
       status: 500,
-      body: {
-        detail: 'PRIVATE ENGLISH',
-        error_type: 'server_error',
-        status_code: 500,
-      },
+      errorType: 'server_error',
+      invalidFields: noFields,
     },
     '提交没有成功，请稍后再试。',
   ],
-] as const) {
-  it(`failure ${name} preserves fields, focuses fixed Chinese and never shows raw detail`, async () => {
+] as const satisfies readonly (readonly [string, SubmitOutcome, string])[]) {
+  it(`failure ${name} preserves fields and focuses fixed Chinese`, async () => {
     const { input } = page({ onSubmit: vi.fn(async () => outcome) });
     await required();
     await userEvent.click(screen.getByRole('button', { name: '提交经验' }));
@@ -447,8 +469,6 @@ for (const [name, outcome, message] of [
     expect(result).toHaveTextContent(message);
     expect(result).toHaveFocus();
     expect(field(/^公司/)).toHaveValue('  Example Co.  ');
-    if (outcome.body)
-      expect(screen.queryByText(outcome.body.detail)).not.toBeInTheDocument();
     if (name === '422')
       expect(field(/^时长/)).toHaveAccessibleDescription(
         '有一项不符合要求，请检查后再提交。',
@@ -471,16 +491,13 @@ it.each([
   'interview_summary',
   'technical_questions',
   'salary_range_usd',
-])('422 safely maps known field %s without echoing detail', async (name) => {
+])('a 422 that refused %s marks that field', async (name) => {
   page({
     onSubmit: vi.fn(async () => ({
       ok: false as const,
       status: 422,
-      body: {
-        detail: `${name}: PRIVATE VALUE`,
-        error_type: 'invalid_input',
-        status_code: 422,
-      },
+      errorType: 'invalid_input',
+      invalidFields: [name],
     })),
   });
   await required();
@@ -490,24 +507,53 @@ it.each([
   expect(control).toHaveAccessibleDescription(
     '有一项不符合要求，请检查后再提交。',
   );
-  expect(screen.queryByText(/PRIVATE VALUE/)).not.toBeInTheDocument();
+  expect(form().querySelectorAll('[aria-invalid="true"]')).toHaveLength(1);
+});
+it('a 422 that refused two fields marks both', async () => {
+  page({
+    onSubmit: vi.fn(async () => ({
+      ok: false as const,
+      status: 422,
+      errorType: 'invalid_input',
+      invalidFields: ['company', 'salary_range_usd'],
+    })),
+  });
+  await required();
+  await userEvent.click(screen.getByRole('button', { name: '提交经验' }));
+  expect(
+    [...form().querySelectorAll('[aria-invalid="true"]')].map((control) =>
+      control.getAttribute('name'),
+    ),
+  ).toEqual(['company', 'salary_range_usd']);
 });
 it('unknown 422 field remains generic with no invalid field', async () => {
   page({
     onSubmit: vi.fn(async () => ({
       ok: false as const,
       status: 422,
-      body: {
-        detail: '__proto__: PRIVATE VALUE',
-        error_type: 'invalid_input',
-        status_code: 422,
-      },
+      errorType: 'invalid_input',
+      invalidFields: ['__proto__', 'constructor'],
     })),
   });
   await required();
   await userEvent.click(screen.getByRole('button', { name: '提交经验' }));
   expect(form().querySelector('[aria-invalid="true"]')).toBeNull();
-  expect(screen.queryByText(/PRIVATE VALUE/)).not.toBeInTheDocument();
+  expect(screen.getByRole('status', { name: '投稿结果' })).toHaveTextContent(
+    '有一项不符合要求，请检查后再提交。',
+  );
+});
+it('only a 422 marks fields', async () => {
+  page({
+    onSubmit: vi.fn(async () => ({
+      ok: false as const,
+      status: 400,
+      errorType: 'bad_request',
+      invalidFields: ['company'],
+    })),
+  });
+  await required();
+  await userEvent.click(screen.getByRole('button', { name: '提交经验' }));
+  expect(form().querySelector('[aria-invalid="true"]')).toBeNull();
 });
 it('rejected callback does not leak its message or discard inputs', async () => {
   page({

@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import tomllib
@@ -66,9 +67,11 @@ def test_the_fake_google_brings_the_browser_back_to_the_front_end(client):
     links = sign_in_links(client)
     assert all(link.startswith(f"{FRONT_END}/?") for link in links)
     codes = [code_and_state(link) for link in links]
-    assert codes[:6] == [(code, STATE) for code in [*dev_api.ACCOUNTS, *dev_api.REFUSALS]]
-    assert codes[6] == ("dev-student", dev_api.WRONG_STATE)
-    assert parse_qs(urlparse(links[7]).query) == {"error": ["access_denied"], "state": [STATE]}
+    named = [*dev_api.ACCOUNTS, *dev_api.REFUSALS]
+    assert len(links) == len(named) + 2
+    assert codes[:len(named)] == [(code, STATE) for code in named]
+    assert codes[len(named)] == ("dev-student", dev_api.WRONG_STATE)
+    assert parse_qs(urlparse(links[-1]).query) == {"error": ["access_denied"], "state": [STATE]}
 
 
 def test_a_preview_build_comes_back_to_its_own_port(client):
@@ -195,6 +198,67 @@ def test_the_sign_in_page_sends_nobody_elsewhere_and_escapes_what_it_echoes(clie
 def test_the_front_end_reads_the_courses_and_the_config(client):
     assert client.get("/config").json() == {"answer_feedback_enabled": False, "login_available": True}
     assert client.get("/course/c-cs-5800").json()["primary_code"] == "CS 5800"
+
+
+def log_in(client, code):
+    response = client.post("/auth/callback", headers=WRITE,
+                           json={"code": code, "session": "cookie", "redirect_uri": f"{FRONT_END}/"})
+    assert response.status_code == 200
+    return response.json()
+
+
+def coop_list(client):
+    response = client.get("/coop")
+    assert response.status_code == 200
+    return response.json()
+
+
+# The tier each detail needs (api/routes/coop.py). 中文：每个细节字段要几级（api/routes/coop.py）。
+TIERS = {"interview_summary": 1, "technical_questions": 1, "salary_range_usd": 2}
+
+
+def test_the_co_op_list_has_every_tier_in_a_fixed_order_and_a_guest_sees_no_details(client):
+    """R5d: the browser acceptance needs locked fields at every tier. 中文：浏览器验收要看到每一级都有锁住的字段。"""
+    rows = coop_list(client)
+    assert [row["coop_id"] for row in rows] == [fields["coop_id"] for _, fields in dev_api.COOP]
+    assert [row["visibility_level"] for row in rows] == [2, 2, 1, 1, 1, 0, 0]
+    assert all(row[name] is None for row in rows for name in TIERS)
+
+
+@pytest.mark.parametrize(("code", "count"), [("dev-student", 0), ("dev-one", 1), ("dev-two", 2)])
+def test_each_account_sees_what_its_credited_contributions_unlock(client, code, count):
+    assert log_in(client, code)["contribution_count"] == count
+    assert client.get("/auth/me").json()["contribution_count"] == count
+    experiences = {fields["coop_id"]: fields for _, fields in dev_api.COOP}
+    for row in coop_list(client):
+        for name, tier in TIERS.items():
+            assert row[name] == (experiences[row["coop_id"]].get(name) if count >= tier else None), (row, name)
+
+
+def test_the_counts_were_credited_by_the_real_review_never_written_by_hand(client):
+    conn = sqlite3.connect(settings.sqlite_path)
+    try:
+        credits = dict(conn.execute("SELECT user_id, count(*) FROM coop_contribution_credits GROUP BY user_id"))
+        counts = dict(conn.execute("SELECT user_id, contribution_count FROM users"))
+        statuses = {status for (status,) in conn.execute("SELECT review_status FROM coop_submissions")}
+    finally:
+        conn.close()
+    assert credits == counts == {dev_api.ONE: 1, dev_api.TWO: 2, dev_api.PEER["user_id"]: 1}
+    assert statuses == {"published"}
+
+
+def test_deleting_an_account_runs_for_real_and_withdraws_the_groups_it_helped_publish(client):
+    log_in(client, "dev-two")
+    response = client.post("/auth/delete-account", headers=WRITE, json={"confirm": "delete"})
+    assert response.status_code == 200
+    assert response.json() == {"deleted": True, "published_experiences": 2, "unlocks_of_those": 0, "own_unlocks": 0,
+                               "submissions": 2, "credits": 2, "planned_courses": 0, "withdrawn_from_groups": 2}
+    assert client.get("/auth/me").status_code == 401
+    # Both groups are left with one contributor, so only the seeds stay public. 中文：两组都只剩一个投稿人，只剩种子公开。
+    seeds = [fields["coop_id"] for contributor, fields in dev_api.COOP if contributor is None]
+    assert [row["coop_id"] for row in coop_list(client)] == seeds
+    # No credit is taken back from the others. 中文：别人的记功不收回。
+    assert log_in(client, "dev-one")["contribution_count"] == 1
 
 
 def ask(client, query):

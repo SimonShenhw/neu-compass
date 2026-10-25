@@ -4,6 +4,7 @@ import {
   ApiError,
   GENERIC_FAILURE,
   TIMEOUT_MS,
+  answerStatus,
   apiErrorMessage,
   apiGet,
   apiPath,
@@ -523,5 +524,27 @@ describe('what the page says', () => {
       expect(isTransientError(error(status)), String(status)).toBe(false);
     expect(isTransientError(new Error('x'))).toBe(false);
     expect(isTransientError(null)).toBe(false);
+  });
+});
+
+describe('the status of the answer behind a failure (R5d)', () => {
+  it('is null when no answer came, and the status otherwise', () => {
+    expect(
+      answerStatus(new ApiError(503, { errorType: 'transport_error' })),
+    ).toBeNull();
+    expect(
+      answerStatus(new ApiError(504, { errorType: 'transport_timeout' })),
+    ).toBeNull();
+    expect(
+      answerStatus(new ApiError(503, { errorType: 'service_unavailable' })),
+    ).toBe(503);
+    expect(answerStatus(new ApiError(504))).toBe(504);
+    expect(
+      answerStatus(new ApiError(502, { errorType: 'invalid_response' })),
+    ).toBe(502);
+    expect(answerStatus(new ApiError(404, { errorType: 'not_found' }))).toBe(
+      404,
+    );
+    expect(answerStatus(new Error('not from the API'))).toBeNull();
   });
 });
