@@ -15,6 +15,12 @@ Layer 3 本体（培养方案 / 必修课程边）此前只能侧面触及：要
 页面 —— 列表接口驱动培养方案卡片网格，课程表接口驱动按学期分组的课程
 表格。
 
+Later batches added the versioned plans, a selected plan's policy evidence and (R4b) the draft check,
+`POST /programs/{program_id}/plans/{plan_id}/draft`, which computes only (api/plan_draft.py).
+
+后来的批次又加了版本化方案、所选方案的政策证据，以及（R4b）草案核对
+`POST /programs/{program_id}/plans/{plan_id}/draft`，只计算（api/plan_draft.py）。
+
 No auth: these records are public, but legacy seeds are NOT verified catalog facts (same tier as
 /course/{id}). The give-to-get gate only guards Co-op contributions.
 
@@ -31,6 +37,7 @@ churning the shared transport-model module for a leaf feature.
 
 from __future__ import annotations
 
+import sqlite3
 from typing import Annotated
 
 import structlog
@@ -38,6 +45,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, st
 from pydantic import BaseModel, ConfigDict, Field
 
 from api.dependencies import DbConn, get_alias_repo, get_course_repo, get_program_policy_reader, get_program_repo
+from api.error_fields import safe_error_fields
 from api.exceptions import PlanSelectionConflict
 from api.plan_draft import DraftCheckIn, DraftCheckOut, check_draft
 from db.alias_repository import AliasRepository
@@ -305,14 +313,17 @@ def get_selected_program_policies(
         "typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in "
         "`added`), the notices for that input in order (plain-text sentences, the Streamlit page's wording), and the "
         "plan's rule tree evaluated on those courses — recorded rules only, not eligibility.\n\n"
-        "`plan_content_sha256` must be the version the page shows (`plan_revisions`); otherwise a 409 whose `reason` "
-        "is `missing`, `stale`, `draft`, `unusable` or `unavailable`, and the page clears the plan choice.\n\n"
+        "`plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be "
+        "confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` "
+        "for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one "
+        "that cannot be verified, `unavailable` when the plans cannot be read now.\n\n"
         "Stores nothing: no database row, no `query_log`, no course code or ID in the logs. Guests may use it."
     ),
     responses={
         404: {"description": "`program_id` not in `programs`."},
         409: {"description": "The exact plan could not be confirmed; `reason` says why."},
         422: {"description": "Body not valid: more than 20 or repeated course IDs, `input` over 4000 characters."},
+        503: {"description": "The course records cannot be read right now."},
     },
 )
 def check_plan_draft(
@@ -324,14 +335,22 @@ def check_plan_draft(
     alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
 ) -> DraftCheckOut:
     try:
-        program_repo.get_program(program_id)
-    except ProgramNotFound as exc:
-        raise HTTPException(status_code=404, detail="program_id not found") from exc
-    resolution = ProgramPlanRepository(conn).resolve_by_id(program_id, plan_id, body.plan_content_sha256)
-    if resolution.outcome != "selected" or resolution.plan is None:
-        log.warning("draft.plan_selection", plan_outcome=resolution.outcome, plan_id=plan_id)
-        raise PlanSelectionConflict(resolution.outcome if resolution.outcome != "selected" else "unusable")
-    out = check_draft(resolution.plan, body.plan_content_sha256, body, course_repo=course_repo, alias_repo=alias_repo)
+        try:
+            program_repo.get_program(program_id)
+        except ProgramNotFound as exc:
+            raise HTTPException(status_code=404, detail="program_id not found") from exc
+        resolution = ProgramPlanRepository(conn).resolve_by_id(program_id, plan_id, body.plan_content_sha256)
+        if resolution.outcome != "selected" or resolution.plan is None:
+            log.warning("draft.plan_selection", plan_outcome=resolution.outcome, plan_id=plan_id)
+            raise PlanSelectionConflict(resolution.outcome if resolution.outcome != "selected" else "unusable")
+        out = check_draft(resolution.plan, body.plan_content_sha256, body, course_repo=course_repo,
+                          alias_repo=alias_repo)
+    except sqlite3.Error as exc:
+        # The plan step answers its own read errors with a 409 `unavailable`; the program and course reads end here.
+        # 中文：方案那一步自己把读库错误答成 409 `unavailable`；项目和课程的读库错误在这里接住。
+        log.warning("draft.storage_failed", **safe_error_fields(exc))
+        raise HTTPException(status_code=503, detail="The course records cannot be read right now.",
+                            headers={"Cache-Control": "no-store"}) from exc
     response.headers["Cache-Control"] = "no-store"
     # Counts only: no course code, ID or typed text. 中文：只记个数，不记课号、课程 ID 或输入的文字。
     log.info("draft.checked", courses=len(out.courses), added=len(out.added), notices=len(out.notices))

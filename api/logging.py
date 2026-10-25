@@ -48,6 +48,11 @@ _COURSE_READ_FIELDS = {
 }
 _COURSE_READ_NUMBERS = {"status", "duration_ms", "count", "dangling", "courses", "unusable_records"}
 _COURSE_READ_TOKENS = {"error_type", "exc_type", "cause_type"}
+# The draft check (R4b) reads typed codes and draft course IDs from its body, so its events get the same allowlist,
+# plus its own counts, the plan outcome and the path's plan ID. 中文：草案核对（R4b）从请求体读课号和草案的课程 ID，
+# 它的事件也走这份白名单，另加它自己的计数、方案确认的结果和路径里的方案 ID。
+_DRAFT_PATH = re.compile(r"/programs/[a-z0-9][a-z0-9-]{0,63}/plans/[a-z0-9][a-z0-9-]{0,99}/draft")
+_DRAFT_FIELDS = _COURSE_READ_FIELDS | {"added", "notices", "plan_outcome", "plan_id"}
 
 
 def _course_read_value(key: str, value: Any) -> bool:
@@ -55,10 +60,12 @@ def _course_read_value(key: str, value: Any) -> bool:
     A frozen stdlib module's frame reads `<frozen os>:685 __getitem__`.
     中文：白名单字段还要值的形状对：计数只收数字，类型只收标识符，frames 只收 `文件:行 函数`（冻结模块写成 `<frozen os>`）。
     """
-    if key in _COURSE_READ_NUMBERS:
+    if key in _COURSE_READ_NUMBERS or key in {"added", "notices"}:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
-    if key in _COURSE_READ_TOKENS:
+    if key in _COURSE_READ_TOKENS or key == "plan_outcome":
         return isinstance(value, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,63}", value) is not None
+    if key == "plan_id":
+        return isinstance(value, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,99}", value) is not None
     if key == "frames":
         return isinstance(value, list) and all(isinstance(frame, str) and re.fullmatch(
             r"(?:<frozen [\w.]{1,100}>|[^\s:]{1,200}):\d+ \S{1,200}", frame) for frame in value)
@@ -81,8 +88,10 @@ def _course_read_fields(_logger: Any, _name: str, event: dict[str, Any]) -> dict
     中文：仅此类请求保留代码定义的诊断字段，不记录 ref、课程 ID、来源文本或任意新字段。
     """
     path = structlog.contextvars.get_contextvars().get("path")
-    if path in _COURSE_READ_PATHS:
-        event = {key: value for key, value in event.items() if key in _COURSE_READ_FIELDS and _course_read_value(key, value)}
+    draft = isinstance(path, str) and _DRAFT_PATH.fullmatch(path) is not None
+    if path in _COURSE_READ_PATHS or draft:
+        allowed = _DRAFT_FIELDS if draft else _COURSE_READ_FIELDS
+        event = {key: value for key, value in event.items() if key in allowed and _course_read_value(key, value)}
         if "catalog_year" in event and (not isinstance(event["catalog_year"], str)
                                        or not re.fullmatch(r"[0-9]{4}-[0-9]{4}", event["catalog_year"])):
             event.pop("catalog_year")

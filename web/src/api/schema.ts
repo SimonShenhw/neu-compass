@@ -367,7 +367,7 @@ export interface paths {
      * Check a session-only course draft against one exact source-checked plan (computes only)
      * @description The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences, the Streamlit page's wording), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.
      *
-     *     `plan_content_sha256` must be the version the page shows (`plan_revisions`); otherwise a 409 whose `reason` is `missing`, `stale`, `draft`, `unusable` or `unavailable`, and the page clears the plan choice.
+     *     `plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one that cannot be verified, `unavailable` when the plans cannot be read now.
      *
      *     Stores nothing: no database row, no `query_log`, no course code or ID in the logs. Guests may use it.
      */
@@ -1149,38 +1149,38 @@ export interface components {
       /** Course Id */
       course_id: string;
       /** Credits */
-      credits?: number | null;
+      credits: number | null;
       /** Name */
       name: string;
     };
     /** DraftNode */
     DraftNode: {
       /** Children */
-      children?: components['schemas']['DraftNode'][];
+      children: components['schemas']['DraftNode'][];
       /** Counted */
-      counted?: string[];
+      counted: string[];
       /** Kind */
       kind: string;
       /** Label */
       label: string;
       /** Missing */
-      missing?: string[];
+      missing: string[];
       /**
        * Missing Omitted
        * @default 0
        */
       missing_omitted: number;
       /** Possible */
-      possible?: string[];
+      possible: string[];
       /** Reasons */
-      reasons?: string[];
+      reasons: string[];
       /**
        * Reasons Omitted
        * @default 0
        */
       reasons_omitted: number;
       /** Shortfall */
-      shortfall?: {
+      shortfall: {
         [key: string]: number;
       };
       /** Status */
@@ -1188,13 +1188,15 @@ export interface components {
     };
     /**
      * DraftNoticeOut
-     * @description One line the page shows as plain text, in processing order. `text` is the Streamlit page's sentence for the
-     *     same case; `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
-     *     中文：页面按处理顺序当纯文字显示的一行。`text` 是 Streamlit 页面同一情况的那句话；`candidates` 只有 `ambiguous` 有。
+     * @description One line the page shows as plain text, in processing order. For a typed code `text` is the Streamlit page's
+     *     sentence for the same case; re-reading the sent draft has three of its own (`course_gone`, `invalid_record`,
+     *     `duplicate_code`). `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
+     *     中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 是 Streamlit 页面同一情况的那句话；重读草案时的三种
+     *     （`course_gone`、`invalid_record`、`duplicate_code`）是自己的句子。`candidates` 只有 `ambiguous` 有。
      */
     DraftNoticeOut: {
       /** Candidates */
-      candidates?: components['schemas']['DraftCandidateOut'][];
+      candidates: components['schemas']['DraftCandidateOut'][];
       /**
        * Candidates Omitted
        * @default 0
@@ -1235,7 +1237,7 @@ export interface components {
         [key: string]: number;
       };
       /** Unplaced */
-      unplaced?: string[];
+      unplaced: string[];
     };
     /**
      * EvidenceSnippet
@@ -2687,6 +2689,13 @@ export interface operations {
       };
       /** @description Body not valid: more than 20 or repeated course IDs, `input` over 4000 characters. */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The course records cannot be read right now. */
+      503: {
         headers: {
           [name: string]: unknown;
         };

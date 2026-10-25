@@ -5,17 +5,20 @@ list plus any newly typed codes into the draft the server stands behind, the not
 same input, and `evaluate_draft`'s result for one exact source-checked plan. The per-code rules mirror
 `app.plan_draft_view._add` step for step (unique match, exact primary code, a cross-listed twin counted once, an alias
 under another primary code, identity and field checks, the 20-course limit), but run on the
-repositories directly, so a lookup can never half-fail the way an HTTP call can. Nothing here writes a database row,
-query_log or a log line with a course code or ID: the route logs counts only.
+repositories directly, so a lookup can never half-fail the way an HTTP call can. One addition: a course whose ID the
+request model would refuse is not taken, so the page can always send back what it gets. Nothing here writes a database
+row, query_log or a log line with a course code or ID: the route logs counts only.
 
 中文：草案核对（R4b）：只计算、不存储。React 的培养方案页把草案（课程 ID）放在内存里，每次变化都带过来；这里把它和这次
 新输入的课号变成服务器认可的草案、Streamlit 对同样输入会显示的提示，以及按一份确切的已核对方案算出的 `evaluate_draft`
 结果。每个课号的规则和 `app.plan_draft_view._add` 一步一步对应，但直接查仓库，不会像 HTTP 请求那样核对到一半失败。
+多了一条：请求模型不收的课程 ID 不加进草案，页面拿到的草案总能原样发回来。
 这里不写数据库、不写 query_log，日志里也没有课号和课程 ID：路由只记个数。
 """
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator
@@ -29,8 +32,9 @@ from schemas.program_plan import ProgramPlan
 
 MAX_DRAFT_INPUT = 4000  # The Streamlit text area's max_chars. 中文：Streamlit 输入框的字数上限。
 MAX_CANDIDATES = 10
+COURSE_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$"
 
-CourseId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")]
+CourseId = Annotated[str, StringConstraints(pattern=COURSE_ID_PATTERN)]
 NoticeKind = Literal["course_gone", "duplicate_code", "too_many_codes", "invalid_format", "invalid_format_more",
                      "all_present", "over_limit", "not_found", "ambiguous", "cross_listed_twin", "also_matches",
                      "primary_code", "invalid_record", "nothing_new"]
@@ -50,17 +54,25 @@ class DraftCheckIn(BaseModel):
         return value
 
 
+# The answer always carries every field, defaults included, so the OpenAPI document marks them all required and the
+# generated types match the page's (B30 N8). 中文：回答总是带着每个字段（有默认值的也带），OpenAPI 里都标成必有，
+# 生成的类型和页面的一致。
+_ANSWER = ConfigDict(extra="forbid", json_schema_serialization_defaults_required=True)
+
+
 class DraftCandidateOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = _ANSWER
     code: str
     name: str
 
 
 class DraftNoticeOut(BaseModel):
-    """One line the page shows as plain text, in processing order. `text` is the Streamlit page's sentence for the
-    same case; `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
-    中文：页面按处理顺序当纯文字显示的一行。`text` 是 Streamlit 页面同一情况的那句话；`candidates` 只有 `ambiguous` 有。"""
-    model_config = ConfigDict(extra="forbid")
+    """One line the page shows as plain text, in processing order. For a typed code `text` is the Streamlit page's
+    sentence for the same case; re-reading the sent draft has three of its own (`course_gone`, `invalid_record`,
+    `duplicate_code`). `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
+    中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 是 Streamlit 页面同一情况的那句话；重读草案时的三种
+    （`course_gone`、`invalid_record`、`duplicate_code`）是自己的句子。`candidates` 只有 `ambiguous` 有。"""
+    model_config = _ANSWER
     kind: NoticeKind
     level: Literal["warning", "info"]
     text: str
@@ -69,7 +81,7 @@ class DraftNoticeOut(BaseModel):
 
 
 class DraftCheckOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = _ANSWER
     plan_content_sha256: str
     courses: list[DraftCourse] = Field(max_length=MAX_DRAFT_COURSES)
     added: list[str] = Field(max_length=MAX_DRAFT_COURSES)
@@ -82,18 +94,44 @@ def _notice(kind: NoticeKind, text: str, level: Literal["warning", "info"] = "wa
 
 
 def _draft_course(course: Course) -> DraftCourse:
+    """A course record as a draft entry. An ID the request model would refuse is refused here too, so the page can
+    always send back the draft it is given (A30 N4). 中文：把课程记录变成草案里的一项。请求模型不收的 ID 这里也不收，
+    页面拿到的草案总能原样发回来。"""
+    if not re.fullmatch(COURSE_ID_PATTERN, course.course_id):
+        raise ValueError("course_id outside the draft's pattern")
     return DraftCourse(course_id=course.course_id, code=course.primary_code, name=course.primary_name,
                        credits=course.credits)
 
 
+def _records(course_ids: list[str], course_repo: CourseRepository) -> tuple[dict[str, Course], set[str]]:
+    """get_batch, or one ID at a time when a stored record no longer reads as a Course (get_batch then fails for the
+    whole batch): those IDs come back as unreadable. 中文：一次取回；有一条存的记录读不成 Course 时（整批都会失败）
+    就逐个再取，读不了的单独列出来。"""
+    try:
+        return course_repo.get_batch(course_ids), set()
+    except (ValueError, TypeError):  # ValidationError is a ValueError. 中文：ValidationError 也是 ValueError。
+        records: dict[str, Course] = {}
+        unreadable: set[str] = set()
+        for course_id in course_ids:
+            try:
+                records.update(course_repo.get_batch([course_id]))
+            except (ValueError, TypeError):
+                unreadable.add(course_id)
+        return records, unreadable
+
+
 def _current(course_ids: list[str], course_repo: CourseRepository) -> tuple[list[DraftCourse], list[DraftNoticeOut]]:
-    """The draft as the server sees it now: a course whose record is gone or no longer valid leaves with a notice;
-    two IDs now under one code keep the first. 中文：服务器现在看到的草案：记录没了或不再有效的课带一条提示离开；
-    两个 ID 现在是同一个课号时留第一个。"""
-    records = course_repo.get_batch(course_ids)
+    """The draft as the server sees it now, re-read on every request (names and credits follow the current records):
+    a course whose record is gone, cannot be read or no longer fits a draft leaves with a notice; two IDs now under
+    one code keep the first. 中文：服务器现在看到的草案，每次请求都重读（课名和学分跟着现在的记录走）：记录没了、
+    读不了或放不进草案的课带一条提示离开；两个 ID 现在是同一个课号时留第一个。"""
+    records, unreadable = _records(course_ids, course_repo)
     courses: list[DraftCourse] = []
     notices: list[DraftNoticeOut] = []
     for course_id in course_ids:
+        if course_id in unreadable:
+            notices.append(_notice("invalid_record", "草案里有 1 门课的课程记录无法读取，已从草案移除。"))
+            continue
         record = records.get(course_id)
         if record is None:
             notices.append(_notice("course_gone", "草案里有 1 门课在课程记录里找不到了，已从草案移除。"))
@@ -101,7 +139,7 @@ def _current(course_ids: list[str], course_repo: CourseRepository) -> tuple[list
         try:
             course = _draft_course(record)
         except (ValidationError, ValueError):
-            notices.append(_notice("invalid_record", record.primary_code + " 返回的课程身份或字段无效，未加入。"))
+            notices.append(_notice("invalid_record", "草案里的 " + record.primary_code + " 课程身份或字段无效，已从草案移除。"))
             continue
         if any(other.code == course.code for other in courses):
             notices.append(_notice("duplicate_code", "草案里有两门课现在是同一个课号 " + course.code + "，只保留一门。"))

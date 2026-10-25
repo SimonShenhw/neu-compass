@@ -8,7 +8,9 @@ no network, no real data.
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
+import re
 import sqlite3
 
 import pytest
@@ -116,7 +118,7 @@ def test_a_guest_adds_codes_and_gets_the_server_draft_and_the_plan_evaluation(cl
     r = check(client, ids=["c-cs-5800"], text="cs5010, CS-5200\nCS 5100.")
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     body = r.json()
-    assert DraftCheckOut.model_validate(body)
+    assert DraftCheckOut.model_validate(body).model_dump(mode="json") == body
     assert codes(r) == ["CS 5800", "CS 5010", "CS 5200", "CS 5100"]
     assert body["added"] == ["CS 5010", "CS 5200", "CS 5100"] and body["notices"] == []
     assert body["courses"][3] == {"course_id": "c-cs-5100", "code": "CS 5100",
@@ -133,6 +135,39 @@ def test_without_input_the_draft_is_only_reread_and_reevaluated(client):
     assert check(client, ids=["c-cs-5100", "c-cs-5010"], text="").json() == r.json()
     empty = check(client).json()
     assert empty["courses"] == [] and empty["result"] == evaluate_draft(PLAN, []).model_dump(mode="json")
+
+
+def edit_record(conn, course_id: str, change) -> None:
+    """Rewrite one stored course record, the way a catalog update (or a newer build) would. 中文：改一条存的课程记录。"""
+    row = conn.execute("SELECT generated_json FROM courses WHERE course_id=?", (course_id,)).fetchone()
+    conn.execute("UPDATE courses SET generated_json=? WHERE course_id=?",
+                 (json.dumps(change(json.loads(row["generated_json"]))), course_id))
+    conn.commit()
+
+
+def test_the_sent_draft_is_reread_with_the_current_names_and_credits(client, empty_db):
+    first = check(client, ids=["c-cs-5010", "c-cs-5100"]).json()["courses"]
+    assert first == [{"course_id": "c-cs-5010", "code": "CS 5010", "name": "Programming Design Paradigm", "credits": 4},
+                     {"course_id": "c-cs-5100", "code": "CS 5100", "name": "Foundations of Artificial Intelligence",
+                      "credits": None}]
+    edit_record(empty_db, "c-cs-5010", lambda data: data | {"primary_name": "Programming Design Paradigm (renamed)",
+                                                            "credits": 2})
+    later = check(client, ids=["c-cs-5010", "c-cs-5100"])
+    assert later.json()["courses"][0] == {"course_id": "c-cs-5010", "code": "CS 5010",
+                                          "name": "Programming Design Paradigm (renamed)", "credits": 2}
+    assert later.json()["notices"] == [] and later.json()["courses"][1] == first[1]
+
+
+@pytest.mark.parametrize("change", [lambda data: {"not": "a course"}, lambda data: data | {"future_field": 1}],
+                         ids=["not-a-course", "newer-schema"])
+def test_a_sent_course_whose_record_no_longer_reads_leaves_with_a_notice(client, empty_db, change):
+    edit_record(empty_db, "c-cs-5010", change)
+    r = check(client, ids=["c-cs-5010", "c-cs-5200"])
+    assert r.status_code == 200
+    assert notices(r) == [("invalid_record", "warning", "草案里有 1 门课的课程记录无法读取，已从草案移除。")]
+    assert [c["course_id"] for c in r.json()["courses"]] == ["c-cs-5200"]
+    typed = check(client, ids=["c-cs-5200"], text="CS 5010")  # typed instead: refused by code. 中文：改成输入。
+    assert notices(typed) == [("invalid_record", "warning", "CS 5010 返回的课程身份或字段无效，未加入。")]
 
 
 # === Notices: each kind with its exact sentence ===
@@ -153,6 +188,15 @@ def test_badly_formatted_tokens_ten_by_name_then_a_count(client):
     assert codes(r) == ["CS 5010"]
     ten = check(client, text=" ".join(f"Q{i}" for i in range(1, 11)))  # ten by name, no count line. 中文：正好 10 个。
     assert notices(ten) == [("invalid_format", "warning", f"课号格式不正确，未加入：Q{i}") for i in range(1, 11)]
+
+
+def test_a_bad_token_is_named_as_typed_up_to_two_hundred_characters(client):
+    long_token = "Q" + "x" * 299
+    assert notices(check(client, text=long_token)) == [
+        ("invalid_format", "warning", "课号格式不正确，未加入：" + long_token[:200])]
+    # Five letters are not a subject, so they do not join the number. 中文：五个字母不算学科，不和数字连成课号。
+    assert notices(check(client, text="ABCDE 5010")) == [("invalid_format", "warning", "课号格式不正确，未加入：ABCDE"),
+                                                         ("invalid_format", "warning", "课号格式不正确，未加入：5010")]
 
 
 def test_codes_already_in_the_draft_are_an_info_line(client):
@@ -238,15 +282,27 @@ def test_a_record_the_draft_cannot_hold_is_refused_by_code(client):
     assert codes(r) == ["CS 5010"]
 
 
+def test_a_course_whose_id_the_request_would_refuse_is_not_taken(client, empty_db):
+    # The page could never send this ID back (the request model refuses it), so it never enters the draft.
+    # 中文：页面没法把这个 ID 发回来（请求模型不收），所以它不进草案。
+    add_course(empty_db, "c bad/id", "BAD 6001", "Synthetic course with an odd ID")
+    empty_db.commit()
+    r = check(client, text="BAD 6001 CS 5010")
+    assert notices(r) == [("invalid_record", "warning", "BAD 6001 返回的课程身份或字段无效，未加入。")]
+    assert codes(r) == ["CS 5010"]
+
+
 def test_the_sent_draft_loses_gone_invalid_and_doubled_records_with_a_notice_each(client, empty_db):
     # A second record under the same code (only here: it would make every "CS 5010" input ambiguous).
     # 中文：同一课号的第二条记录（只放在这里：否则所有「CS 5010」输入都会对上两门）。
     add_course(empty_db, "c-cs-5010-copy", "CS 5010", "Programming Design Paradigm (second record)")
     empty_db.commit()
-    r = check(client, ids=["c-cs-5010", "c-gone-1", "c-lng-6000", "c-cs-5010-copy", "c-cs-5200"])
-    assert notices(r) == [("course_gone", "warning", "草案里有 1 门课在课程记录里找不到了，已从草案移除。"),
-                          ("invalid_record", "warning", "LNG 6000 返回的课程身份或字段无效，未加入。"),
-                          ("duplicate_code", "warning", "草案里有两门课现在是同一个课号 CS 5010，只保留一门。")]
+    r = check(client, ids=["c-cs-5010", "c-gone-1", "c-lng-6000", "c-cs-5010-copy", "c-gone-2", "c-cs-5200"])
+    gone = ("course_gone", "warning", "草案里有 1 门课在课程记录里找不到了，已从草案移除。")
+    assert notices(r) == [gone,
+                          ("invalid_record", "warning", "草案里的 LNG 6000 课程身份或字段无效，已从草案移除。"),
+                          ("duplicate_code", "warning", "草案里有两门课现在是同一个课号 CS 5010，只保留一门。"),
+                          gone]  # one line per course, so two gone courses are two lines. 中文：每门一行。
     assert [c["course_id"] for c in r.json()["courses"]] == ["c-cs-5010", "c-cs-5200"]
 
 
@@ -360,6 +416,39 @@ def test_two_records_under_the_typed_code_are_ambiguous_on_both_pages(client, em
     same_as_streamlit(client, monkeypatch, [], "CS 5010")
 
 
+def test_also_matches_names_at_most_ten_other_codes_once_each(client, empty_db, monkeypatch):
+    # "AMB 6001" is also an alias of the eleven other AMB courses and of a second AMB 6003 record.
+    # 中文：「AMB 6001」也是另外 11 门 AMB 课和第二条 AMB 6003 记录的别名。
+    add_course(empty_db, "c-amb-02-copy", "AMB 6003", "Synthetic ambiguous 02 (second record)")
+    add_alias(empty_db, "AMB 6001", "c-amb-02-copy")
+    for i in range(1, 12):
+        add_alias(empty_db, "AMB 6001", f"c-amb-{i:02d}")
+    empty_db.commit()
+    r = check(client, text="AMB 6001")
+    # In the alias lookup's order (the second AMB 6003 record's alias was stored first); AMB 6003 once; AMB 6012 cut.
+    # 中文：按别名查询返回的顺序（第二条 AMB 6003 记录的别名先存）；AMB 6003 只出现一次；AMB 6012 被截掉。
+    others = "、".join(["AMB 6003", "AMB 6002", *(f"AMB {6004 + i}" for i in range(8))])
+    assert notices(r) == [("also_matches", "warning", "按输入主课号核对 AMB 6001；同一引用也匹配 " + others
+                           + "（可能交叉列出）；方案按哪个课号算，请向项目核实。")]
+    assert codes(r) == ["AMB 6001"]
+    same_as_streamlit(client, monkeypatch, [], "AMB 6001")
+
+
+def test_a_code_cross_listed_with_two_accepted_courses_names_the_first(client, empty_db, monkeypatch):
+    # TWC 7103's record answers to TWA 7101 and TWB 7102; its own code finds only itself.
+    # 中文：TWC 7103 的记录也对得上 TWA 7101 和 TWB 7102；输入它自己的课号只找到它。
+    for course_id, code in [("c-twa", "TWA 7101"), ("c-twb", "TWB 7102"), ("c-twc", "TWC 7103")]:
+        add_course(empty_db, course_id, code, "Synthetic three-way cross-listing " + code)
+    add_alias(empty_db, "TWA 7101", "c-twc")
+    add_alias(empty_db, "TWB 7102", "c-twc")
+    empty_db.commit()
+    r = check(client, text="TWA 7101, TWB 7102, TWC 7103")
+    assert notices(r)[-1] == ("cross_listed_twin", "warning", "TWC 7103 和 TWA 7101 可能是同一门交叉列出的课，只按 "
+                              "TWA 7101 计入；如果是两门不同的课，请向项目核实。")
+    assert codes(r) == ["TWA 7101", "TWB 7102"]
+    same_as_streamlit(client, monkeypatch, [], "TWA 7101, TWB 7102, TWC 7103")
+
+
 # === The plan: exact version or a 409 with a reason ===
 
 
@@ -372,7 +461,13 @@ def conflict(response, reason):
     return body
 
 
-def test_a_stale_content_version_is_a_409_and_computes_nothing(client):
+def test_a_stale_content_version_is_a_409_and_computes_nothing(client, monkeypatch):
+    import api.routes.program as routes
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("checked a draft for a refused plan")
+
+    monkeypatch.setattr(routes, "check_draft", refuse)
     body = conflict(check(client, text="CS 5010 " + MARKER, sha="0" * 64), "stale")
     assert body["detail"] == "The selected plan's scope or content version has changed."
 
@@ -382,6 +477,13 @@ def test_an_unknown_plan_or_one_of_another_program_is_missing(client):
         "The selected plan is not available."
     conflict(check(client, url=f"/programs/cs-ms/plans/{OTHER.plan_id}/draft", sha=content_hash(OTHER)), "missing")
     assert check(client, url=f"/programs/ds-ms/plans/{OTHER.plan_id}/draft", sha=content_hash(OTHER)).status_code == 200
+
+
+def test_another_programs_plan_is_missing_even_when_its_row_is_broken(client, empty_db):
+    empty_db.execute("UPDATE program_plans SET document='{}' WHERE plan_id=?", (OTHER.plan_id,))
+    empty_db.commit()
+    conflict(check(client, url=f"/programs/cs-ms/plans/{OTHER.plan_id}/draft", sha=content_hash(OTHER)), "missing")
+    conflict(check(client, url=f"/programs/ds-ms/plans/{OTHER.plan_id}/draft", sha=content_hash(OTHER)), "unusable")
 
 
 def test_a_plan_not_checked_against_its_sources_is_refused(client, empty_db):
@@ -401,6 +503,31 @@ def test_an_unverifiable_plan_is_unusable(client, empty_db):
 def test_plans_that_cannot_be_read_now_are_unavailable(client, monkeypatch):
     monkeypatch.setattr(ProgramPlanRepository, "available", lambda self: False)
     assert conflict(check(client), "unavailable")["detail"] == "The selected plan cannot be checked right now."
+
+
+def test_a_plan_read_error_is_unavailable_too(client, monkeypatch):
+    def broken(self, selection):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(ProgramPlanRepository, "resolve_selection", broken)
+    conflict(check(client), "unavailable")
+
+
+@pytest.mark.parametrize("target,name", [(CourseRepository, "get_batch"), (AliasRepository, "resolve"),
+                                         (ProgramRepository, "get_program")])
+def test_a_course_or_program_read_error_is_a_503_that_echoes_nothing(client, real_logging, caplog, monkeypatch,
+                                                                     target, name):
+    def broken(*args, **kwargs):
+        raise sqlite3.OperationalError("database is locked " + MARKER)
+
+    monkeypatch.setattr(target, name, broken)
+    with caplog.at_level(logging.INFO):
+        r = check(client, ids=["c-cs-5010"], text="CS 5200 " + MARKER)
+    assert r.status_code == 503 and r.headers["cache-control"] == "no-store"
+    assert r.json() == {"detail": "The course records cannot be read right now.", "error_type": "service_unavailable",
+                        "status_code": 503}
+    assert "draft.storage_failed" in caplog.text and "OperationalError" in caplog.text
+    assert all(value not in caplog.text + r.text for value in [MARKER, "CS 5200", "c-cs-5010"])
 
 
 def test_an_unknown_program_is_the_usual_404(client):
@@ -452,6 +579,23 @@ def test_curriculum_and_plans_answers_name_each_plans_content_version(client):
     assert client.get("/programs/ds-ms").json()["plan_revisions"] == {OTHER.plan_id: content_hash(OTHER)}
 
 
+def test_revisions_name_every_listed_plan_and_follow_the_filters(client, empty_db):
+    align = plans()[5]  # cs-ms align, source-checked. 中文：已核对。
+    bridge = ProgramPlan.model_validate(align.model_dump() | {  # a draft plan is listed too. 中文：草稿方案也列出。
+        "plan_id": "cs-ms-boston-2026-2027-bridge", "pathway": "bridge", "review_status": "draft",
+        "checked_by": None, "checked_on": None})
+    for item in (align, bridge):
+        ProgramPlanRepository(empty_db).store(item)
+    empty_db.commit()
+    want = {item.plan_id: content_hash(item) for item in (PLAN, align, bridge)}
+    curriculum = client.get("/programs/cs-ms").json()
+    assert curriculum["plan_revisions"] == want and {p["plan_id"] for p in curriculum["plans"]} == set(want)
+    assert client.get("/programs/cs-ms/plans").json()["plan_revisions"] == want
+    filtered = client.get("/programs/cs-ms/plans", params={"pathway": "align"}).json()
+    assert [p["plan_id"] for p in filtered["plans"]] == [align.plan_id]
+    assert filtered["plan_revisions"] == {align.plan_id: want[align.plan_id]}
+
+
 def test_a_program_without_plans_has_empty_revisions(client, empty_db):
     ProgramRepository(empty_db).upsert_program(Program(program_id="pjm-ms", full_name="Synthetic PJM", prefix="PJM"))
     empty_db.commit()
@@ -463,10 +607,7 @@ def test_a_program_without_plans_has_empty_revisions(client, empty_db):
 
 
 def test_no_course_code_id_or_typed_text_reaches_the_logs_and_nothing_is_written(client, empty_db, real_logging,
-                                                                             caplog, monkeypatch):
-    import api.routes.program as routes
-
-    monkeypatch.setattr(routes, "log", structlog.get_logger("synthetic.draft.check"))
+                                                                             caplog):
     before = empty_db.total_changes
     with caplog.at_level(logging.INFO):
         r = check(client, ids=["c-cs-5800"], text=f"CS 5010, CS 7140 EECE 7397 {MARKER}")
@@ -475,14 +616,38 @@ def test_no_course_code_id_or_typed_text_reaches_the_logs_and_nothing_is_written
     for value in ["CS 5010", "CS 7140", "EECE 7397", "CS 5800", "c-cs-5010", "c-cs-7140", "c-cs-5800", MARKER,
                   "Programming Design Paradigm"]:
         assert value not in caplog.text
-    assert "draft.checked" in caplog.text and "request.handled" in caplog.text
+    checked = next(line for line in caplog.text.splitlines() if "draft.checked" in line)
+    # The counts survive the allowlist: 3 courses, 2 added, 3 notices (bad token, also matches, twin).
+    # 中文：计数过得了白名单：3 门课、加了 2 门、3 条提示（格式不对、也匹配、交叉列出）。
+    assert all(re.search(key + r"\W{1,4}" + count + r"\b", checked)
+               for key, count in [("courses", "3"), ("added", "2"), ("notices", "3")])
+    assert "request.handled" in caplog.text
 
 
 def test_a_refused_plan_logs_its_outcome_but_no_course(client, real_logging, caplog):
     with caplog.at_level(logging.INFO):
         conflict(check(client, ids=["c-cs-5800"], text="CS 5010 " + MARKER, sha="0" * 64), "stale")
-    assert "draft.plan_selection" in caplog.text and "stale" in caplog.text
+    refused = next(line for line in caplog.text.splitlines() if "draft.plan_selection" in line)
+    assert re.search(r"plan_outcome\W{1,4}stale\b", refused)
+    assert re.search(r"plan_id\W{1,4}" + re.escape(PLAN.plan_id), refused)
     assert all(value not in caplog.text for value in ["CS 5010", "c-cs-5800", MARKER])
+
+
+def test_a_nested_log_line_on_the_draft_route_keeps_only_allowlisted_fields(client, real_logging, caplog,
+                                                                            monkeypatch):
+    # A debug line someone might add to the shared lookup code later: the course-read allowlist strips its values.
+    # 中文：以后有人可能在共用的查找代码里加的一行日志：课程读的白名单把它的值去掉。
+    original = AliasRepository.resolve
+
+    def chatty(self, term):
+        structlog.get_logger("neu_compass.alias").info("alias.resolve", term=term, courses=["c-cs-5010"], count=1)
+        return original(self, term)
+
+    monkeypatch.setattr(AliasRepository, "resolve", chatty)
+    with caplog.at_level(logging.INFO):
+        assert check(client, text="CS 5010").status_code == 200
+    assert "alias.resolve" in caplog.text and "draft.checked" in caplog.text
+    assert "CS 5010" not in caplog.text and "c-cs-5010" not in caplog.text
 
 
 # === Session cookie: the R2a cross-site check applies; guests need no headers ===

@@ -15,10 +15,13 @@ from schemas.program_plan import ProgramPlan, RequirementNode, normalize_code
 
 MAX_DRAFT_COURSES = 20
 Status = Literal["met", "missing", "unknown", "not_evaluated"]
+# The API's draft answer always carries every field, so its OpenAPI schema marks the defaulted ones required too
+# (R4b); validation is unchanged. 中文：API 的草案回答总带着每个字段，OpenAPI 里有默认值的也标成必有（R4b）；校验不变。
+_DRAFT = ConfigDict(extra="forbid", json_schema_serialization_defaults_required=True)
 
 
 class DraftCourse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = _DRAFT
     course_id: str = Field(min_length=1, max_length=200)
     code: str
     name: str = Field(min_length=1, max_length=500)
@@ -31,7 +34,7 @@ class DraftCourse(BaseModel):
 
 
 class DraftNode(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = _DRAFT
     kind: str = Field(min_length=1, max_length=32)
     label: str = Field(min_length=1, max_length=1000)
     status: Status | None
@@ -46,7 +49,7 @@ class DraftNode(BaseModel):
 
 
 class DraftResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = _DRAFT
     root: DraftNode
     unplaced: list[str] = Field(default_factory=list, max_length=MAX_DRAFT_COURSES)
     summary_counts: dict[str, int]
