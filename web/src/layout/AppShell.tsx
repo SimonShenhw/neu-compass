@@ -1,5 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { refreshReads, useShowingOld } from '../api/queries';
+import { AccountContext } from './account';
 import { AskBar } from './AskBar';
 import { usePrototype } from './PrototypeContext';
 import { Sidebar } from './Sidebar';
@@ -9,20 +12,28 @@ import { useSession } from './useSession';
 import { useCompareList } from '../models/compareList';
 import styles from './AppShell.module.css';
 
+// Streamlit's FALLBACK_NOTICE (app/streamlit_app.py), except its last clause: this page does not try again by itself.
+export const FALLBACK_NOTICE =
+  '有些内容这次没能更新，显示的是上次加载的版本；可以点「刷新页面内容」再试。';
+// Pages that say who is looking themselves, so the top bar's guest badge would say it twice.
+const SAYS_WHO = new Set(['/coop', '/privacy', '/coop-demo', '/privacy-demo']);
+
 export function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const state = usePrototype();
   const comparison = useCompareList();
-  const { session, login, logout } = useSession(state.announce);
-  const account = { session, onLogin: login, onLogout: logout };
+  const { session, login, logout, account } = useSession(state.announce);
+  const showingOld = useShowingOld();
+  const box = { session, onLogin: login, onLogout: logout };
   const { title, isSearch, navigationPath } = pagePresentation(pathname);
   useEffect(() => {
     document.title = `${title} · NEU-Compass`;
     document.getElementById('main-content')?.focus({ preventScroll: true });
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [pathname, title]);
-  const refresh = () => state.announce('R1 使用固定假数据；未发送刷新请求。');
+  const refresh = () => void refreshReads(queryClient);
   return (
     <div className={styles.shell}>
       <a href="#main-content" className="skip-link">
@@ -32,23 +43,27 @@ export function AppShell() {
         <Sidebar
           compareCount={comparison.length}
           onRefresh={refresh}
-          {...account}
+          {...box}
         />
       </aside>
       <div className={styles.mainColumn}>
         <TopBar
           showGuest={
             session.kind === 'guest' &&
-            navigationPath !== '/coop' &&
-            navigationPath !== '/privacy'
+            !(navigationPath !== undefined && SAYS_WHO.has(navigationPath))
           }
           title={title}
           count={comparison.length}
           onRefresh={refresh}
-          account={account}
+          account={box}
         />
         <main id="main-content" tabIndex={-1} className={styles.main}>
-          <Outlet />
+          <div role="status" aria-label="内容更新" className={styles.fallback}>
+            {showingOld && <p>{FALLBACK_NOTICE}</p>}
+          </div>
+          <AccountContext.Provider value={account}>
+            <Outlet />
+          </AccountContext.Provider>
         </main>
         <p role="status" className={styles.notice}>
           {state.notice}

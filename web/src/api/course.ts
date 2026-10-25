@@ -1,4 +1,6 @@
 // R5b's view contract. The course detail is the API's own shape (generated, R2b); the rest is the page's.
+import { queryOptions } from '@tanstack/react-query';
+import { apiGet, apiPath } from './client';
 import type { Schemas } from './types';
 
 export type CourseDetail = Schemas['CourseDetailOut'];
@@ -12,6 +14,19 @@ export interface ComparePageProps {
   onRemove: (id: string) => void;
   onClear: () => void;
   onReload: () => void;
+}
+
+// GET /course/{course_id}, the body as it came: each page checks the fields it reads (R5b, R3b). A course reads the
+// same for everyone, so the key names no viewer; nothing here logs the path, which carries the course (R0 14.1).
+export function courseQuery(courseId: string) {
+  return queryOptions({
+    queryKey: ['course', courseId],
+    queryFn: ({ signal }) =>
+      apiGet(apiPath('/course/{course_id}', { course_id: courseId }), {
+        timeout: 'slow',
+        signal,
+      }),
+  });
 }
 
 // Handwritten R3b response contract; runtime parsing is deliberately separate. It stays hand-written beside the

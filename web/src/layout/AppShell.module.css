@@ -27,6 +27,11 @@
 .main:focus {
   outline: none;
 }
+.fallback p {
+  margin: var(--space-0) var(--space-0) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
 .notice {
   font-size: var(--text-sm);
   color: var(--ink3);

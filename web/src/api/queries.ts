@@ -7,8 +7,16 @@
 //   (401, 403, 404...) nothing old (shownData);
 // - what depends on who is asking has the viewer in its key and goes at logout or a change of account (step 2);
 //   policy evidence is never cached and never shown stale (its hook comes with R4).
-// The pages' own hooks come with R3-R5; here are the client and the two hooks every page needs.
-import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+// The pages' own queries sit with their API contracts (R5d: coop.ts, course.ts, privacy.ts); here are the client, the
+// two hooks every page needs, and the shell's refresh and its note on content shown from before.
+import {
+  QueryClient,
+  notifyManager,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useCallback, useSyncExternalStore } from 'react';
 import {
   ApiError,
   apiGet,
@@ -17,6 +25,7 @@ import {
   isTransientError,
   unreadableAnswer,
 } from './client';
+import type { Timeout } from './client';
 import type { Schemas } from './types';
 
 export const PUBLIC_FRESH_MS = 5 * 60_000;
@@ -44,6 +53,41 @@ export function shownData<T>(query: {
   return error === null || error === undefined || isTransientError(error)
     ? data
     : undefined;
+}
+
+// Whether a query on screen is showing what it had before because the latest try failed for a moment (shownData keeps
+// it): the page then says so, as Streamlit's FALLBACK_NOTICE does (R0 2, R5d). Cache events can come while a page
+// renders, so they reach React batched, as TanStack's own useIsFetching does.
+export function useShowingOld(): boolean {
+  const cache = useQueryClient().getQueryCache();
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      cache.subscribe(notifyManager.batchCalls(listener)),
+    [cache],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () =>
+      cache
+        .findAll({ type: 'active' })
+        .some(
+          ({ state }) =>
+            state.status === 'error' &&
+            state.data !== undefined &&
+            isTransientError(state.error),
+        ),
+    () => false,
+  );
+}
+
+// The account box's 「刷新页面内容」, as Streamlit's: every read goes stale, and what is on screen is asked again at once
+// (R0 2). Who is looking changes only with a login, a logout, an upload or a reload of the page, so /auth/me is asked
+// again only when it had failed; otherwise there would be no way to try it again short of reloading.
+export function refreshReads(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({
+    predicate: ({ queryKey, state }) =>
+      !(queryKey[0] === meQuery.queryKey[0] && state.status === 'success'),
+  });
 }
 
 export type PublicConfig = Schemas['PublicConfigResponse'];
@@ -99,7 +143,7 @@ export function parseIdentity(value: unknown): Member {
       typeof email === 'string' &&
       email !== '' &&
       typeof count === 'number' &&
-      Number.isInteger(count) &&
+      Number.isSafeInteger(count) &&
       count >= 0 &&
       (displayName === null || typeof displayName === 'string') &&
       (token === null || typeof token === 'string')
@@ -115,22 +159,48 @@ export function parseIdentity(value: unknown): Member {
   throw unreadableAnswer();
 }
 
-// Who is looking: 401 means a guest (the API also expires a cookie that no longer works). It changes only through
-// login and logout, which update it here, so it never goes stale by itself.
+// Who is looking, from /auth/me: 401 means a guest (the API also expires a cookie that no longer works).
+export async function whoIsAsking(
+  timeout: Timeout = 'slow',
+  signal?: AbortSignal,
+): Promise<Viewer> {
+  try {
+    return parseIdentity(
+      await apiGet(apiPath('/auth/me'), { timeout, signal }),
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return GUEST;
+    throw error;
+  }
+}
+
+// Who is looking changes only through login and logout, which update it here, so it never goes stale by itself.
 export const meQuery = queryOptions({
   queryKey: ['me'],
-  queryFn: async ({ signal }): Promise<Viewer> => {
-    try {
-      return parseIdentity(
-        await apiGet(apiPath('/auth/me'), { timeout: 'slow', signal }),
-      );
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) return GUEST;
-      throw error;
-    }
-  },
+  queryFn: ({ signal }) => whoIsAsking('slow', signal),
   staleTime: Infinity,
 });
+
+// Every tab shares the cookie, and a tab asks who is looking only at login, logout and a reload, so another tab may
+// have logged out, or in as someone else, since. A write that acts on the account asks again first (A27): 'same' while
+// the member this page shows is still the one signed in, 'other' when /auth/me says someone else, or nobody, is now,
+// 'unknown' when it gives no answer this page can read within 8 seconds. An upload goes out unless it is 'other' (a
+// review and the API's duplicate check stand behind it); the deletion, which cannot be undone, only when it is 'same'.
+export type SignedInNow = 'same' | 'other' | 'unknown';
+export async function signedInNow(
+  viewer: Viewer | undefined,
+): Promise<SignedInNow> {
+  if (viewer?.kind !== 'member') return 'other';
+  let asking: Viewer;
+  try {
+    asking = await whoIsAsking('read');
+  } catch {
+    return 'unknown';
+  }
+  return asking.kind === 'member' && asking.userId === viewer.userId
+    ? 'same'
+    : 'other';
+}
 
 export function useMe(enabled = true) {
   return useQuery({ ...meQuery, enabled });

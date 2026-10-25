@@ -235,6 +235,16 @@ export function apiPost(
   );
 }
 
+// The status of the answer behind a failure, or null when no answer came: no connection, or none in time. The
+// pages built on fixtures name that case null (R5b, R5c).
+export function answerStatus(error: unknown): number | null {
+  if (!(error instanceof ApiError)) return null;
+  return error.errorType === 'transport_error' ||
+    error.errorType === 'transport_timeout'
+    ? null
+    : error.status;
+}
+
 // Temporary failures (a timeout, too many requests, the server or the connection) keep showing what the same visitor
 // last saw; a definite answer (401, 403, 404, 422...) does not (R0 12).
 export function isTransientError(error: unknown): boolean {

@@ -1,6 +1,6 @@
 # NEU-Compass · React 本地原型
 
-这是新前端的本地原型：长得对、点得动，页面内容还是假数据。R2b 起登录、登出和「现在是谁」接上了真实接口（见下面「接口层与登录 R2b」），各页的内容以后分批接。不是已经迁移完成的产品，也不替代线上 Streamlit。
+这是新前端的本地原型：长得对、点得动，一部分页面已经接上真实接口。R2b 起登录、登出和「现在是谁」是真的（见下面「接口层与登录 R2b」），R5d 起 Co-op、课程对比、数据与隐私三页也是（见「Co-op、对比、隐私接真实接口 R5d」）；搜索、课程详情和培养方案还是假数据，以后分批接。不是已经迁移完成的产品，也不替代线上 Streamlit。
 
 ## 安装与运行
 
@@ -46,10 +46,13 @@ npm.cmd run test:mutations
 | `/?demo=empty`        | 四个示例问题的空首页；发送后显示固定示例回答                        |
 | `/course/CS-6140`     | 桌面保留左侧对话，右侧课程详情；手机一栏到底                        |
 | `/course/CS-5800` 等  | 只支持五门 fixture 课程；未知课号显示明确空状态                     |
-| `/compare`            | R5b 合成 API 课程对比，默认四列；七项信息、独立失败状态、移出与清空 |
-| `/coop`               | R5a 合成 Co-op 列表、等级展示、投稿表单与结果演示                   |
+| `/compare`            | R5d：对比列表里的课各取一次真实接口；加课的按钮 R3 才接，现在是空的 |
+| `/coop`               | R5d：按「现在是谁」取真实的 Co-op 列表，登录的人能投稿              |
 | `/programs`           | “这一页正在搬到新版”                                                |
-| `/privacy`            | R5c 接口形状的合成隐私说明、确认删除与四类结果演示                  |
+| `/privacy`            | R5d：真实接口给的隐私说明，登录的人能删号                           |
+| `/compare-demo`       | R5b 合成 API 课程对比，默认四列；七项信息、独立失败状态、移出与清空 |
+| `/coop-demo`          | R5a 合成 Co-op 列表、等级展示、投稿表单与结果演示                   |
+| `/privacy-demo`       | R5c 接口形状的合成隐私说明、确认删除与四类结果演示                  |
 | `/course-detail-demo` | R3b 合成课程详情、四种对比状态及原样接入的 R3a 先修面板             |
 | 其他                  | 404 与返回首页链接                                                  |
 
@@ -61,10 +64,10 @@ npm.cmd run test:mutations
 
 - 项目／方案与演示问题放在路由之上的 React context，页间跳转不会丢；换项目会清掉方案。对比页不再提供方案选择。没有持久化到 localStorage、Cookie 或后端。
 - 搜索清单和详情里的“加入对比”按 R1 规范只 `console.info` 合成课号，并显示本地提示，**不实际添加课程**。
-- 对比列表改为独立的 course ID 内存 store，侧栏和顶栏读取同一份列表。演示首次进入或切换场景才填入示例；同一场景离开再返回，不会复活已移出／清空的课程。刷新会恢复示例，不能把它当成正式登录／退出策略；R2 仍须在真实身份边界主动调用 `clearCompare()`。
-- 侧栏和手机菜单的登录、登出从 R2b 起是真的（见「接口层与登录 R2b」）。Co-op、对比、隐私三页还用自己的演示身份，Co-op 本页的登录按钮仍只显示演示通知，等 R5d 接上真实接口。
-- 输入、发送、Enter、Shift+Enter、中文输入法和允许保存勾选可以操作，但只更新本地问题，回答始终标作固定示例；不会调用模型、写查询日志或真的保存回答。「允许保存」默认关闭，每次发送后重置，只代表这次问题的演示选择。未来查询日志提示文案保留；侧栏注明当前是假数据原型。
-- 分享按钮仅展开当前本地路由，不复制、上传或发布任何内容。刷新课程数据也只显示演示提示。
+- 对比列表是 course ID 的内存 store，侧栏和顶栏读同一份；R5d 起它就是学生真正的对比列表，登出和删号时清空。演示外壳 `/compare-demo` 用自己的一份：首次进入或切换场景才填入示例；同一场景离开再返回，不会复活已移出／清空的课程。
+- 侧栏和手机菜单的登录、登出从 R2b 起是真的（见「接口层与登录 R2b」）；R5d 起 Co-op、对比、隐私三页用的也是这个身份，Co-op 页上的登录就是侧栏的登录。三个演示外壳还用自己的演示身份。
+- 输入、发送、Enter、Shift+Enter、中文输入法和允许保存勾选可以操作，但只更新本地问题，回答始终标作固定示例；不会调用模型、写查询日志或真的保存回答。「允许保存」默认关闭，每次发送后重置，只代表这次问题的演示选择。未来查询日志提示文案保留；侧栏注明搜索还是假数据原型。
+- 分享按钮仅展开当前本地路由，不复制、上传或发布任何内容。侧栏的「刷新页面内容」R5d 起真的重取（见 R5d 一节）。
 
 ## Co-op R5a（2026-10-22）
 
@@ -72,13 +75,13 @@ npm.cmd run test:mutations
 
 `src/api/coop.ts` 暂手写说明书的接口类型。`CoopPage` 只接 `viewer`、`list`、`onRetryList`、`onSubmit`、`onLogin`；不读取 URL 或修改贡献数。`CoopDemoPage` 单独承担本地演示参数、通知和 400ms 延迟。登录按钮只显示“未发起真实登录”的本地提示，不伪造登录。
 
-| `/coop` 参数 | 可选值 / 默认                                                                                                                             |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `viewer`     | `guest`（默认）、`member0`、`member1`、`member2`，直接选择对应 API 导出列表                                                               |
-| `list`       | `ready`（默认）、`loading`、`error`、`empty`                                                                                              |
-| `submit`     | `pending`（默认）、`duplicate-pending`、`duplicate-approved`、`duplicate-published`、`duplicate-rejected`、`401`、`422`、`503`、`network` |
+| `/coop-demo` 参数 | 可选值 / 默认                                                                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `viewer`          | `guest`（默认）、`member0`、`member1`、`member2`，直接选择对应 API 导出列表                                                               |
+| `list`            | `ready`（默认）、`loading`、`error`、`empty`                                                                                              |
+| `submit`          | `pending`（默认）、`duplicate-pending`、`duplicate-approved`、`duplicate-published`、`duplicate-rejected`、`401`、`422`、`503`、`network` |
 
-例如 `/coop?viewer=member0&submit=duplicate-approved`，或 `/coop?viewer=guest&list=error`。页面顶部也有三个演示选择器。未知访客回退游客，未知状态回退正常列表 / pending；旧草稿的 `demo=coop-*` 不再使用。演示重试只恢复正常合成列表。
+例如 `/coop-demo?viewer=member0&submit=duplicate-approved`，或 `/coop-demo?viewer=guest&list=error`（R5d 以前是 `/coop`）。页面顶部也有三个演示选择器。未知访客回退游客，未知状态回退正常列表 / pending；旧草稿的 `demo=coop-*` 不再使用。演示重试只恢复正常合成列表。
 
 - **数据来源：** 18 份 JSON 原样来自评审目录 `coop_fixtures/out/`，放在 `src/fixtures/coop/`。测试锁定全部 SHA-256。该生成目录单独跳过 Prettier，以保留来源字节；其余源码照常格式检查。不运行生成脚本、不改 JSON、不包含真实用户数据。
 - **相关课程显示并链接：** 复用 `CourseCode`，空格换横线并编码为本地 `/course/<code>`。当前仍只支持 R1 五门示例；这不是 R3 的真实 resolver。
@@ -95,7 +98,7 @@ npm.cmd run test:mutations
 
 按评审目录 `frontend_react/R5B_COMPARE_SPEC.md`，从 `6b633b9` 开出 `feat/web-compare`，只改 `web/`，不接真实 API。沿用 Sites 的本地预览流程，保留原有 tokens、组件与路由；没有生成托管站点或发布。独立修改与验收记录见 [COMPARE_WORKLOG.md](COMPARE_WORKLOG.md)。
 
-`/compare?case=<值>` 可直接切换，页面顶部也有原生「演示场景」选择器；缺省及未知值回退 `four`。
+`/compare-demo?case=<值>`（R5d 以前是 `/compare`）可直接切换，页面顶部也有原生「演示场景」选择器；缺省及未知值回退 `four`。
 
 | case                     | 内容                                                                    |
 | ------------------------ | ----------------------------------------------------------------------- |
@@ -124,7 +127,7 @@ npm.cmd run test:mutations
 
 从对比页 `101775e` 开 `feat/web-privacy`，依据 `frontend_react/R5C_PRIVACY_SPEC.md`，仅改 `web/`，无新增依赖。沿用 Sites 的本地开发／预览流程与现有 tokens，不注册托管、不发布。独立记录见 [PRIVACY_WORKLOG.md](PRIVACY_WORKLOG.md)。
 
-`/privacy` 默认游客、90 天说明、成功结果场景。参数也可用页面顶部三个选择器切换：
+`/privacy-demo`（R5d 以前是 `/privacy`）默认游客、90 天说明、成功结果场景。参数也可用页面顶部三个选择器切换：
 
 | 参数      | 值                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -132,7 +135,7 @@ npm.cmd run test:mutations
 | `privacy` | `90-days`（默认）、`no-cleanup-off`、`30-days`、`no-cleanup-contact`、`loading`、`error`、`network`、`unrecognised` |
 | `delete`  | `ok`（默认）、`ok-nothing`、`401-stale`、`401-gone`、`403`、`422`、`503`、`network`                                 |
 
-例如 `/privacy?viewer=member&privacy=30-days&delete=503`。未知值分别回退 `guest` / `90-days` / `ok`；`network` 删除场景模拟抛错。删除和重试均等 400ms，重试回到原来的合成响应，不假装联网成功。
+例如 `/privacy-demo?viewer=member&privacy=30-days&delete=503`。未知值分别回退 `guest` / `90-days` / `ok`；`network` 删除场景模拟抛错。删除和重试均等 400ms，重试回到原来的合成响应，不假装联网成功。
 
 - **文本唯一来源：** intro、每段标题／句子、delete_what 全部来自原始 body；不在组件重写保留天数、邮箱或政策文字。10 份 JSON 原字节复制，独立 SHA-256 测试锁定，单独跳过 Prettier。query_log_notice / capture_notice 只声明类型，本页不显示，留给 R3。后端提供的 👍／👎 作为原句的一部分保留，不拿 emoji 代替 UI 图标；标题用 Lucide Lock。
 - **整页校验：** 只校验本页实际使用的字段，其他键忽略；sections 必须非空，每个标题、每句都是字符串。有一处不对就只显示固定失败提示和重试，不展示半份隐私说明，也不开放删除。加载选择文字「正在加载」，避免虚构政策内容。
@@ -142,7 +145,7 @@ npm.cmd run test:mutations
 - **演示身份不等于登录：** 删除成功或 401 只改变本地演示身份，不改 URL；选择器显示 URL 中的初始化场景，当前状态另有一行明确显示。显式切换任意参数会开始新的演示场景并清除旧结果；模拟删号导致的身份变化不会重建页面。全站身份、Cookie 和其他页面 store 的清空留给 R2b。
 - **安全／布局：** 所有接口文字都是 React 纯文本，邮箱／网址不自动成链接；不写 storage，不输出 console。删除区始终在四段之后，确认 label 的触控区不小于 44px；结果是可聚焦 status，正文长句换行，两种验收宽度均无整页横向溢出。
 
-当前仍是合成演示，**没有执行任何真实删号、登录／退出、请求或数据库操作**。真实 R2b 接入必须负责响应校验（特别是 200 的 deleted）、请求体 `{"confirm":"delete"}`、Cookie／Origin／X-NEU-Compass 及会话边界；不能照搬 URL 演示身份作为鉴权，也不能随 viewer 重建 PrivacyPage 丢掉结果。真实请求瀑布、实际删号、屏幕阅读器语音及上线仍需单独验收。
+这一节说的是 R5c 的演示页（R5d 起在 `/privacy-demo`），它仍是合成演示，**没有执行任何真实删号、登录／退出、请求或数据库操作**；`/privacy` 接真实接口见「Co-op、对比、隐私接真实接口 R5d」。真实 R2b 接入必须负责响应校验（特别是 200 的 deleted）、请求体 `{"confirm":"delete"}`、Cookie／Origin／X-NEU-Compass 及会话边界；不能照搬 URL 演示身份作为鉴权，也不能随 viewer 重建 PrivacyPage 丢掉结果。真实请求瀑布、实际删号、屏幕阅读器语音及上线仍需单独验收。
 
 ## R3a 先修要求组件与演示
 
@@ -180,7 +183,7 @@ npm.cmd run test:mutations
 
 **本机怎么跑：** 起两个服务，都在 `127.0.0.1`。
 
-1. 开发用的 API：在仓库根目录（WSL）用项目的 Python 环境运行 `uv run python -m tests.support.dev_api`，监听 `127.0.0.1:8000`；没有 `.env` 时先设一个占位的 `GEMINI_API_KEY`（设置要求有这一项）。它是真的 `create_app()`，但用临时文件里的合成数据库、测试套件的替身模型，Google 换成本机的假登录页 `/__dev/google`（三个合成账号，三种被拒、state 不对和取消各一个链接）。除了 Gemini 的 key，每个设置都从代码里的默认值开始，`.env` 和环境变量里的限流、数据路径之类不起作用；访问日志和生产一样去掉登录地址的查询串、课程只记路径模板。每次启动换一个会话密钥，重启就都登出了。不部署，生产代码不 import 它，API 里也没有测试模式。
+1. 开发用的 API：在仓库根目录（WSL）用项目的 Python 环境运行 `uv run python -m tests.support.dev_api`，监听 `127.0.0.1:8000`；没有 `.env` 时先设一个占位的 `GEMINI_API_KEY`（设置要求有这一项）。它是真的 `create_app()`，但用临时文件里的合成数据库、测试套件的替身模型，Google 换成本机的假登录页 `/__dev/google`（五个合成账号，R5d 加的两个有贡献，见 R5d 一节；三种被拒、state 不对和取消各一个链接）。除了 Gemini 的 key，每个设置都从代码里的默认值开始，`.env` 和环境变量里的限流、数据路径之类不起作用；访问日志和生产一样去掉登录地址的查询串、课程只记路径模板。每次启动换一个会话密钥，重启就都登出了。不部署，生产代码不 import 它，API 里也没有测试模式。
 2. 本页：`npm.cmd run dev`，打开 `http://127.0.0.1:5173/`（不要用 `localhost`）。预览构建用 `npm.cmd run build:dev-api` 再 `npm.cmd run preview:dev-api`。
 
 页面和 API 的主机名必须一样：浏览器按主机名算「站点」，`localhost` 和 `127.0.0.1` 是两个站点，SameSite=Lax 的会话 cookie 就不跟着请求走，登录了也像没登录。Chromium 在 `http://127.0.0.1` 上收 `__Host-` 开头、带 Secure 的 cookie（10-23 在浏览器里验过）。
@@ -194,7 +197,7 @@ npm.cmd run test:mutations
 - **焦点：** 账号框里按下的按钮忙完以后（登出换成登录按钮、失败恢复原按钮），焦点回到账号框现在的按钮上（桌面侧栏和手机菜单里都一样，和结果同一次渲染完成），用户自己移开了就不动。从 Google 页按「后退」、浏览器原样恢复本页时，登录按钮恢复可用。
 - **聊天流：** `src/api/chatStream.ts` 的 `streamChat(request, { signal })` 边收边读 `/chat` 的 NDJSON，给 R3 的搜索和聊天页用；它是 `client.ts` 以外唯一调 fetch 的文件。先 `meta`，再若干 `token`，最后 `done`（可能带反馈凭证，由页面照 Streamlit 的做法核对）；或者中途一个 `error`，它的 `detail` 是 API 给学生看的固定中文，照样显示。等回答开始、等下一块各最多 30 秒；断线、超时、没有 `done` 就结束、有一行不是这四种事件、或者一行（不算行尾）长过 100 万个字符（API 最长的一行也就几十 KB），都在已经收到的内容后面补一句 Streamlit 的话（「连接中断。…」或「回答流未完整结束；…」）。流开始前的失败和别的请求一样是 `ApiError`。不自动重发（每问一次都算模型次数、写查询日志）；能取消。
 - **开发 API 的聊天：** `/chat` 按脚本回答，不调用模型，HyDE 补救也关着。问题里带 `dev:model-error`（模型中途出错）、`dev:no-answer`（没有回答）、`dev:daily-limit`（今天的次数用完）、`dev:no-done`（流没有 `done` 就结束）、`dev:cut`（连接中途断开）、`dev:stall`（停 35 秒，比前端等的久），就换成对应的情况。
-- **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config` 和游客身份，测试里不发请求（`fetch` 在测试里仍被禁止，要用就 stub）。
+- **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config` 和游客身份，外壳不再发请求（`fetch` 在测试里仍被禁止，要用就 stub；R5d 的接线测试用 `src/test/fakeApi.tsx` 回答页面自己的请求）。
 - **上线前（R7）：** Google OAuth 客户端要把新前端的地址（来源加 `/`）加进 Authorized redirect URI，API 的 `WEB_ORIGINS` 也要设成它，不然 Google 或 API 会拒绝。
 
 ## R3c 搜索回答区与演示（2026-10-24）
@@ -232,6 +235,23 @@ npm.cmd run preview -- --port 4173 --strictPort
 ```
 
 前一个变异脚本是 R3c 的 36 个具名变异，后一个保留现有 152 个回归变异；均在临时快照运行并核对工作源文件未变。完整网络瀑布、屏幕阅读器语音、真实 `/chat` / `/feedback`、方案选择、停止、分享及生产集成另行验收。本轮只有本地提交，不推送、不建 PR、不部署。
+
+## Co-op、对比、隐私接真实接口 R5d（2026-10-24）
+
+从 main `4797a32` 开 `feat/web-pages-api`，依据评审目录 `frontend_react/R5D_PLAN.md`。`/coop`、`/compare`、`/privacy` 换成接真实接口的外壳（`src/pages/CoopRoute.tsx`、`CompareRoute.tsx`、`PrivacyRoute.tsx`），页面本身还是 R5a、R5b、R5c 的；三个演示外壳挪到 `/coop-demo`、`/compare-demo`、`/privacy-demo`，内容不变。本机对着开发 API 跑，见「接口层与登录 R2b」。
+
+- **外壳给页面的东西**（`src/layout/account.ts`）：页面用 `useAccount()` 读 `viewer`（还在确认时是 undefined）和 `unsure`（`/auth/me` 暂时失败），调 `login()`（侧栏的同一个登录）、`signedOut()`（删号成功或 401 以后：和登出一样丢掉按身份的缓存、清空对比，但不调 `/auth/logout`）、`contributed(count)`（投稿的 201 带着服务端的贡献数，数变了就当作换了访客，旧的按身份缓存一起丢）。
+- **写操作前再问一次是谁**（`src/api/queries.ts` 的 `signedInNow`）：cookie 是所有标签页共用的，别的标签页可能已经登出或换了人。投稿和删号发出去之前先问 `/auth/me`（最多 8 秒）。明确是别人或没人登录，两样都不发，照「这个登录已经失效」处理；问不到时投稿照发，删号不发（不可撤销），说「什么也没删」。
+- **刷新按钮**：侧栏的按钮改叫「刷新页面内容」，所有读过的内容都过期，正在显示的马上重取；`/auth/me` 只在失败过时重读（身份只在登录、登出、投稿和整页刷新时变）。
+- **「显示的是上次的版本」**：正在显示的内容因为暂时的失败（408、429、5xx、连不上、读不懂）留着上次的版本时，`<main>` 最上面说一句「有些内容这次没能更新，显示的是上次加载的版本；可以点「刷新页面内容」再试。」（Streamlit 的 `FALLBACK_NOTICE`，后半句改了：新前端不会自己再试）。不在屏幕上的内容不算。
+- **Co-op**：键 `['viewer', 身份, 'coop']`，身份是 `guest`、`member:{user_id}:{贡献数}` 或 `unsure`，还不知道是谁时不发；按游客显示的时候（游客或 `unsure`），API 照 cookie 给出的面试、技术题、薪资也按游客清掉，缓存里也不留。每次进这一页都重取，中间先显示上次的；`GET /coop` 等 30 秒。列表有一行不对就整份当作读不懂。投稿 `POST /coop`（30 秒，不自动重试）成功以后，用服务端给的贡献数更新侧栏和等级，列表跟着重取，投稿结果那句还在（页面按登录的人给 key，不按等级）。失败只给页面 R2b `ApiError` 的状态码、`error_type` 和被拒的字段名，API 的原文到不了页面；连不上、超时、代理页面、读不懂和 503 都说「投稿暂时提交不了，请稍后再试。你填的内容还在。」。
+- **对比**：列表里的课（最多 4 门）各取一次 `GET /course/{course_id}`（30 秒），每次进这一页都重取；一门课失败只坏那一列，「重新加载」只重取失败和读不懂的列。`src/models/compareList.ts` 改成 `createCompareList()`：页面用原来那一份（导出的名字不变），演示外壳用自己的一份，演示不再改学生真正的对比列表。加课的按钮在课程详情上，R3 才接，所以在那之前真实的对比页是空的。
+- **隐私**：`GET /privacy`（8 秒），5 分钟内不重取。删号 `POST /auth/delete-account`，请求体正好是 `{"confirm": "delete"}`（15 秒）；200 要读得懂才算删了，读不懂当作不知道删没删。删完或 401，本页变成游客，删除结果留着（页面不按访客给 key）；登出由路由来做，删号路上离开了这一页，回答到了也照样登出（结果那句就看不到了）。
+- **开发 API 的 Co-op**：合成库里有七条 Co-op 记录，三条策展种子（0、1、2 级各一），两组照真的审核流程公开的投稿（每组两个投稿人）。假 Google 页多了 `dev-one`（1 次贡献）和 `dev-two`（2 次贡献），贡献是审核公开时真记的功。删号在临时库上照真的走：删掉 `dev-two`，它参与公开的两组都只剩一个投稿人，一起撤下，列表只剩三条种子，`dev-one` 的贡献不收回。重启就都回来了。
+- **测试**：`src/test/fakeApi.tsx` 按方法和路径回答、记下每个请求，连查询串一起（测试里 `fetch` 照旧要 stub）；`src/test/timeouts.ts` 查一个请求正好在它那一档超时上放弃。项目的 `test:mutations` 还是 152 个，M35、M54、M55、M79 跟着代码改了锚点和测试名。
+- 演示外壳没有改成懒加载（方案里写了要改），和 `/requisites-demo`、`/course-detail-demo` 一样直接加载；首屏 JavaScript gzip 186,015 字节（预算 250,000）。
+
+修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 35 节。
 
 ## 设计选择及差异
 

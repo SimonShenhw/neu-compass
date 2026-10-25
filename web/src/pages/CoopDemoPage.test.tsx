@@ -6,7 +6,7 @@ import { App } from '../App';
 import { demoOutcome } from '../fixtures/coopDemo';
 import { WithApi } from '../test/withApi';
 
-function page(path = '/coop') {
+function page(path = '/coop-demo') {
   return render(
     <WithApi>
       <MemoryRouter initialEntries={[path]}>
@@ -16,7 +16,7 @@ function page(path = '/coop') {
   );
 }
 it('unknown demo input safely falls back to guest with no global guest badge or upload form', () => {
-  page('/COOP/?viewer=unexpected&list=unexpected&submit=unexpected');
+  page('/COOP-DEMO/?viewer=unexpected&list=unexpected&submit=unexpected');
   expect(screen.getAllByRole('article')).toHaveLength(4);
   expect(screen.queryByText('$40-45/hr')).not.toBeInTheDocument();
   expect(
@@ -27,12 +27,12 @@ it('unknown demo input safely falls back to guest with no global guest badge or 
   );
   expect(
     screen
-      .getByRole('heading', { name: 'Co-op 经验', level: 1 })
+      .getByRole('heading', { name: 'Co-op 演示', level: 1 })
       .closest('header'),
   ).not.toHaveTextContent('游客');
 });
 it('switching response scope removes old details and resets filters and private draft', async () => {
-  page('/coop?viewer=member2');
+  page('/coop-demo?viewer=member2');
   const user = userEvent.setup();
   expect(screen.getByText('$40-45/hr')).toBeInTheDocument();
   await user.type(screen.getByLabelText(/^公司/), '私有合成草稿');
@@ -52,7 +52,7 @@ it('switching response scope removes old details and resets filters and private 
   expect(screen.getByLabelText(/^公司/)).toHaveValue('');
 });
 it('demo retry restores the list and login is only a local notification', async () => {
-  page('/coop?list=error');
+  page('/coop-demo?list=error');
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: '重试' }));
   expect(screen.getAllByRole('article')).toHaveLength(4);
@@ -64,7 +64,7 @@ it('demo retry restores the list and login is only a local notification', async 
 it('demo submission waits 400ms, keeps server contribution props unchanged and discards late results after scope change', async () => {
   vi.useFakeTimers();
   try {
-    page('/coop?viewer=member0');
+    page('/coop-demo?viewer=member0');
     fireEvent.change(screen.getByLabelText(/^公司/), {
       target: { value: 'Example' },
     });
@@ -135,7 +135,17 @@ it.each([
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.status).toBe(choice === 'network' ? 503 : Number(choice));
-        expect(result.body === null).toBe(choice === 'network');
+        expect(result.errorType).toBe(
+          {
+            '401': 'unauthorized',
+            '422': 'invalid_input',
+            '503': 'service_unavailable',
+            network: 'transport_error',
+          }[choice],
+        );
+        expect(result.invalidFields).toEqual(
+          choice === '422' ? ['duration_months'] : [],
+        );
       }
     }
   },

@@ -5,10 +5,12 @@ import {
   useMutation,
   useQuery,
 } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, TIMEOUT_MS, apiPath, apiPost } from './client';
+import { expectTimeout } from '../test/timeouts';
+import { ApiError, TIMEOUT_MS, apiGet, apiPath, apiPost } from './client';
 import {
   GUEST,
   PUBLIC_FRESH_MS,
@@ -17,9 +19,12 @@ import {
   meQuery,
   parseConfig,
   parseIdentity,
+  refreshReads,
   shownData,
+  signedInNow,
   useConfig,
   useMe,
+  useShowingOld,
 } from './queries';
 
 function serve(...answers: (() => Response)[]) {
@@ -329,6 +334,7 @@ describe('GET /auth/me', () => {
       { ...member, contribution_count: true },
       { ...member, contribution_count: null },
       { ...member, contribution_count: '2' },
+      { ...member, contribution_count: 2 ** 53 },
       { ...member, display_name: 3 },
       { ...member, session_token: 3 },
     ])
@@ -342,5 +348,176 @@ describe('GET /auth/me', () => {
     const { result } = renderHook(() => useMe(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(GUEST);
+  });
+});
+
+describe('asking again before a write acts on the account (R5d, A27)', () => {
+  const shown = parseIdentity(member);
+
+  // The count is not who is signed in: a review may have published an earlier upload since (B27 recheck).
+  it.each([
+    ['the same member', 'same', json(member)],
+    [
+      'the same member, with a count grown since,',
+      'same',
+      json({ ...member, contribution_count: 3 }),
+    ],
+    ['someone else', 'other', json({ ...member, user_id: 'u-2' })],
+    ['nobody', 'other', json({ error_type: 'unauthorized' }, 401)],
+    ['an answer the page cannot read', 'unknown', json({ user_id: '' })],
+    ['a failure', 'unknown', json({ error_type: 'service_unavailable' }, 503)],
+  ] as const)(
+    'with %s signed in now, the page is told %s',
+    async (_name, now, answer) => {
+      const fetch = serve(answer);
+      expect(await signedInNow(shown)).toBe(now);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0]![0]).toBe('http://127.0.0.1:8000/auth/me');
+      expect(fetch.mock.calls[0]![1]).toMatchObject({ credentials: 'include' });
+    },
+  );
+
+  it('a page that shows nobody signed in never writes as anyone, and asks nothing', async () => {
+    const fetch = serve(json(member));
+    expect(await signedInNow(GUEST)).toBe('other');
+    expect(await signedInNow(undefined)).toBe('other');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('waits 8 seconds at most for /auth/me, then cannot say', async () => {
+    await expectTimeout(
+      () => signedInNow(shown),
+      'read',
+      (settled) => expect(settled).toBe('unknown'),
+    );
+  });
+});
+
+describe('the shell’s refresh and its note on content from before (R5d)', () => {
+  it('refresh makes every read stale and asks again what is on screen, but not who is looking', async () => {
+    const fetch = serve(json(member));
+    const client = createQueryClient();
+    client.setQueryData(meQuery.queryKey, GUEST);
+    // A page left earlier: its query is in the cache, with nobody looking at it.
+    const left = vi.fn(async () => 'left');
+    await client.fetchQuery({ queryKey: ['left'], queryFn: left });
+    const shown = vi.fn(async () => 'fresh');
+    renderHook(
+      () => {
+        useMe();
+        return useQuery({
+          queryKey: ['shown'],
+          queryFn: shown,
+          staleTime: Infinity,
+        });
+      },
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() => expect(shown).toHaveBeenCalledTimes(1));
+    await act(() => refreshReads(client));
+    expect(shown).toHaveBeenCalledTimes(2);
+    // Not on screen: stale now, asked again only when it is shown.
+    expect(left).toHaveBeenCalledTimes(1);
+    expect(client.getQueryState(['left'])?.isInvalidated).toBe(true);
+    expect(client.getQueryState(meQuery.queryKey)?.isInvalidated).toBe(false);
+    expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('refresh asks who is looking again only after that failed', async () => {
+    const fetch = serve(
+      json({ error_type: 'service_unavailable' }, 503),
+      json(member),
+    );
+    const client = createQueryClient();
+    const { result } = renderHook(() => useMe(), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await act(() => refreshReads(client));
+    await waitFor(() =>
+      expect(result.current.data).toMatchObject({ userId: 'u-1' }),
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [
+      'a temporary failure after a success',
+      true,
+      [json(['old']), json({}, 503)],
+    ],
+    [
+      'a definite failure after a success',
+      false,
+      [json(['old']), json({}, 404)],
+    ],
+    ['a temporary failure with nothing before it', false, [json({}, 503)]],
+  ] as const)('after %s the note shows: %s', async (_name, shown, answers) => {
+    serve(...answers);
+    const client = createQueryClient();
+    const { result } = renderHook(
+      () => ({
+        old: useShowingOld(),
+        list: useQuery({
+          queryKey: ['list'],
+          queryFn: ({ signal }) => apiGet('/coop', { timeout: 'read', signal }),
+        }),
+      }),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() => expect(result.current.list.isFetching).toBe(false));
+    if (answers.length > 1) {
+      await act(async () => {
+        await result.current.list.refetch();
+      });
+    }
+    await waitFor(() => expect(result.current.old).toBe(shown));
+  });
+
+  // A page showing the list, and the note, for the two tests below.
+  function showList(client: QueryClient) {
+    return renderHook(
+      () => ({
+        old: useShowingOld(),
+        list: useQuery({
+          queryKey: ['list'],
+          queryFn: ({ signal }) => apiGet('/coop', { timeout: 'read', signal }),
+        }),
+      }),
+      { wrapper: wrapper(client) },
+    );
+  }
+
+  it('the note goes once the content is new again', async () => {
+    serve(json(['old']), json({}, 503), json(['new']));
+    const { result } = showList(createQueryClient());
+    await waitFor(() => expect(result.current.list.data).toEqual(['old']));
+    await act(async () => {
+      await result.current.list.refetch();
+    });
+    await waitFor(() => expect(result.current.old).toBe(true));
+    await act(async () => {
+      await result.current.list.refetch();
+    });
+    await waitFor(() => expect(result.current.old).toBe(false));
+  });
+
+  it('a page no longer shown does not count, though what it kept is still from before', async () => {
+    serve(json(['old']), json({}, 503));
+    const client = createQueryClient();
+    const { result, unmount } = showList(client);
+    await waitFor(() => expect(result.current.list.data).toEqual(['old']));
+    await act(async () => {
+      await result.current.list.refetch();
+    });
+    await waitFor(() => expect(result.current.old).toBe(true));
+    unmount();
+    const watcher = renderHook(() => useShowingOld(), {
+      wrapper: wrapper(client),
+    });
+    expect(client.getQueryState(['list'])).toMatchObject({
+      status: 'error',
+      data: ['old'],
+    });
+    expect(watcher.result.current).toBe(false);
   });
 });

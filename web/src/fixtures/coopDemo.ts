@@ -1,3 +1,5 @@
+import { ApiError, failureFrom } from '../api/client';
+import { submitFailure } from '../api/coop';
 import type {
   CoopListState,
   CoopRecord,
@@ -84,13 +86,20 @@ export const submitOptions = [
   ...Object.keys(results).map((value) => ({ value, label: value })),
   ...['401', '422', '503', 'network'].map((value) => ({ value, label: value })),
 ];
+// A failed upload read from the fixture's answer the way the live page reads one: R2b's failureFrom keeps the status,
+// error_type and the refused fields, never the detail text (R5d).
+function failed(fixture: { status: number; body: unknown }): SubmitOutcome {
+  const text = JSON.stringify(fixture.body);
+  return submitFailure(
+    failureFrom(new Response(text, { status: fixture.status }), text),
+  );
+}
 export function demoOutcome(value: string | null): SubmitOutcome {
-  if (value === 'network') return { ok: false, status: 503, body: null };
-  if (value === '401')
-    return { ok: false, status: 401, body: unauthorized.body };
-  if (value === '422') return { ok: false, status: 422, body: invalid.body };
-  if (value === '503')
-    return { ok: false, status: 503, body: unavailable.body };
+  if (value === 'network')
+    return submitFailure(new ApiError(503, { errorType: 'transport_error' }));
+  if (value === '401') return failed(unauthorized);
+  if (value === '422') return failed(invalid);
+  if (value === '503') return failed(unavailable);
   const key =
     value && Object.hasOwn(results, value)
       ? (value as keyof typeof results)

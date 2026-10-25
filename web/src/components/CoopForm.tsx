@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import type { CoopPageProps } from '../api/coop';
 import {
   emptyDraft,
-  errorField,
+  errorFields,
   failureMessage,
   fieldLabels,
   industryLabels,
@@ -74,15 +74,21 @@ export function CoopForm({
         setDraft({ ...emptyDraft });
       } else {
         setNotice({
-          message: failureMessage(outcome.status, outcome.body !== null),
+          message: failureMessage(outcome.status, outcome.errorType),
           login: outcome.status === 401,
         });
-        const name =
-          outcome.status === 422 ? errorField(outcome.body?.detail) : null;
-        if (name) setErrors({ [name]: invalidMessage });
+        if (outcome.status === 422)
+          setErrors(
+            Object.fromEntries(
+              errorFields(outcome.invalidFields).map((name) => [
+                name,
+                invalidMessage,
+              ]),
+            ),
+          );
       }
     } catch {
-      if (active.current) setNotice({ message: failureMessage(503, false) });
+      if (active.current) setNotice({ message: failureMessage(503, null) });
     } finally {
       if (active.current) {
         locked.current = false;
