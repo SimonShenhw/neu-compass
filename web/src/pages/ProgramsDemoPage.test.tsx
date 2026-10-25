@@ -141,8 +141,8 @@ it('interactive list opens a project, policies follow selection, refresh clears 
   await screen.findAllByText('官方政策来源');
   await userEvent.click(screen.getByRole('button', { name: '查看 CS 5010' }));
   expect(
-    screen.getByRole('status', { name: '培养方案演示结果' }),
-  ).toHaveTextContent('演示：这里会打开 c-cs-5010');
+    screen.getByRole('status', { name: '培养方案演示结果' }).textContent,
+  ).toBe('演示：这里会打开 c-cs-5010');
   await userEvent.click(
     screen.getByRole('button', { name: '刷新方案及政策证据' }),
   );
@@ -195,6 +195,35 @@ it('retry replays the same failed list from loading without fabricating success'
   await tick(300);
   expect(screen.getByRole('alert')).toHaveTextContent('无法加载培养方案列表。');
 });
+it('refresh replays the curriculum from its loading line', async () => {
+  vi.useFakeTimers();
+  page('?scenario=cs-standard-ready');
+  await tick(300);
+  expect(document.querySelector('pre')).not.toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '刷新方案及政策证据' }));
+  expect(screen.getByText('正在加载课程表…')).toBeInTheDocument();
+  await tick(300);
+  expect(
+    screen.getByRole('combobox', { name: /选择目录版本与路径/ }),
+  ).toHaveTextContent(PLAN_PLACEHOLDER);
+});
+// Real timers at the slow speed: Radix Select and fake timers do not mix in jsdom.
+it('a newly chosen plan starts with its own loading line, never the previous plan’s read', async () => {
+  page('?scenario=cs-standard-ready&speed=slow');
+  expect(
+    await screen.findAllByText('官方政策来源', {}, { timeout: 5000 }),
+  ).toHaveLength(2);
+  await choose(/2026-2027 · Align/);
+  expect(screen.getByText('正在加载政策证据…')).toBeInTheDocument();
+  expect(screen.queryByText(/政策响应与当前所选方案/)).toBeNull();
+  expect(
+    await screen.findByText(
+      '该精确方案尚无政策证据关联；不能套用其他年度、方向或路径。',
+      {},
+      { timeout: 5000 },
+    ),
+  ).toBeInTheDocument();
+}, 20000);
 it.each(['/programs-demo', '/PROGRAMS-DEMO/'])(
   'whole App at %s uses no API session requests or prefilled cache',
   async (path) => {

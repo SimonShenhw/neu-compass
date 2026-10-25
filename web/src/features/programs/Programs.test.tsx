@@ -192,6 +192,85 @@ it('data is literal text, preserves spaces and only checked official URLs become
   }
   expect(container.querySelector('pre')!.textContent).toContain('\n  next');
 });
+it('a policy review on the same day as the plan review is shown; only an earlier one is refused', () => {
+  const props = curriculumProps();
+  if (props.policies?.status !== 'ready') throw new Error('fixture');
+  edit(props.policies.data, 'checked_on', '2026-10-03');
+  render(<ProgramCurriculum {...props} />);
+  expect(screen.getAllByText('官方政策来源')).toHaveLength(2);
+});
+it('an unknown requirement type gets the foundation badge style as well as its words', () => {
+  renderGolden(goldens.find((g) => g.name === 'cs-unknown-requirement')!);
+  const row = [...document.querySelectorAll('[data-kind="course"]')].find(
+    (node) => node.textContent?.includes('CS 5200'),
+  )!;
+  expect(row.querySelector('[data-badge]')).toHaveClass('foundation');
+});
+it('every disclosure starts closed', () => {
+  const { container } = renderGolden(
+    goldens.find((g) => g.name === 'cs-standard-ready')!,
+  );
+  const details = [...container.querySelectorAll('details')];
+  expect(details).toHaveLength(6);
+  expect(details.filter((d) => d.open)).toEqual([]);
+});
+it('a draft plan with a reviewer but no review date shows no review line', () => {
+  const props = curriculumProps('cs-bridge-draft');
+  if (props.curriculum.status !== 'ready') throw new Error('fixture');
+  edit(props.curriculum.data, 'plans.1.checked_by', 'synthetic-reviewer');
+  render(<ProgramCurriculum {...props} />);
+  expect(document.querySelector('pre')).not.toBeNull();
+  expect(screen.queryByText(/^对照记录：/)).toBeNull();
+});
+it('the curriculum header shows the prefix and the full name on one line each', () => {
+  const props = curriculumProps('cs-nothing-selected');
+  if (props.curriculum.status !== 'ready') throw new Error('fixture');
+  edit(props.curriculum.data, 'prefix', 'CS\nX');
+  edit(props.curriculum.data, 'full_name', 'MS in\nComputer  Science');
+  const { container } = render(<ProgramCurriculum {...props} />);
+  const header = container.querySelector('[data-kind="header"]')!;
+  expect(header.querySelector('[data-prefix]')!.textContent).toBe('CS X');
+  expect(header.querySelector('[data-name]')!.textContent).toBe(
+    'MS in Computer  Science',
+  );
+});
+it('a program card shows its prefix and full name on one line each', () => {
+  render(
+    <ProgramList
+      programs={{
+        status: 'ready',
+        data: [
+          {
+            program_id: 'x',
+            prefix: 'CS\nX',
+            full_name: 'Name\nTwo',
+            course_count: 1,
+            plan_count: 0,
+          },
+        ],
+      }}
+      onOpenProgram={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+  const card = document.querySelector('[data-kind="program_card"]')!;
+  expect(card.querySelector('[data-prefix]')!.textContent).toBe('CS X');
+  expect(card.querySelector('[data-name]')!.textContent).toBe('Name Two');
+  expect(
+    screen.getByRole('button', { name: '查看 CS X 的课程表' }),
+  ).toBeInTheDocument();
+});
+it('empty curriculum notes and empty course notes show nothing', () => {
+  const props = curriculumProps('cs-nothing-selected');
+  if (props.curriculum.status !== 'ready') throw new Error('fixture');
+  edit(props.curriculum.data, 'notes', '');
+  edit(props.curriculum.data, 'semesters.0.courses.0.notes', '');
+  const { container } = render(<ProgramCurriculum {...props} />);
+  expect(
+    container.querySelector('[data-kind="header"]')!.nextElementSibling,
+  ).toHaveAttribute('data-kind', 'select');
+  expect(container.querySelector('[data-notes]')).toBeNull();
+});
 it.each(['list', 'cs-standard-ready', 'cs-text-edge', 'cs-404', 'loading'])(
   '%s has no axe violations with all disclosures expanded',
   async (name) => {

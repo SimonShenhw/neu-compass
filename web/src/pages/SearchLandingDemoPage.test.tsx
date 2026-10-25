@@ -16,7 +16,11 @@ import { createQueryClient } from '../api/queries';
 import type { ChatSource } from '../api/chat';
 import { useLandingDemo } from '../features/search-landing/useLandingDemo';
 import { LandingConversation } from '../features/search-landing/LandingConversation';
-import { landingSources, landingOptions } from '../fixtures/landingDemo';
+import {
+  landingSources,
+  landingOptions,
+  sampleChat,
+} from '../fixtures/landingDemo';
 import { SAMPLE_QUESTIONS } from '../models/landing';
 import { settledLanding } from '../features/search-landing/landingTestUtils';
 
@@ -29,6 +33,8 @@ const finish = () =>
   act(async () => {
     await vi.runAllTimersAsync();
   });
+const status = () =>
+  screen.getByRole('status', { name: '落地页演示结果' }).textContent;
 function page(query = '?speed=instant', app = false) {
   return render(
     <StrictMode>
@@ -95,6 +101,17 @@ it('slow multiplies all source delays, forever has no scheduled work and unmount
   expect(vi.getTimerCount()).toBe(0);
   forever.unmount();
 });
+it('instant releases every source with no delay', async () => {
+  vi.useFakeTimers();
+  const hook = renderHook(() => useLandingDemo('guest', 'instant'));
+  await tick(0);
+  expect(hook.result.current.programs.status).toBe('ready');
+  expect(hook.result.current.coop.status).toBe('ready');
+  // A zero delay set during a fake-timer tick runs one fake millisecond later.
+  await tick(1);
+  expect(Object.keys(hook.result.current.curricula)).toHaveLength(3);
+  hook.unmount();
+});
 it.each(['programs-503', 'programs-malformed', 'no-programs'])(
   'demo %s never schedules irrelevant curricula',
   async (scenario) => {
@@ -128,9 +145,7 @@ it.each([
     page();
     await finish();
     fireEvent.click(screen.getByRole('button', { name: button }));
-    expect(
-      screen.getByRole('status', { name: '落地页演示结果' }),
-    ).toHaveTextContent(notice);
+    expect(status()).toBe(notice);
     expect(screen.getByLabelText('搜索落地内容')).toBeInTheDocument();
   },
 );
@@ -183,6 +198,39 @@ it.each(SAMPLE_QUESTIONS.map((q, index) => ({ ...q, index })))(
     expect(screen.queryByLabelText('搜索演示对话')).toBeNull();
     await finish();
     expect(screen.getByLabelText('搜索落地内容')).toBeInTheDocument();
+  },
+);
+const samplePhrases = [
+  '讲算法的设计与分析',
+  '适合入门的有',
+  '和数据库相关的是',
+  '机器学习方向的有',
+];
+it.each(SAMPLE_QUESTIONS.map((q, index) => ({ ...q, index })))(
+  'sample $label plays its own chat sample at normal speed, and its 查看 and follow-up only write status',
+  async (q) => {
+    vi.useFakeTimers();
+    page();
+    await finish();
+    fireEvent.click(screen.getByRole('button', { name: q.label }));
+    await tick(399);
+    expect(screen.getByText('正在查找相关的课…')).toBeInTheDocument();
+    await finish();
+    expect(screen.getByLabelText('搜索演示对话')).toHaveTextContent(
+      samplePhrases[q.index]!,
+    );
+    const first = sampleChat(q.index).events[0] as unknown as {
+      meta: { results: { course_id: string }[] };
+    };
+    fireEvent.click(screen.getAllByRole('button', { name: /^查看 / })[0]!);
+    expect(status()).toBe(
+      `演示：这里会打开 ${first.meta.results[0]!.course_id}`,
+    );
+    const followUp = document.querySelector<HTMLButtonElement>(
+      '[data-kind="followup"]',
+    )!;
+    fireEvent.click(followUp);
+    expect(status()).toBe(`演示：这里会接着问「${followUp.textContent}」`);
   },
 );
 it('a refused first turn and a source error never bring landing content back or lose the conversation focus', async () => {

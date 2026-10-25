@@ -352,3 +352,152 @@ it('malformed roots and sparse arrays fail closed, while a checked plan on the s
   r.checked_on = r.captured_on;
   expect(parsePlan(r, 'cs-ms').kind).toBe('ok');
 });
+
+const notLinked = () => {
+  const p = policy();
+  p.status = 'not_linked';
+  p.policies = [];
+  p.link = null;
+  p.checked_by = null;
+  p.checked_on = null;
+  return p;
+};
+const OTHER_URL =
+  'https://catalog.northeastern.edu/graduate/academic-policies-procedures/other-policy/';
+it('view identity fields keep their own format even when the view and its link agree', () => {
+  for (const change of [
+    (p: ProgramPolicyView) => {
+      p.plan_id = 'BAD';
+      p.link!.plan_id = 'BAD';
+    },
+    (p: ProgramPolicyView) => {
+      p.plan_content_sha256 = 'a'.repeat(63);
+      p.link!.plan_content_sha256 = 'a'.repeat(63);
+    },
+  ]) {
+    const view = policy();
+    change(view);
+    expect(parsePolicyView(view).kind).toBe('invalid');
+  }
+});
+it('a view that is not ready still needs a well-formed scope and a known status', () => {
+  expect(parsePolicyView(notLinked()).kind).toBe('ok');
+  for (const change of [
+    (p: ProgramPolicyView) => {
+      p.scope.campus = 'Boston';
+    },
+    (p: ProgramPolicyView) => {
+      p.scope.catalog_year = '2026-2028';
+    },
+    (p: ProgramPolicyView) => {
+      (p as { status: string }).status = 'okay';
+    },
+    (p: ProgramPolicyView) => {
+      (p as unknown as { status: unknown }).status = ['not_linked'];
+    },
+  ]) {
+    const view = notLinked();
+    change(view);
+    expect(parsePolicyView(view).kind).toBe('invalid');
+  }
+});
+it('review dates must be real dates even when they are later than every other date', () => {
+  const view = policy();
+  view.checked_on = '2026-11-31';
+  expect(parsePolicyView(view).kind).toBe('invalid');
+  const p = plan();
+  p.checked_on = '2026-11-31';
+  expect(parsePlan(p, 'cs-ms').kind).toBe('invalid');
+});
+it('catalog years must be consecutive even when every copy of the year agrees', () => {
+  const p = plan();
+  p.catalog_year = '2026-2028';
+  p.source_catalog_year = '2026-2028';
+  expect(parsePlan(p, 'cs-ms').kind).toBe('invalid');
+});
+it('the home college must be one of the three colleges, even with only university policies', () => {
+  const view = policy();
+  view.policies = [view.policies[0]!];
+  view.link!.policy_ids = [view.policies[0]!.policy_id];
+  expect(parsePolicyView(view).kind).toBe('ok');
+  (view.link as { home_college: string }).home_college = 'university';
+  expect(parsePolicyView(view).kind).toBe('invalid');
+});
+it('duplicate policy IDs are refused even when the link lists the same duplicates', () => {
+  const view = policy();
+  const twin = structuredClone(view.policies[0]!);
+  twin.source.url = OTHER_URL;
+  view.policies = [view.policies[0]!, twin];
+  view.link!.policy_ids = [twin.policy_id, twin.policy_id];
+  expect(parsePolicyView(view).kind).toBe('invalid');
+});
+it('a policy of another college is refused even when its URL sits under that college', () => {
+  const view = policy();
+  view.policies[1]!.authority = 'camd';
+  view.policies[1]!.source.url =
+    'https://catalog.northeastern.edu/graduate/arts-media-design/academic-policies-procedures/academic-probation/';
+  expect(parsePolicyView(view).kind).toBe('invalid');
+});
+it('thirty distinct fragments are allowed, thirty-one are not', () => {
+  const view = policy();
+  const base = view.policies[0]!.fragments[0]!;
+  view.policies[0]!.fragments = Array.from({ length: 31 }, (_, i) => ({
+    ...structuredClone(base),
+    fragment_id: 'f' + i,
+    source_kind: 'paragraph' as const,
+    paragraph_index: i,
+  }));
+  expect(parsePolicyView(view).kind).toBe('invalid');
+  view.policies[0]!.fragments = view.policies[0]!.fragments.slice(0, 30);
+  expect(parsePolicyView(view).kind).toBe('ok');
+});
+it('a fragment ID may not repeat, even at another location', () => {
+  const view = policy();
+  const copy = structuredClone(view.policies[0]!.fragments[0]!);
+  copy.paragraph_index = 7;
+  view.policies[0]!.fragments.push(copy);
+  expect(parsePolicyView(view).kind).toBe('invalid');
+  copy.fragment_id = 'distinct';
+  expect(parsePolicyView(view).kind).toBe('ok');
+});
+it('two policies may not share one source URL', () => {
+  const view = policy();
+  const twin = structuredClone(view.policies[0]!);
+  twin.policy_id = 'university-other';
+  view.policies = [view.policies[0]!, twin];
+  view.link!.policy_ids = [view.policies[0]!.policy_id, 'university-other'];
+  expect(parsePolicyView(view).kind).toBe('invalid');
+  twin.source.url = OTHER_URL;
+  expect(parsePolicyView(view).kind).toBe('ok');
+});
+it('policy IDs keep their own format even when the link agrees', () => {
+  for (const id of ['BAD', 'a'.repeat(81)]) {
+    const view = policy();
+    view.policies[0]!.policy_id = id;
+    view.link!.policy_ids[0] = id;
+    expect(parsePolicyView(view).kind, id.slice(0, 5)).toBe('invalid');
+  }
+  const view = policy();
+  view.policies[0]!.policy_id = 'a'.repeat(80);
+  view.link!.policy_ids[0] = 'a'.repeat(80);
+  expect(parsePolicyView(view).kind).toBe('ok');
+});
+it('one notice per refused plan, in the API order', () => {
+  const plans = (
+    programFixture('curriculum-cs-ms').body as { plans: ProgramPlanDoc[] }
+  ).plans;
+  const foreign = structuredClone(plans[3]!);
+  foreign.program_id = 'ds-ms';
+  const bad = structuredClone(plans[2]!);
+  bad.campus = 'Boston';
+  const other = '一份方案与当前项目身份不符，未显示。';
+  const invalid = '一份版本化规则格式/来源校验未通过，未显示。';
+  expect(availablePlans([foreign, bad, plans[0]], 'cs-ms').notes).toEqual([
+    other,
+    invalid,
+  ]);
+  expect(availablePlans([bad, foreign, plans[0]], 'cs-ms').notes).toEqual([
+    invalid,
+    other,
+  ]);
+});

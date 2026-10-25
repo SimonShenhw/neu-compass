@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { expect, it, vi } from 'vitest';
@@ -10,7 +10,7 @@ import {
   failure,
   ready,
 } from './landingTestUtils';
-import { landingSources } from '../../fixtures/landingDemo';
+import { landingFixture, landingSources } from '../../fixtures/landingDemo';
 import { SAMPLE_QUESTIONS } from '../../models/landing';
 
 const callbacks = () => ({
@@ -21,6 +21,8 @@ const callbacks = () => ({
   onRetry: vi.fn(),
 });
 const guest = () => settledLanding(landingSources('guest'));
+const fixtureCopy = <T,>(name: string) =>
+  structuredClone(landingFixture(name).body) as T;
 it('freezes 27 independent expected scenes and the production source manifest', () => {
   expect(landingExpected).toHaveLength(27);
   for (const e of landingExpected)
@@ -102,6 +104,19 @@ it('a missing required curriculum is loading, irrelevant keys are ignored, failu
   rerender(<SearchLanding {...data} {...cb} />);
   expect(screen.queryByText('正在加载推荐内容…')).toBeNull();
   expect(screen.getAllByText('部分内容暂时没加载出来。')).toHaveLength(1);
+});
+it('a listed program that is not featured never gets a starter card, even with a curriculum to pick from', () => {
+  const data = guest();
+  data.curricula['pjm-ms'] = ready({
+    ...fixtureCopy<object>('curriculum-cs-ms'),
+    program_id: 'pjm-ms',
+  });
+  const { container } = render(<SearchLanding {...data} {...callbacks()} />);
+  expect(
+    readLanding(container)
+      .filter((item) => item.kind === 'starter')
+      .map((item) => (item as { code: string }).code),
+  ).toEqual(['AAI 6600', 'CS 5010']);
 });
 it.each([0, 401, 403, 404, 422])(
   'definite failure %s never advertises a retry',
@@ -189,6 +204,97 @@ it('API text stays literal in prefix code name company and role, with no body an
     container.querySelector('[data-kind="program"]')?.textContent,
   ).toContain('javascript:alert(1) line two joined');
 });
+it('every card and Co-op value drops CR and keeps LF, and 查看 names the code on one line', () => {
+  const text = 'A<b>1</b>\r\nB\rC';
+  const shown = 'A<b>1</b>\nBC';
+  const data = guest();
+  const curriculum = fixtureCopy<{
+    prefix: string;
+    semesters: { courses: Record<string, unknown>[] }[];
+  }>('curriculum-cs-ms');
+  curriculum.prefix = text;
+  curriculum.semesters[0]!.courses[0]!.primary_code = text;
+  curriculum.semesters[0]!.courses[0]!.primary_name = text;
+  data.curricula['cs-ms'] = ready(curriculum);
+  const rows = fixtureCopy<Record<string, unknown>[]>('coop-guest');
+  rows[0]!.company = text;
+  rows[0]!.role = text;
+  data.coop = ready(rows);
+  const { container } = render(<SearchLanding {...data} {...callbacks()} />);
+  const card = container.querySelectorAll('[data-kind="starter"]')[1]!;
+  for (const field of ['[data-code]', '[data-prefix]', '[data-name]'])
+    expect(card.querySelector(field)!.textContent).toBe(shown);
+  expect(container.querySelector('[data-company]')!.textContent).toBe(shown);
+  expect(container.querySelector('[data-role]')!.textContent).toBe(shown);
+  // The attribute itself: a query by accessible name would fold the whitespace.
+  expect(
+    container
+      .querySelectorAll('[data-kind="view"]')[1]!
+      .getAttribute('aria-label'),
+  ).toBe('查看 A<b>1</b> B C');
+});
+it('the title is a level-2 heading and the four subheadings level 3 (spec 8)', () => {
+  render(<SearchLanding {...guest()} {...callbacks()} />);
+  expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+    '问一门课，或者一个选课问题',
+  );
+  expect(
+    screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+  ).toEqual(['按培养方案浏览', '入门推荐', '最近的 Co-op 经验', '试试这样问']);
+});
+it('the Co-op rows are one list, each company in strong (spec 8)', () => {
+  render(<SearchLanding {...guest()} {...callbacks()} />);
+  const list = screen.getByRole('list');
+  expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+  expect(list.querySelectorAll('strong[data-company]')).toHaveLength(2);
+});
+it('every program button sends its own ID, in the API’s order (spec 12.5)', () => {
+  const cb = callbacks();
+  const { container } = render(<SearchLanding {...guest()} {...cb} />);
+  for (const button of container.querySelectorAll<HTMLElement>(
+    '[data-kind="program"]',
+  ))
+    fireEvent.click(button);
+  expect(cb.onOpenProgram.mock.calls.map(([id]) => id)).toEqual([
+    'aai-ms',
+    'cs-ms',
+    'ds-ms',
+    'pjm-ms',
+  ]);
+});
+it('the loading line comes after the three blocks and before the notice (spec 6)', () => {
+  const data = guest();
+  data.curricula['cs-ms'] = { status: 'loading' };
+  data.coop = failure(503);
+  const { container } = render(<SearchLanding {...data} {...callbacks()} />);
+  const programs = container.querySelector('[data-kind="program"]')!;
+  const line = screen.getByText('正在加载推荐内容…');
+  const notice = screen.getByText('部分内容暂时没加载出来。');
+  expect(
+    programs.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    line.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+// The golden items are read from data-kind elements, so text outside them (an icon in its own span) would pass the
+// comparison above: nothing else may show, and no emoji or arrow (spec 9.2, 14.2).
+it.each(landingExpected)(
+  'landing $name shows no text outside the golden items, and no emoji or arrow',
+  (e) => {
+    const { container } = render(
+      <SearchLanding {...settledLanding(e.sources)} {...callbacks()} />,
+    );
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(
+      /[\u{FE0F}\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2600}-\u{27BF}]/u,
+    );
+    const items = [...container.querySelectorAll('[data-kind]')]
+      .map((el) => el.textContent)
+      .join('');
+    expect(text.replace(/\s+/g, '')).toBe(items.replace(/\s+/g, ''));
+  },
+);
 it.each(['guest', 'programs-503', 'coop-text-edge', 'loading'])(
   'landing axe %s',
   async (name) => {

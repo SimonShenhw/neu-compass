@@ -135,6 +135,17 @@ it.each([
 it.each([null, [], 1, 'x'])('curriculum requires an object %#', (v) =>
   expect(parseCurriculum(v, 'aai-ms').kind).toBe('invalid'),
 );
+it('the documented edges are accepted: a course count of 0 and semester 8', () => {
+  expect(
+    parseProgramList(edited(body('programs'), [0, 'course_count'], 0)).kind,
+  ).toBe('ok');
+  expect(
+    parseCurriculum(
+      edited(body('curriculum-aai-ms'), ['semesters', 1, 'semester'], 8),
+      'aai-ms',
+    ).kind,
+  ).toBe('ok');
+});
 it('curriculum defaults optional fields, checks all groups and keeps unvalidated plans for R4a', () => {
   const valid = body('curriculum-aai-ms') as Record<string, unknown>;
   delete valid.notes;
