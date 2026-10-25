@@ -290,7 +290,7 @@ R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLO
 
 入口 `/programs-demo?scenario=cs-standard-ready&speed=instant`；默认 `scenario=list&speed=normal`。37 个场景，速度为 normal（300ms）、slow（1200ms）、instant（0ms 定时器）、forever。未知参数回默认；场景／速度变化重建演示会话。演示页懒加载并复用 R3d 的 OfflineDemoShell，不挂真实 useSession，所有数据来自原字节冻结的 75 份合成 JSON。`/programs` 正式占位页保持原状。
 
-`features/programs/ProgramList` 和 `ProgramCurriculum` 只消费 Load 和回调，项目、方案选择及内容版本由外层控制；只让原生 details 保存展开状态。用 R1 Select 明确选择，单个方案也不默认选中；内部空选项使用不可能成为合法 plan_id 的 `__none__`，避免与真实 ID 冲突。演示的选择和请求计时放在外层：每次读取带一个请求号，号变了钩子先给加载中、不显示旧结果，所以选方案和刷新都在原地重新读取、不重建组件，焦点留在选择框和按钮上；每选一次方案都重新读政策证据，选回之前选过的也一样。打开项目、回到列表、重试会换掉按下的按钮，焦点移到新显示的那一块（列表和课程表的 section 带 `tabIndex=-1`）。刷新清掉选择，重试重放同一份失败；换场景或速度仍用 key 从头来。
+`features/programs/ProgramList` 和 `ProgramCurriculum` 只消费 Load 和回调，项目、方案选择及内容版本由外层控制；只让原生 details 保存展开状态。用 R1 Select 明确选择，单个方案也不默认选中；内部空选项使用不可能成为合法 plan_id 的 `__none__`，避免与真实 ID 冲突。演示的选择和请求计时放在外层：每次读取带一个只往上加的请求号，钩子只显示为当前名字、速度和请求号读到的结果，别的时候给加载中，所以选方案和刷新都在原地重新读取、不重建课程表，焦点留在选择框和按钮上（所选方案那一块按方案重建，它自己的折叠框重新关着，「分享这个培养方案」不变）；每选一次方案都重新读政策证据，选回之前选过的也一样。打开项目、回到列表、重试会换掉按下的按钮，焦点移到新显示的那一块（列表和课程表的 section 带 `tabIndex=-1`）。刷新清掉选择，重试重放同一份失败；换场景或速度仍用 key 从头来。
 
 沿用 R3d 项目检查、R3a programTree / programRuleLines 与 R3b oneLine。`models/programGuard` 放日期、官方目录 URL 和范围比较；`programPlans` 做逐份检查与整组去重；`programPolicy` 查来源路径、身份、版本和顺序，忽略未来额外字段。政策 UI 先检查响应再核对所选方案，失败时保留方案规则。版本直接使用 planRevisions，不在 TS 重算 Python JSON 哈希。
 

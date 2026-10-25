@@ -4,8 +4,9 @@ import { programLoad } from '../../fixtures/programsDemo';
 
 const LOADING: Load = { status: 'loading' };
 
-// A new name, speed or request starts the read again. Until it arrives this gives loading, never an earlier read's
-// result, so the demo restarts a read without recreating (and unfocusing) the component that shows it.
+// Only a result read for exactly this name, speed and request shows; until one arrives this gives loading. The demo
+// counts its request numbers up whenever it reads again, so a restarted read never shows an earlier result and the
+// component showing it is not recreated (and keeps its focus).
 export function useProgramDemoLoad(
   name: string | null,
   speed: string,
