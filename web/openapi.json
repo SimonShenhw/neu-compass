@@ -1533,6 +1533,346 @@
         "title": "DescriptionCandidate",
         "type": "object"
       },
+      "DraftCandidateOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "DraftCandidateOut",
+        "type": "object"
+      },
+      "DraftCheckIn": {
+        "additionalProperties": false,
+        "properties": {
+          "course_ids": {
+            "items": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Course Ids",
+            "type": "array"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "plan_content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Plan Content Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_content_sha256"
+        ],
+        "title": "DraftCheckIn",
+        "type": "object"
+      },
+      "DraftCheckOut": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Added",
+            "type": "array"
+          },
+          "courses": {
+            "items": {
+              "$ref": "#/components/schemas/DraftCourse"
+            },
+            "maxItems": 20,
+            "title": "Courses",
+            "type": "array"
+          },
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/DraftNoticeOut"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "plan_content_sha256": {
+            "title": "Plan Content Sha256",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/DraftResult"
+          }
+        },
+        "required": [
+          "plan_content_sha256",
+          "courses",
+          "added",
+          "notices",
+          "result"
+        ],
+        "title": "DraftCheckOut",
+        "type": "object"
+      },
+      "DraftCourse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "course_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Course Id",
+            "type": "string"
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits"
+          },
+          "name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "course_id",
+          "code",
+          "name",
+          "credits"
+        ],
+        "title": "DraftCourse",
+        "type": "object"
+      },
+      "DraftNode": {
+        "additionalProperties": false,
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/DraftNode"
+            },
+            "maxItems": 40,
+            "title": "Children",
+            "type": "array"
+          },
+          "counted": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Counted",
+            "type": "array"
+          },
+          "kind": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Missing",
+            "type": "array"
+          },
+          "missing_omitted": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Omitted",
+            "type": "integer"
+          },
+          "possible": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Possible",
+            "type": "array"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Reasons",
+            "type": "array"
+          },
+          "reasons_omitted": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reasons Omitted",
+            "type": "integer"
+          },
+          "shortfall": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Shortfall",
+            "type": "object"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "met",
+                  "missing",
+                  "unknown",
+                  "not_evaluated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "status",
+          "reasons",
+          "reasons_omitted",
+          "counted",
+          "possible",
+          "missing",
+          "missing_omitted",
+          "shortfall",
+          "children"
+        ],
+        "title": "DraftNode",
+        "type": "object"
+      },
+      "DraftNoticeOut": {
+        "additionalProperties": false,
+        "description": "One line the page shows as plain text, in processing order. For a typed code `text` is the Streamlit page's\nsentence for the same case; re-reading the sent draft has three of its own (`course_gone`, `invalid_record`,\n`duplicate_code`). `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).\n中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 是 Streamlit 页面同一情况的那句话；重读草案时的三种\n（`course_gone`、`invalid_record`、`duplicate_code`）是自己的句子。`candidates` 只有 `ambiguous` 有。",
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/DraftCandidateOut"
+            },
+            "maxItems": 10,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "candidates_omitted": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Candidates Omitted",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "course_gone",
+              "duplicate_code",
+              "too_many_codes",
+              "invalid_format",
+              "invalid_format_more",
+              "all_present",
+              "over_limit",
+              "not_found",
+              "ambiguous",
+              "cross_listed_twin",
+              "also_matches",
+              "primary_code",
+              "invalid_record",
+              "nothing_new"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "warning",
+              "info"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "level",
+          "text",
+          "candidates",
+          "candidates_omitted"
+        ],
+        "title": "DraftNoticeOut",
+        "type": "object"
+      },
+      "DraftResult": {
+        "additionalProperties": false,
+        "properties": {
+          "root": {
+            "$ref": "#/components/schemas/DraftNode"
+          },
+          "summary_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Summary Counts",
+            "type": "object"
+          },
+          "unplaced": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Unplaced",
+            "type": "array"
+          }
+        },
+        "required": [
+          "root",
+          "unplaced",
+          "summary_counts"
+        ],
+        "title": "DraftResult",
+        "type": "object"
+      },
       "EvidenceSnippet": {
         "additionalProperties": false,
         "description": "One quote backing a soft field value (PLAN §2.3).\n\n中文:支撑某个软字段(soft field)取值的一条引用证据(PLAN §2.3)。",
@@ -2272,6 +2612,13 @@
             ],
             "title": "Notes"
           },
+          "plan_revisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Plan Revisions",
+            "type": "object"
+          },
           "plan_schema_available": {
             "default": false,
             "title": "Plan Schema Available",
@@ -2472,6 +2819,13 @@
       },
       "ProgramPlansOut": {
         "properties": {
+          "plan_revisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Plan Revisions",
+            "type": "object"
+          },
           "plans": {
             "items": {
               "$ref": "#/components/schemas/ProgramPlan"
@@ -4198,6 +4552,72 @@
           }
         },
         "summary": "Version-scoped requirement documents (not eligibility decisions)",
+        "tags": [
+          "programs"
+        ]
+      }
+    },
+    "/programs/{program_id}/plans/{plan_id}/draft": {
+      "post": {
+        "description": "The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.\n\n`plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one that cannot be verified, `unavailable` when the plans cannot be read now.\n\nStores nothing: no database row, no `query_log`, no course code or ID in the logs. Guests may use it.",
+        "operationId": "check_plan_draft_programs__program_id__plans__plan_id__draft_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "program_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Program Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,99}$",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "`program_id` not in `programs`."
+          },
+          "409": {
+            "description": "The exact plan could not be confirmed; `reason` says why."
+          },
+          "422": {
+            "description": "Body not valid: more than 20 or repeated course IDs, `input` over 4000 characters."
+          },
+          "503": {
+            "description": "The course records cannot be read right now."
+          }
+        },
+        "summary": "Check a session-only course draft against one exact source-checked plan (computes only)",
         "tags": [
           "programs"
         ]

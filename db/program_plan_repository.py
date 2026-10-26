@@ -168,6 +168,32 @@ class ProgramPlanRepository:
         except (ValueError, TypeError):
             return PlanResolution("unusable")
 
+    def resolve_by_id(self, program_id: str, plan_id: str, plan_content_sha256: str) -> PlanResolution:
+        """resolve_selection for a caller that names a plan by its two IDs and a content version only (the draft
+        check, R4b): the scope comes from the stored row, then resolve_selection runs every check, so the content
+        version decides stale. A plan of another program is missing, whatever state its row is in (A30 N1); never
+        writes.
+        中文：给只用两个 ID 和内容版本指明方案的调用方（草案核对，R4b）用的 resolve_selection：范围取自存的那一行，
+        再由 resolve_selection 做全部检查，所以是否过时由内容版本决定。别的项目的方案不论那一行坏没坏都算 missing；
+        从不写库。"""
+        try:
+            if not self.available():
+                return PlanResolution("unavailable")
+            rows = self._conn.execute("SELECT * FROM program_plans WHERE plan_id=? AND program_id=?",
+                                      (plan_id, program_id)).fetchall()
+            if not rows:
+                return PlanResolution("missing")
+            if len(rows) != 1 or len(rows[0]["document"]) > 200_000:
+                return PlanResolution("unusable")
+            plan = _verified(rows[0])  # binds the document's scope to the row's, so it is this program's plan.
+            return self.resolve_selection(PlanSelection(
+                program_id=plan.program_id, plan_id=plan.plan_id, campus=plan.campus, catalog_year=plan.catalog_year,
+                pathway=plan.pathway, concentration=plan.concentration, plan_content_sha256=plan_content_sha256))
+        except sqlite3.DatabaseError:
+            return PlanResolution("unavailable")
+        except (ValueError, TypeError):
+            return PlanResolution("unusable")
+
     def has_records_for_program(self, program_id: str) -> bool:
         # Even corrupt scoped records must not silently reactivate guessed schedules.
         return self.available() and self._conn.execute(

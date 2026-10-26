@@ -15,6 +15,12 @@ Layer 3 本体（培养方案 / 必修课程边）此前只能侧面触及：要
 页面 —— 列表接口驱动培养方案卡片网格，课程表接口驱动按学期分组的课程
 表格。
 
+Later batches added the versioned plans, a selected plan's policy evidence and (R4b) the draft check,
+`POST /programs/{program_id}/plans/{plan_id}/draft`, which computes only (api/plan_draft.py).
+
+后来的批次又加了版本化方案、所选方案的政策证据，以及（R4b）草案核对
+`POST /programs/{program_id}/plans/{plan_id}/draft`，只计算（api/plan_draft.py）。
+
 No auth: these records are public, but legacy seeds are NOT verified catalog facts (same tier as
 /course/{id}). The give-to-get gate only guards Co-op contributions.
 
@@ -31,13 +37,19 @@ churning the shared transport-model module for a leaf feature.
 
 from __future__ import annotations
 
+import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import DbConn, get_course_repo, get_program_policy_reader, get_program_repo
-from db.program_plan_repository import ProgramPlanRepository
+from api.dependencies import DbConn, get_alias_repo, get_course_repo, get_program_policy_reader, get_program_repo
+from api.error_fields import safe_error_fields
+from api.exceptions import PlanSelectionConflict
+from api.plan_draft import DraftCheckIn, DraftCheckOut, check_draft
+from db.alias_repository import AliasRepository
+from db.program_plan_repository import ProgramPlanRepository, content_hash
 from db.program_repository import ProgramNotFound, ProgramRepository
 from db.repository import CourseRepository
 from schemas.program_plan import ProgramPlan
@@ -45,6 +57,17 @@ from schemas.program_policy_view import ProgramPolicyView
 from rag.program_policy_evidence import ProgramPolicyReader
 
 router = APIRouter(prefix="/programs", tags=["programs"])
+
+log = structlog.get_logger("neu_compass.program")
+
+
+def _revisions(plans: list[ProgramPlan]) -> dict[str, str]:
+    """{plan_id: plan_content_sha256} for the plans in an answer (R4b): the web front end sends a plan's content
+    version back with a draft check or a question and never recomputes Python's JSON hash. Kept at the top level, not
+    in each plan, because the Streamlit page validates every plan against ProgramPlan (extra="forbid").
+    中文：回答里每份方案的内容版本（R4b）：新前端在草案核对或提问时原样带回，不用自己重算 Python 的 JSON 摘要。放在顶层
+    而不放进每份方案，因为 Streamlit 页面按 ProgramPlan（extra="forbid"）校验每份方案。"""
+    return {plan.plan_id: content_hash(plan) for plan in plans}
 
 
 # === Response models (route-private — api/models.py stays untouched) ===
@@ -103,6 +126,7 @@ class ProgramCurriculumOut(BaseModel):
     notes: str | None = None
     semesters: list[CurriculumSemesterOut]
     plans: list[ProgramPlan] = Field(default_factory=list)
+    plan_revisions: dict[str, str] = Field(default_factory=dict)
     plan_schema_available: bool = False
     warnings: list[str] = Field(default_factory=lambda: ["legacy_seed_unverified", "legacy_scope_unknown"])
 
@@ -111,6 +135,7 @@ class ProgramPlansOut(BaseModel):
     program_id: str
     schema_available: bool
     plans: list[ProgramPlan]
+    plan_revisions: dict[str, str] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=lambda: ["personal_catalog_applicability_unconfirmed", "not_an_eligibility_evaluator"])
 
 
@@ -219,6 +244,7 @@ def get_program_curriculum(
             )
         )
 
+    plans = ProgramPlanRepository(conn).list_for_program(program_id)
     return ProgramCurriculumOut(
         program_id=program.program_id,
         full_name=program.full_name,
@@ -228,7 +254,8 @@ def get_program_curriculum(
             CurriculumSemesterOut(semester=sem, courses=cs)
             for sem, cs in groups.items()
         ],
-        plans=ProgramPlanRepository(conn).list_for_program(program_id),
+        plans=plans,
+        plan_revisions=_revisions(plans),
         plan_schema_available=ProgramPlanRepository(conn).available(),
     )
 
@@ -251,8 +278,9 @@ def get_program_plans(
         if end != start + 1:
             raise HTTPException(status_code=422, detail="Catalog year must be consecutive")
     repo = ProgramPlanRepository(conn)
-    return ProgramPlansOut(program_id=program_id, schema_available=repo.available(),
-                           plans=repo.list_for_program(program_id, campus=campus, catalog_year=catalog_year, pathway=pathway))
+    plans = repo.list_for_program(program_id, campus=campus, catalog_year=catalog_year, pathway=pathway)
+    return ProgramPlansOut(program_id=program_id, schema_available=repo.available(), plans=plans,
+                           plan_revisions=_revisions(plans))
 
 
 @router.get("/{program_id}/plans/{plan_id}/policies", response_model=ProgramPolicyView,
@@ -274,3 +302,59 @@ def get_selected_program_policies(
         raise HTTPException(status_code=404, detail="No usable current plan with this ID in the selected program")
     response.headers["Cache-Control"] = "no-store"
     return policy_reader.read(plan)
+
+
+@router.post(
+    "/{program_id}/plans/{plan_id}/draft",
+    response_model=DraftCheckOut,
+    summary="Check a session-only course draft against one exact source-checked plan (computes only)",
+    description=(
+        "The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly "
+        "typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in "
+        "`added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed "
+        "codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those "
+        "courses — recorded rules only, not eligibility.\n\n"
+        "`plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be "
+        "confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` "
+        "for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one "
+        "that cannot be verified, `unavailable` when the plans cannot be read now.\n\n"
+        "Stores nothing: no database row, no `query_log`, no course code or ID in the logs. Guests may use it."
+    ),
+    responses={
+        404: {"description": "`program_id` not in `programs`."},
+        409: {"description": "The exact plan could not be confirmed; `reason` says why."},
+        422: {"description": "Body not valid: more than 20 or repeated course IDs, `input` over 4000 characters."},
+        503: {"description": "The course records cannot be read right now."},
+    },
+)
+def check_plan_draft(
+    program_id: Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")],
+    plan_id: Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9-]{0,99}$")],
+    body: DraftCheckIn, conn: DbConn, response: Response,
+    program_repo: Annotated[ProgramRepository, Depends(get_program_repo)],
+    course_repo: Annotated[CourseRepository, Depends(get_course_repo)],
+    alias_repo: Annotated[AliasRepository, Depends(get_alias_repo)],
+) -> DraftCheckOut:
+    try:
+        try:
+            program_repo.get_program(program_id)
+        except ProgramNotFound as exc:
+            raise HTTPException(status_code=404, detail="program_id not found") from exc
+        resolution = ProgramPlanRepository(conn).resolve_by_id(program_id, plan_id, body.plan_content_sha256)
+        if resolution.outcome != "selected" or resolution.plan is None:
+            log.warning("draft.plan_selection", plan_outcome=resolution.outcome, plan_id=plan_id)
+            raise PlanSelectionConflict(resolution.outcome if resolution.outcome != "selected" else "unusable")
+        out = check_draft(resolution.plan, body.plan_content_sha256, body, course_repo=course_repo,
+                          alias_repo=alias_repo)
+    except sqlite3.Error as exc:
+        # The plan step answers its own read errors (any DatabaseError) with a 409 `unavailable`; every other sqlite3
+        # error ends here as a 503, a programming error included, and the log keeps its type (A30 recheck).
+        # 中文：方案那一步自己把读库错误（所有 DatabaseError）答成 409 `unavailable`；别的 sqlite3 错误都在这里答 503，
+        # 代码自己的错误也算在内，日志里有它的类型。
+        log.warning("draft.storage_failed", **safe_error_fields(exc))
+        raise HTTPException(status_code=503, detail="The course records cannot be read right now.",
+                            headers={"Cache-Control": "no-store"}) from exc
+    response.headers["Cache-Control"] = "no-store"
+    # Counts only: no course code, ID or typed text. 中文：只记个数，不记课号、课程 ID 或输入的文字。
+    log.info("draft.checked", courses=len(out.courses), added=len(out.added), notices=len(out.notices))
+    return out

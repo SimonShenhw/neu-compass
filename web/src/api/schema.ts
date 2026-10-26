@@ -354,6 +354,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/programs/{program_id}/plans/{plan_id}/draft': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Check a session-only course draft against one exact source-checked plan (computes only)
+     * @description The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.
+     *
+     *     `plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one that cannot be verified, `unavailable` when the plans cannot be read now.
+     *
+     *     Stores nothing: no database row, no `query_log`, no course code or ID in the logs. Guests may use it.
+     */
+    post: operations['check_plan_draft_programs__program_id__plans__plan_id__draft_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/programs/{program_id}/plans/{plan_id}/policies': {
     parameters: {
       query?: never;
@@ -1090,6 +1114,131 @@ export interface components {
       /** Paragraph Index */
       paragraph_index: number;
     };
+    /** DraftCandidateOut */
+    DraftCandidateOut: {
+      /** Code */
+      code: string;
+      /** Name */
+      name: string;
+    };
+    /** DraftCheckIn */
+    DraftCheckIn: {
+      /** Course Ids */
+      course_ids?: string[];
+      /** Input */
+      input?: string | null;
+      /** Plan Content Sha256 */
+      plan_content_sha256: string;
+    };
+    /** DraftCheckOut */
+    DraftCheckOut: {
+      /** Added */
+      added: string[];
+      /** Courses */
+      courses: components['schemas']['DraftCourse'][];
+      /** Notices */
+      notices: components['schemas']['DraftNoticeOut'][];
+      /** Plan Content Sha256 */
+      plan_content_sha256: string;
+      result: components['schemas']['DraftResult'];
+    };
+    /** DraftCourse */
+    DraftCourse: {
+      /** Code */
+      code: string;
+      /** Course Id */
+      course_id: string;
+      /** Credits */
+      credits: number | null;
+      /** Name */
+      name: string;
+    };
+    /** DraftNode */
+    DraftNode: {
+      /** Children */
+      children: components['schemas']['DraftNode'][];
+      /** Counted */
+      counted: string[];
+      /** Kind */
+      kind: string;
+      /** Label */
+      label: string;
+      /** Missing */
+      missing: string[];
+      /**
+       * Missing Omitted
+       * @default 0
+       */
+      missing_omitted: number;
+      /** Possible */
+      possible: string[];
+      /** Reasons */
+      reasons: string[];
+      /**
+       * Reasons Omitted
+       * @default 0
+       */
+      reasons_omitted: number;
+      /** Shortfall */
+      shortfall: {
+        [key: string]: number;
+      };
+      /** Status */
+      status: ('met' | 'missing' | 'unknown' | 'not_evaluated') | null;
+    };
+    /**
+     * DraftNoticeOut
+     * @description One line the page shows as plain text, in processing order. For a typed code `text` is the Streamlit page's
+     *     sentence for the same case; re-reading the sent draft has three of its own (`course_gone`, `invalid_record`,
+     *     `duplicate_code`). `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
+     *     中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 是 Streamlit 页面同一情况的那句话；重读草案时的三种
+     *     （`course_gone`、`invalid_record`、`duplicate_code`）是自己的句子。`candidates` 只有 `ambiguous` 有。
+     */
+    DraftNoticeOut: {
+      /** Candidates */
+      candidates: components['schemas']['DraftCandidateOut'][];
+      /**
+       * Candidates Omitted
+       * @default 0
+       */
+      candidates_omitted: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind:
+        | 'course_gone'
+        | 'duplicate_code'
+        | 'too_many_codes'
+        | 'invalid_format'
+        | 'invalid_format_more'
+        | 'all_present'
+        | 'over_limit'
+        | 'not_found'
+        | 'ambiguous'
+        | 'cross_listed_twin'
+        | 'also_matches'
+        | 'primary_code'
+        | 'invalid_record'
+        | 'nothing_new';
+      /**
+       * Level
+       * @enum {string}
+       */
+      level: 'warning' | 'info';
+      /** Text */
+      text: string;
+    };
+    /** DraftResult */
+    DraftResult: {
+      root: components['schemas']['DraftNode'];
+      /** Summary Counts */
+      summary_counts: {
+        [key: string]: number;
+      };
+      /** Unplaced */
+      unplaced: string[];
+    };
     /**
      * EvidenceSnippet
      * @description One quote backing a soft field value (PLAN §2.3).
@@ -1454,6 +1603,10 @@ export interface components {
       full_name: string;
       /** Notes */
       notes?: string | null;
+      /** Plan Revisions */
+      plan_revisions?: {
+        [key: string]: string;
+      };
       /**
        * Plan Schema Available
        * @default false
@@ -1524,6 +1677,10 @@ export interface components {
     };
     /** ProgramPlansOut */
     ProgramPlansOut: {
+      /** Plan Revisions */
+      plan_revisions?: {
+        [key: string]: string;
+      };
       /** Plans */
       plans: components['schemas']['ProgramPlan'][];
       /** Program Id */
@@ -2488,6 +2645,61 @@ export interface operations {
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
         };
+      };
+    };
+  };
+  check_plan_draft_programs__program_id__plans__plan_id__draft_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        program_id: string;
+        plan_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DraftCheckIn'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftCheckOut'];
+        };
+      };
+      /** @description `program_id` not in `programs`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The exact plan could not be confirmed; `reason` says why. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Body not valid: more than 20 or repeated course IDs, `input` over 4000 characters. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The course records cannot be read right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

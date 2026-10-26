@@ -37,6 +37,7 @@
 | GET    | `/programs/{program_id}` | Curriculum by recommended semester  |
 | GET    | `/programs/{program_id}/plans` | Requirement documents by version |
 | GET    | `/programs/{program_id}/plans/{plan_id}/policies` | Policy evidence for one plan |
+| POST   | `/programs/{program_id}/plans/{plan_id}/draft` | Check a session course draft (R4b) |
 | POST   | `/coop`               | Submit Co-op (k=2 anonymity gated)     |
 | GET    | `/coop`               | List Co-op visible to user             |
 | POST   | `/chat`               | Streamed grounded chat (NDJSON)        |
@@ -52,7 +53,8 @@
 The routes without a section below are described in their OpenAPI docstrings (`/docs`).
 
 Auth model: anonymous for `/health`, `/ready`, `/search`, `/course/{id}` (and its requisites), `/resolve/course`,
-`/programs…`, `/chat`, `/feedback` (a vote carries its own receipt), `/privacy`, `/config`, `/auth/login-url`, and
+`/programs…` (the draft check included), `/chat`, `/feedback` (a vote carries its own receipt), `/privacy`, `/config`,
+`/auth/login-url`, and
 `GET /coop` (degraded view). `GET /auth/me`, `POST /coop` and `POST /auth/delete-account` need
 `Authorization: Bearer <session_token>`, or, without a non-empty `Authorization` header, the API's session cookie
 (R2a; see "Session cookie, CSRF and CORS" under Conventions); without either they answer 401.
@@ -629,6 +631,53 @@ client secret and a `SESSION_SECRET` are all configured, so `/auth/login-url` an
 
 ---
 
+## POST /programs/{program_id}/plans/{plan_id}/draft
+
+R4b. The program page's session-only course draft, checked against one exact source-checked plan. It computes only:
+no database row, no `query_log`, nothing shared with chat, and no course code, course ID or typed text in the logs
+(the route logs counts). Guests may use it; a request with the session cookie passes the R2a cross-site check.
+
+```json
+{"plan_content_sha256": "<64 hex>", "course_ids": ["neu-cs-5800"], "input": "CS 5010, CS 5800"}
+```
+
+- `plan_content_sha256`: the version the page shows, from the top-level `plan_revisions` of `GET /programs/{id}` or
+  `GET /programs/{id}/plans` (`{plan_id: plan_content_sha256}`, added for R4b next to `plans`).
+- `course_ids`: the draft now, at most 20, distinct. `input`: codes to add, at most 4000 characters, optional. Both
+  strict; anything else in the body is a 422.
+
+Answer (200, `Cache-Control: no-store`):
+
+```json
+{"plan_content_sha256": "...", "courses": [{"course_id": "...", "code": "CS 5010", "name": "...", "credits": 4}],
+ "added": ["CS 5010"], "notices": [{"kind": "...", "level": "warning", "text": "...", "candidates": [],
+ "candidates_omitted": 0}], "result": {"root": {...}, "unplaced": [], "summary_counts": {...}}}
+```
+
+- `courses` is the whole draft after this request, re-read from the course records on every request, so names and
+  credits are the current ones. A sent course whose record is gone, cannot be read, or no longer fits a draft leaves
+  with a notice, and of two that now share a code the first stays. `added` lists the codes newly added.
+- `notices` come in processing order, each a plain-text sentence with a stable `kind`: `course_gone`,
+  `duplicate_code`, `too_many_codes`, `invalid_format`, `invalid_format_more`, `all_present`, `over_limit`,
+  `not_found`, `ambiguous` (with up to 10 `candidates`, the rest in `candidates_omitted`), `cross_listed_twin`,
+  `also_matches`, `primary_code`, `invalid_record`, `nothing_new`. For typed codes the sentence is the Streamlit
+  page's; re-reading the sent draft has its own (`course_gone`, `duplicate_code`, and `invalid_record` for a course
+  that cannot be read or no longer fits). Typed text quoted in a sentence is plain text, never markup.
+- A matched course whose ID the request would refuse (outside `course_ids`' pattern) is not added (`invalid_record`),
+  so the page can always send back the draft it gets.
+- `result` is `evaluate_draft` on those courses: the rule tree with statuses, `unplaced` codes and `summary_counts`.
+  Recorded rules only, not eligibility. Every field of the answer is always present (the schema marks them required).
+
+Errors: **404** program not found (`program_id not found`); **409** when the exact plan cannot be confirmed, with the
+SAFE-02 fields plus `reason`, one of `stale` (another content version or scope), `missing` (no such plan in this
+program), `draft` (not source-checked), `unusable` (cannot be verified) or `unavailable` (the plans cannot be read
+now), and a fixed English detail; **422** body or path IDs out of bounds (not echoed); **503**
+`The course records cannot be read right now.` when a program or course read fails, any sqlite3 error included (the
+log has `draft.storage_failed` with the error's type and location only). The 409 and the 503 carry
+`Cache-Control: no-store`.
+
+---
+
 ## Conventions
 
 - **All inputs**: `extra='forbid'` Pydantic config. Typo'd fields → 422 with
@@ -687,7 +736,7 @@ For the new web front end, which calls `api.<zone>` from `compass.<zone>` (the s
 ### Safe error exits (SAFE-02)
 
 The `{detail, error_type, status_code}` shape and existing HTTP status codes remain; an OAuth refusal's 401 also
-has `reason` (R2b, below).
+has `reason` (R2b, below), and so does the draft check's 409 (R4b, above).
 Uncaught 500 uses `internal_error`; other HTTP 5xx use `server_error` unless explicitly
 mapped (502 `upstream_error`, 503 `service_unavailable`); 429 is `rate_limited`.
 No request ID is added to the body. An inbound `x-request-id` is retained only if it
