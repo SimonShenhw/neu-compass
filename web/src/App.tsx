@@ -1,9 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
-import { PrototypeProvider } from './layout/PrototypeContext';
-import { SearchPage } from './pages/SearchPage';
-import { CourseDetail } from './pages/CourseDetail';
+import { NoticeProvider } from './layout/NoticeContext';
+import { SearchRoute } from './pages/SearchRoute';
+import { CourseRoute } from './pages/CourseRoute';
 import { CompareRoute } from './pages/CompareRoute';
 import { CompareDemoPage } from './pages/CompareDemoPage';
 import { ProgramsPage } from './pages/ProgramsPage';
@@ -24,7 +24,7 @@ const SearchLandingDemoPage = lazy(
 
 export function App() {
   return (
-    <PrototypeProvider>
+    <NoticeProvider>
       <Routes>
         <Route
           element={
@@ -51,8 +51,8 @@ export function App() {
           />
         </Route>
         <Route element={<AppShell />}>
-          <Route path="/" element={<SearchPage />} />
-          <Route path="/course/:code" element={<CourseDetail />} />
+          <Route path="/" element={<SearchRoute />} />
+          <Route path="/course/:code" element={<CourseRoute />} />
           <Route path="/compare" element={<CompareRoute />} />
           <Route path="/programs" element={<ProgramsPage />} />
           <Route path="/coop" element={<CoopRoute />} />
@@ -76,6 +76,6 @@ export function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
-    </PrototypeProvider>
+    </NoticeProvider>
   );
 }

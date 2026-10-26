@@ -55,6 +55,20 @@
 .optin input {
   accent-color: var(--accent);
 }
+.limit {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.capture {
+  display: grid;
+  gap: var(--space-1);
+}
+.note {
+  color: var(--ink3);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
 @media (max-width: 767px) {
   .optin {
     min-height: var(--touch);

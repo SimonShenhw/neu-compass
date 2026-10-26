@@ -36,6 +36,7 @@ export function Sidebar({
   onRefresh,
   onLogin,
   onLogout,
+  note = '',
 }: {
   session?: SessionView;
   compareCount?: number;
@@ -43,6 +44,8 @@ export function Sidebar({
   onRefresh?: () => void;
   onLogin?: () => void;
   onLogout?: () => void;
+  // What the last login or logout pressed here came to, by its button, in the sidebar and the mobile menu alike (R3e).
+  note?: string;
 }) {
   const { pathname } = useLocation();
   const { navigationPath } = pagePresentation(pathname);
@@ -114,6 +117,10 @@ export function Sidebar({
             </Button>
           </>
         )}
+        {/* Always there, so a screen reader hears it change; out of the layout while it is empty. */}
+        <p role="status" className={note ? styles.note : 'visually-hidden'}>
+          {note}
+        </p>
       </div>
       <nav aria-label="主导航" className={styles.navigation}>
         {links.map(({ path, label, icon: Icon }) => {
@@ -146,7 +153,7 @@ export function Sidebar({
         </Button>
         <small>非官方学生工具 · 选课以官方目录为准</small>
         <small>
-          登录、Co-op、课程对比、数据与隐私已接真实接口；搜索、课程详情和培养方案还是假数据原型
+          搜索、课程详情、Co-op、课程对比、数据与隐私已接真实接口；培养方案还是假数据原型
         </small>
       </div>
     </div>

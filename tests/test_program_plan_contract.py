@@ -58,7 +58,7 @@ def test_prefix_ambiguity_requests_selection_instead_of_picking_first(api_client
     repo.add_program(Program(program_id="cs-ms", full_name="CS MS", prefix="CS"))
     repo.add_program(Program(program_id="cs-align", full_name="CS Align", prefix="CS"))
     response = api_client.post("/chat", json={"query": "CS first semester"})
-    assert response.status_code == 409
+    assert response.status_code == 409 and response.json()["reason"] == "program_ambiguous"
     assert "cs-ms" in response.text and "cs-align" in response.text
     from app.program_plan_view import SELECTOR_LABEL  # noqa: PLC0415
 
@@ -179,7 +179,7 @@ def test_invalid_scoped_document_cannot_reactivate_legacy_guessed_schedule(api_c
 def test_explicit_family_and_query_prefix_conflict_requires_clarification(api_client, empty_db):
     ProgramRepository(empty_db).add_program(Program(program_id="cs-ms", full_name="CS", prefix="CS"))
     response = api_client.post("/chat", json={"query": "AAI first semester", "program_id": "cs-ms"})
-    assert response.status_code == 409
+    assert response.status_code == 409 and response.json()["reason"] == "program_conflict"
     from app.program_plan_view import SELECTOR_LABEL  # noqa: PLC0415
 
     assert f"「{SELECTOR_LABEL}」" in response.json()["detail"] and "不指定" in response.json()["detail"]

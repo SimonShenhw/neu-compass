@@ -4674,3 +4674,138 @@ Streamlit 版（第 30 节）在 UI 进程里存草案，每加一个课号就�
 ### 发布状态
 
 分支 `feat/api-plan-draft`，从 main `5c1f1b9`（#35 合并以后）开。第一个提交 `ff35231` 是 R4b 的 API，第二个提交 `4186ddb` 是第一轮变异存活的 8 个缺口的测试，第三个提交 `89f6bce` 是第 30 轮审查的修复，第四个提交 `500a400` 是复核第 1 轮的修复，第五个提交是复核第 2 轮补的两条测试和本节的记录。没有使用真实模型、账号、NAS 或生产库，测试只用合成课程和仓库里的策展方案。上线要另外授权（和 React 前端一起）。
+
+## 37 — 搜索页和课程页接上真实接口（R3e，2026-10-26）
+
+### 范围与原因
+
+R3a（先修）、R3b（课程详情）、R3c（搜索回答）、R3d（落地内容）四块组件已经合并（#30–#35），可是只用在演示路由上：真实的 `/` 和 `/course/:code` 还是 R1 的原型，固定示例回答、五门假课。这一批把这两个地址换成用这四块组件、接真实接口的页面，方案 `R3E_PLAN.md`。10-26 用户定了方案第 8 节：每门课一个网址（`/course/CS-6140`），隐私说明加一句浏览器历史。从 main `cbb91f7`（#36 合并以后）开 `feat/web-search-api`。培养方案和草案（R4）等 R4b 的页面合并以后再接。
+
+线上不变：新前端还没部署。后端改了两处（`/chat` 的 409 带上原因、隐私说明多一句），Streamlit 显示的字一个没变；开发用的 API 补了合成目录。
+
+### 已实现
+
+**后端**
+
+1. **`/chat` 的 409 带 `reason`**（`api/exceptions.py`、`api/routes/chat.py`；R3c 说明书第 2 节最后一条的建议）：新的 `ChatConflict` 是 `HTTPException` 的子类，只收七种原因：`plan_missing`、`plan_stale`、`plan_draft`、`plan_unusable`、`plan_unavailable`、`program_ambiguous`、`program_conflict`，别的直接报错。`http_exception_handler` 遇到它，在 SAFE-02 的三个字段之外加上 `reason`，别的 HTTPException 照旧。三处 409 换成它，`detail` 一字不改（Streamlit 照旧显示 `detail`）；路由的 409 说明列出七种原因，`web/openapi.json`、`schema.ts` 各变一行。
+2. **隐私说明多一句**（`api/privacy_text.py` 的 `privacy_sections(settings, *, web=False)`，`api/routes/public.py`）：`GET /privacy` 传 `web=True`，「记了什么」末尾多一句：每门课的页面有自己的网址（比如 /course/CS-6140），打开过的课程页会和浏览别的网站一样，留在这台设备的浏览器历史里，可以在浏览器里清除；分享出去的链接里也带着课号。Streamlit 不传，一字不变。
+
+**外壳**
+
+3. **构建时定的地址**（`web/src/api/apiBase.ts`、`vite.config.ts`、`src/api/env.d.ts`）：
+   - 分享链接的站点 `choosePublicBase`（`VITE_PUBLIC_BASE_URL`）：正式构建和别的构建模式（比如 beta）默认 `PRODUCTION_SITE`（`https://compass.neu-compass.me`），只认 https；`build:dev-api` 是本机的预览 `http://127.0.0.1:4173`；开发服务器是它自己的地址；测试一律是 `http://127.0.0.1:5173`。和 API 地址一样在构建时定、注入成 `__PUBLIC_BASE_URL__`，不读页面的 `window.location`，所以 beta 上分享出去的也是正式站点（R0 第 16 节第 4 条）。
+   - 开发端口 `devPort`（`VITE_DEV_PORT`）：默认 5173，只收 1024–65535；开发服务器照旧 `strictPort`。这台机器上 Windows 有时把包含 5173 的一段端口留作动态保留（第 35 节「已知」），这时就换一个端口。
+   - `apiBaseUrl` 报错时写出是哪个变量。
+4. **对话和选择放在外壳里**（新文件 `src/layout/SearchContext.tsx`）：R3c 的 `useConversation` 提到路由上面，去课程页再回来还在；项目、方案和「允许保存」也在这里。它属于「现在是谁」：`AppShell` 把 `viewerOwner` 传进来，换了人（登出、删号、别人登录）就清空对话、选择和勾选；`/auth/me` 第一次回答只是说明一直是谁，不算换人。整页刷新就没了，和 Streamlit 一样。
+   - `useConversation` 加了 `reset()`：先中止路上的提问，再清空。
+   - 选方案时记下当时方案列表的样子（`plansSignature`）：列表变了，选择清掉，说一次「方案有更新」；列表读不到了，选择也清掉（不说有更新）。这两处和「反馈关着时清掉勾选」都照 React「随值变化调整状态」的写法放在渲染里，不用 effect（lint 的 `set-state-in-effect`），不会有一帧带着过期的选择画出来。
+5. **提示一行**（新文件 `src/layout/NoticeContext.tsx`）：R1 的 `PrototypeContext` 去掉以后只剩这一样：从 Google 回来的结果和离线演示外壳的提示。
+6. **`AppShell`**：`AccountContext` 包住页面和提问栏，`SearchProvider` 在它里面；提问栏只在搜索页和课程页出现，在课程页发问会回到首页看回答（R1 原型就是这样）。
+7. **提问栏**（`src/layout/AskBar.tsx` 重写）：
+   - 查询日志的提示和「允许保存」的说明来自 `GET /privacy`（`privacy.ts` 的 `askNotices`：查询日志那句必须是非空的字；说明是非空的字或 null，null 表示回答反馈关着）。`/privacy` 回答之前，查询日志那句先用 API 现在给的同一句（`QUERY_LOG_FALLBACK`），提示一直都在。
+   - 勾选框只在 `/config` 开着回答反馈、`/privacy` 也给了说明时出现；关着时只说 Streamlit 的「回答内容不会保存（回答反馈功能目前关闭）。」；`/config` 还没回答时两样都不显示。
+   - 问题最多 500 个字（按码位算，和 API 一样），超了不能发，说现在是多少字；回答还在路上时不能发下一个。Enter 发送，Shift+Enter 换行，输入法组字时的 Enter 不算。
+   - **「允许保存」照 Streamlit，不每次复位**（方案第 3、9 节 10-26 改过）：勾了以后，这个标签页里之后的问题都带 `allow_feedback_capture: true`，直到取消勾选、登出或换人。方案的草稿原来写的是每次发送后复位，可 `GET /privacy` 的说明和 Streamlit 共用，写的就是「本次会话之后正常完成的回答」，复位了说明就不对。
+8. **顶栏的课程数**（新文件 `src/api/ready.ts`；`TopBar.tsx`、`AppShell.tsx`、`OfflineDemoShell.tsx`）：R1 原型写死的「6,469 门课 · 目录 2026–2027」换成 `GET /ready` 的 `courses_indexed`（R0 第 1 节）：5 秒，5 分钟内不重取；失败以后 30 秒再取一次，是唯一一个自己重试的读请求（Streamlit 的失败也只记 30 秒，下一次操作页面时再取；这里没有失败的那句话，只有不带数字的说法，所以不等学生操作）。数是大于 0 的整数才显示 `{n:,} 门课`；失败、预热中（数是 0）、读不懂时显示「NEU 研究生课程目录」。目录年份没有接口给，去掉了。和 `/config` 一样，地址里还带着 Google 的 code 时先不问（`useSession` 多给一个 `settled`）。暂时失败时照 `shownData` 留着上次的数，`<main>` 顶上那句「显示的是上次加载的版本」也会出现；明确的失败不留。离线演示外壳不连 API，显示不带数字的那句。窄屏上照 R1 不显示这一项。
+9. **账号的提示挪到看得见的地方**（`useSession.ts`、`Sidebar.tsx`、`TopBar.tsx`、`AppShell.tsx`；第 34 节「已知」里留给 R3 的那条）：原来登录、登出的结果都在 `<main>` 后面那一行，长页面上第一屏看不见；手机菜单开着时，它在 Radix 给菜单外面加的 `aria-hidden` 里，读屏读不到。现在：
+   - 在账号框里按出来的结果（登录没能开始、已经退出、没能退出）由 `useSession` 自己记着，显示在账号框里（`role="status"`，一直在，空着时不占位置），桌面侧栏和手机菜单各显示自己的。新的一次按下先清掉上一次的，同一句话再出现时读屏也会再读。焦点照 R2b：和结果同一次渲染回到账号框的按钮上。
+   - 从 Google 回来的结果（登录没完成、cookie 没留下、外校邮箱……）显示在 `<main>` 最上面，「显示的是上次加载的版本」那句下面（`aria-label="登录结果"`）。
+10. **从 Google 回来那一段多发了请求**（`useSession.ts`）：React Router 7 的 `navigate` 是 transition，`setBusy(null)` 会先单独画一帧（地址还是 `/`、已经知道是谁），首页就按新的身份去取落地内容，紧接着又跳回原来的页面。现在这两步放进同一个 `startTransition`；搜索页和提问栏的请求也等 `viewerScope(account)` 有了再发（和 R5d 的页面一样）。
+11. **侧栏页脚**：改成「搜索、课程详情、Co-op、课程对比、数据与隐私已接真实接口；培养方案还是假数据原型」。
+
+**搜索页**（新文件 `src/pages/SearchRoute.tsx`）
+
+12. **没提问时是 R3d 的落地内容**：`GET /programs`、三个精选项目的 `GET /programs/{id}`、`GET /coop`（R5d 的 `coopListQuery`，按「现在是谁」）各自独立，接成 R3d 要的三态（`api/load.ts` 的 `loadOf`：能显示的是 ready，失败了、也没在重取是 failed，其余是 loading）；「重新加载」只重取失败了的。点项目去 `/programs?program=<ID>`（ID 编码；R4 接页面之前那里还是占位），点 Co-op 去 `/coop`，点推荐的课去它的课程页（带 ID），示例问题当作问题发出去，焦点移到对话上、不滚动。R3d 那个带 `aria-label` 的 `div` 加了 `role="group"`（axe 的 `aria-prohibited-attr`）。
+13. **提问以后是 R3c 的对话**（`SearchWorkspace`）：`api/chat.ts` 的事件和失败直接用 R2b 的（`chatStream.ts` 的 `ChatEvent`、`load.ts` 的 `ApiFailure`），R3c 的组件读的就是 `streamChat` 给的。请求照 Streamlit（R0 第 3 节②）：`query`、`k: 10`、`allow_feedback_capture`、`history`（最近 6 轮，每轮截到 4000 字）、`context_course_ids`（最近一条有结果的回答里的课，最多 10 个），选了的话还有 `program_id` 和 `plan`。回答里的「查看」去课程页（带 ID）。回答出来以后不自动打开第一门课（方案第 9 节）。
+14. **项目和方案的选择框**：项目来自 `GET /programs`（`programListQuery`），方案来自这个项目的 `GET /programs/{id}`（`curriculumQuery`，和落地内容共用一份缓存，5 分钟）。方案（新文件 `src/models/chatPlans.ts`，照 Streamlit 的 `selectable_chat_plans`）：方案表在、方案不超过 100 份才列；每份要过 R4a 的 `availablePlans`（形状、来源、本项目，ID 和范围都只出现一次），要核对过来源（草稿不列），还要在 #36 的 `plan_revisions` 里有一个 SHA-256 的内容版本。提问时 `planSelection` 带上范围和这个版本，前端不算 Python 的 JSON 摘要。项目从列表里没了，选择清掉；方案列表读不到时说「暂时无法核对方案列表；未携带方案，课程搜索仍可使用。」，问题不带方案。
+15. **方案类的 409**：`reason` 是 `plan_` 开头的五种时，照 Streamlit 清掉被拒的那个方案（之后又选的不动）、重取这个项目；`program_*` 两种保留选择（R0 第 3 节③）。R3c 的组件按 `reason` 说话。
+16. **评价**（新文件 `src/api/feedback.ts`）：`POST /feedback`，8 秒，请求体只有凭证和 `rating`，不重试；凭证的核对和结果的说法是 R3c 的。
+17. **旧链接** `/?course=CS-5800`：换成 `/course/CS-5800`（替换，后退不会回到旧地址）；空的不跳；地址是从 Google 回来的那一次时，先由登录处理，回到原来的地址以后再换。
+
+**课程页**（新文件 `src/pages/CourseRoute.tsx`、`CourseRoute.module.css`）
+
+18. **课号进网址**（新文件 `src/models/coursePath.ts`）：`coursePath('CS 6140')` 是 `/course/CS-6140`（空格换成横线再编码），`codeFromPath` 反过来，`courseShareUrl` 是站点加路径；`refLabel` 把地址里的字照 Streamlit 去掉反引号、压成一行、截到 64 字再显示（R0 第 11 节⑤），查的时候照原样。
+19. **解析**（新文件 `src/api/resolve.ts`）：`GET /resolve/course?ref=`，8 秒，5 分钟内不重取；`parseResolved` 每门只留三样字段，形状不对算读不懂。从回答、落地推荐、对比页、「其他课程」点进来的带着课程 ID（React Router 的 state），不再解析；state 不对就当没带。对上多门时开第一门，另外列出最多 3 门（带边框的按钮，一眼看得出能点）；找不到（包括 422 太长、404）一句话加回首页的链接；暂时失败一句话加「重试」，不自动重试（R0 第 16 节第 14 条）。
+20. **详情**：R3b 的组件，`GET /course/{id}`（R5d 的 `courseQuery`，和对比页共用，`staleTime: 0`）；404 说课可能已经下线，暂时失败给「重试」，重取期间显示加载。先修是 R3a 的面板，先修树和旧的平铺先修里的课号去 `/course/<课号>`（不带 ID，按课号解析）。「加入对比」真的加进对比列表。分享框（R0 第 5 节第 11 条）给 `courseShareUrl`，只读，聚焦时全选，带 Streamlit 那句说明。外层不再是一个叫「课程详情」的 region（和 R3b 里那个重名，读屏会听到两个）。1200 宽以上左边对话、右边详情，再窄就一栏。
+21. **对比页的「查看」带课程 ID**（`ComparePage.tsx`）：原来只带课号，同一个课号对应多门课时可能打开别的那门。
+
+**删掉的原型**
+
+22. `src/pages/SearchPage.tsx`、`CourseDetail.tsx` 和它的 CSS、`src/layout/PrototypeContext.tsx`、`src/fixtures/courses.ts`；`SearchPage.module.css` 去掉原型的类。原型的「加入对比」写控制台的 `console.info` 跟着没了（第 35 节「已知」）。`App.tsx` 换成两个新路由。
+
+**开发用的 API**（只在 `tests/support/`，生产不 import）
+
+23. **合成目录**（新文件 `tests/support/dev_catalog.py`，`dev_api.py` 的 `make_database` 调 `seed_catalog`）：R3d、R4a、R3a 假数据里用到的课程，四个项目，每学期的课表，方案（cs-ms 的 standard、align、bridge（草稿）和 2025–2026 的 standard，ds-ms 一份带 concentration 的），先修（CS 6140 按两年存，还有 CS 5008、DS 5220、CS 6220）和旧的平铺先修。CS 6140 课程页能显示的字段全都有（学期、学分、上课方式、老师、工作量、难度、考核构成、主题、技能、职业方向、AI 政策、四条证据、来源评价），CS 5010 和 AAI 5025 只有一部分。「ML」是 CS 6140 和 DS 5220 共用的简称，`/course/ML` 能看到对上多门的样子。估计出来的字段都配了证据（课程的 schema 要求）。
+24. **`--web-port`**（`dev_api.py`）：开发服务器换了端口时告诉开发 API，CORS 和登录跳回的地址按它来（`front_ends(web_port)`，`configure`、`build_dev_app` 的 `web_port`）；只收 1024–65535，不能是预览的 4173，也不能和 API 自己的 `--port` 一样。
+
+**测试**
+
+25. **新测试**：
+    - `pages/searchRouteTestUtils.tsx`：合成的假 API（落地数据、带方案版本的 cs-ms、一条固定回答、几门课；解析和 API 一样不管分隔符），`page()` 能带多条历史和 state，旁边一个显示地址和 state 的 `where`、一个后退按钮。
+    - `pages/SearchRoute.test.tsx`：落地页只取该取的、每样一次；「查看」带 ID；项目和 Co-op 的跳转；项目 ID 编码进地址；落地页的重试只重取失败的；示例问题照 Streamlit 发、焦点去对话且不滚动；追问带历史和上一条的课；回答里的「查看」；勾选以后评价照原样发到 `/feedback`；不勾选不保存、也没有可评的；取消勾选以后的问题不保存；旧 `?course=` 替换历史；空的不跳；从 Google 回来时不打开；身份没确定时页面不发请求；身份确认以后对话还在；游客的说明；项目列表读不到、重试；项目列表明确失败以后重取期间不说读不到；带项目和方案提问、只列核对过的方案；方案被拒；方案改版；方案列表读不到（恢复以后选择也不回来）；项目下架；axe。
+    - `pages/CourseRoute.test.tsx`：解析再取详情；加载的两句话；带 ID 不解析；坏的 state；加入对比；分享地址按课号拼；找不到、422、404；暂时失败重试；解析和详情明确失败以后重取期间显示加载；对上多门只列三门、按 ID 打开；详情 404、503；先修按课号打开；地址里的字净化；从对比页进；对话跨页保留且不重取 Co-op；课程页提问回首页；axe。
+    - `layout/TopBar.test.tsx`：课程数；失败时不带数字、30 秒后再取、成功以后不自己再取；预热中和读不懂；暂时失败留着上次的数并提示，明确失败不留；对比页说已选几门；离线演示不发请求。
+    - `layout/SearchContext.test.tsx`、`api/ready.test.ts`、`resolve.test.ts`、`feedback.test.ts`、`programs.test.ts`、`load.test.ts`、`models/chatPlans.test.ts`、`coursePath.test.ts`。
+26. **改过的旧测试**：
+    - `layout/AskBar.test.tsx` 重写（API 的两句、兜底的那句、勾选框出现的条件、500 字、回答时不能发）。
+    - `layout/session.test.tsx`：八条的起始页从 `/` 改成 `/compare`（搜索页现在会自己取数据）；「回来时什么都不发」那条多了顶栏的 `/ready`（地址干净以后才发）；账号的提示改从账号框和页面顶上取，加了三条：手机菜单里登出，结果在菜单里；回来的结果在 `<main>` 第二个位置、账号框里没有；第二次按下先清掉上一句。
+    - `pages/pages.test.tsx`：删掉原型的 11 条，加「没对上课的地址」一条，假的 fetch 补上 `/programs`、`/resolve/course`。
+    - `test/contracts.test.ts`：删掉「假数据只能有五门课」（原型的假课没了）。
+    - `components/controls.test.tsx`、`pages/ComparePage.test.tsx`：去掉对原型的依赖；对比页的「查看」带 ID。
+    - `api/apiBase.test.ts` 改一条、加几条（分享站点、开发端口）；`privacy.test.ts` 加 `askNotices`；`features/search-answer/useConversation.test.tsx` 加 `reset`。
+    - `test/withApi.tsx`：`seededQueryClient` 也预先放好 `/ready`（`SEEDED_READY`），整页的测试照旧不发请求；搜索页「身份没确定时不发请求」那条自己建的客户端也放好了它（这条测的是页面自己的请求）。
+    - `pages/SearchRoute.test.tsx`「勾选以后评价」那条加了一句：问完以后勾选还在（项目变异脚本的 M18 靠它）。
+    - 后端：`tests/test_chat_plan_evidence.py` 的五种方案结果断言 `plan_<结果>`；`test_program_plan_contract.py` 两条断言 `program_ambiguous`、`program_conflict`；`test_api_errors.py` 加两条（带 reason 的错误体，普通 409 不带；七种都收、不带前缀的不收）；`test_public_routes.py` 改一条、加一条（网页版多那一句，Streamlit 不多）；`test_dev_api.py`：端口那条改成读 `apiBase.ts`（端口在 `vite.config.ts` 里变成了变量），加 `--web-port` 三条、目录三条。
+27. **项目的变异脚本**（`web/scripts/mutations.mjs`）：M12、M18、M19、M23 改到新的地方（见验证记录），总数还是 152。
+
+### 修改文件
+
+- 后端改：`api/exceptions.py`、`api/privacy_text.py`、`api/routes/chat.py`、`api/routes/public.py`。
+- 开发用的 API：新建 `tests/support/dev_catalog.py`，改 `tests/support/dev_api.py`。
+- 后端测试改：`tests/test_api_errors.py`、`test_chat_plan_evidence.py`、`test_dev_api.py`、`test_program_plan_contract.py`、`test_public_routes.py`。
+- 前端新建：`web/src/api/feedback.ts`、`ready.ts`、`resolve.ts`，`web/src/layout/NoticeContext.tsx`、`SearchContext.tsx`，`web/src/models/chatPlans.ts`、`coursePath.ts`，`web/src/pages/CourseRoute.tsx`、`CourseRoute.module.css`、`SearchRoute.tsx`。
+- 前端改：`web/vite.config.ts`、`web/openapi.json`；`src/App.tsx`；`api/apiBase.ts`、`chat.ts`、`env.d.ts`、`load.ts`、`privacy.ts`、`programs.ts`、`schema.ts`；`features/demo/OfflineDemoShell.tsx`、`features/search-answer/useConversation.ts`、`features/search-landing/SearchLanding.tsx`；`layout/AppShell.tsx`、`AppShell.module.css`、`AskBar.tsx`、`AskBar.module.css`、`Sidebar.tsx`、`Sidebar.module.css`、`TopBar.tsx`、`useSession.ts`；`pages/ComparePage.tsx`、`SearchPage.module.css`；`test/withApi.tsx`；`web/scripts/mutations.mjs`。
+- 前端删除：`src/fixtures/courses.ts`、`src/layout/PrototypeContext.tsx`、`src/pages/CourseDetail.tsx`、`CourseDetail.module.css`、`SearchPage.tsx`。
+- 前端测试新建：`api/feedback.test.ts`、`load.test.ts`、`programs.test.ts`、`ready.test.ts`、`resolve.test.ts`，`layout/SearchContext.test.tsx`、`TopBar.test.tsx`，`models/chatPlans.test.ts`、`coursePath.test.ts`，`pages/CourseRoute.test.tsx`、`SearchRoute.test.tsx`、`searchRouteTestUtils.tsx`；改：`api/apiBase.test.ts`、`privacy.test.ts`，`components/controls.test.tsx`，`features/search-answer/useConversation.test.tsx`，`layout/AskBar.test.tsx`、`session.test.tsx`，`pages/ComparePage.test.tsx`、`pages.test.tsx`，`test/contracts.test.ts`。
+- 文档：`web/README.md`（开头、路由表、状态边界、R2b 和 R5d 两节里几句已经不对的话、R3e 一节），本节。
+
+数据库结构、检索、提示词和 Streamlit 版都没改。
+
+### 验证记录
+
+- **前端检查**：类型、零警告 lint、构建、格式、生成的类型都过；Vitest **75 个文件 2115 条**全过；首屏 JavaScript gzip **197,754 字节**（预算 250,000）。构建的「有块超过 500 kB」提示开工前就有。
+- **后端**：附近的测试（`near1`：这一批改过的 6 个测试文件，加上聊天、方案、OpenAPI、跨站、日志、隐私、公开接口和草案的）778 条过；Ruff F／E9／B 在改过和新建的 11 个 Python 文件上通过；所有改动和新建的文件里没有 CR，也没有不可见字符。**串行全量 5308 passed／7 warnings／593.54 秒**，退出码 0；跑之前和之后，67 个改动的文件逐个哈希相同。
+- **变异**（都在副本里跑。我自己的读 Vitest 的 JSON 报告：这一批的测试文件里有具名测试因断言失败才算杀掉，只撞上超时、整个文件起不来的不算；日志记下每个变异的全部失败）：
+  - 我自己的 194 个（`r3e_mutants.py`：课号和分享地址、解析、评价、项目和方案、加载状态、提问栏的两句、构建时的地址、对话、搜索状态、提问栏、外壳、登录回来、搜索页、课程页、对比页的链接、顶栏课程数、账号提示）。顶栏和账号提示之前的 177 个分两次跑完：171 个由断言杀掉，11 个存活，没有超时或出错。
+    - 10 个是测试缺口，补了测试以后都由对口的新测试杀掉：RS07（解析的超时档）漏了一条超时测试；CH03、CH06、CH07、CH08（方案的上限、重复的方案、concentration、版本的来源）原来的测试用的是 101 份一模一样的方案（重复的本来就会被拿掉，看不出上限）、没有重复和别的项目的方案、没有带 concentration 的、版本和来源页的摘要没有不同的；SC11（方案列表读不到时不清选择）补了「列表回来以后选择也不回来」；AK17（取消勾选不起作用）补了取消勾选；SR04、CR07、CR24（项目列表、解析、详情在重取期间显示失败）和第 35 节的 R02、M02、Y03 是同一类：TanStack v5 对从没成功过的查询重取时退回 pending，只有先成功、后来明确失败、再重取时才停在 error，三处各补了这一条。
+    - SR28 等价，见「已知」。
+    - 顶栏和账号提示的 17 个（RD01–RD07、TB01–TB02、AS01–AS02、OD01、NT01–NT05）全由断言杀掉；之后改过的函数里原有的变异（课程页 CR 组、外壳 SH 组、`useSession` 的 SS01）连同上面补测试的 5 个重跑，33 个杀掉，SR28 照旧存活。
+  - 项目自己的 `npm run test:mutations`：基线通过，**152／152** 都由对口的测试杀掉，工作源文件没变（`sourceUnchanged: true`），391.7 秒。R3e 删掉了原型的搜索页和 `PrototypeContext`，「允许保存」也从提问栏挪进了搜索状态，所以 152 个里有 4 个的锚点没了：M19、M23 改到新的搜索状态和搜索页上（换项目清掉方案；第一个问题让焦点去对话、不滚动），M12 改到搜索状态（默认不勾），M18 原来测「每次发送后复位」，这一批照 Streamlit 改成不复位，所以改成测「问完不复位」。其余 148 个的锚点和测试名都对得上（照 Vitest 报告里的完整测试名逐个核过）。
+- **浏览器验收**（内置浏览器，对着开发 API 和合成数据；另一个会话可能要用 8000 和 5173，所以开发 API 开在 8100、开发服务器开在 5273，用的就是这一批的 `--web-port` 和 `VITE_DEV_PORT`；1024、1440 和 390 宽）：
+  - 落地页：四个项目、两门入门推荐、两条 Co-op、项目选择框；顶栏「16 门课」（开发 API 合成目录的课数）。
+  - 项目和方案：选了 cs-ms，方案框列出三份核对过的，草稿没出现；带方案提问，回答里有「所选方案与课程位置」，先修规则用的是所选的那一年。
+  - 回答里的「查看」打开 `/course/CS-6140`，对话还在；详情、评价的估计、两年的先修（不默认最新）、培养方案里的位置都在；分享框是 `http://127.0.0.1:5273/course/CS-6140`，只读；「加入对比」以后侧栏的数字是 1，按钮不能再点；对比页的「查看」带着课程 ID，没有再解析。
+  - 先修里的课号去 `/course/CS-5800`，不带 ID、按课号解析；`/course/ML` 说对上多门、打开 CS 6140，点 DS 5220 带着 ID 打开；`/course/CS-7800` 的旧平铺先修也按课号跳；`/?course=CS%206140` 换成 `/course/CS-6140`，后退回到之前的隐私页。
+  - 隐私页「记了什么」末尾有浏览器历史那句。
+  - 在课程页用假 Google 登录 `dev-one`，回到同一个课程页；会员在课程页提问，回到首页看回答；登出以后对话清空。账号提示挪了位置以后又看了一次：登出的结果在侧栏的账号框里、焦点在登录按钮上，手机菜单的账号框里也有这句，`<main>` 顶上那行是空的。
+  - 1440 宽时课程页左边对话、右边详情；390 宽没有横向滚动。「其他课程」原来是 ghost 按钮，看着像普通的字，改成了带边框的（第 19 条）。
+  - 控制台只有游客 `/auth/me` 的 401 和 API 还没起来时的连接失败，没有脚本错误和 React 警告。开发服务器下每个请求都先中止一次，是 React 开发模式的 StrictMode 挂两遍；`build:dev-api` 的正式预览里（包里只有 `127.0.0.1:8100` 和分享用的 `127.0.0.1:4173`，没有正式的地址），落地页的每个请求只发一次，课程页只发一次 `/course/{id}`，`/course/ML` 只解析一次。`/chat` 在网络记录里显示为取消，是收到 `done` 以后客户端关掉连接（R2b 的设计），回答是完整的。
+
+### 审查
+
+（待填）
+
+### 已知、未处理
+
+- **会话在页面开着时过期**、**写前确认只是把空档缩小了**（第 35 节「已知」）：没变，R7 再看。搜索页的对话按「现在是谁」保留，同样要等到下一次问 `/auth/me` 才知道换了人。
+- **三个「再试一次」的按钮按下以后，键盘焦点掉到 `<body>`**（第 35 节「已知」）：没动。这一批课程页的「重试」也一样（重取期间那一块换成加载的那句）。
+- **演示外壳没改成懒加载**（第 35 节「已知」）：首屏 JavaScript gzip 现在 197,754 字节（预算 250,000）。
+- **先修面板里每门课的按钮都叫「查看」**（浏览器验收时看到，R3a 的组件）：按钮单独念出来分不清是哪门课，列表项里有课号和课名。要改的话动的是 R3a 的面板（比如按钮名带上课号），等用户定。
+- **开发服务器的热更新对 `CourseRoute.tsx` 不起作用**：它除了组件还导出了给测试用的 `notFound`，Vite 的 React 插件就整页重载，只影响本机开发。
+- **`?program=` 和方案链接**：R4 接，在那之前打开首页，不报错。
+- **等价的变异体**：SR28（`?course=` 不管地址是不是从 Google 回来的都换）：真正从 Google 回来的地址里只有 code 和 state，不会带 `course`；就算手工拼一个带 `course` 的，搜索页的跳转和登录去掉 code 的跳转都在同一个 transition 里，后一个是登录的 `/`，最后落在同一处，测试看不出差别。`!login` 留着，是为了结果不靠两次跳转的先后。
+- **和 R4b 页面合并**：R4b 的页面在另一个会话里做，两边都改 `web/src/App.tsx`、`web/README.md` 和本文件；不管哪一个后合并，冲突由 R3e 这一边来解。
+
+### 发布状态
+
+分支 `feat/web-search-api`，从 main `cbb91f7`（#36 合并以后）开。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。

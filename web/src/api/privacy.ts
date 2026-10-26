@@ -31,6 +31,25 @@ export const privacyQuery = queryOptions({
   staleTime: PUBLIC_FRESH_MS,
 });
 
+// The two notices next to the ask box (R3e), from the same answer as the privacy page: the query log's always, the
+// opt-in's while answer feedback is on (null otherwise). Null for an answer that does not carry them as text.
+export function askNotices(
+  value: unknown,
+): { queryLog: string; capture: string | null } | null {
+  if (
+    !isJsonObject(value) ||
+    typeof value.query_log_notice !== 'string' ||
+    value.query_log_notice.trim() === '' ||
+    !(
+      value.capture_notice === null ||
+      (typeof value.capture_notice === 'string' &&
+        value.capture_notice.trim() !== '')
+    )
+  )
+    return null;
+  return { queryLog: value.query_log_notice, capture: value.capture_notice };
+}
+
 const COUNTS = [
   'published_experiences',
   'unlocks_of_those',

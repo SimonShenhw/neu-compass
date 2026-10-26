@@ -55,9 +55,11 @@ function page(path: string, client = seededQueryClient()) {
   return client;
 }
 const where = () => screen.getByRole('status', { name: 'where' });
-const notice = () =>
-  screen.getAllByRole('status').find((node) => node.tagName === 'P')!;
 const sidebar = () => screen.getByRole('complementary');
+// What a press in the account box came to, said in the box (R3e).
+const boxNote = () => within(sidebar()).getByRole('status');
+// What came back from Google, at the top of the page (R3e).
+const returnNote = () => screen.getByRole('status', { name: '登录结果' });
 const accountButton = (name: string) =>
   within(sidebar()).getByRole('button', { name });
 // Browsers move focus to the page when the focused button is disabled; jsdom leaves it on the button (and will not
@@ -179,11 +181,12 @@ describe('coming back from Google', () => {
         </BrowserRouter>
       </WithApi>,
     );
-    await waitFor(() => expect(sent).toHaveLength(3));
+    await waitFor(() => expect(sent).toHaveLength(4));
     expect(sent).toEqual([
       '/auth/callback from /',
       '/auth/me from /',
       '/config from /compare',
+      '/ready from /compare',
     ]);
     expect(addressBar()).toBe('/compare');
     // Both steps replaced the entry: going back cannot reach an address with the code in it.
@@ -202,7 +205,7 @@ describe('coming back from Google', () => {
     );
     const client = page(`/?code=c&state=${STATE}`);
     await waitFor(() =>
-      expect(notice()).toHaveTextContent(LOGIN_MESSAGES.notKept),
+      expect(returnNote()).toHaveTextContent(LOGIN_MESSAGES.notKept),
     );
     await waitFor(() => expect(where()).toHaveTextContent('/compare'));
     expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
@@ -257,22 +260,28 @@ describe('coming back from Google', () => {
     vi.stubGlobal('fetch', fetch);
     page('/?code=synthetic-code&state=someone-elses-state-0123456789');
     await waitFor(() =>
-      expect(notice()).toHaveTextContent('登录没有完成，请重新登录。'),
+      expect(returnNote()).toHaveTextContent('登录没有完成，请重新登录。'),
     );
     // React Router commits a navigation in a transition, after the notice.
     await waitFor(() => expect(where()).toHaveTextContent('/compare'));
     expect(fetch).not.toHaveBeenCalled();
+    // At the top of the page, right under the line on content shown from before; not in the account box.
+    expect([...screen.getByRole('main').children].indexOf(returnNote())).toBe(
+      1,
+    );
+    expect(boxNote()).toBeEmptyDOMElement();
   });
 
   it('Google’s cancel comes back as a line, not a login', async () => {
-    pendingLogin('/');
+    // Back to a page that asks for nothing by itself (an empty comparison): the search page asks for what it shows.
+    pendingLogin('/compare');
     page(`/?error=access_denied&state=${STATE}`);
     await waitFor(() =>
-      expect(notice()).toHaveTextContent(
+      expect(returnNote()).toHaveTextContent(
         '登录没有完成（access_denied），请再试一次。',
       ),
     );
-    await waitFor(() => expect(where()).toHaveTextContent(/^\/$/));
+    await waitFor(() => expect(where()).toHaveTextContent('/compare'));
     expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
   });
 
@@ -296,7 +305,7 @@ describe('coming back from Google', () => {
     );
     const client = page(`/?code=c&state=${STATE}`);
     await waitFor(() =>
-      expect(notice()).toHaveTextContent(
+      expect(returnNote()).toHaveTextContent(
         '只能用 husky.neu.edu 或 northeastern.edu 邮箱登录。',
       ),
     );
@@ -316,7 +325,7 @@ describe('logging out', () => {
     page('/programs', client);
     addToCompare('c-cs-5800');
     await user.click(screen.getAllByRole('button', { name: '退出登录' })[0]!);
-    await waitFor(() => expect(notice()).toHaveTextContent('已退出登录。'));
+    await waitFor(() => expect(boxNote()).toHaveTextContent('已退出登录。'));
     expect(fetch.mock.calls[0]![0]).toBe('http://127.0.0.1:8000/auth/logout');
     expect(client.getQueryData(meQuery.queryKey)).toEqual(GUEST);
     expect(client.getQueryData([...VIEWER_KEY, 'u-1', 'coop'])).toBeUndefined();
@@ -343,7 +352,7 @@ describe('logging out', () => {
     addToCompare('c-cs-5800');
     await user.click(screen.getAllByRole('button', { name: '退出登录' })[0]!);
     await waitFor(() =>
-      expect(notice()).toHaveTextContent('没能退出登录，请再试一次。'),
+      expect(boxNote()).toHaveTextContent('没能退出登录，请再试一次。'),
     );
     expect(client.getQueryData(meQuery.queryKey)).toEqual(MEMBER);
     expect(getCompareList()).toEqual(['c-cs-5800']);
@@ -371,7 +380,7 @@ describe('logging out', () => {
     void client.refetchQueries({ queryKey: meQuery.queryKey });
     await waitFor(() => expect(meSignal).toBeDefined());
     await user.click(accountButton('退出登录'));
-    await waitFor(() => expect(notice()).toHaveTextContent('已退出登录。'));
+    await waitFor(() => expect(boxNote()).toHaveTextContent('已退出登录。'));
     expect(meSignal?.aborted).toBe(true);
     late(json(identity));
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -386,7 +395,7 @@ describe('the mobile menu', () => {
   }
 
   it('has the same account box as the sidebar', async () => {
-    page('/', seededQueryClient({ viewer: MEMBER }));
+    page('/compare', seededQueryClient({ viewer: MEMBER }));
     const menu = await openMenu();
     expect(menu).toHaveTextContent('Synthetic Student');
     expect(menu).toHaveTextContent('贡献数：2');
@@ -395,9 +404,9 @@ describe('the mobile menu', () => {
     ).toBeEnabled();
   });
 
-  it('a logout in the menu leaves focus on the menu’s login button', async () => {
+  it('a logout in the menu is said in the menu, and leaves focus on its login button', async () => {
     const calls = held();
-    page('/', seededQueryClient({ viewer: MEMBER }));
+    page('/compare', seededQueryClient({ viewer: MEMBER }));
     const menu = await openMenu();
     within(menu).getByRole('button', { name: '退出登录' }).focus();
     await userEvent.keyboard('{Enter}');
@@ -414,27 +423,29 @@ describe('the mobile menu', () => {
       name: '用 NEU 邮箱登录',
     });
     expect(login).toHaveFocus();
+    // The page behind an open menu is hidden from a screen reader; the menu's own box says it.
+    expect(within(menu).getByRole('status')).toHaveTextContent('已退出登录。');
   });
 });
 
 describe('focus in the account box', () => {
   it('a keyboard logout leaves focus on the login button that replaces it', async () => {
     const calls = held();
-    page('/', seededQueryClient({ viewer: MEMBER }));
+    page('/compare', seededQueryClient({ viewer: MEMBER }));
     await pressAndDropFocus('退出登录', '正在退出…');
     calls[0]!.answer(new Response(null, { status: 204 }));
-    await waitFor(() => expect(notice()).toHaveTextContent('已退出登录。'));
+    await waitFor(() => expect(boxNote()).toHaveTextContent('已退出登录。'));
     expect(accountButton('用 NEU 邮箱登录')).toHaveFocus();
   });
 
   it('a logout that fails puts focus back on the logout button', async () => {
     const calls = held();
-    page('/', seededQueryClient({ viewer: MEMBER }));
+    page('/compare', seededQueryClient({ viewer: MEMBER }));
     await pressAndDropFocus('退出登录', '正在退出…');
     const shown = focusWhenShown('没能退出登录，请再试一次。');
     calls[0]!.fail(new TypeError('Failed to fetch'));
     await waitFor(() =>
-      expect(notice()).toHaveTextContent('没能退出登录，请再试一次。'),
+      expect(boxNote()).toHaveTextContent('没能退出登录，请再试一次。'),
     );
     expect(accountButton('退出登录')).toHaveFocus();
     expect(shown.focus).toBe(accountButton('退出登录'));
@@ -447,7 +458,7 @@ describe('focus in the account box', () => {
     const shown = focusWhenShown('请求过于频繁，请稍后手动重试。');
     calls[0]!.answer(json({ error_type: 'rate_limited' }, 429));
     await waitFor(() =>
-      expect(notice()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
+      expect(boxNote()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
     );
     expect(accountButton('用 NEU 邮箱登录')).toHaveFocus();
     expect(shown.focus).toBe(accountButton('用 NEU 邮箱登录'));
@@ -473,19 +484,22 @@ describe('focus in the account box', () => {
 
   it('focus the student moved elsewhere meanwhile stays there', async () => {
     const calls = held();
-    page('/', seededQueryClient({ viewer: MEMBER }));
+    page('/compare', seededQueryClient({ viewer: MEMBER }));
     await pressAndDropFocus('退出登录', '正在退出…');
     const link = within(sidebar()).getByRole('link', { name: /培养方案/ });
     link.focus();
     calls[0]!.answer(new Response(null, { status: 204 }));
-    await waitFor(() => expect(notice()).toHaveTextContent('已退出登录。'));
+    await waitFor(() => expect(boxNote()).toHaveTextContent('已退出登录。'));
     expect(link).toHaveFocus();
   });
 });
 
 describe('the account box', () => {
   it('a member is named in the sidebar and has no guest badge', () => {
-    page('/', seededQueryClient({ viewer: { ...MEMBER, displayName: null } }));
+    page(
+      '/compare',
+      seededQueryClient({ viewer: { ...MEMBER, displayName: null } }),
+    );
     expect(sidebar()).toHaveTextContent('synthetic.student@husky.neu.edu');
     expect(sidebar()).toHaveTextContent('贡献数：2');
     expect(screen.queryByText('游客')).not.toBeInTheDocument();
@@ -493,7 +507,7 @@ describe('the account box', () => {
 
   it('login is off when the API says so', () => {
     page(
-      '/',
+      '/compare',
       seededQueryClient({
         config: { answer_feedback_enabled: false, login_available: false },
       }),
@@ -516,12 +530,29 @@ describe('the account box', () => {
       screen.getAllByRole('button', { name: '用 NEU 邮箱登录' })[0]!,
     );
     await waitFor(() =>
-      expect(notice()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
+      expect(boxNote()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
     );
     expect(
       screen.getAllByRole('button', { name: '用 NEU 邮箱登录' })[0],
     ).toBeEnabled();
     expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
+  });
+
+  it('a second press clears what the first came to, so the same words are said again', async () => {
+    const calls = held();
+    page('/compare');
+    await userEvent.click(accountButton('用 NEU 邮箱登录'));
+    calls[0]!.answer(json({ error_type: 'rate_limited' }, 429));
+    await waitFor(() =>
+      expect(boxNote()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
+    );
+    await userEvent.click(accountButton('用 NEU 邮箱登录'));
+    expect(boxNote()).toBeEmptyDOMElement();
+    calls[1]!.answer(json({ error_type: 'rate_limited' }, 429));
+    await waitFor(() =>
+      expect(boxNote()).toHaveTextContent('请求过于频繁，请稍后手动重试。'),
+    );
+    expect(returnNote()).toBeEmptyDOMElement();
   });
 });
 

@@ -39,8 +39,11 @@ def capture_notice(days):
             + keep + '取消勾选、清空对话或登出都不会删除已经保存的数据。')
 
 
-def privacy_sections(settings: Any) -> list[tuple[str, list[str]]]:
-    """(heading, sentences) in page order; a pure function of the settings. 中文：按页面顺序的（标题，句子）。"""
+def privacy_sections(settings: Any, *, web: bool = False) -> list[tuple[str, list[str]]]:
+    """(heading, sentences) in page order; a pure function of the settings. `web`: for the web front end, where each
+    course page has its own address, so the browser's history keeps the courses opened (R3e); the Streamlit page never
+    puts a course in its address. 中文：按页面顺序的（标题，句子）。`web`：给新前端用，那里每门课的页面有自己的网址，
+    浏览器历史会记下打开过的课（R3e）；Streamlit 页的网址里从不放课。"""
     days = settings.query_log_retention_days
     feedback = settings.answer_feedback_enabled is True
     contact = settings.privacy_contact_email
@@ -62,6 +65,9 @@ def privacy_sections(settings: Any) -> list[tuple[str, list[str]]]:
          else "回答反馈功能目前关闭：回答不保存。"),
         "选课草案和课程对比只在这次会话里，刷新或登出就清空，不写数据库。",
     ]
+    if web:
+        kept.append("每门课的页面有自己的网址（比如 /course/CS-6140）：打开过的课程页会和浏览别的网站一样，留在你这台设备的"
+                    "浏览器历史里，可以在浏览器里清除；分享出去的链接里也带着课号。")
     who = ["服务器上的数据只有维护者能看，不卖、也不交给第三方；公开的 Co-op 经验按贡献等级给访客看；"
            "生成回答要把问题发给 Google Gemini，见上。",
            "网站经 Cloudflare 转发到服务器：连接在 Cloudflare 那里解密再转发，所以 Cloudflare 能看到传输的内容。"]

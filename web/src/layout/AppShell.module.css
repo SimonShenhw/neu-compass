@@ -32,6 +32,15 @@
   font-size: var(--text-sm);
   color: var(--ink2);
 }
+.returnNote {
+  margin: var(--space-0);
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+.returnNote:not(:empty) {
+  margin-bottom: var(--space-3);
+}
+/* The offline demo shell's line under the page. */
 .notice {
   font-size: var(--text-sm);
   color: var(--ink3);

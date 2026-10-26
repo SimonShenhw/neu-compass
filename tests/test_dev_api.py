@@ -154,14 +154,47 @@ def test_the_dev_api_listens_on_this_machine_only(settings_back, monkeypatch, ca
 
 
 def test_the_front_ends_are_the_dev_server_and_the_preview():
-    """The hosts and ports of web/vite.config.ts, on 127.0.0.1 and never localhost: one host name keeps the page and
-    this API one site for the browser. 中文：和 web/vite.config.ts 的主机、端口一样，用 127.0.0.1、不用 localhost：
-    同一个主机名，浏览器才把页面和这个 API 算作同一个站点。"""
+    """The ports of web/src/api/apiBase.ts, which web/vite.config.ts serves on, on 127.0.0.1 and never localhost: one
+    host name keeps the page and this API one site for the browser. 中文：web/src/api/apiBase.ts 的端口，也就是
+    web/vite.config.ts 用的那两个，用 127.0.0.1、不用 localhost：同一个主机名，浏览器才把页面和这个 API 算作同一个站点。"""
+    base = (ROOT / "web" / "src" / "api" / "apiBase.ts").read_text(encoding="utf-8")
+    port = {name: int(re.search(rf"export const {name} = (\d+);", base).group(1))
+            for name in ("DEV_PORT", "PREVIEW_PORT")}
     config = (ROOT / "web" / "vite.config.ts").read_text(encoding="utf-8")
-    port = {name: re.search(rf"{name}: \{{ host: '127\.0\.0\.1', port: (\d+),", config).group(1)
-            for name in ("server", "preview")}
-    assert dev_api.FRONT_ENDS == (f"http://127.0.0.1:{port['server']}", f"http://127.0.0.1:{port['preview']}")
+    assert "const port = devPort(VITE_DEV_PORT);" in config
+    assert "server: { host: '127.0.0.1', port, strictPort: true }" in config
+    assert "preview: { host: '127.0.0.1', port: PREVIEW_PORT, strictPort: true }" in config
+    assert (dev_api.DEV_PORT, dev_api.PREVIEW_PORT) == (port["DEV_PORT"], port["PREVIEW_PORT"])
+    assert dev_api.FRONT_ENDS == (f"http://127.0.0.1:{port['DEV_PORT']}", f"http://127.0.0.1:{port['PREVIEW_PORT']}")
     assert dev_api.HOST == "127.0.0.1"
+
+
+def test_a_dev_server_on_another_port_is_the_one_let_in_and_signed_in_back_to(settings_back, tmp_path):
+    """--web-port (R3e): the dev server's port when 5173 cannot be used. 中文：5173 用不了时开发服务器的端口。"""
+    app = dev_api.build_dev_app(tmp_path / "dev.sqlite3", base="https://dev-api.test", web_port=5300)
+    assert settings.web_origins == ["http://127.0.0.1:5300", dev_api.FRONT_ENDS[1]]
+    assert settings.google_oauth_redirect_uri == "http://127.0.0.1:5300/"
+    with TestClient(app, base_url="https://testserver") as client:
+        links = sign_in_links(client, "http://127.0.0.1:5300")
+        assert all(link.startswith("http://127.0.0.1:5300/?") for link in links)
+        refused = client.get("/auth/login-url", params={"state": STATE, "redirect_uri": f"{FRONT_END}/"})
+        assert refused.status_code == 422
+
+
+def test_the_web_port_is_passed_on(settings_back, monkeypatch, capsys):
+    import uvicorn  # noqa: PLC0415
+
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: None)
+    assert dev_api.main(["--port", "8123", "--web-port", "5300"]) == 0
+    assert settings.web_origins[0] == "http://127.0.0.1:5300"
+    assert "http://127.0.0.1:5300" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("port", ["1023", "65536", "4173", "8123"])
+def test_a_web_port_the_dev_server_cannot_have_is_refused(port, capsys):
+    with pytest.raises(SystemExit) as refused:
+        dev_api.main(["--port", "8123", "--web-port", port])
+    assert refused.value.code == 2 and "--web-port" in capsys.readouterr().err
 
 
 def test_a_code_the_sign_in_page_never_gave_is_refused_as_google_would():
@@ -265,6 +298,60 @@ def ask(client, query):
     response = client.post("/chat", json={"query": query, "k": 5, "allow_feedback_capture": False})
     assert response.status_code == 200
     return [json.loads(line) for line in response.text.splitlines() if line.strip()]
+
+
+def test_the_catalog_has_programs_to_start_with_and_plans_to_ask_under(client):
+    """R3e's synthetic catalog (tests/support/dev_catalog.py). 中文：R3e 的合成目录。"""
+    assert [row["program_id"] for row in client.get("/programs").json()] == ["aai-ms", "cs-ms", "ds-ms", "pjm-ms"]
+    first = {program: [(course["primary_code"], course["requirement_type"]) for group in body["semesters"]
+                       if group["semester"] == 1 for course in group["courses"]]
+             for program in ("aai-ms", "cs-ms", "ds-ms") for body in [client.get(f"/programs/{program}").json()]}
+    assert first == {"aai-ms": [("AAI 5025", "elective_pool"), ("AAI 6600", "foundation"), ("CS 5100", "core")],
+                     "cs-ms": [("CS 5010", "core"), ("CS 5800", "core")], "ds-ms": [("DS 5110", "elective_pool")]}
+    cs = client.get("/programs/cs-ms").json()
+    assert cs["plan_schema_available"] is True
+    assert {plan["plan_id"]: plan["review_status"] for plan in cs["plans"]} == {
+        "cs-ms-boston-2026-2027-standard": "source_checked", "cs-ms-boston-2026-2027-align": "source_checked",
+        "cs-ms-boston-2026-2027-bridge": "draft", "cs-ms-boston-2025-2026-standard": "source_checked"}
+    assert set(cs["plan_revisions"]) == {plan["plan_id"] for plan in cs["plans"]}
+
+
+def plan_question(client, plan_id, *, revision=None):
+    body = client.get("/programs/cs-ms").json()
+    plan = next(plan for plan in body["plans"] if plan["plan_id"] == plan_id)
+    selection = {key: plan[key] for key in ("program_id", "plan_id", "campus", "catalog_year", "pathway",
+                                            "concentration")}
+    selection["plan_content_sha256"] = revision or body["plan_revisions"][plan_id]
+    return client.post("/chat", json={"query": "CS 6140 讲什么？", "k": 10, "allow_feedback_capture": False,
+                                      "program_id": "cs-ms", "plan": selection})
+
+
+def test_a_question_goes_with_a_checked_plan_and_never_with_a_draft_or_an_old_version(client, monkeypatch):
+    monkeypatch.setattr(dev_api, "PIECE_SECONDS", 0)
+    answered = plan_question(client, "cs-ms-boston-2026-2027-align")
+    assert answered.status_code == 200
+    meta = json.loads(answered.text.splitlines()[0])
+    assert meta["type"] == "meta" and meta["results"][0]["primary_code"] == "CS 6140"
+    draft = plan_question(client, "cs-ms-boston-2026-2027-bridge")
+    assert draft.status_code == 409 and draft.json()["reason"] == "plan_draft"
+    stale = plan_question(client, "cs-ms-boston-2026-2027-align", revision="f" * 64)
+    assert stale.status_code == 409 and stale.json()["reason"] == "plan_stale"
+
+
+def test_a_nickname_names_two_courses_and_a_course_has_its_catalog_requisites(client):
+    matches = client.get("/resolve/course", params={"ref": "ML"}).json()["matches"]
+    assert sorted(match["course_id"] for match in matches) == ["c-cs-6140", "c-ds-5220"]
+    ml = client.get("/course/c-cs-6140").json()
+    assert sorted(document["catalog_year"] for document in ml["course_requisites"]["documents"]) == [
+        "2025-2026", "2026-2027"]
+    # And everything else a course page shows. 中文：课程页能显示的别的东西也都有。
+    assert (ml["credits"], ml["workload_hours_per_week"], len(ml["grading_components"])) == (4, 7.5, 4)
+    assert ml["ai_policy"]["disclosure_required"] is True and len(ml["evidence_snippets"]) == 4
+    assert ml["answer_evidence"]["catalog"]["description"].startswith("Covers supervised learning")
+    flat = client.get("/course/c-cs-7800").json()
+    assert flat["course_requisites"]["documents"] == []
+    assert [(edge["primary_code"], edge["requirement"]) for edge in flat["prerequisites"]] == [
+        ("CS 5100", "recommended"), ("CS 5800", "required"), ("CS 6140", "concurrent")]
 
 
 def test_a_question_gets_the_scripted_answer_and_never_a_model(client, monkeypatch):

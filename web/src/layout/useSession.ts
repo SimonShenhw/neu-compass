@@ -1,7 +1,14 @@
 // Who is looking, and the login and logout buttons (R2b). AppShell uses this once and hands the result to the
 // desktop sidebar and the mobile menu.
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LOGIN_MESSAGES,
@@ -22,6 +29,7 @@ import type { SessionView } from './Sidebar';
 export const VIEWER_KEY = ['viewer'] as const;
 
 export function useSession(
+  // The page's line for what came back from Google (at the top of the page since R3e).
   announce: (message: string) => void,
   // Leaving the page for Google; a test passes a spy.
   go: (url: string) => void = (url) => window.location.assign(url),
@@ -35,6 +43,10 @@ export function useSession(
     () =>
       isLoginReturn(location.pathname, location.search) ? 'returning' : null,
   );
+  // What the last login or logout pressed in the account box came to, said in the box itself (R3e; the page's line
+  // under everything was out of sight on a long page and hidden behind the open mobile menu). A new press clears it,
+  // so the same words again are read out again.
+  const [note, setNote] = useState('');
   // While the address still carries Google's code, neither /config nor /auth/me is asked: an /auth/me sent with an
   // old cookie could answer after the login and expire the new cookie.
   const config = useConfig(busy !== 'returning');
@@ -83,9 +95,13 @@ export function useSession(
         if (!(await kept(result.member))) announce(LOGIN_MESSAGES.notKept);
       }
       if (result.kind === 'failed') announce(result.message);
-      if (result.kind !== 'none')
-        void navigate(result.returnTo, { replace: true });
-      setBusy(null);
+      // React Router makes a navigation a transition; the return ends in the same one, so no page is drawn for a moment
+      // at / with the new viewer, asking for what it shows there (R3e).
+      startTransition(() => {
+        if (result.kind !== 'none')
+          void navigate(result.returnTo, { replace: true });
+        setBusy(null);
+      });
     });
   }, [announce, becomes, kept, navigate]);
 
@@ -102,13 +118,14 @@ export function useSession(
   const login = useCallback(() => {
     if (busy) return;
     setBusy('login');
+    setNote('');
     startLogin(`${location.pathname}${location.search}${location.hash}`, go)
       // On success the page is leaving for Google; only a failure comes back here.
       .catch((error: unknown) => {
-        announce(loginFailureMessage(error));
+        setNote(loginFailureMessage(error));
         setBusy(null);
       });
-  }, [announce, busy, go, location]);
+  }, [busy, go, location]);
 
   // Forgetting who was looking, at a logout and when the account is gone.
   const forget = useCallback(async () => {
@@ -119,17 +136,18 @@ export function useSession(
   const signOut = useCallback(() => {
     if (busy) return;
     setBusy('logout');
+    setNote('');
     logout()
       .then(
         async () => {
           await forget();
-          announce(LOGIN_MESSAGES.loggedOut);
+          setNote(LOGIN_MESSAGES.loggedOut);
         },
         // The cookie is HttpOnly: without the API's answer the session may still be alive, so say so.
-        () => announce(LOGIN_MESSAGES.logoutFailed),
+        () => setNote(LOGIN_MESSAGES.logoutFailed),
       )
       .finally(() => setBusy(null));
-  }, [announce, busy, forget]);
+  }, [busy, forget]);
 
   // An upload's 201 carries the server's contribution count (R0 8: never one more than before, by inference). A new
   // count changes what this viewer may see, so it goes in as a change of viewer: what was shown for the old count goes.
@@ -177,5 +195,5 @@ export function useSession(
     }),
     [contributed, forget, login, settled, unsure, viewer],
   );
-  return { session, login, logout: signOut, account };
+  return { session, login, logout: signOut, account, settled, note };
 }

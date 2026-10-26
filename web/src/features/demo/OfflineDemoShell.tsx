@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../../layout/Sidebar';
 import { TopBar } from '../../layout/TopBar';
-import { usePrototype } from '../../layout/PrototypeContext';
+import { useNotice } from '../../layout/NoticeContext';
 import { pagePresentation } from '../../layout/routePresentation';
 import { useCompareList } from '../../models/compareList';
 import styles from '../../layout/AppShell.module.css';
@@ -10,7 +10,7 @@ import styles from '../../layout/AppShell.module.css';
 // Only synthetic demo routes use this shell. It never mounts useSession or API queries.
 export default function OfflineDemoShell() {
   const { pathname } = useLocation();
-  const { notice, announce } = usePrototype();
+  const { notice, announce } = useNotice();
   const { title } = pagePresentation(pathname);
   const count = useCompareList().length;
   const account = {
@@ -35,6 +35,7 @@ export default function OfflineDemoShell() {
           title={title}
           showGuest
           count={count}
+          courses={null}
           onRefresh={refresh}
           account={account}
         />

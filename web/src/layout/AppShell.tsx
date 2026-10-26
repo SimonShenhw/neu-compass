@@ -1,10 +1,12 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { refreshReads, useShowingOld } from '../api/queries';
-import { AccountContext } from './account';
+import { refreshReads, shownData, useShowingOld } from '../api/queries';
+import { coursesIndexed, readyQuery } from '../api/ready';
+import { AccountContext, viewerOwner } from './account';
 import { AskBar } from './AskBar';
-import { usePrototype } from './PrototypeContext';
+import { useNotice } from './NoticeContext';
+import { SearchProvider, useSearch } from './SearchContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { pagePresentation } from './routePresentation';
@@ -18,15 +20,33 @@ export const FALLBACK_NOTICE =
 // Pages that say who is looking themselves, so the top bar's guest badge would say it twice.
 const SAYS_WHO = new Set(['/coop', '/privacy', '/coop-demo', '/privacy-demo']);
 
-export function AppShell() {
+// The ask box asks in the shell's conversation; from a course page the answer is read on the search page, as R1's
+// prototype did.
+function SearchAskBar() {
+  const search = useSearch();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  return (
+    <AskBar
+      onSend={(question) => {
+        search.ask(question);
+        if (pathname !== '/') void navigate('/');
+      }}
+    />
+  );
+}
+
+export function AppShell() {
+  const { pathname } = useLocation();
   const queryClient = useQueryClient();
-  const state = usePrototype();
+  const { notice, announce } = useNotice();
   const comparison = useCompareList();
-  const { session, login, logout, account } = useSession(state.announce);
+  const { session, login, logout, account, settled, note } =
+    useSession(announce);
+  // The top bar's course count, held back like /config while the address still carries Google's code (R3e).
+  const ready = useQuery({ ...readyQuery, enabled: settled });
   const showingOld = useShowingOld();
-  const box = { session, onLogin: login, onLogout: logout };
+  const box = { session, onLogin: login, onLogout: logout, note };
   const { title, isSearch, navigationPath } = pagePresentation(pathname);
   useEffect(() => {
     document.title = `${title} · NEU-Compass`;
@@ -54,28 +74,39 @@ export function AppShell() {
           }
           title={title}
           count={comparison.length}
+          courses={coursesIndexed(shownData(ready))}
           onRefresh={refresh}
           account={box}
         />
-        <main id="main-content" tabIndex={-1} className={styles.main}>
-          <div role="status" aria-label="内容更新" className={styles.fallback}>
-            {showingOld && <p>{FALLBACK_NOTICE}</p>}
-          </div>
-          <AccountContext.Provider value={account}>
-            <Outlet />
-          </AccountContext.Provider>
-        </main>
-        <p role="status" className={styles.notice}>
-          {state.notice}
-        </p>
-        {isSearch && (
-          <AskBar
-            onSend={(question) => {
-              state.submit(question);
-              if (pathname !== '/') void navigate('/');
-            }}
-          />
-        )}
+        <AccountContext.Provider value={account}>
+          <SearchProvider
+            owner={
+              account.viewer === undefined
+                ? undefined
+                : viewerOwner(account.viewer)
+            }
+          >
+            <main id="main-content" tabIndex={-1} className={styles.main}>
+              <div
+                role="status"
+                aria-label="内容更新"
+                className={styles.fallback}
+              >
+                {showingOld && <p>{FALLBACK_NOTICE}</p>}
+              </div>
+              {/* What came back from Google, at the top where the page opens (R3e). */}
+              <p
+                role="status"
+                aria-label="登录结果"
+                className={styles.returnNote}
+              >
+                {notice}
+              </p>
+              <Outlet />
+            </main>
+            {isSearch && <SearchAskBar />}
+          </SearchProvider>
+        </AccountContext.Provider>
       </div>
     </div>
   );
