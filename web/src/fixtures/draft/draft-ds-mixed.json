@@ -1,0 +1,96 @@
+{
+  "case": "draft-ds-mixed",
+  "notes": "The ds plan (a concentration).",
+  "request": {
+    "method": "POST",
+    "path": "/programs/ds-ms/plans/ds-ms-boston-2026-2027-standard-ai/draft",
+    "body": {
+      "plan_content_sha256": "852443e7c562b023a5fb374b0f056fa3dc3b1d6d0ef6728ba8fffce68d9cd5ee",
+      "course_ids": [],
+      "input": "DS 5220 CS 6140"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "852443e7c562b023a5fb374b0f056fa3dc3b1d6d0ef6728ba8fffce68d9cd5ee",
+    "courses": [
+      {
+        "course_id": "c-ds-5220",
+        "code": "DS 5220",
+        "name": "Supervised Machine Learning and Learning Theory",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-6140",
+        "code": "CS 6140",
+        "name": "Machine Learning",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "DS 5220",
+      "CS 6140"
+    ],
+    "notices": [],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic data science core",
+        "status": "unknown",
+        "reasons": [
+          "这个方案只记录了部分规则。"
+        ],
+        "reasons_omitted": 0,
+        "counted": [
+          "DS 5220",
+          "CS 6140"
+        ],
+        "possible": [],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Supervised learning core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "DS 5220"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic data science electives",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 6140"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 0
+            },
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 1,
+        "missing": 0,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

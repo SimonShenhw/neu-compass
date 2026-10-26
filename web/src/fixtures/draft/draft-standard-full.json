@@ -1,0 +1,296 @@
+{
+  "case": "draft-standard-full",
+  "notes": "A full draft of 20 (14 the plan does not name).",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [
+        "c-cs-5010",
+        "c-cs-5800",
+        "c-cs-6140",
+        "c-cs-5200",
+        "c-ds-5110",
+        "c-cs-5100",
+        "c-zz-00",
+        "c-zz-01",
+        "c-zz-02",
+        "c-zz-03",
+        "c-zz-04",
+        "c-zz-05",
+        "c-zz-06",
+        "c-zz-07",
+        "c-zz-08",
+        "c-zz-09",
+        "c-zz-10",
+        "c-zz-11",
+        "c-zz-12",
+        "c-zz-13"
+      ]
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5010",
+        "code": "CS 5010",
+        "name": "Programming Design Paradigm",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5800",
+        "code": "CS 5800",
+        "name": "Algorithms",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-6140",
+        "code": "CS 6140",
+        "name": "Machine Learning",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5200",
+        "code": "CS 5200",
+        "name": "Database Management Systems",
+        "credits": 4
+      },
+      {
+        "course_id": "c-ds-5110",
+        "code": "DS 5110",
+        "name": "Essentials of Data Science",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5100",
+        "code": "CS 5100",
+        "name": "Foundations of Artificial Intelligence",
+        "credits": null
+      },
+      {
+        "course_id": "c-zz-00",
+        "code": "ZZ 7001",
+        "name": "Synthetic filler 00",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-01",
+        "code": "ZZ 7002",
+        "name": "Synthetic filler 01",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-02",
+        "code": "ZZ 7003",
+        "name": "Synthetic filler 02",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-03",
+        "code": "ZZ 7004",
+        "name": "Synthetic filler 03",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-04",
+        "code": "ZZ 7005",
+        "name": "Synthetic filler 04",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-05",
+        "code": "ZZ 7006",
+        "name": "Synthetic filler 05",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-06",
+        "code": "ZZ 7007",
+        "name": "Synthetic filler 06",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-07",
+        "code": "ZZ 7008",
+        "name": "Synthetic filler 07",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-08",
+        "code": "ZZ 7009",
+        "name": "Synthetic filler 08",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-09",
+        "code": "ZZ 7010",
+        "name": "Synthetic filler 09",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-10",
+        "code": "ZZ 7011",
+        "name": "Synthetic filler 10",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-11",
+        "code": "ZZ 7012",
+        "name": "Synthetic filler 11",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-12",
+        "code": "ZZ 7013",
+        "name": "Synthetic filler 12",
+        "credits": 4
+      },
+      {
+        "course_id": "c-zz-13",
+        "code": "ZZ 7014",
+        "name": "Synthetic filler 13",
+        "credits": 4
+      }
+    ],
+    "added": [],
+    "notices": [],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "unknown",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5010",
+          "CS 5800",
+          "CS 6140",
+          "CS 5200"
+        ],
+        "possible": [
+          "CS 5200",
+          "DS 5110",
+          "CS 5100"
+        ],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5010"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 6140",
+              "CS 5200"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 0
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "unknown",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+              "学分未知：CS 5100",
+              "范围内可能计入：DS 5110、CS 5100；是否能算，要项目确认。",
+              "CS 5200 已算进『Synthetic elective pool』；能不能同时算这一组，要项目确认。",
+              "CS 5010 在这一组被明确排除，不算。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "CS 5200",
+              "DS 5110",
+              "CS 5100"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "ZZ 7001",
+        "ZZ 7002",
+        "ZZ 7003",
+        "ZZ 7004",
+        "ZZ 7005",
+        "ZZ 7006",
+        "ZZ 7007",
+        "ZZ 7008",
+        "ZZ 7009",
+        "ZZ 7010",
+        "ZZ 7011",
+        "ZZ 7012",
+        "ZZ 7013",
+        "ZZ 7014"
+      ],
+      "summary_counts": {
+        "met": 1,
+        "missing": 0,
+        "unknown": 1
+      }
+    }
+  },
+  "failure": null
+}

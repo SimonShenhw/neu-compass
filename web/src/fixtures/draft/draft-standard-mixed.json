@@ -1,0 +1,194 @@
+{
+  "case": "draft-standard-mixed",
+  "notes": "The two cores in the draft, then a pool, the breadth group (one course with unknown credits) and a course the plan does not name.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [
+        "c-cs-5010",
+        "c-cs-5800"
+      ],
+      "input": "CS 6140 CS 5200 DS 5110 CS 5100 EECE 5644"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5010",
+        "code": "CS 5010",
+        "name": "Programming Design Paradigm",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5800",
+        "code": "CS 5800",
+        "name": "Algorithms",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-6140",
+        "code": "CS 6140",
+        "name": "Machine Learning",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5200",
+        "code": "CS 5200",
+        "name": "Database Management Systems",
+        "credits": 4
+      },
+      {
+        "course_id": "c-ds-5110",
+        "code": "DS 5110",
+        "name": "Essentials of Data Science",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5100",
+        "code": "CS 5100",
+        "name": "Foundations of Artificial Intelligence",
+        "credits": null
+      },
+      {
+        "course_id": "c-eece-5644",
+        "code": "EECE 5644",
+        "name": "Introduction to Machine Learning and Pattern Recognition",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "CS 6140",
+      "CS 5200",
+      "DS 5110",
+      "CS 5100",
+      "EECE 5644"
+    ],
+    "notices": [],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "unknown",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5010",
+          "CS 5800",
+          "CS 6140",
+          "CS 5200"
+        ],
+        "possible": [
+          "CS 5200",
+          "DS 5110",
+          "CS 5100"
+        ],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5010"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 6140",
+              "CS 5200"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 0
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "unknown",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+              "学分未知：CS 5100",
+              "范围内可能计入：DS 5110、CS 5100；是否能算，要项目确认。",
+              "CS 5200 已算进『Synthetic elective pool』；能不能同时算这一组，要项目确认。",
+              "CS 5010 在这一组被明确排除，不算。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "CS 5200",
+              "DS 5110",
+              "CS 5100"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "EECE 5644"
+      ],
+      "summary_counts": {
+        "met": 1,
+        "missing": 0,
+        "unknown": 1
+      }
+    }
+  },
+  "failure": null
+}

@@ -1,0 +1,75 @@
+{
+  "case": "draft-malformed",
+  "notes": "An answer without its result.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [
+        "c-cs-5010",
+        "c-cs-5800"
+      ],
+      "input": "CS 6140 CS 5200 DS 5110 CS 5100 EECE 5644"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5010",
+        "code": "CS 5010",
+        "name": "Programming Design Paradigm",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5800",
+        "code": "CS 5800",
+        "name": "Algorithms",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-6140",
+        "code": "CS 6140",
+        "name": "Machine Learning",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5200",
+        "code": "CS 5200",
+        "name": "Database Management Systems",
+        "credits": 4
+      },
+      {
+        "course_id": "c-ds-5110",
+        "code": "DS 5110",
+        "name": "Essentials of Data Science",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5100",
+        "code": "CS 5100",
+        "name": "Foundations of Artificial Intelligence",
+        "credits": null
+      },
+      {
+        "course_id": "c-eece-5644",
+        "code": "EECE 5644",
+        "name": "Introduction to Machine Learning and Pattern Recognition",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "CS 6140",
+      "CS 5200",
+      "DS 5110",
+      "CS 5100",
+      "EECE 5644"
+    ],
+    "notices": []
+  },
+  "failure": null,
+  "derived_from": "draft-standard-mixed",
+  "edit": "removed body.result"
+}

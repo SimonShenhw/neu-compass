@@ -1,0 +1,52 @@
+{
+  "name": "standard-malformed",
+  "notes": "An answer without its result: one warning.",
+  "props": {
+    "plan": {
+      "fixture": "plans-cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-standard"
+    },
+    "planContentSha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "answer": "draft-malformed",
+    "status": "idle",
+    "failure": null
+  },
+  "visible": [
+    {
+      "kind": "heading",
+      "text": "我的选课草案（只在本次会话）"
+    },
+    {
+      "kind": "note",
+      "text": "填写修过或打算修的课，只按填写课号解释已记录规则；不看成绩、免修、审批或开课学期，不判断能否注册或毕业。"
+    },
+    {
+      "kind": "note",
+      "text": "仅本次会话保存；刷新为新会话、登出或换账号后清空，不写数据库、不分享清单，也不交给聊天。"
+    },
+    {
+      "kind": "note",
+      "text": "学分按核对时的课程记录，不确认具体班次或个人学位计入。"
+    },
+    {
+      "kind": "button",
+      "text": "清空草案",
+      "action": "clear"
+    },
+    {
+      "kind": "textarea",
+      "label": "课号（逗号、空格或换行分开，例如 CS 5010, CS 5800）",
+      "max_length": 4000
+    },
+    {
+      "kind": "button",
+      "text": "加入草案",
+      "action": "add",
+      "disabled": false
+    },
+    {
+      "kind": "warning",
+      "text": "草案结果的格式不对，没有显示。"
+    }
+  ]
+}

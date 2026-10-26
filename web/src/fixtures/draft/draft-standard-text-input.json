@@ -1,0 +1,181 @@
+{
+  "case": "draft-standard-text-input",
+  "notes": "Markup typed into the box comes back as plain text in the notices; a course whose catalog name holds markup is added.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [],
+      "input": "<b>x</b> [链接](https://example.com) javascript:alert(1) CS 5340"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5340",
+        "code": "CS 5340",
+        "name": "Human <b>Computer</b> Interaction [链接](https://example.com) javascript:alert(1) (synthetic)",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "CS 5340"
+    ],
+    "notices": [
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：<b>x<",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：b>",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：[链接](https:",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：example.com)",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：javascript:alert(1)",
+        "candidates": [],
+        "candidates_omitted": 0
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [],
+        "possible": [
+          "CS 5340"
+        ],
+        "missing": [
+          "CS 5010",
+          "CS 5800",
+          "Synthetic elective pool（还差 2 门）",
+          "Synthetic breadth（按已知确定学分距目标差 8 学分）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5010"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5800"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "missing",
+            "reasons": [
+              "还差 2 门（含可能候选的门数上限）。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 6140",
+              "CS 5200",
+              "CS 6220"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 2
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+              "范围内可能计入：CS 5340；是否能算，要项目确认。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "CS 5340"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

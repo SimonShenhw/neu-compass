@@ -1,0 +1,176 @@
+[
+  {
+    "node": {
+      "kind": "course",
+      "label": "Synthetic leaf",
+      "status": "met",
+      "reasons": [],
+      "reasons_omitted": 0,
+      "counted": [],
+      "possible": [],
+      "missing": [],
+      "missing_omitted": 0,
+      "shortfall": {},
+      "children": []
+    },
+    "lines": [
+      "按你填的满足 — Synthetic leaf"
+    ]
+  },
+  {
+    "node": {
+      "kind": "course",
+      "label": "Synthetic leaf",
+      "status": "missing",
+      "reasons": [],
+      "reasons_omitted": 0,
+      "counted": [],
+      "possible": [],
+      "missing": [],
+      "missing_omitted": 0,
+      "shortfall": {},
+      "children": []
+    },
+    "lines": [
+      "还缺 — Synthetic leaf"
+    ]
+  },
+  {
+    "node": {
+      "kind": "course",
+      "label": "Synthetic leaf",
+      "status": "unknown",
+      "reasons": [],
+      "reasons_omitted": 0,
+      "counted": [],
+      "possible": [],
+      "missing": [],
+      "missing_omitted": 0,
+      "shortfall": {},
+      "children": []
+    },
+    "lines": [
+      "不确定 — Synthetic leaf"
+    ]
+  },
+  {
+    "node": {
+      "kind": "course",
+      "label": "Synthetic leaf",
+      "status": "not_evaluated",
+      "reasons": [],
+      "reasons_omitted": 0,
+      "counted": [],
+      "possible": [],
+      "missing": [],
+      "missing_omitted": 0,
+      "shortfall": {},
+      "children": []
+    },
+    "lines": [
+      "可选分支，不自动判断 — Synthetic leaf"
+    ]
+  },
+  {
+    "node": {
+      "kind": "course",
+      "label": "Synthetic leaf",
+      "status": null,
+      "reasons": [],
+      "reasons_omitted": 0,
+      "counted": [],
+      "possible": [],
+      "missing": [],
+      "missing_omitted": 0,
+      "shortfall": {},
+      "children": []
+    },
+    "lines": [
+      "仅列出，不自动判断 — Synthetic leaf"
+    ]
+  },
+  {
+    "node": {
+      "kind": "select",
+      "label": "Synthetic leaf",
+      "status": "unknown",
+      "reasons": [
+        "Synthetic reason."
+      ],
+      "reasons_omitted": 2,
+      "counted": [
+        "CS 5200",
+        "CS 5100"
+      ],
+      "possible": [
+        "CS 5100"
+      ],
+      "missing": [
+        "CS 6220"
+      ],
+      "missing_omitted": 3,
+      "shortfall": {},
+      "children": []
+    },
+    "lines": [
+      "不确定 — 组选（非全部必修） Synthetic leaf",
+      "  按填写计入：CS 5200",
+      "  可能计入／学分未知：CS 5100",
+      "  缺项候选：CS 6220",
+      "  另有 3 项候选／子项未展开。",
+      "  原因：Synthetic reason.",
+      "  另有 2 项原因未展开。"
+    ]
+  },
+  {
+    "node": {
+      "kind": "all_of",
+      "label": "Outer",
+      "status": "missing",
+      "reasons": [],
+      "reasons_omitted": 0,
+      "counted": [],
+      "possible": [],
+      "missing": [],
+      "missing_omitted": 0,
+      "shortfall": {},
+      "children": [
+        {
+          "kind": "any_of",
+          "label": "Inner",
+          "status": "met",
+          "reasons": [],
+          "reasons_omitted": 0,
+          "counted": [],
+          "possible": [],
+          "missing": [],
+          "missing_omitted": 0,
+          "shortfall": {},
+          "children": [
+            {
+              "kind": "course",
+              "label": "Synthetic leaf",
+              "status": "met",
+              "reasons": [],
+              "reasons_omitted": 0,
+              "counted": [
+                "CS 5800"
+              ],
+              "possible": [],
+              "missing": [],
+              "missing_omitted": 0,
+              "shortfall": {},
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    "lines": [
+      "还缺 — 全部分支（AND） Outer",
+      "  按你填的满足 — 任选其一（OR） Inner",
+      "    按你填的满足 — Synthetic leaf",
+      "      按填写计入：CS 5800"
+    ]
+  }
+]

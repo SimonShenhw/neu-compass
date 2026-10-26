@@ -1,0 +1,200 @@
+[
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": "stale"
+    },
+    "text": "所选方案已经变化或不能再用，草案没有计算；请重新选择方案。",
+    "retry": false
+  },
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": "missing"
+    },
+    "text": "所选方案已经变化或不能再用，草案没有计算；请重新选择方案。",
+    "retry": false
+  },
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": "draft"
+    },
+    "text": "所选方案已经变化或不能再用，草案没有计算；请重新选择方案。",
+    "retry": false
+  },
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": "unusable"
+    },
+    "text": "所选方案已经变化或不能再用，草案没有计算；请重新选择方案。",
+    "retry": false
+  },
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": "unavailable"
+    },
+    "text": "暂时无法核对所选方案，草案没有计算；请稍后重新核对。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。请求未完成，请稍后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 409,
+      "errorType": "conflict",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": "other"
+    },
+    "text": "无法核对草案。请求未完成，请稍后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 404,
+      "errorType": "not_found",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "找不到这个培养方案或方案，草案没有计算。",
+    "retry": false
+  },
+  {
+    "failure": {
+      "status": 422,
+      "errorType": "invalid_input",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "草案的内容超出了限制，没有计算；请清空草案后重新添加。",
+    "retry": false
+  },
+  {
+    "failure": {
+      "status": 429,
+      "errorType": "rate_limited",
+      "retryAfter": 7,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。请求过于频繁，请7 秒后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 429,
+      "errorType": "rate_limited",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。请求过于频繁，请稍后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 503,
+      "errorType": "service_busy",
+      "retryAfter": 3,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。服务正忙，请3 秒后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 503,
+      "errorType": "transport_error",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。服务暂不可用，请稍后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 504,
+      "errorType": "transport_timeout",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 408,
+      "errorType": null,
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 502,
+      "errorType": "invalid_response",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。服务返回了无法识别的内容，请稍后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 500,
+      "errorType": "internal_error",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。服务暂时出错，请稍后手动重试。",
+    "retry": true
+  },
+  {
+    "failure": {
+      "status": 403,
+      "errorType": "csrf_rejected",
+      "retryAfter": null,
+      "invalidFields": [],
+      "reason": null
+    },
+    "text": "无法核对草案。请求未完成，请稍后手动重试。",
+    "retry": true
+  }
+]
