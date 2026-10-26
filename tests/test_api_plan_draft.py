@@ -545,6 +545,19 @@ def test_a_course_or_program_read_error_is_a_503_that_echoes_nothing(client, rea
     assert all(value not in caplog.text + r.text for value in [MARKER, "CS 5200", "c-cs-5010"])
 
 
+@pytest.mark.parametrize("error", [sqlite3.ProgrammingError, sqlite3.InterfaceError])
+def test_any_sqlite_error_in_a_course_read_is_a_503_too(client, monkeypatch, error):
+    # A programming error, and one outside DatabaseError, answer 503 as well (change log section 36, known).
+    # 中文：代码自己的错误、不属于 DatabaseError 的错误也答 503（变更记录第 36 节「已知」）。
+    def broken(*args, **kwargs):
+        raise error("synthetic " + MARKER)
+
+    monkeypatch.setattr(CourseRepository, "get_batch", broken)
+    r = check(client, ids=["c-cs-5010"])
+    assert r.status_code == 503 and r.json()["detail"] == "The course records cannot be read right now."
+    assert MARKER not in r.text
+
+
 def test_an_unknown_program_is_the_usual_404(client):
     r = check(client, url=f"/programs/zz-ms/plans/{PLAN.plan_id}/draft")
     assert r.status_code == 404 and r.json() == {"detail": "program_id not found", "error_type": "not_found",
@@ -639,12 +652,45 @@ def test_no_course_code_id_or_typed_text_reaches_the_logs_and_nothing_is_written
     assert "request.handled" in caplog.text
 
 
-def test_a_refused_plan_logs_its_outcome_but_no_course(client, real_logging, caplog):
+def refused_as_stale(db, monkeypatch):
+    return URL, "0" * 64, PLAN.plan_id
+
+
+def refused_as_missing(db, monkeypatch):
+    return "/programs/cs-ms/plans/cs-ms-no-such-plan/draft", SHA, "cs-ms-no-such-plan"
+
+
+def refused_as_draft(db, monkeypatch):
+    draft = ProgramPlan.model_validate(PLAN.model_dump() | {"review_status": "draft"})
+    ProgramPlanRepository(db).store(draft, allow_downgrade=True)
+    db.commit()
+    return URL, content_hash(draft), PLAN.plan_id
+
+
+def refused_as_unusable(db, monkeypatch):
+    db.execute("UPDATE program_plans SET document='{}' WHERE plan_id=?", (PLAN.plan_id,))
+    db.commit()
+    return URL, SHA, PLAN.plan_id
+
+
+def refused_as_unavailable(db, monkeypatch):
+    monkeypatch.setattr(ProgramPlanRepository, "available", lambda self: False)
+    return URL, SHA, PLAN.plan_id
+
+
+@pytest.mark.parametrize("reason,refuse", [("stale", refused_as_stale), ("missing", refused_as_missing),
+                                           ("draft", refused_as_draft), ("unusable", refused_as_unusable),
+                                           ("unavailable", refused_as_unavailable)],
+                         ids=["stale", "missing", "draft", "unusable", "unavailable"])
+def test_a_refused_plan_logs_its_outcome_but_no_course(client, empty_db, real_logging, caplog, monkeypatch, reason,
+                                                       refuse):
+    # Every reason survives the log allowlist, with the path's plan ID. 中文：五种原因都过得了日志白名单，带着路径里的方案 ID。
+    url, sha, plan_id = refuse(empty_db, monkeypatch)
     with caplog.at_level(logging.INFO):
-        conflict(check(client, ids=["c-cs-5800"], text="CS 5010 " + MARKER, sha="0" * 64), "stale")
+        conflict(check(client, ids=["c-cs-5800"], text="CS 5010 " + MARKER, sha=sha, url=url), reason)
     refused = next(line for line in caplog.text.splitlines() if "draft.plan_selection" in line)
-    assert re.search(r"plan_outcome\W{1,4}stale\b", refused)
-    assert re.search(r"plan_id\W{1,4}" + re.escape(PLAN.plan_id), refused)
+    assert re.search(r"plan_outcome\W{1,4}" + reason + r"\b", refused)
+    assert re.search(r"plan_id\W{1,4}" + re.escape(plan_id), refused)
     assert all(value not in caplog.text for value in ["CS 5010", "c-cs-5800", MARKER])
 
 
