@@ -7,6 +7,8 @@ import styles from './TopBar.module.css';
 
 // The privacy page and its demo carry the lock (R5c, R5d).
 const PRIVACY = new Set(['数据与隐私', '数据与隐私演示']);
+// Streamlit's hero says this while it has no course count (app/ui_theme.py), and so does the top bar (R3e).
+export const CATALOG_NAME = 'NEU 研究生课程目录';
 
 export function TopBar({
   title,
@@ -48,7 +50,7 @@ export function TopBar({
           {title === '课程对比'
             ? `已选 ${count} / 4 门 · 按加入的顺序`
             : courses === null
-              ? 'NEU 研究生课程目录'
+              ? CATALOG_NAME
               : `${courses.toLocaleString('en-US')} 门课`}
         </span>
         {showGuest && <span className={styles.tag}>游客</span>}

@@ -20,10 +20,10 @@ export function courseShareUrl(code: string): string {
 
 // What the address names, said back on the page: anyone can write the address, so it is shown on one line and cut to
 // 64 characters, as Streamlit's _ref_label does (app/deep_links.py; it also drops backticks, there for Markdown). It
-// drops the invisible direction and zero-width characters as well, which Streamlit does not: they could turn the rest
-// of the page's own sentence around (review A32).
-const INVISIBLE =
-  /[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/gu;
+// drops every character that draws nothing as well, which Streamlit does not: format characters and the ones Unicode
+// says to ignore (direction marks, zero-width spaces, soft hyphens, variation selectors, tags). Direction marks could
+// turn the rest of the page's own sentence around (review A32).
+const INVISIBLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
 export function refLabel(ref: string): string {
   return Array.from(
     collapseSpace(ref.replaceAll('`', '').replace(INVISIBLE, '')),

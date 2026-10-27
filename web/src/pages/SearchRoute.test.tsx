@@ -653,6 +653,26 @@ it('a plan list that can no longer be read takes the choice and the selector, an
   expect(screen.queryByText(PLAN_REVISED)).not.toBeInTheDocument();
 });
 
+it('a program list that comes but cannot be read says so as well, and takes the choice’s selector (recheck 1)', async () => {
+  let list: unknown = programRows;
+  const api = world((call) =>
+    call.path === '/programs' ? json(list) : undefined,
+  );
+  const { client } = page('/');
+  await landed();
+  await choose('项目', CS_PROGRAM);
+  // The same program twice: parseProgramList cannot read it.
+  list = [programRows[1], programRows[1]];
+  await act(() =>
+    client.invalidateQueries({ queryKey: programListQuery.queryKey }),
+  );
+  expect(await screen.findByText(PROGRAMS_UNAVAILABLE)).toBeInTheDocument();
+  expect(combobox('项目')).toBeNull();
+  await ask('CS 6140 讲什么？');
+  await waitFor(() => expect(chats(api.calls)).toHaveLength(1));
+  expect(chats(api.calls)[0]).not.toHaveProperty('program_id');
+});
+
 it('an empty program list shows no selectors, and says nothing failed (R0 3 ①, review B32)', async () => {
   world((call) => (call.path === '/programs' ? json([]) : undefined));
   page('/');

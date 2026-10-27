@@ -76,8 +76,10 @@ function ProgramChoice() {
     )
       chooseProgram(null);
   }, [rows, programId, chooseProgram]);
+  // A list that came but cannot be read is one that cannot be read, as in Streamlit: the choice made before no longer
+  // goes with a question (SearchContext), and the page says why (recheck 1).
   if (rows === null)
-    return programs.isError && !programs.isFetching ? (
+    return parsed !== null || (programs.isError && !programs.isFetching) ? (
       <p className={styles.hint}>{PROGRAMS_UNAVAILABLE}</p>
     ) : null;
   if (rows.length === 0) return null;
