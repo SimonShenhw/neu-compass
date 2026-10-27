@@ -3,7 +3,8 @@
 // a mutation counts as killed only when Vitest fails and one of the failed tests is the named one, whatever failed
 // it (an assertion, a missing element or a thrown error); a type mutation, only when the named type test fails to
 // compile on that field. The working tree is hashed before and after and must not change; the copy is removed when
-// the process exits, however the run ends, its junctions first.
+// the process exits, after the run or an error, its junctions first. A run stopped from outside (Ctrl+C, a killed
+// process, a restart) leaves it in the temp folder.
 import { createHash } from 'node:crypto';
 import {
   cpSync,
@@ -60,8 +61,9 @@ const frozen = freeze(),
   );
 mkdirSync(output, { recursive: true });
 const snapshot = mkdtempSync(join(realpathSync.native(tmpdir()), 'neu-draft-'));
-// The copy goes however the run ends, a failed baseline or a bad anchor included. Its junctions go first, so removing
-// it cannot reach the node_modules behind them; if one cannot be removed, the copy stays.
+// The copy goes when the process exits, a failed baseline or a bad anchor included. Its junctions go first, so removing
+// it cannot reach the node_modules behind them; if one cannot be removed, the copy stays. There is no signal handler:
+// the run is synchronous, so one would only run after the last mutant, and Ctrl+C would no longer stop the run.
 process.on('exit', () => {
   const links = ['node_modules', 'tools/openapi-types/node_modules'].map((l) =>
     join(snapshot, l),
@@ -1323,6 +1325,88 @@ add(
   ".add[aria-disabled='true'] {",
   view,
   'the stylesheet gives a warning notice its border',
+);
+// Recheck round 2: an element that loses its class loses the rules the stylesheet tests read.
+const classes = 'the elements carry the classes those rules are for';
+add(
+  'B110: a course line loses its class',
+  ui,
+  '<p data-kind="course" className={styles.courseText}>',
+  '<p data-kind="course">',
+  view,
+  classes,
+);
+add(
+  'B111: the rule tree loses its class',
+  ui,
+  '<pre data-kind="tree" className={styles.tree}>',
+  '<pre data-kind="tree">',
+  view,
+  classes,
+);
+add(
+  'B112: the codes the plan does not name lose their class',
+  ui,
+  '<p data-kind="unplaced" className={styles.text}>',
+  '<p data-kind="unplaced">',
+  view,
+  classes,
+);
+add(
+  'B113: the draft loses its class',
+  ui,
+  '<section aria-labelledby={headingId} className={styles.draft}>',
+  '<section aria-labelledby={headingId}>',
+  view,
+  classes,
+);
+add(
+  'B114: the retry button loses its class',
+  ui,
+  'className={styles.retry}',
+  '',
+  view,
+  classes,
+);
+add(
+  'a note loses its class',
+  ui,
+  '<p data-kind="note" className={styles.note}>\n        学分按核对时的课程记录',
+  '<p data-kind="note">\n        学分按核对时的课程记录',
+  view,
+  classes,
+);
+add(
+  'an alert loses its class',
+  ui,
+  '<p data-kind={kind} role="alert" className={styles.alert}>',
+  '<p data-kind={kind} role="alert">',
+  view,
+  classes,
+);
+add(
+  'a notice sentence loses the class of its box',
+  ui,
+  '<div className={styles.noticeBody}>',
+  '<div>',
+  view,
+  classes,
+);
+add(
+  'the candidates lose their class',
+  ui,
+  '<ul className={styles.candidates}>',
+  '<ul>',
+  view,
+  classes,
+);
+add(
+  'the add button loses its class',
+  ui,
+  'className={styles.add}',
+  '',
+  view,
+  classes,
 );
 
 // Check every anchor before starting baseline or mutating the isolated copy.

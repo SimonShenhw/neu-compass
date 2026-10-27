@@ -552,6 +552,37 @@ it('the stylesheet gives a warning notice its border and greys out a button that
   expect(waiting).toContain('opacity: 0.55;');
 });
 
+// Those rules reach only the elements that carry their classes: each kind of element is checked in every scene, and
+// each kind turns up in one scene at least.
+it('the elements carry the classes those rules are for', () => {
+  const classes: [string, string, (el: Element) => Element | null][] = [
+    ['section', styles.draft!, (el) => el],
+    ['[data-kind="note"]', styles.note!, (el) => el],
+    ['[data-kind="unplaced"]', styles.text!, (el) => el],
+    ['[role="alert"]', styles.alert!, (el) => el],
+    // A notice's sentence and its candidates take their rule from the box around them.
+    ['[data-kind="notice"]', styles.noticeBody!, (el) => el.parentElement],
+    ['[data-kind="candidate"]', styles.candidates!, (el) => el.parentElement],
+    ['[data-kind="course"]', styles.courseText!, (el) => el],
+    ['[data-kind="tree"]', styles.tree!, (el) => el],
+    ['[data-action="add"]', styles.add!, (el) => el],
+    ['[data-action="retry"]', styles.retry!, (el) => el],
+  ];
+  const seen = new Set<string>();
+  for (const g of draftGoldens) {
+    const { container, unmount } = render(
+      <PlanDraft {...draftProps(g.name)} />,
+    );
+    for (const [selector, name, holder] of classes)
+      for (const el of container.querySelectorAll(selector)) {
+        expect(holder(el), `${g.name} ${selector}`).toHaveClass(name);
+        seen.add(selector);
+      }
+    unmount();
+  }
+  expect([...seen].sort()).toEqual(classes.map(([s]) => s).sort());
+});
+
 it('typing and every button keep nothing: no storage and no address', () => {
   localStorage.clear();
   sessionStorage.clear();
