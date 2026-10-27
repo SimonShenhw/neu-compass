@@ -1,0 +1,63 @@
+.panel {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  background: var(--surface);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  min-width: 0;
+}
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  color: var(--ink3);
+  font-size: var(--text-sm);
+  min-height: var(--control);
+}
+.state {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.others {
+  display: grid;
+  gap: var(--space-2);
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.links button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: start;
+}
+.share {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+@media (max-width: 767px) {
+  .panel {
+    border: var(--space-0);
+    padding: var(--space-0);
+    background: var(--transparent);
+  }
+  .back,
+  .links button,
+  .share {
+    min-height: var(--touch);
+  }
+}

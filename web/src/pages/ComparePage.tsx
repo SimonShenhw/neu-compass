@@ -6,6 +6,7 @@ import { Button } from '../components/Button';
 import { CourseFactCell, CourseHeaderFacts } from '../components/CourseFacts';
 import { EmptyState } from '../components/EmptyState';
 import { resolveColumn, rowLabels } from '../models/compare';
+import { coursePath } from '../models/coursePath';
 import styles from './ComparePage.module.css';
 
 export function ComparePage({
@@ -101,7 +102,8 @@ export function ComparePage({
                           <div className={styles.actions}>
                             {column.status === 'ready' && (
                               <Link
-                                to={`/course/${encodeURIComponent(column.identity.primary_code.replaceAll(' ', '-'))}`}
+                                to={coursePath(column.identity.primary_code)}
+                                state={{ courseId: id }}
                                 aria-label={`查看 ${name}`}
                               >
                                 查看

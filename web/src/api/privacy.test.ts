@@ -4,7 +4,12 @@ import nothing from '../fixtures/privacy/delete-ok-nothing-else.json';
 import privacy from '../fixtures/privacy/privacy-90-days-feedback-contact.json';
 import { apiError, asked, fakeApi, json } from '../test/fakeApi';
 import { expectTimeout } from '../test/timeouts';
-import { deleteAccount, parseDeleteResult, privacyQuery } from './privacy';
+import {
+  askNotices,
+  deleteAccount,
+  parseDeleteResult,
+  privacyQuery,
+} from './privacy';
 import { PUBLIC_FRESH_MS, createQueryClient } from './queries';
 
 describe('the deletion’s answer', () => {
@@ -104,5 +109,27 @@ describe('the privacy text', () => {
       () => createQueryClient().fetchQuery(privacyQuery),
       'read',
     );
+  });
+
+  it('gives the ask box its two notices (R3e): the query log’s, and the opt-in’s only while there is one', () => {
+    expect(askNotices(privacy.body)).toEqual({
+      queryLog: privacy.body.query_log_notice,
+      capture: privacy.body.capture_notice,
+    });
+    expect(askNotices({ ...privacy.body, capture_notice: null })).toEqual({
+      queryLog: privacy.body.query_log_notice,
+      capture: null,
+    });
+    for (const broken of [
+      null,
+      'text',
+      { ...privacy.body, query_log_notice: undefined },
+      { ...privacy.body, query_log_notice: ' ' },
+      { ...privacy.body, query_log_notice: 5 },
+      { ...privacy.body, capture_notice: undefined },
+      { ...privacy.body, capture_notice: '' },
+      { ...privacy.body, capture_notice: ['x'] },
+    ])
+      expect(askNotices(broken), JSON.stringify(broken)).toBeNull();
   });
 });

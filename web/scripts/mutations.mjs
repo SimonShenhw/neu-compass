@@ -198,14 +198,15 @@ const cases = [
     'src/layout/AskBar.test.tsx',
     'Enter sends trimmed',
   ],
+  // R3e: the opt-in lives in the shell's search state now.
   [
     'M12',
     'save consent defaults off',
-    'src/layout/AskBar.tsx',
-    'useState(false)',
-    'useState(true)',
-    'src/layout/AskBar.test.tsx',
-    'leaves consent off',
+    'src/layout/SearchContext.tsx',
+    'const [allowSave, setAllowSave] = useState(false);',
+    'const [allowSave, setAllowSave] = useState(true);',
+    'src/pages/SearchRoute.test.tsx',
+    'without the opt-in, a question does not ask to save its answer',
   ],
   [
     'M13',
@@ -255,23 +256,26 @@ const cases = [
 ];
 const results = [];
 cases.push(
+  // R3e: the opt-in stays ticked for the answers after it, as in Streamlit (R3e plan 9), so the mutant is the old
+  // per-question reset.
   [
     'M18',
-    'per-question consent reset',
-    'src/layout/AskBar.tsx',
-    'setAllowSave(false);',
-    '',
-    'src/layout/AskBar.test.tsx',
-    'resets consent after sending',
+    'consent stays after sending',
+    'src/layout/SearchContext.tsx',
+    '      askWith({\n        question: query,',
+    '      setAllowSave(false);\n      askWith({\n        question: query,',
+    'src/pages/SearchRoute.test.tsx',
+    'and the opt-in stays ticked',
   ],
+  // R3e: the prototype's state is gone; a new program takes the plan chosen under the old one.
   [
     'M19',
     'project and plan consistency',
-    'src/layout/PrototypeContext.tsx',
-    "if (value !== 'none') setProjectValue('cs-ms');",
-    "if (value !== 'none') setProjectValue('none');",
-    'src/pages/pages.test.tsx',
-    'project and plan choices survive route navigation',
+    'src/layout/SearchContext.tsx',
+    '    setProgramId(id);\n    setChoice(null);',
+    '    setProgramId(id);',
+    'src/layout/SearchContext.test.tsx',
+    'another program takes the plan, without saying that the plans changed',
   ],
   [
     'M20',
@@ -300,14 +304,15 @@ cases.push(
     'src/pages/pages.test.tsx',
     'clearing comparison focuses its remaining keyboard action',
   ],
+  // R3e: the search page on the live API puts focus on the conversation when the first question leaves the landing.
   [
     'M23',
     'example answer focus',
-    'src/pages/SearchPage.tsx',
-    'answer.current?.focus({ preventScroll: true });',
-    'answer.current?.blur();',
-    'src/pages/pages.test.tsx',
-    'choosing the empty-page example CS 5800 讲什么？ focuses the new answer',
+    'src/pages/SearchRoute.tsx',
+    'region.current?.focus({ preventScroll: true });',
+    'region.current?.blur();',
+    'src/pages/SearchRoute.test.tsx',
+    'a sample question is asked as Streamlit asks one, and focus goes to the conversation',
   ],
   [
     'M24',

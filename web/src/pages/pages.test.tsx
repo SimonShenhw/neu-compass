@@ -16,22 +16,30 @@ function page(path = '/') {
     </WithApi>,
   );
 }
-// The live pages ask the API (R5d): here /coop has no rows yet and /privacy answers with a fixture.
+// The live pages ask the API (R5d, R3e): here /coop and /programs have no rows yet, /privacy answers with a fixture and
+// /resolve/course knows no course.
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) =>
-      url.endsWith('/coop')
-        ? new Response('[]')
-        : url.endsWith('/privacy')
-          ? new Response(JSON.stringify(privacy.body))
-          : new Response(null, { status: 404 }),
-    ),
+    vi.fn(async (url: string) => {
+      const { pathname, searchParams } = new URL(url);
+      if (pathname === '/coop' || pathname === '/programs')
+        return new Response('[]');
+      if (pathname === '/privacy')
+        return new Response(JSON.stringify(privacy.body));
+      if (pathname === '/resolve/course')
+        return new Response(
+          JSON.stringify({ ref: searchParams.get('ref'), matches: [] }),
+        );
+      return new Response(null, { status: 404 });
+    }),
   );
 });
-// Until no live page is loading any more.
+// Until no live page is loading or looking anything up any more.
 const settled = () =>
-  waitFor(() => expect(screen.queryByText('正在加载')).not.toBeInTheDocument());
+  waitFor(() =>
+    expect(screen.queryByText(/^正在(加载|查找)/)).not.toBeInTheDocument(),
+  );
 
 it('route focus does not scroll the heading out of view', () => {
   const focus = vi.spyOn(HTMLElement.prototype, 'focus');
@@ -39,23 +47,9 @@ it('route focus does not scroll the heading out of view', () => {
   expect(focus).toHaveBeenCalledWith({ preventScroll: true });
 });
 
-it('comparison view does not invent a program selection before R4', async () => {
-  const user = userEvent.setup();
-  page('/compare-demo');
-  expect(
-    screen.queryByRole('combobox', { name: /按方案看/ }),
-  ).not.toBeInTheDocument();
-  await user.click(screen.getByRole('link', { name: '查看 CS 6140' }));
-  expect(screen.getByRole('combobox', { name: /项目/ })).toHaveTextContent(
-    '不指定',
-  );
-  expect(screen.getByRole('combobox', { name: /^方案/ })).toBeDisabled();
-});
-
 describe('page accessibility', () => {
   it.each([
     '/',
-    '/?demo=empty',
     '/course/CS-6140',
     '/compare',
     '/programs',
@@ -150,85 +144,18 @@ it.each([
     ).toBeNull();
   },
 );
-it('a matched but unknown course remains a search-page empty state rather than a route 404', () => {
+it('an address that names no course is a course page saying so, not a route 404', async () => {
   page('/COURSE/UNKNOWN/');
-  expect(screen.getByText('找不到这门演示课程：UNKNOWN')).toBeInTheDocument();
+  expect(
+    await screen.findByText(
+      '链接指向的课程「UNKNOWN」没找到：可能已经停开，或者链接被截断了。',
+    ),
+  ).toBeInTheDocument();
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
     '课程搜索',
   );
   expect(screen.getByRole('form', { name: '提问' })).toBeInTheDocument();
   expect(screen.queryByText('404 · 找不到这个页面')).not.toBeInTheDocument();
-});
-
-it('search shows four courses in answer order, and opens an inline detail', async () => {
-  const user = userEvent.setup();
-  page();
-  const courseList = screen.getByRole('region', { name: '回答用到的课' });
-  expect(
-    within(courseList)
-      .getAllByRole('link')
-      .map((link) => link.textContent),
-  ).toEqual(['查看', '查看', '查看', '查看']);
-  expect(
-    within(courseList)
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href')),
-  ).toEqual([
-    '/course/CS-6140',
-    '/course/DS-5220',
-    '/course/CS-5100',
-    '/course/CS-5800',
-  ]);
-  await user.click(screen.getByRole('link', { name: '查看 CS 6140' }));
-  expect(
-    screen.getByRole('region', { name: 'CS 6140 课程详情' }),
-  ).toBeInTheDocument();
-  expect(screen.getByRole('article', { name: '示例回答' })).toBeInTheDocument();
-});
-it('empty demo has four working example questions', async () => {
-  const user = userEvent.setup();
-  page('/?demo=empty');
-  expect(
-    screen.getByRole('heading', { name: '问一门课，或者一个选课问题' }),
-  ).toBeInTheDocument();
-  expect(
-    screen.queryByRole('article', { name: '示例回答' }),
-  ).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'CS 5800 讲什么？' }));
-  expect(screen.getByLabelText('演示问题')).toHaveTextContent(
-    'CS 5800 讲什么？',
-  );
-  expect(screen.getByRole('article', { name: '示例回答' })).toBeInTheDocument();
-});
-it('plus only records a demo action without changing the comparison', async () => {
-  const user = userEvent.setup();
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
-  page();
-  await user.click(screen.getByRole('button', { name: '加入对比 CS 6140' }));
-  expect(log).toHaveBeenCalledExactlyOnceWith('prototype.compare', 'CS 6140');
-  // The shell's notice line (the other status region is the note on content shown from before, R5d).
-  expect(
-    screen.getAllByRole('status').find((node) => node.tagName === 'P'),
-  ).toHaveTextContent('R1 不向对比列表添加数据');
-});
-it('detail leaf navigation opens the exact prerequisite and resets expansion', async () => {
-  const user = userEvent.setup();
-  page('/course/CS-6140');
-  await user.click(screen.getByRole('button', { name: '展开全文' }));
-  expect(screen.getByRole('button', { name: '收起全文' })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
-  await user.click(
-    screen.getByRole('button', { name: /CS 7800 Advanced Algorithms/ }),
-  );
-  expect(
-    screen.getByRole('region', { name: 'CS 7800 课程详情' }),
-  ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '展开全文' })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
 });
 it('all seven comparison rows remain visible and removal keeps other columns', async () => {
   const user = userEvent.setup();
@@ -302,46 +229,6 @@ it('clearing comparison focuses its remaining keyboard action', async () => {
   screen.getByRole('button', { name: '清空对比' }).focus();
   await user.keyboard('{Enter}');
   expect(screen.getByRole('link', { name: '回到课程搜索' })).toHaveFocus();
-});
-it.each([
-  'CS 5800 讲什么？',
-  '适合入门的机器学习课',
-  'CS 6140 的先修是什么？',
-  'MSCS 第一学期一般选什么？',
-])(
-  'choosing the empty-page example %s focuses the new answer',
-  async (question) => {
-    const user = userEvent.setup();
-    page('/?demo=empty');
-    screen.getByRole('button', { name: question }).focus();
-    await user.keyboard('{Enter}');
-    expect(screen.getByLabelText('演示问题')).toHaveTextContent(question);
-    expect(screen.getByRole('article', { name: '示例回答' })).toHaveFocus();
-  },
-);
-it('project and plan choices survive route navigation and a project change clears the plan', async () => {
-  const user = userEvent.setup();
-  page();
-  const project = screen.getByRole('combobox', { name: /项目/ });
-  project.focus();
-  await user.keyboard('{ArrowDown}{End}{Enter}');
-  const plan = screen.getByRole('combobox', { name: /^方案/ });
-  plan.focus();
-  await user.keyboard('{ArrowDown}{End}{Enter}');
-  expect(plan).toHaveTextContent('Boston');
-  await user.click(screen.getByRole('link', { name: '查看 CS 6140' }));
-  expect(screen.getByRole('combobox', { name: /项目/ })).toHaveTextContent(
-    'MSCS',
-  );
-  expect(screen.getByRole('combobox', { name: /^方案/ })).toHaveTextContent(
-    'Boston',
-  );
-  screen.getByRole('combobox', { name: /项目/ }).focus();
-  await user.keyboard('{ArrowDown}{Home}{Enter}');
-  expect(screen.getByRole('combobox', { name: /^方案/ })).toHaveTextContent(
-    '不指定',
-  );
-  expect(screen.getByRole('combobox', { name: /^方案/ })).toBeDisabled();
 });
 it('unrecognized paths give a working home link', async () => {
   page('/missing');

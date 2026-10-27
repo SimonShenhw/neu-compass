@@ -46,6 +46,30 @@ it('on a page with nothing of its own, a refresh the API could not answer still 
   ).toBeInTheDocument();
 });
 
+it('the offline demo’s note stays in the demo: on a real page the line for a login is empty (review A32)', async () => {
+  fakeApi(() => json(null, 404));
+  livePage('/programs-demo');
+  await userEvent.click(
+    within(
+      (await screen.findByRole('navigation', { name: '主导航' })).closest(
+        'aside',
+      )!,
+    ).getByRole('button', { name: '刷新页面内容' }),
+  );
+  expect(
+    screen.getByText('固定合成演示；请使用页面内的重新加载。'),
+  ).toBeInTheDocument();
+  await userEvent.click(
+    within(sidebar()).getByRole('link', { name: /课程对比/ }),
+  );
+  expect(
+    await screen.findByRole('status', { name: '登录结果' }),
+  ).toBeEmptyDOMElement();
+  expect(
+    screen.queryByText('固定合成演示；请使用页面内的重新加载。'),
+  ).not.toBeInTheDocument();
+});
+
 it('the mobile menu’s 刷新页面内容 asks again as well', async () => {
   const user = userEvent.setup();
   const calls = fakeApi(({ path }) =>

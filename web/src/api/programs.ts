@@ -1,4 +1,29 @@
+import { queryOptions } from '@tanstack/react-query';
+import { apiGet, apiPath } from './client';
+import { PUBLIC_FRESH_MS } from './queries';
 import type { ProgramNode } from './requisites';
+
+// GET /programs and GET /programs/{id} (R3e): public lists, fresh for five minutes as in Streamlit (R0 0.5), one cache
+// for the search page's selectors and landing and, from R4, the program pages (R3d spec 2). The bodies come as they
+// are: each page checks what it reads (models/programs.ts, programPlans.ts, chatPlans.ts).
+export const programListQuery = queryOptions({
+  queryKey: ['programs'],
+  queryFn: ({ signal }) =>
+    apiGet(apiPath('/programs'), { timeout: 'read', signal }),
+  staleTime: PUBLIC_FRESH_MS,
+});
+
+export function curriculumQuery(programId: string) {
+  return queryOptions({
+    queryKey: ['programs', programId],
+    queryFn: ({ signal }) =>
+      apiGet(apiPath('/programs/{program_id}', { program_id: programId }), {
+        timeout: 'read',
+        signal,
+      }),
+    staleTime: PUBLIC_FRESH_MS,
+  });
+}
 
 export interface ProgramSummary {
   program_id: string;

@@ -2296,7 +2296,7 @@ export interface operations {
           'application/x-ndjson': unknown;
         };
       };
-      /** @description Program selection is ambiguous or conflicts with the query's program prefix. */
+      /** @description The selected plan cannot be confirmed, or the program selection is ambiguous or conflicts with the query's program prefix; `reason` says which (`plan_missing`, `plan_stale`, `plan_draft`, `plan_unusable`, `plan_unavailable`, `program_ambiguous`, `program_conflict`). */
       409: {
         headers: {
           [name: string]: unknown;

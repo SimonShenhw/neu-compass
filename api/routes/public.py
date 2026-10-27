@@ -36,7 +36,7 @@ def privacy() -> PrivacyResponse:
     return PrivacyResponse(
         intro=INTRO,
         sections=[PrivacySectionOut(heading=heading, sentences=sentences)
-                  for heading, sentences in privacy_sections(settings)],
+                  for heading, sentences in privacy_sections(settings, web=True)],
         delete_what=DELETE_WHAT,
         query_log_notice=QUERY_LOG_NOTICE_BASE,
         capture_notice=capture_notice(settings.query_log_retention_days)

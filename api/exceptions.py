@@ -146,6 +146,10 @@ async def http_exception_handler(
     Preserves the original status_code + detail + headers; adds error_type.
     把 FastAPI 默认的 `{"detail": ...}` 替换成结构化形状。保留原始的
     status_code + detail，只是新增 error_type。"""
+    if isinstance(exc, ChatConflict):  # The one HTTPException that also carries a reason. 中文：另带 reason 的那一种。
+        body = ErrorResponse(detail=str(exc.detail), error_type="conflict", status_code=409).model_dump()
+        body["reason"] = exc.reason
+        return JSONResponse(status_code=409, content=body, headers=exc.headers)
     return _error_response(
         status_code=exc.status_code,
         error_type=_http_status_to_type(exc.status_code),
@@ -228,6 +232,23 @@ async def plan_selection_conflict_handler(
     body = ErrorResponse(detail=exc.DETAILS[exc.reason], error_type="conflict", status_code=409).model_dump()
     body["reason"] = exc.reason
     return JSONResponse(status_code=409, content=body, headers={"cache-control": "no-store"})
+
+
+class ChatConflict(HTTPException):
+    """A /chat 409 (F's plan selection, OPT-04's program prefix) that also carries `reason`, one of REASONS, the way the
+    login 401 carries its reason: the web front end words it from `reason` without reading the detail (R3c, R3e),
+    while the Streamlit page keeps showing the Chinese detail verbatim, unchanged.
+    中文：/chat 的 409（F 的方案确认、OPT-04 的项目前缀）另带 `reason`（REASONS 之一），和登录 401 带 reason 一样：
+    新前端按 `reason` 说话、不读 detail（R3c、R3e）；Streamlit 照旧原样显示中文的 detail，一字不改。"""
+
+    REASONS = ("plan_missing", "plan_stale", "plan_draft", "plan_unusable", "plan_unavailable", "program_ambiguous",
+               "program_conflict")
+
+    def __init__(self, reason: str, detail: str):
+        if reason not in self.REASONS:
+            raise ValueError("unknown chat conflict reason")
+        super().__init__(status_code=409, detail=detail)
+        self.reason = reason
 
 
 async def course_not_found_handler(
@@ -335,6 +356,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 __all__ = [
+    "ChatConflict",
     "ErrorResponse",
     "PlanSelectionConflict",
     "oauth_rejection_response",

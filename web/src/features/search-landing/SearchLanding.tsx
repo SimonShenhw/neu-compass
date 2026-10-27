@@ -28,6 +28,7 @@ export function SearchLanding(props: SearchLandingProps) {
         问一门课，或者一个选课问题
       </h2>
       <div
+        role="group"
         className={styles.discovery}
         aria-label="发现课程与经验"
         aria-busy={view.pending}
