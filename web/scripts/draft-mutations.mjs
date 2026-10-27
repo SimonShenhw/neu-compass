@@ -1,7 +1,9 @@
 // R4b: named mutations of the draft component, its answer check, its small functions, the demo and R4a's draft slot.
 // Each runs against an isolated copy of src/ (a junction to node_modules) after a clean baseline of types and tests;
-// a mutation counts as killed only when the named test fails on an assertion (or, for a type mutation, the named
-// type test fails to compile). The working tree is hashed before and after and must not change.
+// a mutation counts as killed only when Vitest fails and one of the failed tests is the named one, whatever failed
+// it (an assertion, a missing element or a thrown error); a type mutation, only when the named type test fails to
+// compile on that field. The working tree is hashed before and after and must not change; the copy is removed at the
+// end, its junctions first.
 import { createHash } from 'node:crypto';
 import {
   cpSync,
@@ -11,7 +13,9 @@ import {
   mkdirSync,
   mkdtempSync,
   realpathSync,
+  rmSync,
   symlinkSync,
+  unlinkSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -88,6 +92,18 @@ function run(args, name, timeout = 45000) {
 }
 console.info('Evidence: ' + output);
 const cases = [];
+// A mutation is one edit, or several edits to the same file made in order (`from` and `to` as lists); each anchor
+// must occur exactly once when its edit is made.
+function mutate(text, c) {
+  const froms = [c.from].flat(),
+    tos = [c.to].flat();
+  froms.forEach((from, i) => {
+    if (text.split(from).length !== 2)
+      throw Error(c.id + ': expected one mutation anchor');
+    text = text.replace(from, () => tos[i]);
+  });
+  return text;
+}
 function add(label, file, from, to, test, expected, mode = 'test') {
   cases.push({
     id: 'D' + String(cases.length + 1).padStart(2, '0'),
@@ -102,6 +118,7 @@ function add(label, file, from, to, test, expected, mode = 'test') {
 }
 const model = 'src/models/planDraft.ts',
   ui = 'src/features/programs/PlanDraft.tsx',
+  css = 'src/features/programs/PlanDraft.module.css',
   slot = 'src/features/programs/ProgramCurriculum.tsx',
   demoPage = 'src/pages/PlanDraftDemoPage.tsx',
   demoData = 'src/fixtures/draftDemo.ts',
@@ -504,8 +521,8 @@ add(
 add(
   'add is disabled instead of aria-disabled',
   ui,
-  'aria-disabled={props.checking}',
-  'disabled={props.checking}',
+  'aria-disabled={props.checking}\n          className={styles.add}',
+  'disabled={props.checking}\n          className={styles.add}',
   view,
   'no button anywhere uses the disabled attribute',
 );
@@ -616,8 +633,8 @@ add(
 add(
   'notice level ignored',
   ui,
-  '<p data-kind="notice" data-level={n.level}>',
-  '<p data-kind="notice" data-level="warning">',
+  '<div key={i} className={styles.notice} data-level={n.level}>',
+  '<div key={i} className={styles.notice} data-level="warning">',
   view,
   'standard-all-present matches',
 );
@@ -799,12 +816,439 @@ add(
   'types',
 );
 
+// Review round 31: each fix undone, and the gaps the reviewers' own mutants found (B31's IDs in the labels).
+add(
+  'a failure like the last keeps its sentence',
+  ui,
+  '<Alert key={failureRound} kind="failure">',
+  '<Alert kind="failure">',
+  view,
+  'a retry that fails the same way again draws its sentence afresh',
+);
+add(
+  'a failure like the last rebuilds the retry button',
+  ui,
+  '<div ref={keepFocus} className={styles.failure}>',
+  '<div key={failureRound} ref={keepFocus} className={styles.failure}>',
+  view,
+  'a retry that fails the same way again draws its sentence afresh',
+);
+add(
+  'rounds never move',
+  ui,
+  'if (last.value === value) return last.round;',
+  'return last.round;',
+  view,
+  'a retry that fails the same way again draws its sentence afresh',
+);
+add(
+  'an answer like the last keeps its notices',
+  ui,
+  '<Notices key={answerRound} answer={answer} />',
+  '<Notices answer={answer} />',
+  view,
+  'an answer like the last one draws its notices',
+);
+add(
+  'an answer like the last keeps the count’s words',
+  ui,
+  '<span key={answerRound}>',
+  '<span>',
+  view,
+  'an answer like the last one draws its notices',
+);
+add(
+  'each answer rebuilds the count line',
+  ui,
+  '<p ref={countRef} tabIndex={-1} data-kind="count">',
+  '<p key={answerRound} ref={countRef} tabIndex={-1} data-kind="count">',
+  view,
+  'an answer like the last one draws its notices',
+);
+add(
+  'another malformed answer keeps its warning',
+  ui,
+  '<Alert key={answerRound} kind="warning">\n          草案结果的格式不对',
+  '<Alert kind="warning">\n          草案结果的格式不对',
+  view,
+  'another answer that cannot be shown draws its warning afresh',
+);
+add(
+  'another answer of another version keeps its warning',
+  ui,
+  '<Alert key={answerRound} kind="warning">\n          草案结果与当前',
+  '<Alert kind="warning">\n          草案结果与当前',
+  view,
+  'another answer that cannot be shown draws its warning afresh',
+);
+add(
+  'every render redraws the notices',
+  ui,
+  '<Notices key={answerRound} answer={answer} />',
+  '<Notices key={Math.random()} answer={answer} />',
+  view,
+  'drawing again with the same answer and failure redraws nothing',
+);
+add(
+  'every render redraws the failure',
+  ui,
+  '<Alert key={failureRound} kind="failure">',
+  '<Alert key={Math.random()} kind="failure">',
+  view,
+  'drawing again with the same answer and failure redraws nothing',
+);
+add(
+  'retry calls back while checking',
+  ui,
+  'if (props.checking) return;',
+  '',
+  view,
+  'while a check is on its way retry does nothing',
+);
+add(
+  'retry is not aria-disabled while checking',
+  ui,
+  'aria-disabled={props.checking}\n              className={styles.retry}',
+  'className={styles.retry}',
+  view,
+  'while a check is on its way retry does nothing',
+);
+add(
+  'retry is disabled instead of aria-disabled',
+  ui,
+  'aria-disabled={props.checking}\n              className={styles.retry}',
+  'disabled={props.checking}\n              className={styles.retry}',
+  view,
+  'no button anywhere uses the disabled attribute',
+);
+add(
+  'B42: the failure hides while a check is on its way',
+  ui,
+  '{props.failure && (',
+  '{props.failure && !props.checking && (',
+  view,
+  'while a check is on its way retry does nothing',
+);
+add(
+  'the count line takes focus away with it',
+  ui,
+  'heading.current?.focus({ preventScroll: true });',
+  'void 0;',
+  view,
+  'when the course count goes while it has focus',
+);
+add(
+  'the count line takes focus from elsewhere',
+  ui,
+  'if (el?.contains(document.activeElement))',
+  'if (el !== null)',
+  view,
+  'when the course count goes while nothing has focus',
+);
+add(
+  'the fallback focus scrolls',
+  ui,
+  'heading.current?.focus({ preventScroll: true });',
+  'heading.current?.focus();',
+  view,
+  'when the course count goes while it has focus',
+);
+add(
+  'the typed text outlives a plan not checked',
+  ui,
+  [
+    "  if (props.plan.review_status !== 'source_checked') return null;\n  return <Draft {...props} />;",
+    "function Draft(props: PlanDraftProps) {\n  const [text, setText] = useState('');",
+  ],
+  [
+    "  const [text, setText] = useState('');\n  if (props.plan.review_status !== 'source_checked') return null;\n  return <Draft {...props} text={text} setText={setText} />;",
+    'function Draft(\n  props: PlanDraftProps & { text: string; setText: (text: string) => void },\n) {\n  const { text, setText } = props;',
+  ],
+  view,
+  'goes with a plan not checked against its sources',
+);
+add(
+  'B64b: the typed text goes with every plan change',
+  ui,
+  "  const [text, setText] = useState('');\n",
+  "  const [text, setText] = useState('');\n  const [seenPlan, setSeenPlan] = useState(props.plan.plan_id);\n  if (seenPlan !== props.plan.plan_id) {\n    setSeenPlan(props.plan.plan_id);\n    setText('');\n  }\n",
+  view,
+  'stays through a check',
+);
+add(
+  'B63b: the typed text goes with each answer',
+  ui,
+  "  const [text, setText] = useState('');\n",
+  "  const [text, setText] = useState('');\n  const [seenAnswer, setSeenAnswer] = useState(props.answer);\n  if (seenAnswer !== props.answer) {\n    setSeenAnswer(props.answer);\n    setText('');\n  }\n",
+  view,
+  'stays through a check',
+);
+add(
+  'B65b: the last answer that fitted stays on screen',
+  ui,
+  [
+    '  const count = useRef<HTMLParagraphElement | null>(null);\n',
+    '      : null;\n  return (',
+    '      {answer && (\n        <Result\n          answer={answer}',
+  ],
+  [
+    '  const count = useRef<HTMLParagraphElement | null>(null);\n  const [lastGood, setLastGood] = useState<DraftAnswer | null>(null);\n',
+    '      : null;\n  if (answer && answer !== lastGood) setLastGood(answer);\n  const shown = answer ?? lastGood;\n  return (',
+    '      {shown && (\n        <Result\n          answer={shown}',
+  ],
+  view,
+  'an answer shown before shows nothing of it once it no longer fits',
+);
+add(
+  'B20: warning notices get the plain box',
+  ui,
+  '<div key={i} className={styles.notice} data-level={n.level}>',
+  '<div key={i} className={styles.notice} data-level="info">',
+  view,
+  'a notice looks like its level',
+);
+add(
+  'B21: the two notice icons swapped',
+  ui,
+  '        <TriangleAlert aria-hidden="true" />\n      ) : (\n        <Info aria-hidden="true" />',
+  '        <Info aria-hidden="true" />\n      ) : (\n        <TriangleAlert aria-hidden="true" />',
+  view,
+  'a notice looks like its level',
+);
+add(
+  'the level on the sentence, not on the box',
+  ui,
+  [
+    '<div key={i} className={styles.notice} data-level={n.level}>',
+    '<p data-kind="notice">{n.text}</p>',
+  ],
+  [
+    '<div key={i} className={styles.notice}>',
+    '<p data-kind="notice" data-level={n.level}>\n          {n.text}\n        </p>',
+  ],
+  view,
+  'a notice looks like its level',
+);
+add(
+  'B22: the rule tree is hidden',
+  ui,
+  '<pre data-kind="tree" className={styles.tree}>',
+  '<pre data-kind="tree" hidden className={styles.tree}>',
+  view,
+  'standard-mixed hides none of the items',
+);
+add(
+  'the summary is hidden from screen readers',
+  ui,
+  '<p data-kind="summary">',
+  '<p data-kind="summary" aria-hidden="true">',
+  view,
+  'standard-mixed hides none of the items',
+);
+add(
+  'B24: the version warning is not an alert',
+  ui,
+  '        <Alert key={answerRound} kind="warning">\n          草案结果与当前所选方案的内容版本不一致；请刷新方案后重试，未显示旧结果。\n        </Alert>',
+  '        <p data-kind="warning" className={styles.alert}>\n          草案结果与当前所选方案的内容版本不一致；请刷新方案后重试，未显示旧结果。\n        </p>',
+  view,
+  'the version warning is an alert too',
+);
+add(
+  'B30: the box gets a placeholder',
+  ui,
+  '          rows={3}\n',
+  '          rows={3}\n          placeholder="例如 CS 5010"\n',
+  view,
+  'standard-empty shows no text outside',
+);
+add(
+  'a second label with words of its own',
+  ui,
+  '        学分按核对时的课程记录，不确认具体班次或个人学位计入。\n      </p>\n',
+  '        学分按核对时的课程记录，不确认具体班次或个人学位计入。\n      </p>\n      <label>草案不会自动保存。</label>\n',
+  view,
+  'standard-empty shows no text outside',
+);
+add(
+  'B58: every 409 gets a retry in the component',
+  ui,
+  '{canRetryDraft(props.failure) && (',
+  '{(canRetryDraft(props.failure) || props.failure.status === 409) && (',
+  view,
+  'the real draft-409-stale failure',
+);
+add(
+  'B59: a plan-gone 409 shows no failure',
+  ui,
+  '{props.failure && (',
+  "{props.failure && !(props.failure.status === 409 && props.failure.reason !== 'unavailable') && (",
+  view,
+  'the real draft-409-missing failure',
+);
+add(
+  'B70: typing writes to sessionStorage',
+  ui,
+  'onChange={(e) => setText(e.target.value)}',
+  "onChange={(e) => {\n            setText(e.target.value);\n            sessionStorage.setItem('neu-draft-text', e.target.value);\n          }}",
+  view,
+  'typing and every button keep nothing',
+);
+add(
+  'B71: remove writes the address',
+  ui,
+  'focusFirst(count);\n            props.onRemove(id);',
+  "focusFirst(count);\n            window.history.replaceState(null, '', '?removed=' + id);\n            props.onRemove(id);",
+  view,
+  'typing and every button keep nothing',
+);
+add(
+  'the answer check logs',
+  model,
+  'export function parseDraftAnswer(',
+  'console.info(0);\nexport function parseDraftAnswer(',
+  view,
+  'the draft modules keep nothing',
+);
+add(
+  'B27: long words no longer wrap',
+  css,
+  '  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.draft h3 {',
+  '  min-width: 0;\n}\n.draft h3 {',
+  view,
+  'the stylesheet shows line breaks',
+);
+add(
+  'B28: a course line no longer keeps its line breaks',
+  css,
+  '.courseText {\n  white-space: pre-wrap;\n}',
+  '.courseText {\n}',
+  view,
+  'the stylesheet shows line breaks',
+);
+add(
+  'warning notices lose their border',
+  css,
+  ".notice[data-level='warning'] {\n  border-color: var(--accent);",
+  ".notice[data-level='warning'] {",
+  view,
+  'the stylesheet shows line breaks',
+);
+add(
+  'B50: changing one control drops the other',
+  demoPage,
+  'const next = new URLSearchParams(params);',
+  'const next = new URLSearchParams();',
+  demo,
+  'changing one control keeps the other',
+);
+add(
+  'B51: the first check already shows the failure',
+  demoPage,
+  '{...(arrived ? draftState(spec) : CHECKING)}',
+  '{...(arrived ? draftState(spec) : { ...CHECKING, failure: draftState(spec).failure })}',
+  demo,
+  'a failure scene shows no failure while its first check',
+);
+add(
+  'B52: a speed reads otherwise',
+  demoData,
+  "['forever', '一直加载'],",
+  "['forever', '永远加载'],",
+  demo,
+  'the speeds read',
+);
+add(
+  'B01: any space between the letters and the digits',
+  model,
+  'const CODE = /[A-Z]{2,4} [0-9]{4}[A-Z]?/;',
+  'const CODE = /[A-Z]{2,4}\\s[0-9]{4}[A-Z]?/;',
+  modelTest,
+  'a course code of',
+);
+add(
+  'B02: a lowercase last letter',
+  model,
+  'const CODE = /[A-Z]{2,4} [0-9]{4}[A-Z]?/;',
+  'const CODE = /[A-Z]{2,4} [0-9]{4}[A-Za-z]?/;',
+  modelTest,
+  'a course code of',
+);
+add(
+  'B03: counted items not checked',
+  model,
+  'stringList(v.counted, 20)',
+  'listOf(v.counted, 20, () => true)',
+  modelTest,
+  'node counted of',
+);
+add(
+  'B04: missing items not checked',
+  model,
+  'stringList(v.missing, 10)',
+  'listOf(v.missing, 10, () => true)',
+  modelTest,
+  'node missing of',
+);
+add(
+  'B05: notice text of spaces refused',
+  model,
+  "v.text !== ''",
+  "v.text.trim() !== ''",
+  modelTest,
+  'notice text only has to be non-empty',
+);
+add(
+  'B06: a candidate name of any type',
+  model,
+  '(c) => object(c) && string(c.code) && string(c.name),',
+  '(c) => object(c) && string(c.code) && c.name !== undefined,',
+  modelTest,
+  'a candidate name that is not a string',
+);
+add(
+  'B07: the result not checked to be an object',
+  model,
+  '!object(result) ||',
+  '',
+  modelTest,
+  'null in place of the result',
+);
+add(
+  'B09: the unavailable sentence for any status',
+  model,
+  "if (failure.status === 409 && failure.reason === 'unavailable')",
+  "if (failure.reason === 'unavailable')",
+  modelTest,
+  'the unavailable sentence is for a 409 only',
+);
+
+add(
+  'a course takes focus away with it',
+  ui,
+  '<li key={c.code} ref={keepFocus} className={styles.course}>',
+  '<li key={c.code} className={styles.course}>',
+  view,
+  'when the buttons of a course or the retry button go',
+);
+add(
+  'the retry button takes focus away with it',
+  ui,
+  '<div ref={keepFocus} className={styles.failure}>',
+  '<div className={styles.failure}>',
+  view,
+  'when the buttons of a course or the retry button go',
+);
+add(
+  'the course count takes focus away with it',
+  ui,
+  'keep();\n        count.current = null;',
+  'count.current = null;',
+  view,
+  'when the course count goes while it has focus',
+);
+
 // Check every anchor before starting baseline or mutating the isolated copy.
-for (const c of cases) {
-  const original = readFileSync(join(snapshot, c.file), 'utf8');
-  if (original.split(c.from).length !== 2)
-    throw Error(c.id + ': expected one mutation anchor');
-}
+for (const c of cases) mutate(readFileSync(join(snapshot, c.file), 'utf8'), c);
 if (
   run([tsc, '--noEmit', '--pretty', 'false'], 'baseline-types').status !== 0 ||
   run([vitest, 'run'], 'baseline-tests', 120000).status !== 0
@@ -814,9 +1258,7 @@ const results = [];
 for (const c of cases) {
   const file = join(snapshot, c.file),
     original = readFileSync(file, 'utf8');
-  if (original.split(c.from).length !== 2)
-    throw Error(c.id + ': expected one mutation anchor');
-  const changed = original.replace(c.from, () => c.to),
+  const changed = mutate(original, c),
     report = join(output, c.id + '.json');
   writeFileSync(file, changed);
   let r;
@@ -888,6 +1330,10 @@ writeFileSync(
   ),
   { flag: 'wx' },
 );
+// The junctions go first, so removing the copy cannot reach the node_modules behind them.
+for (const link of ['node_modules', 'tools/openapi-types/node_modules'])
+  unlinkSync(join(snapshot, link));
+rmSync(snapshot, { recursive: true });
 console.info(
   `${results.filter((r) => r.killed).length}/${results.length} killed; source unchanged: ${sourceUnchanged}`,
 );

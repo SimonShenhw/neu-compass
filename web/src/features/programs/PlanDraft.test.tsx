@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -17,7 +19,15 @@ const LABEL = '课号（逗号、空格或换行分开，例如 CS 5010, CS 5800
 const BAD_ANSWER = '草案结果的格式不对，没有显示。';
 const OTHER_REVISION =
   '草案结果与当前所选方案的内容版本不一致；请刷新方案后重试，未显示旧结果。';
-const countLine = () => screen.getByText(/^已填 \d+\/20 门/);
+const PLAN_GONE = '所选方案已经变化或不能再用，草案没有计算；请重新选择方案。';
+// The course count line; its words sit in a span that each answer draws afresh.
+const countLine = () =>
+  document.querySelector<HTMLElement>('[data-kind="count"]')!;
+const malformed = () => {
+  const answer = answerOf('draft-standard-mixed');
+  delete answer.result;
+  return answer;
+};
 
 describe('draft component actual DOM reference', () => {
   it('the 29 scenes are the demo scenarios', () => {
@@ -36,22 +46,61 @@ describe('draft component actual DOM reference', () => {
       expect(readDraftDom(container)).toEqual(g.visible);
     },
   );
-  // The reference reads only data-kind items (and the box's label), so nothing else may show any text.
+  // The reference reads only data-kind items (and the box's own label), so nothing else may show any text, neither
+  // in the page nor in an attribute a browser shows.
   it.each(draftGoldens)(
     '$name shows no text outside the items the reference reads',
     (g) => {
       const { container } = render(<PlanDraft {...draftProps(g.name)} />);
+      const label = container.querySelector('textarea')?.labels?.[0] ?? null;
       const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
       const stray: string[] = [];
-      for (let node = walker.nextNode(); node; node = walker.nextNode())
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const parent = node.parentElement!;
         if (
           node.textContent!.trim() !== '' &&
-          !node.parentElement!.closest('[data-kind], label')
+          !parent.closest('[data-kind]') &&
+          (label === null || parent.closest('label') !== label)
         )
           stray.push(node.textContent!);
+      }
       expect(stray).toEqual([]);
+      expect(
+        container.querySelectorAll('[placeholder], [title], [alt]'),
+      ).toHaveLength(0);
     },
   );
+  // And it reads them as shown, so none of them may be hidden, from the eye or from a screen reader.
+  it.each(draftGoldens)(
+    '$name hides none of the items the reference reads',
+    (g) => {
+      const { container } = render(<PlanDraft {...draftProps(g.name)} />);
+      for (const item of container.querySelectorAll('[data-kind]')) {
+        expect(item).toBeVisible();
+        expect(item.closest('[aria-hidden="true"]')).toBeNull();
+      }
+    },
+  );
+});
+
+it('a notice looks like its level: the warning box and icon, or the plain box and the info icon', () => {
+  const levels: string[] = [];
+  for (const name of ['standard-notices', 'standard-nothing-new']) {
+    const { container, unmount } = render(<PlanDraft {...draftProps(name)} />);
+    for (const notice of container.querySelectorAll('[data-kind="notice"]')) {
+      // The level is on the box that holds the icon, not on the sentence.
+      const box = notice.closest<HTMLElement>('[data-level]')!;
+      const level = box.dataset.level!;
+      levels.push(level);
+      const icon = box.querySelector(':scope > svg');
+      expect(icon, level).not.toBeNull();
+      expect(icon!.getAttribute('class')).toMatch(
+        level === 'warning' ? /\blucide-triangle-alert\b/ : /\blucide-info\b/,
+      );
+    }
+    unmount();
+  }
+  expect(new Set(levels)).toEqual(new Set(['warning', 'info']));
 });
 
 it('the rule tree is one block of lines joined by newlines, indentation kept', () => {
@@ -138,15 +187,31 @@ describe('callbacks', () => {
     expect(add).not.toBeDisabled();
     expect(add).toHaveFocus();
   });
+  it('while a check is on its way retry does nothing, is aria-disabled and never disabled', async () => {
+    const props = draftProps('standard-409-unavailable', { checking: true });
+    const { container } = render(<PlanDraft {...props} />);
+    const retry = screen.getByRole('button', { name: '重新核对' });
+    await userEvent.click(retry);
+    fireEvent.keyDown(retry, { key: 'Enter' });
+    expect(props.onRetry).not.toHaveBeenCalled();
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(retry).not.toBeDisabled();
+    expect(retry).toHaveFocus();
+    // The last failure stays until a check succeeds (spec section 3), under the checking line.
+    expect(
+      readDraftDom(container)
+        .slice(6, 10)
+        .map((i) => (i.action ? `${i.kind}:${String(i.action)}` : i.kind)),
+    ).toEqual(['button:add', 'status', 'failure', 'button:retry']);
+  });
   it('no button anywhere uses the disabled attribute', () => {
-    for (const name of [
-      'standard-checking-again',
-      'standard-409-unavailable',
-      'standard-full',
+    for (const props of [
+      draftProps('standard-checking-again'),
+      draftProps('standard-409-unavailable'),
+      draftProps('standard-409-unavailable', { checking: true }),
+      draftProps('standard-full'),
     ]) {
-      const { container, unmount } = render(
-        <PlanDraft {...draftProps(name)} />,
-      );
+      const { container, unmount } = render(<PlanDraft {...props} />);
       expect(container.querySelectorAll('button[disabled]')).toHaveLength(0);
       unmount();
     }
@@ -185,6 +250,49 @@ describe('callbacks', () => {
   it('the box takes at most 4000 characters and is labelled', () => {
     render(<PlanDraft {...draftProps()} />);
     expect(screen.getByLabelText(LABEL)).toHaveAttribute('maxlength', '4000');
+  });
+});
+
+describe('the typed text', () => {
+  it('stays through a check, its answer and a move straight to another checked plan', () => {
+    const props = draftProps('standard-add');
+    const { rerender } = render(<PlanDraft {...props} />);
+    const box = screen.getByLabelText(LABEL);
+    fireEvent.change(box, { target: { value: 'CS 6140, XX 1' } });
+    rerender(<PlanDraft {...props} checking />);
+    rerender(
+      <PlanDraft {...props} answer={answerOf('draft-standard-notices')} />,
+    );
+    expect(box).toHaveValue('CS 6140, XX 1');
+    const align = draftProps('align-mixed');
+    rerender(
+      <PlanDraft
+        {...props}
+        plan={align.plan}
+        planContentSha256={align.planContentSha256}
+        answer={align.answer}
+      />,
+    );
+    expect(screen.getByLabelText(LABEL)).toBe(box);
+    expect(box).toHaveValue('CS 6140, XX 1');
+  });
+  it('goes with a plan not checked against its sources, as on Streamlit, and does not come back', () => {
+    const props = draftProps('standard-add');
+    const { container, rerender } = render(<PlanDraft {...props} />);
+    fireEvent.change(screen.getByLabelText(LABEL), {
+      target: { value: 'CS 6140' },
+    });
+    const bridge = draftProps('bridge-not-checked');
+    rerender(
+      <PlanDraft
+        {...props}
+        plan={bridge.plan}
+        planContentSha256={bridge.planContentSha256}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    rerender(<PlanDraft {...props} />);
+    expect(screen.getByLabelText(LABEL)).toHaveValue('');
   });
 });
 
@@ -246,6 +354,55 @@ describe('focus', () => {
     );
     expect(add).toHaveFocus();
   });
+  it('when the course count goes while it has focus, focus moves to the heading, without scrolling', async () => {
+    const props = draftProps('standard-mixed');
+    const { rerender } = render(<PlanDraft {...props} />);
+    await userEvent.click(screen.getByRole('button', { name: '移除 CS 6140' }));
+    expect(countLine()).toHaveFocus();
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    rerender(<PlanDraft {...props} answer={malformed()} />);
+    expect(countLine()).toBeNull();
+    const heading = screen.getByRole('heading', { level: 3, name: HEADING });
+    expect(heading).toHaveFocus();
+    expect(focus.mock.contexts).toEqual([heading]);
+    expect(focus.mock.lastCall).toEqual([{ preventScroll: true }]);
+  });
+  it('when the buttons of a course or the retry button go while one has focus, focus moves to the heading', () => {
+    const props = draftProps('standard-mixed');
+    const { rerender, unmount } = render(<PlanDraft {...props} />);
+    screen.getByRole('button', { name: 'CS 6140 · 课程页／年度先修' }).focus();
+    rerender(<PlanDraft {...props} answer={malformed()} />);
+    expect(
+      screen.getByRole('heading', { level: 3, name: HEADING }),
+    ).toHaveFocus();
+    unmount();
+    // A keyboard user reached retry while it was on its way, and the check succeeds.
+    const retrying = draftProps('standard-409-unavailable', { checking: true });
+    const view = render(<PlanDraft {...retrying} />);
+    screen.getByRole('button', { name: '重新核对' }).focus();
+    view.rerender(<PlanDraft {...retrying} checking={false} failure={null} />);
+    expect(screen.queryByRole('button', { name: '重新核对' })).toBeNull();
+    expect(
+      screen.getByRole('heading', { level: 3, name: HEADING }),
+    ).toHaveFocus();
+  });
+  it('when the course count goes while nothing has focus, nothing takes it', () => {
+    const props = draftProps('standard-mixed');
+    const { rerender } = render(<PlanDraft {...props} />);
+    expect(document.activeElement).toBe(document.body);
+    rerender(<PlanDraft {...props} planContentSha256={'f'.repeat(64)} />);
+    expect(countLine()).toBeNull();
+    expect(document.activeElement).toBe(document.body);
+  });
+  it('when the course count goes while focus is elsewhere, focus stays there', async () => {
+    const props = draftProps('standard-mixed');
+    const { rerender } = render(<PlanDraft {...props} />);
+    const box = screen.getByLabelText(LABEL);
+    await userEvent.click(box);
+    rerender(<PlanDraft {...props} planContentSha256={'f'.repeat(64)} />);
+    expect(countLine()).toBeNull();
+    expect(box).toHaveFocus();
+  });
   it('the heading and the course count take focus from the page but are not Tab stops', async () => {
     render(<PlanDraft {...draftProps()} />);
     expect(
@@ -304,7 +461,7 @@ it('every answer text is literal: markup, links and scripts stay text, and there
   );
 });
 
-it('long course names, notices and rule lines keep their line breaks and spaces', () => {
+it('a course line keeps its line breaks and spaces as text, with no anchor', () => {
   const { container } = render(
     <PlanDraft {...draftProps('standard-text-edge')} />,
   );
@@ -314,6 +471,89 @@ it('long course names, notices and rule lines keep their line breaks and spaces'
   );
   expect(container.querySelector('a')).toBeNull();
 });
+
+// jsdom applies no stylesheet, so the declarations that show line breaks and wrap long words are read from the file.
+it('the stylesheet shows line breaks and spaces and wraps long words', () => {
+  // A line break in front, so the first rule starts a line like the others.
+  const css = `\n${readFileSync(
+    resolve(process.cwd(), 'src/features/programs/PlanDraft.module.css'),
+    'utf8',
+  )}`;
+  const rule = (selector: string) => {
+    const start = css.indexOf(`\n${selector} {`);
+    expect(start, selector).toBeGreaterThanOrEqual(0);
+    return css.slice(start, css.indexOf('}', start));
+  };
+  expect(rule('.draft')).toContain('overflow-wrap: anywhere;');
+  for (const selector of [
+    '.note',
+    '.text',
+    '.alert',
+    '.noticeBody p,\n.candidates',
+    '.courseText',
+    '.tree',
+  ])
+    expect(rule(selector), selector).toContain('white-space: pre-wrap;');
+  expect(rule('.tree')).toContain('overflow-wrap: anywhere;');
+  // The two looks of a notice hang on its box's level.
+  expect(rule(".notice[data-level='warning']")).toContain(
+    'border-color: var(--accent);',
+  );
+});
+
+it('typing and every button keep nothing: no storage and no address', () => {
+  localStorage.clear();
+  sessionStorage.clear();
+  const href = window.location.href;
+  render(<PlanDraft {...draftProps('standard-409-unavailable')} />);
+  fireEvent.change(screen.getByLabelText(LABEL), {
+    target: { value: 'CS 6140' },
+  });
+  for (const name of [
+    '加入草案',
+    '移除 CS 5010',
+    'CS 5800 · 课程页／年度先修',
+    '重新核对',
+    '清空草案',
+  ])
+    fireEvent.click(screen.getByRole('button', { name }));
+  expect(localStorage).toHaveLength(0);
+  expect(sessionStorage).toHaveLength(0);
+  expect(window.location.href).toBe(href);
+});
+
+it('the draft modules keep nothing, ask nothing and interpret no HTML or Markdown', () => {
+  for (const file of [
+    'api/draft.ts',
+    'models/planDraft.ts',
+    'features/programs/PlanDraft.tsx',
+    'fixtures/draftDemo.ts',
+    'pages/PlanDraftDemoPage.tsx',
+  ]) {
+    const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
+    expect(source, file).not.toMatch(
+      /localStorage|sessionStorage|indexedDB|document\.cookie|history\.|location\.|fetch\(|console\.|dangerouslySetInnerHTML|react-markdown/,
+    );
+  }
+});
+
+it.each([
+  'draft-409-stale',
+  'draft-409-missing',
+  'draft-409-draft',
+  'draft-409-unusable',
+])(
+  'the real %s failure says the plan has changed and offers no retry',
+  (name) => {
+    render(
+      <PlanDraft
+        {...draftProps('standard-add', { failure: draftFixture(name).failure })}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(PLAN_GONE);
+    expect(screen.queryByRole('button', { name: '重新核对' })).toBeNull();
+  },
+);
 
 describe('the answer is checked before any of it shows', () => {
   it('an answer that is not the shape shows only one warning, nothing of the answer', () => {
@@ -372,6 +612,27 @@ describe('the answer is checked before any of it shows', () => {
     );
     expect(document.querySelectorAll('[data-kind="notice"]')).toHaveLength(0);
   });
+  it('an answer shown before shows nothing of it once it no longer fits the page', () => {
+    const props = draftProps('standard-mixed');
+    const { container, rerender } = render(<PlanDraft {...props} />);
+    const shown = () =>
+      container.querySelectorAll(
+        '[data-kind="course"], [data-kind="summary"], [data-kind="tree"], [data-kind="count"], [data-action="remove"]',
+      ).length;
+    expect(shown()).toBeGreaterThan(5);
+    rerender(<PlanDraft {...props} planContentSha256={'f'.repeat(64)} />);
+    expect(readDraftDom(container).at(-1)).toEqual({
+      kind: 'warning',
+      text: OTHER_REVISION,
+    });
+    expect(shown()).toBe(0);
+    rerender(<PlanDraft {...props} answer={malformed()} />);
+    expect(readDraftDom(container).at(-1)).toEqual({
+      kind: 'warning',
+      text: BAD_ANSWER,
+    });
+    expect(shown()).toBe(0);
+  });
 });
 
 describe('what a screen reader hears', () => {
@@ -411,6 +672,85 @@ describe('what a screen reader hears', () => {
       '无法核对草案。请求超时，处理可能仍在进行；请稍后手动重试，避免重复提交。',
     );
     expect(screen.getByRole('button', { name: '重新核对' })).toBeVisible();
+  });
+  it('the version warning is an alert too', () => {
+    render(<PlanDraft {...draftProps('standard-other-revision')} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(OTHER_REVISION);
+  });
+  // A live region speaks only when its content changes, so an outcome like the last one must be drawn afresh.
+  it('a retry that fails the same way again draws its sentence afresh; the retry button and focus on it stay', () => {
+    const props = draftProps('standard-503-transport');
+    const { container, rerender } = render(<PlanDraft {...props} />);
+    const sentence = () => container.querySelector('[data-kind="failure"]')!;
+    const first = sentence();
+    expect(first).toHaveAttribute('role', 'alert');
+    const retry = screen.getByRole('button', { name: '重新核对' });
+    rerender(<PlanDraft {...props} checking />);
+    expect(sentence()).toBe(first);
+    retry.focus(); // A keyboard user reaches it while the retry is on its way.
+    rerender(<PlanDraft {...props} failure={{ ...props.failure! }} />);
+    expect(sentence()).not.toBe(first);
+    expect(sentence()).toHaveTextContent(first.textContent!);
+    expect(sentence()).toHaveAttribute('role', 'alert');
+    expect(screen.getByRole('button', { name: '重新核对' })).toBe(retry);
+    expect(retry).toHaveFocus();
+  });
+  it('an answer like the last one draws its notices and the count’s words afresh; the count line stays', () => {
+    const props = draftProps('standard-notices');
+    const { container, rerender } = render(<PlanDraft {...props} />);
+    const notices = () => [
+      ...container.querySelectorAll('[data-kind="notice"]'),
+    ];
+    const first = notices();
+    const count = countLine();
+    const words = count.firstElementChild!;
+    rerender(<PlanDraft {...props} checking />);
+    expect(notices().every((n, i) => n === first[i])).toBe(true);
+    rerender(
+      <PlanDraft {...props} answer={answerOf('draft-standard-notices')} />,
+    );
+    const again = notices();
+    expect(again.map((n) => n.textContent)).toEqual(
+      first.map((n) => n.textContent),
+    );
+    expect(again.some((n) => first.includes(n))).toBe(false);
+    expect(countLine()).toBe(count);
+    expect(count.firstElementChild).not.toBe(words);
+    expect(count).toHaveTextContent(words.textContent!);
+  });
+  it('another answer that cannot be shown draws its warning afresh', () => {
+    for (const [scene, text, next] of [
+      ['standard-malformed', BAD_ANSWER, malformed],
+      [
+        'standard-other-revision',
+        OTHER_REVISION,
+        () => answerOf('draft-other-revision'),
+      ],
+    ] as const) {
+      const props = draftProps(scene);
+      const { container, rerender, unmount } = render(<PlanDraft {...props} />);
+      const warning = container.querySelector('[data-kind="warning"]');
+      expect(warning).toHaveTextContent(text);
+      rerender(<PlanDraft {...props} answer={next()} />);
+      const again = container.querySelector('[data-kind="warning"]');
+      expect(again).not.toBe(warning);
+      expect(again).toHaveTextContent(text);
+      unmount();
+    }
+  });
+  it('drawing again with the same answer and failure redraws nothing', () => {
+    const props = draftProps('standard-notices', {
+      failure: draftFixture('draft-409-unavailable').failure,
+    });
+    const { container, rerender } = render(<PlanDraft {...props} />);
+    const before = [...container.querySelectorAll('*')];
+    fireEvent.change(screen.getByLabelText(LABEL), {
+      target: { value: 'CS 6140' },
+    });
+    rerender(<PlanDraft {...props} />);
+    const after = [...container.querySelectorAll('*')];
+    expect(after).toHaveLength(before.length);
+    expect(after.filter((el, i) => el !== before[i])).toEqual([]);
   });
   it('the draft is a region named by its heading', () => {
     render(<PlanDraft {...draftProps()} />);

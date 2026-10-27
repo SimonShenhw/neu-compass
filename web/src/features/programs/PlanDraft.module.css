@@ -49,7 +49,8 @@
   gap: var(--space-3);
   min-width: 0;
 }
-.add[aria-disabled='true'] {
+.add[aria-disabled='true'],
+.retry[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.55;
 }

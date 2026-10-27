@@ -1,6 +1,6 @@
 import { Info, TriangleAlert } from 'lucide-react';
-import { Fragment, useId, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import { Fragment, useCallback, useId, useRef, useState } from 'react';
+import type { RefCallback, RefObject } from 'react';
 import type { DraftAnswer } from '../../api/draft';
 import type { ApiFailure } from '../../api/load';
 import type { ProgramPlanDoc } from '../../api/programs';
@@ -34,6 +34,7 @@ export interface PlanDraftProps {
   onViewCourse: (courseId: string) => void;
 }
 
+// The level is on the box its look comes from (the border, the background and the icon); the reference reads it there.
 function Notices({ answer }: { answer: DraftAnswer }) {
   return answer.notices.map((n, i) => (
     <div key={i} className={styles.notice} data-level={n.level}>
@@ -43,9 +44,7 @@ function Notices({ answer }: { answer: DraftAnswer }) {
         <Info aria-hidden="true" />
       )}
       <div className={styles.noticeBody}>
-        <p data-kind="notice" data-level={n.level}>
-          {n.text}
-        </p>
+        <p data-kind="notice">{n.text}</p>
         {n.candidates.length > 0 && (
           <ul className={styles.candidates}>
             {n.candidates.map((c, j) => (
@@ -66,11 +65,13 @@ function Notices({ answer }: { answer: DraftAnswer }) {
 function Result({
   answer,
   plan,
+  keepFocus,
   onRemove,
   onViewCourse,
 }: {
   answer: DraftAnswer;
   plan: ProgramPlanDoc;
+  keepFocus: RefCallback<HTMLElement>;
   onRemove: (courseId: string) => void;
   onViewCourse: (courseId: string) => void;
 }) {
@@ -80,7 +81,7 @@ function Result({
     <>
       <ul className={styles.courses}>
         {answer.courses.map((c) => (
-          <li key={c.code} className={styles.course}>
+          <li key={c.code} ref={keepFocus} className={styles.course}>
             <p data-kind="course" className={styles.courseText}>
               {`${c.code} · ${c.name} · ${creditsText(c.credits)}`}
             </p>
@@ -146,13 +147,52 @@ function Alert({ kind, children }: { kind: string; children: string }) {
   );
 }
 
+// Each new answer or failure from the wiring is the outcome of a new check. What shows it is keyed by how many there
+// have been, so it is drawn afresh and a screen reader hears it even when it repeats the last one word for word.
+function useRound(value: unknown) {
+  const [last, setLast] = useState({ value, round: 0 });
+  if (last.value === value) return last.round;
+  setLast({ value, round: last.round + 1 });
+  return last.round + 1;
+}
+
 export function PlanDraft(props: PlanDraftProps) {
+  // A plan not checked against its sources has no draft, and the typed text in Draft goes with it, as on Streamlit,
+  // whose run under such a plan draws no text area; between two checked plans it stays.
+  if (props.plan.review_status !== 'source_checked') return null;
+  return <Draft {...props} />;
+}
+
+function Draft(props: PlanDraftProps) {
   const [text, setText] = useState('');
   const inputId = useId();
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  const count = useRef<HTMLParagraphElement>(null);
-  if (props.plan.review_status !== 'source_checked') return null;
+  const count = useRef<HTMLParagraphElement | null>(null);
+  const answerRound = useRound(props.answer);
+  const failureRound = useRound(props.failure);
+  // A new answer or outcome can take away a part of the draft that has focus: the course count a remove left focus
+  // on (when the answer cannot be shown), a course's buttons, the retry button after a success. Focus would fall back
+  // to the page, so it goes to the heading first, again without scrolling. A ref cleanup runs before React takes the
+  // node out, while focus is still in it; focus anywhere else, or nowhere, is left alone.
+  const keepFocus = useCallback(
+    (el: HTMLElement | null) => () => {
+      if (el?.contains(document.activeElement))
+        heading.current?.focus({ preventScroll: true });
+    },
+    [],
+  );
+  const countRef = useCallback(
+    (el: HTMLParagraphElement | null) => {
+      count.current = el;
+      const keep = keepFocus(el);
+      return () => {
+        keep();
+        count.current = null;
+      };
+    },
+    [keepFocus],
+  );
   // A pressed button that goes away hands focus to a fixed place first (the course count, the heading), without
   // scrolling; one that stays keeps it (spec section 9).
   const focusFirst = (target: RefObject<HTMLElement | null>) =>
@@ -221,13 +261,20 @@ export function PlanDraft(props: PlanDraftProps) {
         </div>
       </div>
       {props.failure && (
-        <div className={styles.failure}>
-          <Alert kind="failure">{draftFailureMessage(props.failure)}</Alert>
+        <div ref={keepFocus} className={styles.failure}>
+          {/* Only the sentence is drawn afresh; the retry button stays, and so does any focus on it. */}
+          <Alert key={failureRound} kind="failure">
+            {draftFailureMessage(props.failure)}
+          </Alert>
           {canRetryDraft(props.failure) && (
+            // While the retry is on its way, like add: no second call, and focus stays.
             <Button
               data-kind="button"
               data-action="retry"
+              aria-disabled={props.checking}
+              className={styles.retry}
               onClick={() => {
+                if (props.checking) return;
                 focusFirst(heading);
                 props.onRetry();
               }}
@@ -238,20 +285,25 @@ export function PlanDraft(props: PlanDraftProps) {
         </div>
       )}
       {parsed?.kind === 'invalid' && (
-        <Alert kind="warning">草案结果的格式不对，没有显示。</Alert>
+        <Alert key={answerRound} kind="warning">
+          草案结果的格式不对，没有显示。
+        </Alert>
       )}
       {parsed?.kind === 'ok' && !answer && (
-        <Alert kind="warning">
+        <Alert key={answerRound} kind="warning">
           草案结果与当前所选方案的内容版本不一致；请刷新方案后重试，未显示旧结果。
         </Alert>
       )}
-      {/* Always there, so a screen reader hears what a check changed while focus stays on the button pressed. */}
+      {/* Always there, so a screen reader hears what a check changed while focus stays on the button pressed. Each
+          answer draws its notices and the count's words afresh; the count line itself stays, as focus may be on it. */}
       <div aria-live="polite" className={`${styles.live} ${styles.stack}`}>
         {answer && (
           <>
-            <Notices answer={answer} />
-            <p ref={count} tabIndex={-1} data-kind="count">
-              {`已填 ${answer.courses.length}/${MAX_DRAFT_COURSES} 门（不区分已修与打算修）`}
+            <Notices key={answerRound} answer={answer} />
+            <p ref={countRef} tabIndex={-1} data-kind="count">
+              <span key={answerRound}>
+                {`已填 ${answer.courses.length}/${MAX_DRAFT_COURSES} 门（不区分已修与打算修）`}
+              </span>
             </p>
           </>
         )}
@@ -260,6 +312,7 @@ export function PlanDraft(props: PlanDraftProps) {
         <Result
           answer={answer}
           plan={props.plan}
+          keepFocus={keepFocus}
           onRemove={(id) => {
             focusFirst(count);
             props.onRemove(id);

@@ -4687,29 +4687,40 @@ R4b 分两半：草案判断的接口（第 36 节，#36 已合并）和新前�
 
 ### 已实现
 
-1. **R4a 的课程表多一个参数**（第一个提交，单独提交）：`ProgramCurriculum` 的 `draft?: ReactNode`，选中了一份方案时原样放在方案块后面、「以下是旧课程表…」那行前面，也就是 R4a 说明书第 6 节第 9 步留给草案的位置；没选方案、选的方案不在列表里、课程表还在加载或读不出来、没传这个参数时什么都不画，R4a 的演示和 37 个标准答案不变。放在方案块后面而不是里面：方案块按 `plan_id` 重建（R4a 返工时加的 key），放进去的话换方案就会清掉输入框里还没加的字，Streamlit 的输入框不随方案清；接线要按方案重来，可以自己给 key。R3a–R4a 的文件只改了这一处。
+1. **R4a 的课程表多一个参数**（第一个提交，单独提交）：`ProgramCurriculum` 的 `draft?: ReactNode`，选中了一份方案时原样放在方案块后面、「以下是旧课程表…」那行前面，也就是 R4a 说明书第 6 节第 9 步留给草案的位置；没选方案、选的方案不在列表里、课程表还在加载或读不出来、没传这个参数时什么都不画，R4a 的演示和 37 个标准答案不变。放在方案块后面而不是里面：方案块按 `plan_id` 重建（R4a 返工时加的 key），放进去的话换方案就会清掉输入框里还没加的字，Streamlit 在两份已核对方案之间切换时不清输入框；接线要按方案重来，可以自己给 key。R3a–R4a 的文件只改了这一处。
 2. **回答的类型**（`web/src/api/draft.ts`）：照说明书第 2 节手写。草案接口已经在 main 上，`draft.types.test.ts` 现在就用 `Misfits` 把它们（连同嵌套的课程、提示、候选、规则节点）和生成的 `DraftCheckOut` 等对照，说明书原本把这条留给 R4 接线。
 3. **检查回答**（`web/src/models/planDraft.ts` 的 `parseDraftAnswer`）：照说明书第 4 节，参考实现是生成脚本里的 `answer_ok`（它在 19 份回答上和 API 自己的 pydantic 模型结论一样）。内容版本是 64 位小写十六进制；最多 20 门课，课程 ID 1–200 字、课号 `^[A-Z]{2,4} [0-9]{4}[A-Z]?$`（只认 ASCII 数字）、课名 1–500 字、`credits` 这个键必须在、值是 null 或 0–12 的整数（`true` 不算），课号不重复；`added` 不重复、都是草案里的课号；提示的 `kind` 是 14 种之一、`level` 两种、`text` 非空、候选最多 10 个、未展开数是非负整数；规则节点照第 4 节最后一条，根算第 0 层、最深第 20 层，`status` 这个键必须在；`unplaced` 最多 20 个；三个计数是非负整数。字数一律按码点（`Array.from`）。多出来的键不管。过了还要内容版本等于页面显示的那一版。
 4. **几个小函数**（同一文件）：`draftTreeLines` 照 Streamlit 的 `_tree_lines` 去掉 emoji（状态、运算的字用 `Map` 查：`kind` 是任意字符串，用对象字面量的话 `constructor` 会查到 `Object.prototype` 上的函数；「按填写计入」去掉同时在 `possible` 里的；两种「另有…未展开」；每层两个空格）；`creditsText`（0 是「0 学分」，null 是「学分未知」）；`draftFailureMessage` 和 `canRetryDraft` 照第 8 节（409 的 `stale`、`missing`、`draft`、`unusable` 合成一句、不给重试，`unavailable` 一句、可以重试，404、422 各一句、不给重试，别的「无法核对草案。」加 R4a 的 `apiErrorMessage`；从不显示 API 的 `detail`）。
-5. **组件**（`web/src/features/programs/PlanDraft.tsx`、`PlanDraft.module.css`）：方案不是 `source_checked` 就返回 null。从上到下照第 5 节：小标题（h3）、三行说明、「清空草案」、输入框（标题、`maxLength` 4000）、「加入草案」、核对中那一行、失败那一句和「重新核对」、回答（格式不对或版本对不上各一句警告；否则提示和候选、已填几门、每门课一行和两个按钮、统计、部分规则的说明、规则树、方案里没写到的课）。文字一个字不改，都是纯文本，课程行、提示和规则树保留换行和空格（`white-space: pre-wrap`），长词能折行；组件里没有 `<a>`。每个显示的东西带 `data-kind`。
-   - **核对中：** 「加入草案」用 `aria-disabled`、点了不调 `onAdd`，不用 `disabled`（禁用的按钮会把焦点丢掉）；上一次的回答留在下面。
-   - **焦点：** 照 10-25 定的统一焦点规则。「加入草案」「清空草案」按了焦点不动；「移除」先把焦点放到「已填 n/20 门」那一行，「重新核对」先放到小标题（都是 `tabIndex=-1`，`focus({ preventScroll: true })`），再调回调。
-   - **读屏（说明书没写，协调方定的）：** 草案是以小标题命名的 region。核对中那一行放在「加入草案」旁边一个一直在的 `role="status"` 里；提示和「已填 n/20 门」放在一个一直在的 `aria-live="polite"` 区域里：按了「加入草案」焦点留在按钮上，读屏用户也能听到这次哪些课号没加进去、现在一共几门。失败和两种格式警告是 `role="alert"`（和 R4a 的警告一样）。两个一直在的区域空着时 `position: absolute`，不占网格的间距。
-   - **样子（说明书没写，协调方定的）：** 没有转动的图标（和 R3d、R4a 一样只有一行字）；警告带 lucide 的 `TriangleAlert`、强调色边框，普通提示带 `Info`、普通边框（tokens 里没有黄色，没有加颜色）；每门课一张卡，两个按钮能折行；规则树用等宽字体。
+5. **组件**（`web/src/features/programs/PlanDraft.tsx`、`PlanDraft.module.css`）：方案不是 `source_checked` 就什么都不画。输入框的字放在里面一层组件里，这时跟着清掉，和 Streamlit 一样（那次运行不画输入框，字就没了）；两份已核对方案之间直接换，字还在。从上到下照第 5 节：小标题（h3）、三行说明、「清空草案」、输入框（标题、`maxLength` 4000）、「加入草案」、核对中那一行、失败那一句和「重新核对」、回答（格式不对或版本对不上各一句警告；否则提示和候选、已填几门、每门课一行和两个按钮、统计、部分规则的说明、规则树、方案里没写到的课）。文字一个字不改，都是纯文本，课程行、提示和规则树保留换行和空格（`white-space: pre-wrap`），长词能折行；组件里没有 `<a>`。每个显示的东西带 `data-kind`。
+   - **核对中：** 「加入草案」用 `aria-disabled`、点了不调 `onAdd`，不用 `disabled`（禁用的按钮会把焦点丢掉）；上一次的回答留在下面。「重新核对」也一样（第 31 轮加的，说明书没写；免得同一次核对发两遍），上一次的失败照说明书第 3 节留到核对成功为止。「移除」「清空草案」说明书没拦，照样调回调，README 写明接线以最后一次请求为准。
+   - **焦点：** 照 10-25 定的统一焦点规则。「加入草案」「清空草案」按了焦点不动；「移除」先把焦点放到「已填 n/20 门」那一行，「重新核对」先放到小标题（都是 `tabIndex=-1`，`focus({ preventScroll: true })`），再调回调。新回答或新结果拿掉草案里有焦点的那一块时，先把焦点交给小标题（同样不滚动；第 31 轮加的）。比如：移除以后的回答显示不了（格式不对、版本对不上），拿掉了「已填」那一行；一门课的两个按钮被拿掉；核对成功以后「重新核对」消失。做法是给这几块挂同一个 ref 回调，它的清理函数在 React 拿掉节点以前跑，那时焦点还在里面。焦点在别处或哪里都没有时不动：React 每次更新完会把焦点还给更新前那个还在页面上的元素，所以「别处」的情况本来就测不出区别，测试用的是「哪里都没有焦点」。
+   - **读屏（说明书没写，协调方定的）：** 草案是以小标题命名的 region。核对中那一行放在「加入草案」旁边一个一直在的 `role="status"` 里；提示和「已填 n/20 门」放在一个一直在的 `aria-live="polite"` 区域里：按了「加入草案」焦点留在按钮上，读屏用户也能听到这次哪些课号没加进去、现在一共几门。失败和两种格式警告是 `role="alert"`（和 R4a 的警告一样）。两个一直在的区域空着时 `position: absolute`，不占网格的间距。读屏只在内容变了时才读，所以按对象数轮次（第 31 轮加的）：每个新回答把提示和「已填」的字重新画一遍，每个新失败、每个显示不了的新回答把那句重新画一遍。这样结果和上次一字不差也会再读一遍。「已填」那一行本身和「重新核对」按钮不重建，焦点在上面不会掉。
+   - **样子（说明书没写，协调方定的）：** 没有转动的图标（和 R3d、R4a 一样只有一行字）；警告带 lucide 的 `TriangleAlert`、强调色边框，普通提示带 `Info`、普通边框（tokens 里没有黄色，没有加颜色），级别写在定样子的外层框上；每门课一张卡，两个按钮能折行；规则树用等宽字体。
 6. **离线演示**（`web/src/pages/PlanDraftDemoPage.tsx`、`web/src/fixtures/draftDemo.ts`、`draftScenarios.ts`）：路由 `/programs-draft-demo`，不进导航，`React.lazy` 懒加载，放在 R3d 的 `OfflineDemoShell` 下面（不发 `/config`、`/auth/me`）。顶部「场景」（29 个）、「速度」（正常、慢、立即、一直加载），网址参数 `scenario`、`speed`，认不出的回到 `standard-mixed`、`normal`（`Object.hasOwn`，`constructor` 这样的名字不算），换了控件按 key 从头来。每个场景先按「第一次核对在路上」显示，300ms（慢乘 4，立即 0，一直加载不来）以后换成场景的参数。上面一行是 R4a 的 `scopeLabel(plan)`（h2）。回调只在一个 `role="status"` 区域写一句，回答不变。方案从假数据里按 R4a 的 `availablePlans` 检查以后取。标题「选课草案演示」（`routePresentation.ts`）。
 7. **假数据和标准答案：** `draft_fixtures/out` 的 32 份原样复制到 `web/src/fixtures/draft/`，`expected` 的 31 份复制到 `expected/`，一个字节都没改（`cmp` 核过）；`draftFixtures.test.ts` 锁定 63 份的 SHA-256；`web/.prettierignore` 加 `src/fixtures/draft/`。expected 只在测试里读；演示的场景映射是从 29 个标准答案的 props 生成一次的源文件，测试核对两边一样。
 8. **测试：**
-   - `PlanDraft.test.tsx`：29 个场景逐项比对实际 DOM（`draftTestUtils.tsx` 的 `readDraftDom`：种类、文字、顺序、按钮的 action 和 course_id、「加入草案」的 `aria-disabled`、输入框的标题和字数上限、树的每一行）；回调（输入框的字原样、不去空白，空的也照样调；核对中点了、按回车都不调；清空清输入框、加入不清；移除、课程页、重新核对的参数）；焦点（先移焦点再调回调、`preventScroll`、新回答到了焦点还在那一行；加入时焦点留在按钮上；小标题和那一行不进 Tab 顺序）；纯文本（课名、提示、候选、规则名、原因、没写到的课里放 `<b>`、Markdown 链接、`javascript:`、`<img>`，原样显示，没有 `<a>`、`<b>`、`<img>`、`<script>`）；不是 `source_checked` 的方案什么都不画、不调回调；格式不对、版本对不上（另一个版本、页面上的版本不合格、没有版本）只有一句警告；多出来的键不影响；读屏的区域一直在；部分规则那行只看 `coverage`；学分 0 和 null；`vitest-axe` 六个场景没有违规。
-   - `planDraft.test.ts`：18 份真实回答和改出来的两份都读得懂，没有 `result` 的那份不行；第 4 节每一条各一组（从真实回答改一处，边界两侧都测，码点和 UTF-16 长度不同的字也测）；18 个失败向量、7 个树向量；`creditsText`；`Object.prototype` 上的名字当 `kind`；`depth` 参数；同时在 `counted` 和 `possible` 里的课号。
-   - `PlanDraftDemoPage.test.tsx`：参数（认不出的回默认）、四种速度的时间（差 1 毫秒都不对）、先核对中再出结果、核对中的场景一直核对中、换控件从头来（输入框的字和状态区的句子也清掉）、五句状态、回答不变、`axe`、整个 App 在这个地址不发请求也不往缓存里放东西。
+   - `PlanDraft.test.tsx`：29 个场景逐项比对实际 DOM（`draftTestUtils.tsx` 的 `readDraftDom`：种类、文字、顺序、按钮的 action 和 course_id、「加入草案」的 `aria-disabled`、输入框的标题和字数上限、树的每一行；提示的级别从外层框读），29 个场景再各查一遍：读到的以外没有别的字（`placeholder`、`title`、`alt` 也没有），读到的都看得见、不在 `aria-hidden` 里；回调（输入框的字原样、不去空白，空的也照样调；核对中点了、按回车都不调；清空清输入框、加入不清；移除、课程页、重新核对的参数）；焦点（先移焦点再调回调、`preventScroll`、新回答到了焦点还在那一行；加入时焦点留在按钮上；小标题和那一行不进 Tab 顺序）；纯文本（课名、提示、候选、规则名、原因、没写到的课里放 `<b>`、Markdown 链接、`javascript:`、`<img>`，原样显示，没有 `<a>`、`<b>`、`<img>`、`<script>`）；不是 `source_checked` 的方案什么都不画、不调回调；格式不对、版本对不上（另一个版本、页面上的版本不合格、没有版本）只有一句警告；多出来的键不影响；读屏的区域一直在；部分规则那行只看 `coverage`；学分 0 和 null；`vitest-axe` 六个场景没有违规。第 31 轮又加了：
+     - 提示的样子和图标；
+     - 结果和上次一样时重新画，同一个对象重画什么都不重建；
+     - 核对中「重新核对」不响应；
+     - 有焦点的那一块（「已填」那一行、一门课的按钮、「重新核对」）被拿掉时焦点去哪，焦点在别处或哪里都没有时不动；
+     - 输入框的字在回答以后、直接换到另一份已核对方案以后还在，经过不能用草案的方案就清掉；
+     - 同一个组件里，回答不再合适以后什么都不留；
+     - 409 的四种真实失败；
+     - 版本警告是 alert；
+     - 打字和每个按钮不写存储和网址，源码里没有存储、请求、日志和 HTML；
+     - 样式表里换行、折行和警告样子的那几条声明。
+   - `planDraft.test.ts`：16 份真实回答和改出来的 2 份都读得懂，没有 `result` 的那份不行；第 4 节每一条各一组（从真实回答改一处，边界两侧都测，码点和 UTF-16 长度不同的字也测）。第 31 轮补了几条子规则：课号中间的其他空白和小写尾字母、`counted`／`missing` 的元素类型、只有空格的提示（合格）、候选的 `name` 类型、`result: null`；18 个失败向量、7 个树向量；`creditsText`；`Object.prototype` 上的名字当 `kind`；`depth` 参数；同时在 `counted` 和 `possible` 里的课号；503 带 `unavailable` 只是普通失败。
+   - `PlanDraftDemoPage.test.tsx`：参数（认不出的回默认）、四种速度的时间（差 1 毫秒都不对）、先核对中再出结果、核对中的场景一直核对中、换控件从头来（输入框的字和状态区的句子也清掉）、五句状态、回答不变、`axe`、整个 App 在这个地址不发请求也不往缓存里放东西。第 31 轮加了三条：换一个控件另一个参数不变；失败场景第一次核对时不显示失败；四种速度的字。
    - `ProgramCurriculum.draft.test.tsx`：第 1 条的位置、不画的几种情况、换方案时同一个元素、输入框的字还在。
    - `draft.types.test.ts`：第 2 条。
-9. **变异**（`web/scripts/draft-mutations.mjs`，照 R4a 的 `programs-mutations.mjs`）：在临时副本里先跑一遍类型和全量测试，再逐个改一处、只跑对口的测试，只有命中对口测试名的真实断言失败才算杀掉（类型变异算对口的类型测试编译失败），跑完核对工作区没变。说明书第 15 节第 2 条列的改坏都在里面（树里留着 emoji、运算的字写错、「按填写计入」算上 `possible`、两种「另有」不写、计数用了别的数、null 学分写成 0、`complete` 也写部分规则、版本不比、`credits` 是 `true` 或 13 也通过、候选超过 10 个也通过、stale 也给重试、unavailable 不给重试、失败时显示 API 给的东西、核对中照样调 `onAdd`、清空不清输入框、移除以后焦点不动、课程行做成 `<a>`、草稿方案也画出来）。
+9. **变异**（`web/scripts/draft-mutations.mjs`，照 R4a 的 `programs-mutations.mjs`）：在临时副本里先跑一遍类型和全量测试，再逐个改、只跑对口的测试。Vitest 失败、而且失败的测试里有对口的那条，才算杀掉，不分是断言没过、找不到元素还是抛了异常；类型变异算对口的类型测试在那个字段上编译失败。第 31 轮以前这里写的是「只算真实断言失败」，和代码不符，B31 指出以后改正。跑完核对工作区没变，再删副本：先删副本里的两个 `node_modules` 链接，再删副本，以前是留在 `%TEMP%` 里。第 31 轮加了 51 个（D85–D135）：每处修复反过来改一次，再加上 B31 自己的变异里存活的那些；一个变异可以在同一个文件里按顺序改几处。说明书第 15 节第 2 条列的改坏都在里面（树里留着 emoji、运算的字写错、「按填写计入」算上 `possible`、两种「另有」不写、计数用了别的数、null 学分写成 0、`complete` 也写部分规则、版本不比、`credits` 是 `true` 或 13 也通过、候选超过 10 个也通过、stale 也给重试、unavailable 不给重试、失败时显示 API 给的东西、核对中照样调 `onAdd`、清空不清输入框、移除以后焦点不动、课程行做成 `<a>`、草稿方案也画出来）。
 
 ### 修改文件
 
 - 第一个提交：改 `web/src/features/programs/ProgramCurriculum.tsx`；新建 `web/src/features/programs/ProgramCurriculum.draft.test.tsx`。
 - 第二个提交：新建 `web/src/api/draft.ts`、`draft.types.test.ts`，`web/src/models/planDraft.ts`、`planDraft.test.ts`，`web/src/features/programs/PlanDraft.tsx`、`PlanDraft.module.css`、`PlanDraft.test.tsx`、`draftTestUtils.tsx`，`web/src/fixtures/draftDemo.ts`、`draftScenarios.ts`、`draftFixtures.test.ts`、`web/src/fixtures/draft/`（32 份）和 `draft/expected/`（31 份），`web/src/pages/PlanDraftDemoPage.tsx`、`PlanDraftDemoPage.test.tsx`，`web/scripts/draft-mutations.mjs`；改 `web/src/App.tsx`、`web/src/layout/routePresentation.ts`、`web/.prettierignore`；文档 `web/README.md`（R4b 一节）和本节。
+- 第三个提交（第 31 轮）：改 `web/src/features/programs/PlanDraft.tsx`、`PlanDraft.module.css`、`PlanDraft.test.tsx`、`draftTestUtils.tsx`，`web/src/models/planDraft.test.ts`，`web/src/pages/PlanDraftDemoPage.test.tsx`，`web/scripts/draft-mutations.mjs`；文档 `web/README.md`（R4b 一节）和本节。
 
 数据库结构、API、Streamlit 版、Docker、nginx 都没改；`web/openapi.json`、`web/src/api/schema.ts` 没动。
 
@@ -4721,16 +4732,61 @@ R4b 分两半：草案判断的接口（第 36 节，#36 已合并）和新前�
   - 29 个场景、18 个失败向量、7 个树向量全对；63 份假数据和说明书目录里的逐字节一样。
   - 变异：`draft-mutations.mjs` 84 个，**84／84 杀**，跑完工作区没变。第一次跑有 21 个没判定，毛病都在脚本：20 个的过滤名把 describe 名和测试名用空格拼在一起，Vitest 是一层一层（「describe > 测试」）匹配的，一个测试都没选中；D21 写成了等价的（只改 `includes`，前面的 `hasOwn` 照样拦住），改成两行一起换（缺了 `status` 当成 null）。几条 `it.each` 的标题因此改得各自唯一。R4a 的 `programs-mutations.mjs` 也跑了一遍，29／29 杀（`ProgramCurriculum` 改了以后它的锚点都还对得上）。
   - 浏览器（内置浏览器，`build:dev-api` 以后 `preview:dev-api`，5173）：1440×900 和 390×844 各量了 13 个和 18 个场景，整页都没有横向滚动，也没有超出视口的元素；看了 `standard-mixed`、`standard-notices`、`standard-text-edge`（手机）、`standard-409-unavailable`、`standard-checking-again`、`standard-all-present`。键盘：场景、速度、清空、输入框、加入、重新核对依次能 Tab 到，焦点框看得见；按「重新核对」焦点到小标题，按「移除」焦点到「已填」那一行，页面不滚动。新开标签直接打开演示页：控制台没有消息，只有同源的请求。演示是离线外壳，没有开开发 API。服务器用完停了。
+- **第三个提交（第 31 轮的修复）：**
+  - typecheck、零警告 lint、`format:check`、Vitest **70 个文件 2394 项**、构建、`gen:api:check` 都过。首屏 JavaScript gzip **187,129 字节**。
+  - 变异：`draft-mutations.mjs` 现在 135 个，**135／135 杀**；跑完工作区没变，副本已删（先删链接）。中间有一次 132 个里 131 个杀掉，没杀掉的是去掉「焦点就在这一块里」的判断。原因是 React 每次更新完会把焦点还给更新前那个还在页面上的元素，所以「焦点在输入框」测不出区别。后来改用「哪里都没有焦点」来测，并把兜底推广到课程按钮和「重新核对」，又加了 3 个变异。
+  - 新测试放到 `4f84d7d` 的组件上跑：376 项里 8 项失败，正好是修的那几处；其余新测试守的是本来就对的行为。
+  - 浏览器：`build:dev-api` 以后 `preview:dev-api`，5173。
+    - 1440 宽量了 `standard-notices`、`standard-409-unavailable`、`standard-full`，390 宽量了 `standard-text-edge`、`standard-409-unavailable`，都没有横向滚动。
+    - 提示是外层框带级别、警告是强调色边框和三角图标。不在核对中时「重新核对」不变灰。
+    - 按「重新核对」焦点到小标题，按「移除」焦点到「已填」那一行，页面不滚动，状态区写出句子。
+    - 控制台没有消息，没有跨源请求。服务器用完停了。
+    - 核对中的「重新核对」、几处焦点兜底、结果重读在演示里走不到（演示的回调不换回答），由组件测试管。
 
 ### 审查
 
-第 31 轮，两路只读审查（A31：正确性、和说明书是否一致、无障碍、安全；B31：测试够不够、变异、文档），进行中。
+第 31 轮，两路只读审查，范围 `cbb91f7..4f84d7d`，都没有派子 agent。
+
+- **A31**（正确性、和说明书是否一致、无障碍、安全）：0 CRITICAL、0 HIGH、1 MEDIUM、2 LOW、6 NIT。它核过的东西：
+  - 照参考实现生成了 21,246 个回答和 `answer_ok` 比，只在数字的写法上不同（见「已知」）；
+  - 拿 Streamlit 的 `_tree_lines` 原文比了 400 棵随机树；
+  - 失败的句子比了 17,864 种组合，客户端能产生的都一样；
+  - 29 个场景 axe 0 违规。
+
+  发现：
+  - MEDIUM：同样的结果再来一次（重试又是同样的失败、回答和上次一样），读屏什么都听不到。
+  - LOW：核对中「重新核对」照样回调；移除以后来的回答显示不了时，焦点掉到页面上。
+  - NIT：经过不能用草案的方案，输入框的字还在（Streamlit 会清掉）；超出双精度的数字；参考实现碰到列表或对象值会抛异常；警告和提示对读屏没区别；接线换方案时要把回答置空；本节在 `web/` 以外。
+- **B31**（测试够不够、变异、文档）：0 CRITICAL、0 HIGH、4 MEDIUM、8 LOW、6 NIT。它在自己的副本里跑了自己写的变异体。
+  - MEDIUM：
+    - 警告／提示两种样子实际没测：测的是一个只给测试看的属性。
+    - 回答回来、换方案以后，输入框的字会不会被清掉，测试抓不到。
+    - 「未显示旧结果」只测了第一次渲染。
+    - 409 的四种「方案已变」在组件层没测。
+  - LOW：
+    - 第 4 节有几条子规则没测；
+    - 读法不查可见性；
+    - 版本警告不是 alert 也能过；
+    - 「核对中＋上次失败」没测；
+    - 不写存储和网址没测；
+    - 只靠 CSS 的行为没测、测试名说多了；
+    - 演示有三处没测；
+    - 变异的杀死判据说得不准。
+  - NIT：几处数字和清单、一条注释、「没有多余文字」只看文本节点、409 的条件没测住、变异脚本在 `%TEMP%` 留副本。
+
+第三个提交逐条处理（上面第 1、5、8、9 条里写着「第 31 轮」的地方）。除了「已知」里的几条，其余全部修了或补了测试。本节留在 `web/` 以外，是这次任务要求写的。验证修复的办法：
+- A31 的 7 条探针在 `4f84d7d` 上都失败。
+- 新测试放到 `4f84d7d` 的组件上跑，失败的正好是修的那 8 处：读屏重读三处、核对中重试、焦点两处（「已填」那一行；课程按钮和「重新核对」）、输入框的字、提示级别的位置。
+- 别的新测试守的是本来就对的行为，它们管不管用，靠杀掉 B31 的变异体来证明。
 
 ### 已知、未处理
 
 - **写成 `1.0`、`1e3` 的整数：** JSON 里的 `1.0` 在 JavaScript 里就是 `1`，所以前端把它当整数收（学分、几个计数都一样），Python 的 `answer_ok`（`type(v) is int`）不收。API 给的都是整数，碰不到；R4a 的检查也一样。
 - **输入框的 `maxLength`** 按 UTF-16 算，API 的 4000 字按码点算：输入框里的字有表外字（比如 emoji）时，能填的比 API 收的少，不会多。
+- **超出双精度范围的数字（A31）：** 401 位的整数在 JavaScript 里读成 `Infinity`，页面判格式不对，Python 的 `answer_ok` 收；`1e21` 这样的计数页面显示成 `1e+21`。API 给的都是小整数，碰不到。
+- **警告和提示对读屏没有区别（A31）：** 图标是 `aria-hidden`，级别不进无障碍树；句子本身已经说清楚。要加一个只给读屏的「警告：」，得用户定字。
+- **说明书目录里的参考实现（A31）：** `expected_draft.py` 碰到列表或对象做 `kind`、`status` 时会抛 TypeError；前端在这些情况下判格式不对，是对的。它不在仓库里，以后要拿它做差分，先改成先判断是不是字符串。
 
 ### 发布状态
 
-分支 `feat/web-plan-draft`，从 main `cbb91f7` 开。第一个提交 `979e4be` 是 R4a 课程表的草案参数，第二个提交是组件、演示、测试、变异脚本和文档。没有使用真实模型、账号、NAS 或生产库，只用说明书目录里的合成假数据。上线要另外授权（和 React 前端一起）。
+分支 `feat/web-plan-draft`，从 main `cbb91f7` 开。第一个提交 `979e4be` 是 R4a 课程表的草案参数，第二个提交 `4f84d7d` 是组件、演示、测试、变异脚本和文档，第三个提交是第 31 轮审查的修复。没有使用真实模型、账号、NAS 或生产库，只用说明书目录里的合成假数据。上线要另外授权（和 React 前端一起）。

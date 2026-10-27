@@ -70,6 +70,20 @@ describe('options', () => {
       }),
     ).toHaveLength(29);
   });
+  it('the speeds read 正常, 慢, 立即 and 一直加载, in that order', () => {
+    page();
+    expect(
+      [...screen.getByLabelText('速度').querySelectorAll('option')].map((o) => [
+        o.value,
+        o.textContent,
+      ]),
+    ).toEqual([
+      ['normal', '正常'],
+      ['slow', '慢'],
+      ['instant', '立即'],
+      ['forever', '一直加载'],
+    ]);
+  });
 });
 
 describe('a run of a scene', () => {
@@ -107,6 +121,16 @@ describe('a run of a scene', () => {
     expect(count()).toHaveTextContent('已填 2/20 门');
     await tick(60000);
     expect(checking()).toBeInTheDocument();
+  });
+  it('a failure scene shows no failure while its first check is on its way', async () => {
+    vi.useFakeTimers();
+    page('?scenario=standard-404');
+    expect(checking()).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    await tick(300);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '找不到这个培养方案或方案，草案没有计算。',
+    );
   });
   it('a failure scene brings its failure and its retry', async () => {
     page('?scenario=standard-409-unavailable&speed=instant');
@@ -156,6 +180,17 @@ describe('changing a control starts over', () => {
     await tick(5000);
     expect(count()).toBeNull();
     expect(checking()).toBeInTheDocument();
+  });
+  it('changing one control keeps the other', () => {
+    page('?scenario=standard-404&speed=forever');
+    fireEvent.change(screen.getByLabelText('场景'), {
+      target: { value: 'standard-422' },
+    });
+    expect(screen.getByLabelText('速度')).toHaveValue('forever');
+    fireEvent.change(screen.getByLabelText('速度'), {
+      target: { value: 'slow' },
+    });
+    expect(screen.getByLabelText('场景')).toHaveValue('standard-422');
   });
   it('the typed text and the last sentence do not survive a new scene', async () => {
     page('?speed=instant');

@@ -142,7 +142,8 @@ describe('courses', () => {
   ])('a course_id of %j', (value, kind) => {
     expect(course((c) => (c.course_id = value))).toBe(kind);
   });
-  // Course 7 of the full draft is ZZ 7002, which `added` does not name; the new codes are all unused.
+  // Course 7 of the full draft is ZZ 7002, which `added` does not name. The other codes here are unused but CS 5010,
+  // course 0's code, which fails only as a repeat.
   it.each([
     ['AB 1234', 'ok'],
     ['EECE 5644', 'ok'],
@@ -154,8 +155,11 @@ describe('courses', () => {
     ['CS 501', 'invalid'],
     ['CS 50100', 'invalid'],
     ['CS 5010AB', 'invalid'],
+    ['CS 5011a', 'invalid'],
     ['CS-5010', 'invalid'],
     ['CS  5010', 'invalid'],
+    ['CS\t5011', 'invalid'],
+    ['CS 5011', 'invalid'],
     [' CS 5010', 'invalid'],
     ['CS 5010\n', 'invalid'],
     ['CS ５０１０', 'invalid'],
@@ -252,6 +256,10 @@ describe('notices', () => {
       (a: Json) => (at(ambiguous(a), ['candidates', 0]).code = 5010),
     ],
     [
+      'a candidate name that is not a string',
+      (a: Json) => (at(ambiguous(a), ['candidates', 0]).name = null),
+    ],
+    [
       'a candidate that is not an object',
       (a: Json) => ((ambiguous(a).candidates as unknown[])[0] = 'CS 5010'),
     ],
@@ -269,6 +277,9 @@ describe('notices', () => {
     ],
   ])('%s', (_, change) => {
     expect(edited(change)).toBe('invalid');
+  });
+  it('notice text only has to be non-empty: spaces alone are fine', () => {
+    expect(edited((a) => (at(a, ['notices', 0]).text = '  '))).toBe('ok');
   });
   it('exactly 10 candidates, with empty names, are fine', () => {
     expect(
@@ -306,6 +317,7 @@ describe('notices', () => {
 describe('result', () => {
   it.each([
     ['not an object', (a: Json) => (a.result = [])],
+    ['null in place of the result', (a: Json) => (a.result = null)],
     ['no root', (a: Json) => delete at(a, ['result']).root],
     [
       '21 unplaced codes',
@@ -368,10 +380,12 @@ describe('rule nodes', () => {
     ['reasons_omitted', 2, 'ok'],
     ['counted', Array(20).fill('CS 5010'), 'ok'],
     ['counted', Array(21).fill('CS 5010'), 'invalid'],
+    ['counted', [5010], 'invalid'],
     ['possible', Array(21).fill('CS 5010'), 'invalid'],
     ['possible', [null], 'invalid'],
     ['missing', Array(10).fill('CS 5010'), 'ok'],
     ['missing', Array(11).fill('CS 5010'), 'invalid'],
+    ['missing', [{}], 'invalid'],
     ['missing_omitted', 0.5, 'invalid'],
     ['shortfall', [], 'invalid'],
     ['shortfall', null, 'invalid'],
@@ -509,5 +523,18 @@ describe('small functions', () => {
     expect(canRetryDraft({ ...failure, status: 503, reason: 'stale' })).toBe(
       true,
     );
+  });
+  it('the unavailable sentence is for a 409 only: a 503 with that reason is a plain failure', () => {
+    const failure = {
+      status: 503,
+      errorType: 'server',
+      retryAfter: null,
+      invalidFields: [],
+      reason: 'unavailable',
+    };
+    expect(draftFailureMessage(failure)).toBe(
+      draftFailureMessage({ ...failure, reason: null }),
+    );
+    expect(draftFailureMessage(failure)).not.toContain('暂时无法核对所选方案');
   });
 });

@@ -73,7 +73,9 @@ export function readDraftDom(root: HTMLElement) {
         (line) => line.textContent,
       );
     } else {
-      if (kind === 'notice') item.level = node.dataset.level;
+      // A notice's level is read from the box whose look it sets.
+      if (kind === 'notice')
+        item.level = node.closest<HTMLElement>('[data-level]')?.dataset.level;
       item.text = node.textContent;
       if (kind === 'button') {
         item.action = node.dataset.action;
