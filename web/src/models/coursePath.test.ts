@@ -32,8 +32,9 @@ it('what an address names is said back on one line, without backticks, cut to 64
   expect(refLabel('a'.repeat(64) + 'b')).toBe('a'.repeat(64));
   // Direction and zero-width characters go, so they cannot turn the page's own sentence around (review A32).
   expect(refLabel('CS\u202e 6140\u2066\u200b\u200f\ufeff')).toBe('CS 6140');
-  // So does every other character that draws nothing: the Arabic letter mark, a soft hyphen, a combining grapheme
-  // joiner, the Mongolian vowel separator, a variation selector, a tag, an interlinear annotation anchor (recheck 1).
+  // So do the other format characters and the ones Unicode says to ignore: the Arabic letter mark, a soft hyphen, a
+  // combining grapheme joiner, the Mongolian vowel separator, a variation selector, a tag, an interlinear annotation
+  // anchor, a deprecated format character (recheck 1).
   const unseen = [
     0x061c, 0x00ad, 0x034f, 0x180e, 0xfe0f, 0xe0041, 0xfff9, 0x206a,
   ].map((point) => String.fromCodePoint(point));
