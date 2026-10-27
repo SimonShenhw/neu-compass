@@ -1,13 +1,17 @@
 import { createHash } from 'node:crypto';
 import {
   cpSync,
+  existsSync,
+  lstatSync,
   readFileSync,
   writeFileSync,
   readdirSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
+  rmSync,
   symlinkSync,
+  unlinkSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -52,6 +56,21 @@ mkdirSync(output, { recursive: true });
 const snapshot = mkdtempSync(
   join(realpathSync.native(tmpdir()), 'neu-landing-'),
 );
+// The copy goes when the process exits, a failed baseline or a bad anchor included. Its junctions go first, so removing
+// it cannot reach the node_modules behind them; if one cannot be removed, the copy stays. There is no signal handler:
+// the run is synchronous, so one would only run after the last mutant, and Ctrl+C would no longer stop the run (R4c,
+// as in draft-mutations.mjs).
+process.on('exit', () => {
+  const links = ['node_modules', 'tools/openapi-types/node_modules'].map((l) =>
+    join(snapshot, l),
+  );
+  for (const link of links)
+    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
+      unlinkSync(link);
+  if (links.some((link) => existsSync(link)))
+    console.error('Copy kept, a link is still there: ' + snapshot);
+  else rmSync(snapshot, { recursive: true, force: true });
+});
 cpSync(join(root, 'src'), join(snapshot, 'src'), { recursive: true });
 for (const file of config) {
   const target = join(snapshot, file);

@@ -5,6 +5,7 @@ import type {
   DraftCourse,
   DraftNode,
   DraftNotice,
+  DraftRequest,
   DraftResult,
 } from './draft';
 import type { Schemas } from './types';
@@ -21,6 +22,12 @@ it('draft answer types stay compatible with the generated API fields', () => {
   >().toBeNever();
   expectTypeOf<Misfits<DraftResult, Schemas['DraftResult']>>().toBeNever();
   expectTypeOf<Misfits<DraftNode, Schemas['DraftNode']>>().toBeNever();
+});
+
+// R4c: the request goes the other way, so every field the page sends must be one the API takes, as it takes it.
+it('the draft check sends only what the API takes', () => {
+  expectTypeOf<DraftRequest>().toExtend<Schemas['DraftCheckIn']>();
+  expectTypeOf<Misfits<DraftRequest, Schemas['DraftCheckIn']>>().toBeNever();
 });
 
 it('the nested rows the component reads are checked through their fields too', () => {

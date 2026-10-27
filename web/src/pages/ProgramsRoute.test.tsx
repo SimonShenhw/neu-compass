@@ -1,23 +1,36 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import { ApiError } from '../api/client';
+import type { DraftRequest } from '../api/draft';
 import { curriculumQuery } from '../api/programs';
 import { configQuery, createQueryClient } from '../api/queries';
 import type { Member } from '../api/queries';
 import { readyQuery } from '../api/ready';
+import stale from '../fixtures/draft/draft-409-stale.json';
+import unavailable from '../fixtures/draft/draft-409-unavailable.json';
+import unusable from '../fixtures/draft/draft-409-unusable.json';
 import ready from '../fixtures/programs/policies-cs-ms-standard-ready.json';
+import { draftFailureMessage } from '../models/planDraft';
 import { PLAN_PLACEHOLDER } from '../models/programFormat';
 import { PLAN_LINK_NOTICES, programNotFound } from '../models/programLinks';
 import { apiError, asked, held, json } from '../test/fakeApi';
 import type { Call } from '../test/fakeApi';
 import { SEEDED_READY, seededQueryClient } from '../test/withApi';
-import { CHECKING_LINK, PLAN_REVISED_LINE } from './ProgramsRoute';
 import {
+  CHECKING_LINK,
+  PLAN_REFUSED_LINE,
+  PLAN_REVISED_LINE,
+} from './ProgramsRoute';
+import {
+  ALIGN,
   CS,
   STANDARD,
   choose,
   combobox,
   csBody,
+  draftAnswer,
+  draftChecks,
   page,
   revisions,
   stateOf,
@@ -502,4 +515,387 @@ it('the program’s earlier choice does not stand in for the plan a link shares'
     expect(linkNotice()).toHaveTextContent(PLAN_LINK_NOTICES.missing),
   );
   expect(combobox(PLAN)).toHaveTextContent(PLAN_PLACEHOLDER);
+});
+
+// The course draft under a checked plan (R4b's PlanDraft, its answers from the API's check).
+const BRIDGE_PLAN =
+  'boston · Catalog 2026-2027 · Bridge · 共同部分／未限定 concentration';
+const count = (n: number) => `已填 ${n}/20 门（不区分已修与打算修）`;
+const codes = () => screen.getByRole('textbox', { name: /^课号/ });
+const isDraft = (call: Call) =>
+  call.method === 'POST' && call.path.endsWith('/draft');
+const draftRegion = () =>
+  screen.queryByRole('region', { name: '我的选课草案（只在本次会话）' });
+const sentBodies = (calls: readonly Call[]) =>
+  draftChecks(calls).map((check) => check.body as DraftRequest);
+const nothingYet = (plan = STANDARD): DraftRequest => ({
+  plan_content_sha256: revisions[plan]!,
+  course_ids: [],
+});
+const moment = () =>
+  act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+async function add(text: string) {
+  await userEvent.type(codes(), text);
+  await userEvent.click(screen.getByRole('button', { name: '加入草案' }));
+}
+// cs-ms with its standard plan chosen, and the draft's first check answered.
+async function standardChosen() {
+  await opened();
+  await choose(PLAN, STANDARD_PLAN);
+  await screen.findByText(count(0));
+}
+
+it('choosing a checked plan checks its empty draft once, so the count and the rules are there from the start', async () => {
+  const api = world(policies);
+  page('/programs/cs-ms');
+  await standardChosen();
+  expect(draftChecks(api.calls)).toEqual([
+    { plan: STANDARD, body: nothingYet() },
+  ]);
+  expect(document.querySelector('[data-kind="tree"]')).not.toBeNull();
+});
+
+it('adding sends the draft and the words typed, removing sends the rest, and each answer is the draft from then on', async () => {
+  const api = world(policies);
+  page('/programs/cs-ms');
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  expect(await screen.findByText(count(2))).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: '移除 CS 5010' }));
+  expect(await screen.findByText(count(1))).toBeInTheDocument();
+  expect(sentBodies(api.calls)).toEqual([
+    nothingYet(),
+    { ...nothingYet(), input: 'CS 5010, CS 5800' },
+    { ...nothingYet(), course_ids: ['c-cs-5800'] },
+  ]);
+});
+
+it('a course in the draft opens its page with its ID, and on the way back the draft is there, not checked again', async () => {
+  const api = world(policies);
+  page('/programs/cs-ms');
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  await screen.findByText(count(2));
+  await userEvent.click(
+    screen.getByRole('button', { name: 'CS 5010 · 课程页／年度先修' }),
+  );
+  expect(where()).toBe('/course/CS-5010');
+  expect(stateOf()).toEqual({ courseId: 'c-cs-5010' });
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  expect(await screen.findByText(count(2))).toBeInTheDocument();
+  expect(draftChecks(api.calls)).toHaveLength(2);
+});
+
+it('the last check counts: one answered after it is dropped', async () => {
+  const late = held();
+  const api = world((call) =>
+    isDraft(call) &&
+    (call.body as DraftRequest).course_ids.join() === 'c-cs-5800'
+      ? late.response
+      : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  await screen.findByText(count(2));
+  await userEvent.click(screen.getByRole('button', { name: '移除 CS 5010' }));
+  expect(await screen.findByText('正在核对课程…')).toBeInTheDocument();
+  // The answer before stays while the check is on its way, and its buttons work.
+  await userEvent.click(screen.getByRole('button', { name: '移除 CS 5800' }));
+  expect(await screen.findByText(count(0))).toBeInTheDocument();
+  late.answer(
+    json(draftAnswer(STANDARD, { ...nothingYet(), course_ids: ['c-cs-5800'] })),
+  );
+  await moment();
+  expect(screen.getByText(count(0))).toBeInTheDocument();
+  expect(sentBodies(api.calls).map((body) => body.course_ids)).toEqual([
+    [],
+    [],
+    ['c-cs-5800'],
+    [],
+  ]);
+  // The check it took the place of was stopped on its way.
+  expect(api.calls.filter(isDraft)[2]!.init.signal?.aborted).toBe(true);
+});
+
+it('under another plan the answer before goes at once, and the same courses are checked there', async () => {
+  const align = held();
+  const api = world((call) =>
+    isDraft(call) && call.path.includes(ALIGN)
+      ? align.response
+      : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  await screen.findByText(count(2));
+  await choose(PLAN, ALIGN_PLAN);
+  expect(await screen.findByText('正在核对课程…')).toBeInTheDocument();
+  expect(screen.queryByText(count(2))).not.toBeInTheDocument();
+  const last = draftChecks(api.calls).at(-1)!;
+  expect(last).toEqual({
+    plan: ALIGN,
+    body: {
+      plan_content_sha256: revisions[ALIGN],
+      course_ids: ['c-cs-5010', 'c-cs-5800'],
+    },
+  });
+  align.answer(json(draftAnswer(ALIGN, last.body as DraftRequest)));
+  expect(await screen.findByText(count(2))).toBeInTheDocument();
+});
+
+it('清空草案 takes the draft and its answer at once, then checks the empty draft', async () => {
+  const later = held();
+  let clearing = false;
+  const api = world((call) =>
+    isDraft(call) && clearing ? later.response : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  await screen.findByText(count(2));
+  clearing = true;
+  await userEvent.click(screen.getByRole('button', { name: '清空草案' }));
+  expect(screen.queryByText(count(2))).not.toBeInTheDocument();
+  expect(screen.getByText('正在核对课程…')).toBeInTheDocument();
+  expect(sentBodies(api.calls)).toHaveLength(3);
+  expect(sentBodies(api.calls).at(-1)).toEqual(nothingYet());
+  later.answer(json(draftAnswer(STANDARD, nothingYet())));
+  expect(await screen.findByText(count(0))).toBeInTheDocument();
+});
+
+it('a check that failed for a moment is sent again by 重新核对', async () => {
+  let failing = false;
+  const api = world((call) =>
+    isDraft(call) && failing ? down() : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  failing = true;
+  await add('CS 5010, CS 5800');
+  expect(await screen.findByText(/^无法核对草案。/)).toBeInTheDocument();
+  failing = false;
+  await userEvent.click(screen.getByRole('button', { name: '重新核对' }));
+  expect(await screen.findByText(count(2))).toBeInTheDocument();
+  const [, failed, again] = sentBodies(api.calls);
+  expect(failed).toEqual({ ...nothingYet(), input: 'CS 5010, CS 5800' });
+  expect(again).toEqual(failed);
+});
+
+it('a plan the check finds stale goes, focus goes to the plan selector, and plans read again that changed say so', async () => {
+  let refused = false;
+  const api = world((call) => {
+    if (isDraft(call) && refused) return json(stale.body, 409);
+    if (call.path === CURRICULUM && refused)
+      return json(csBody({ ...revisions, [STANDARD]: 'f'.repeat(64) }));
+    return policies(call);
+  });
+  page('/programs/cs-ms');
+  await standardChosen();
+  refused = true;
+  // Focus is on 加入草案, inside the draft that goes.
+  await add('CS 5010');
+  await waitFor(() => expect(combobox(PLAN)).toHaveFocus());
+  expect(combobox(PLAN)).toHaveTextContent(PLAN_PLACEHOLDER);
+  expect(draftRegion()).toBeNull();
+  expect(await screen.findAllByText(PLAN_REVISED_LINE)).toHaveLength(2);
+  expect(screen.queryByText(PLAN_REFUSED_LINE)).not.toBeInTheDocument();
+  expect(api.count('GET', CURRICULUM)).toBe(2);
+});
+
+it('a plan the check refuses in plans that did not change goes, the page says why in R4b’s words, and the draft keeps its courses', async () => {
+  let refused = false;
+  const api = world((call) =>
+    isDraft(call) && refused ? json(unusable.body, 409) : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  await screen.findByText(count(2));
+  refused = true;
+  await userEvent.clear(codes());
+  await add('CS 6140');
+  await waitFor(() =>
+    expect(screen.getByRole('status', { name: '方案更新' })).toHaveTextContent(
+      PLAN_REFUSED_LINE,
+    ),
+  );
+  expect(combobox(PLAN)).toHaveTextContent(PLAN_PLACEHOLDER);
+  expect(screen.queryByText(PLAN_REVISED_LINE)).not.toBeInTheDocument();
+  expect(api.count('GET', CURRICULUM)).toBe(2);
+  refused = false;
+  await choose(PLAN, ALIGN_PLAN);
+  expect(await screen.findByText(count(2))).toBeInTheDocument();
+  expect(draftChecks(api.calls).at(-1)).toEqual({
+    plan: ALIGN,
+    body: {
+      plan_content_sha256: revisions[ALIGN],
+      course_ids: ['c-cs-5010', 'c-cs-5800'],
+    },
+  });
+  expect(screen.queryByText(PLAN_REFUSED_LINE)).not.toBeInTheDocument();
+});
+
+it('a plan list that changed while focus was in the plan’s block hands focus to the plan selector', async () => {
+  let changed = false;
+  world((call) =>
+    call.path === CURRICULUM && changed
+      ? json(csBody({ ...revisions, [STANDARD]: 'f'.repeat(64) }))
+      : policies(call),
+  );
+  const { client } = page('/programs/cs-ms');
+  await standardChosen();
+  // In the block of the plan, which goes with the draft, not in the draft.
+  act(() => screen.getByRole('link', { name: '官方目录来源' }).focus());
+  changed = true;
+  await act(() =>
+    client.invalidateQueries({
+      queryKey: curriculumQuery(CS).queryKey,
+      exact: true,
+    }),
+  );
+  await waitFor(() => expect(draftRegion()).toBeNull());
+  expect(combobox(PLAN)).toHaveFocus();
+});
+
+it('a plan list that changed while nothing had focus gives focus to nothing, the plan selector included', async () => {
+  let changed = false;
+  world((call) =>
+    call.path === CURRICULUM && changed
+      ? json(csBody({ ...revisions, [STANDARD]: 'f'.repeat(64) }))
+      : policies(call),
+  );
+  const { client } = page('/programs/cs-ms');
+  await standardChosen();
+  act(() => (document.activeElement as HTMLElement).blur());
+  expect(document.activeElement).toBe(document.body);
+  changed = true;
+  await act(() =>
+    client.invalidateQueries({
+      queryKey: curriculumQuery(CS).queryKey,
+      exact: true,
+    }),
+  );
+  await waitFor(() => expect(draftRegion()).toBeNull());
+  expect(document.activeElement).toBe(document.body);
+});
+
+it('a keyboard logout with the draft open leaves focus on the login button the account box gives it', async () => {
+  const logout = held();
+  world((call) =>
+    call.path === '/auth/logout' ? logout.response : policies(call),
+  );
+  page('/programs/cs-ms', seededQueryClient({ viewer: member }));
+  await standardChosen();
+  screen.getAllByRole('button', { name: '退出登录' })[0]!.focus();
+  await userEvent.keyboard('{Enter}');
+  await waitFor(() =>
+    expect(
+      screen.getAllByRole('button', { name: '正在退出…' })[0],
+    ).toBeDisabled(),
+  );
+  // A browser moves focus off the disabled button to the page; jsdom does not (session.test.tsx).
+  document.body.tabIndex = -1;
+  document.body.focus();
+  document.body.removeAttribute('tabindex');
+  logout.answer(new Response(null, { status: 204 }));
+  await waitFor(() => expect(draftRegion()).toBeNull());
+  expect(
+    screen.getAllByRole('button', { name: '用 NEU 邮箱登录' })[0],
+  ).toHaveFocus();
+});
+
+it('the sentence for a refused plan is R4b’s for each of the four reasons', () => {
+  for (const reason of ['missing', 'stale', 'draft', 'unusable'])
+    expect(draftFailureMessage(new ApiError(409, { reason }))).toBe(
+      PLAN_REFUSED_LINE,
+    );
+});
+
+it('a plan that cannot be checked for now keeps the choice, and the draft offers 重新核对', async () => {
+  let refused = false;
+  world((call) =>
+    isDraft(call) && refused ? json(unavailable.body, 409) : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  refused = true;
+  await add('CS 5010');
+  expect(
+    await screen.findByText(
+      '暂时无法核对所选方案，草案没有计算；请稍后重新核对。',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '重新核对' })).toBeInTheDocument();
+  expect(combobox(PLAN)).toHaveTextContent(STANDARD_PLAN);
+});
+
+it('a logout empties the draft and what was typed', async () => {
+  const api = world((call) =>
+    call.path === '/auth/logout'
+      ? new Response(null, { status: 204 })
+      : policies(call),
+  );
+  page('/programs/cs-ms', seededQueryClient({ viewer: member }));
+  await standardChosen();
+  await add('CS 5010, CS 5800');
+  await screen.findByText(count(2));
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '退出登录' })[0]!,
+  );
+  await waitFor(() =>
+    expect(combobox(PLAN)).toHaveTextContent(PLAN_PLACEHOLDER),
+  );
+  await choose(PLAN, STANDARD_PLAN);
+  expect(await screen.findByText(count(0))).toBeInTheDocument();
+  expect(codes()).toHaveValue('');
+  expect(sentBodies(api.calls).at(-1)).toEqual(nothingYet());
+});
+
+it.each([
+  ['not checked against its sources', BRIDGE_PLAN, csBody()],
+  [
+    'whose content version the page does not know',
+    STANDARD_PLAN,
+    csBody(
+      Object.fromEntries(
+        Object.entries(revisions).filter(([id]) => id !== STANDARD),
+      ),
+    ),
+  ],
+])(
+  'a plan %s has no draft, and no check is asked for',
+  async (_name, label, answer) => {
+    const api = world((call) =>
+      call.path === CURRICULUM ? json(answer) : policies(call),
+    );
+    page('/programs/cs-ms');
+    await opened();
+    await choose(PLAN, label);
+    await moment();
+    expect(draftRegion()).toBeNull();
+    expect(draftChecks(api.calls)).toEqual([]);
+  },
+);
+
+// React gives focus back after an update to the element that had it before, so where focus ends up shows nothing; a
+// moment of focus on the plan selector or the curriculum would still blur the button, so that is watched too.
+it('after 刷新方案及政策证据 the draft is checked again under the plan chosen again; focus stays on the button, not even for a moment elsewhere', async () => {
+  const api = world(policies);
+  page('/programs/cs-ms');
+  await standardChosen();
+  const refresh = screen.getByRole('button', { name: '刷新方案及政策证据' });
+  const refreshBlurred = vi.fn();
+  refresh.addEventListener('blur', refreshBlurred);
+  await userEvent.click(refresh);
+  // The draft went with the choice, but focus was not in it.
+  expect(draftRegion()).toBeNull();
+  expect(refresh).toHaveFocus();
+  expect(refreshBlurred).not.toHaveBeenCalled();
+  await waitFor(() => expect(api.count('GET', CURRICULUM)).toBe(2));
+  expect(refresh).toHaveFocus();
+  expect(await opened()).toHaveTextContent(PLAN_PLACEHOLDER);
+  await choose(PLAN, STANDARD_PLAN);
+  expect(await screen.findByText(count(0))).toBeInTheDocument();
+  expect(draftChecks(api.calls)).toHaveLength(2);
 });

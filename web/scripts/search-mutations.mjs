@@ -1,13 +1,17 @@
 import { createHash } from 'node:crypto';
 import {
   cpSync,
+  existsSync,
+  lstatSync,
   readFileSync,
   writeFileSync,
   readdirSync,
   mkdirSync,
   mkdtempSync,
+  rmSync,
   symlinkSync,
   realpathSync,
+  unlinkSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -54,6 +58,18 @@ mkdirSync(output, { recursive: true });
 const snapshot = mkdtempSync(
   join(realpathSync.native(tmpdir()), 'neu-search-'),
 );
+// The copy goes when the process exits, a failed baseline or a bad anchor included. Its junction goes first, so removing
+// it cannot reach the node_modules behind it; if it cannot be removed, the copy stays. There is no signal handler: the
+// run is synchronous, so one would only run after the last mutant, and Ctrl+C would no longer stop the run (R4c, as in
+// draft-mutations.mjs).
+process.on('exit', () => {
+  const link = join(snapshot, 'node_modules');
+  if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
+    unlinkSync(link);
+  if (existsSync(link))
+    console.error('Copy kept, the link is still there: ' + snapshot);
+  else rmSync(snapshot, { recursive: true, force: true });
+});
 cpSync(join(root, 'src'), join(snapshot, 'src'), { recursive: true });
 for (const file of config) {
   mkdirSync(dirname(join(snapshot, file)), { recursive: true });
@@ -274,7 +290,13 @@ const cases = [
     id: 'S22',
     label: 'unmount aborts stream',
     file: 'src/features/search-answer/useConversation.ts',
-    changes: [['owner.current?.abort();', '']],
+    // R3e's reset() aborts too, so the anchor is the unmount cleanup's own (R4c).
+    changes: [
+      [
+        'mounted.current = false;\n      owner.current?.abort();',
+        'mounted.current = false;',
+      ],
+    ],
     test: 'src/features/search-answer/useConversation.test.tsx',
     expected: 'hook aborts on unmount',
   },
