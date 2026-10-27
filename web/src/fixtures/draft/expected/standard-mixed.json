@@ -1,0 +1,203 @@
+{
+  "name": "standard-mixed",
+  "notes": "A pool, the breadth group with unknown credits, and a course the plan does not name.",
+  "props": {
+    "plan": {
+      "fixture": "plans-cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-standard"
+    },
+    "planContentSha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "answer": "draft-standard-mixed",
+    "status": "idle",
+    "failure": null
+  },
+  "visible": [
+    {
+      "kind": "heading",
+      "text": "我的选课草案（只在本次会话）"
+    },
+    {
+      "kind": "note",
+      "text": "填写修过或打算修的课，只按填写课号解释已记录规则；不看成绩、免修、审批或开课学期，不判断能否注册或毕业。"
+    },
+    {
+      "kind": "note",
+      "text": "仅本次会话保存；刷新为新会话、登出或换账号后清空，不写数据库、不分享清单，也不交给聊天。"
+    },
+    {
+      "kind": "note",
+      "text": "学分按核对时的课程记录，不确认具体班次或个人学位计入。"
+    },
+    {
+      "kind": "button",
+      "text": "清空草案",
+      "action": "clear"
+    },
+    {
+      "kind": "textarea",
+      "label": "课号（逗号、空格或换行分开，例如 CS 5010, CS 5800）",
+      "max_length": 4000
+    },
+    {
+      "kind": "button",
+      "text": "加入草案",
+      "action": "add",
+      "disabled": false
+    },
+    {
+      "kind": "count",
+      "text": "已填 7/20 门（不区分已修与打算修）"
+    },
+    {
+      "kind": "course",
+      "text": "CS 5010 · Programming Design Paradigm · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "CS 5010 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-cs-5010"
+    },
+    {
+      "kind": "button",
+      "text": "移除 CS 5010",
+      "action": "remove",
+      "course_id": "c-cs-5010"
+    },
+    {
+      "kind": "course",
+      "text": "CS 5800 · Algorithms · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "CS 5800 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-cs-5800"
+    },
+    {
+      "kind": "button",
+      "text": "移除 CS 5800",
+      "action": "remove",
+      "course_id": "c-cs-5800"
+    },
+    {
+      "kind": "course",
+      "text": "CS 6140 · Machine Learning · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "CS 6140 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-cs-6140"
+    },
+    {
+      "kind": "button",
+      "text": "移除 CS 6140",
+      "action": "remove",
+      "course_id": "c-cs-6140"
+    },
+    {
+      "kind": "course",
+      "text": "CS 5200 · Database Management Systems · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "CS 5200 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-cs-5200"
+    },
+    {
+      "kind": "button",
+      "text": "移除 CS 5200",
+      "action": "remove",
+      "course_id": "c-cs-5200"
+    },
+    {
+      "kind": "course",
+      "text": "DS 5110 · Essentials of Data Science · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "DS 5110 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-ds-5110"
+    },
+    {
+      "kind": "button",
+      "text": "移除 DS 5110",
+      "action": "remove",
+      "course_id": "c-ds-5110"
+    },
+    {
+      "kind": "course",
+      "text": "CS 5100 · Foundations of Artificial Intelligence · 学分未知"
+    },
+    {
+      "kind": "button",
+      "text": "CS 5100 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-cs-5100"
+    },
+    {
+      "kind": "button",
+      "text": "移除 CS 5100",
+      "action": "remove",
+      "course_id": "c-cs-5100"
+    },
+    {
+      "kind": "course",
+      "text": "EECE 5644 · Introduction to Machine Learning and Pattern Recognition · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "EECE 5644 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-eece-5644"
+    },
+    {
+      "kind": "button",
+      "text": "移除 EECE 5644",
+      "action": "remove",
+      "course_id": "c-eece-5644"
+    },
+    {
+      "kind": "summary",
+      "text": "按记录到的规则：1 组满足、0 组还缺、1 组不确定。"
+    },
+    {
+      "kind": "note",
+      "text": "这个方案只记录了部分规则；上述统计不是个人学位或注册审核。"
+    },
+    {
+      "kind": "tree",
+      "lines": [
+        "不确定 — 全部分支（AND） Synthetic core and electives",
+        "  按填写计入：CS 5010、CS 5800、CS 6140",
+        "  可能计入／学分未知：CS 5200、DS 5110、CS 5100",
+        "  按你填的满足 — Programming design core (synthetic)",
+        "    按填写计入：CS 5010",
+        "  按你填的满足 — Algorithms core (synthetic)",
+        "    按填写计入：CS 5800",
+        "  按你填的满足 — 组选（非全部必修） Synthetic elective pool",
+        "    按填写计入：CS 6140、CS 5200",
+        "  不确定 — 组选（非全部必修） Synthetic breadth",
+        "    可能计入／学分未知：CS 5200、DS 5110、CS 5100",
+        "    原因：按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+        "    原因：学分未知：CS 5100",
+        "    原因：范围内可能计入：DS 5110、CS 5100；是否能算，要项目确认。",
+        "    原因：CS 5200 已算进『Synthetic elective pool』；能不能同时算这一组，要项目确认。",
+        "    原因：CS 5010 在这一组被明确排除，不算。",
+        "  不确定 — Further rules not modeled yet (synthetic)",
+        "    原因：方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+      ]
+    },
+    {
+      "kind": "unplaced",
+      "text": "方案里没有写到：EECE 5644"
+    },
+    {
+      "kind": "note",
+      "text": "方案里没有写到这门课；不代表不能算，也不代表能算，请向项目核实。"
+    }
+  ]
+}

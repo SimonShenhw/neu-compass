@@ -1,0 +1,152 @@
+{
+  "case": "draft-align-mixed",
+  "notes": "The align plan with both area courses and the thesis.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-align/draft",
+    "body": {
+      "plan_content_sha256": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+      "course_ids": [
+        "c-cs-5200",
+        "c-cs-6140"
+      ],
+      "input": "CS 7990"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+    "courses": [
+      {
+        "course_id": "c-cs-5200",
+        "code": "CS 5200",
+        "name": "Database Management Systems",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-6140",
+        "code": "CS 6140",
+        "name": "Machine Learning",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-7990",
+        "code": "CS 7990",
+        "name": "Thesis",
+        "credits": null
+      }
+    ],
+    "added": [
+      "CS 7990"
+    ],
+    "notices": [],
+    "result": {
+      "root": {
+        "kind": "any_of",
+        "label": "Synthetic align options",
+        "status": "unknown",
+        "reasons": [
+          "只按已记录规则计算，不作个人学位或注册审核。"
+        ],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5200",
+          "CS 6140"
+        ],
+        "possible": [],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Algorithms option (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5800"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Synthetic thesis branch",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：Only for students who choose the thesis option (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Thesis (synthetic)",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [
+                  "CS 7990"
+                ],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic area electives",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5200",
+              "CS 6140"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 0,
+              "areas": 0
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "A program GPA of at least 3.0 (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：A program GPA of at least 3.0 (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 0,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

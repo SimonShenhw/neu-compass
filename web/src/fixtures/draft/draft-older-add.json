@@ -1,0 +1,55 @@
+{
+  "case": "draft-older-add",
+  "notes": "The 2025-2026 edition (one course).",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2025-2026-standard/draft",
+    "body": {
+      "plan_content_sha256": "8d769db5672591d0980041ff4f77764b0a1ab3b9b9c24ee650e1c675438acf71",
+      "course_ids": [],
+      "input": "CS 5800"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "8d769db5672591d0980041ff4f77764b0a1ab3b9b9c24ee650e1c675438acf71",
+    "courses": [
+      {
+        "course_id": "c-cs-5800",
+        "code": "CS 5800",
+        "name": "Algorithms",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "CS 5800"
+    ],
+    "notices": [],
+    "result": {
+      "root": {
+        "kind": "course",
+        "label": "Algorithms (synthetic)",
+        "status": "unknown",
+        "reasons": [
+          "这个方案只记录了部分规则。"
+        ],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5800"
+        ],
+        "possible": [],
+        "missing": [],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": []
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 0,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

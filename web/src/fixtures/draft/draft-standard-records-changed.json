@@ -1,0 +1,180 @@
+{
+  "case": "draft-standard-records-changed",
+  "notes": "The sent draft meets a course whose record is gone, one the draft cannot hold and two records now under one code.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [
+        "c-cs-5010",
+        "c-gone-1",
+        "c-lng-6000",
+        "c-cs-5010-copy",
+        "c-cs-5200"
+      ]
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5010",
+        "code": "CS 5010",
+        "name": "Programming Design Paradigm",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5200",
+        "code": "CS 5200",
+        "name": "Database Management Systems",
+        "credits": 4
+      }
+    ],
+    "added": [],
+    "notices": [
+      {
+        "kind": "course_gone",
+        "level": "warning",
+        "text": "草案里有 1 门课在课程记录里找不到了，已从草案移除。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_record",
+        "level": "warning",
+        "text": "草案里的 LNG 6000 课程身份或字段无效，已从草案移除。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "duplicate_code",
+        "level": "warning",
+        "text": "草案里有两门课现在是同一个课号 CS 5010，只保留一门。",
+        "candidates": [],
+        "candidates_omitted": 0
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5010",
+          "CS 5200"
+        ],
+        "possible": [
+          "CS 5200"
+        ],
+        "missing": [
+          "CS 5800",
+          "Synthetic elective pool（还差 1 门）",
+          "Synthetic breadth（按已知确定学分距目标差 8 学分）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5010"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5800"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "missing",
+            "reasons": [
+              "还差 1 门（含可能候选的门数上限）。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5200"
+            ],
+            "possible": [],
+            "missing": [
+              "CS 6140",
+              "CS 6220"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 1
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+              "CS 5200 已算进『Synthetic elective pool』；能不能同时算这一组，要项目确认。",
+              "CS 5010 在这一组被明确排除，不算。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [
+              "CS 5200"
+            ],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

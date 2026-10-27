@@ -1,0 +1,156 @@
+{
+  "case": "draft-standard-nothing-new",
+  "notes": "A renumbered code for a course already in the draft.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [
+        "c-cs-5800"
+      ],
+      "input": "CS 5810"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5800",
+        "code": "CS 5800",
+        "name": "Algorithms",
+        "credits": 4
+      }
+    ],
+    "added": [],
+    "notices": [
+      {
+        "kind": "primary_code",
+        "level": "warning",
+        "text": "输入的 CS 5810 对应主课号 CS 5800，按 CS 5800 核对；方案按哪个课号算，请向项目核实。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "nothing_new",
+        "level": "info",
+        "text": "没有新增课程；重复课号不会重复加入。",
+        "candidates": [],
+        "candidates_omitted": 0
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5800"
+        ],
+        "possible": [],
+        "missing": [
+          "CS 5010",
+          "Synthetic elective pool（还差 2 门）",
+          "Synthetic breadth（按已知确定学分距目标差 8 学分）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5010"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "missing",
+            "reasons": [
+              "还差 2 门（含可能候选的门数上限）。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 6140",
+              "CS 5200",
+              "CS 6220"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 2
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

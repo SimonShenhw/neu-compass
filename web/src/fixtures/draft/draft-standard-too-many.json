@@ -1,0 +1,139 @@
+{
+  "case": "draft-standard-too-many",
+  "notes": "21 codes in one input: nothing added, nothing checked.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [],
+      "input": "ZZ 7001 ZZ 7002 ZZ 7003 ZZ 7004 ZZ 7005 ZZ 7006 ZZ 7007 ZZ 7008 ZZ 7009 ZZ 7010 ZZ 7011 ZZ 7012 ZZ 7013 ZZ 7014 ZZ 7015 ZZ 7016 ZZ 7017 ZZ 7018 ZZ 7019 ZZ 7020 ZZ 7021"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [],
+    "added": [],
+    "notices": [
+      {
+        "kind": "too_many_codes",
+        "level": "warning",
+        "text": "一次最多填写 20 门；本次没有加入课程。",
+        "candidates": [],
+        "candidates_omitted": 0
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [],
+        "possible": [],
+        "missing": [
+          "CS 5010",
+          "CS 5800",
+          "Synthetic elective pool（还差 2 门）",
+          "Synthetic breadth（按已知确定学分距目标差 8 学分）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5010"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5800"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "missing",
+            "reasons": [
+              "还差 2 门（含可能候选的门数上限）。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 6140",
+              "CS 5200",
+              "CS 6220"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 2
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

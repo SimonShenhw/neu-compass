@@ -16,6 +16,7 @@ import { NotFound } from './pages/NotFound';
 
 const SearchDemoPage = lazy(() => import('./pages/SearchDemoPage'));
 const ProgramsDemoPage = lazy(() => import('./pages/ProgramsDemoPage'));
+const PlanDraftDemoPage = lazy(() => import('./pages/PlanDraftDemoPage'));
 const OfflineDemoShell = lazy(() => import('./features/demo/OfflineDemoShell'));
 const SearchLandingDemoPage = lazy(
   () => import('./pages/SearchLandingDemoPage'),
@@ -36,6 +37,14 @@ export function App() {
           element={
             <Suspense fallback={<p role="status">正在加载培养方案演示…</p>}>
               <ProgramsDemoPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/programs-draft-demo"
+          element={
+            <Suspense fallback={<p role="status">正在加载选课草案演示…</p>}>
+              <PlanDraftDemoPage />
             </Suspense>
           }
         />

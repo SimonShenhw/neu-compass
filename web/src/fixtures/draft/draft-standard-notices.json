@@ -1,0 +1,241 @@
+{
+  "case": "draft-standard-notices",
+  "notes": "One input that meets every per-code notice: a badly formatted token, an unknown code, an ambiguous ref (12 candidates), a cross-listed pair, a renumbered code and a record the draft cannot hold.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [],
+      "input": "Q1 CS 9999 CS 6999 CS 7140 EECE 7397 CS 5810 LNG 6000"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-7140",
+        "code": "CS 7140",
+        "name": "Advanced Machine Learning",
+        "credits": 4
+      },
+      {
+        "course_id": "c-cs-5800",
+        "code": "CS 5800",
+        "name": "Algorithms",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "CS 7140",
+      "CS 5800"
+    ],
+    "notices": [
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q1",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "not_found",
+        "level": "warning",
+        "text": "没有找到 CS 9999；未加入。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "ambiguous",
+        "level": "warning",
+        "text": "对上多门，未加入；请核对完整课号：CS 6999",
+        "candidates": [
+          {
+            "code": "CS 6901",
+            "name": "Special Topics (synthetic) 01"
+          },
+          {
+            "code": "CS 6902",
+            "name": "Special Topics (synthetic) 02"
+          },
+          {
+            "code": "CS 6903",
+            "name": "Special Topics (synthetic) 03"
+          },
+          {
+            "code": "CS 6904",
+            "name": "Special Topics (synthetic) 04"
+          },
+          {
+            "code": "CS 6905",
+            "name": "Special Topics (synthetic) 05"
+          },
+          {
+            "code": "CS 6906",
+            "name": "Special Topics (synthetic) 06"
+          },
+          {
+            "code": "CS 6907",
+            "name": "Special Topics (synthetic) 07"
+          },
+          {
+            "code": "CS 6908",
+            "name": "Special Topics (synthetic) 08"
+          },
+          {
+            "code": "CS 6909",
+            "name": "Special Topics (synthetic) 09"
+          },
+          {
+            "code": "CS 6910",
+            "name": "Special Topics (synthetic) 10"
+          }
+        ],
+        "candidates_omitted": 2
+      },
+      {
+        "kind": "also_matches",
+        "level": "warning",
+        "text": "按输入主课号核对 CS 7140；同一引用也匹配 EECE 7397（可能交叉列出）；方案按哪个课号算，请向项目核实。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "cross_listed_twin",
+        "level": "warning",
+        "text": "EECE 7397 和 CS 7140 可能是同一门交叉列出的课，只按 CS 7140 计入；如果是两门不同的课，请向项目核实。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "primary_code",
+        "level": "warning",
+        "text": "输入的 CS 5810 对应主课号 CS 5800，按 CS 5800 核对；方案按哪个课号算，请向项目核实。",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_record",
+        "level": "warning",
+        "text": "LNG 6000 返回的课程身份或字段无效，未加入。",
+        "candidates": [],
+        "candidates_omitted": 0
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5800"
+        ],
+        "possible": [],
+        "missing": [
+          "CS 5010",
+          "Synthetic elective pool（还差 2 门）",
+          "Synthetic breadth（按已知确定学分距目标差 8 学分）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5010"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5800"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "missing",
+            "reasons": [
+              "还差 2 门（含可能候选的门数上限）。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 6140",
+              "CS 5200",
+              "CS 6220"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 2
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [
+        "CS 7140"
+      ],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

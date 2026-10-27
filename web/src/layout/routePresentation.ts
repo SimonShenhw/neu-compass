@@ -15,6 +15,7 @@ const pages = [
   { path: '/search-demo', title: '搜索回答演示' },
   { path: '/search-landing-demo', title: '搜索落地演示' },
   { path: '/programs-demo', title: '培养方案演示' },
+  { path: '/programs-draft-demo', title: '选课草案演示' },
 ];
 
 export function pagePresentation(pathname: string) {

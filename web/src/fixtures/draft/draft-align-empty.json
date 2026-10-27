@@ -1,0 +1,126 @@
+{
+  "case": "draft-align-empty",
+  "notes": "The align plan (an OR with an optional branch, areas and a condition), nothing in the draft.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-align/draft",
+    "body": {
+      "plan_content_sha256": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+      "course_ids": []
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "ee94cf9b6d017da2ab494585d62dd3a6d6be952d696e991503503ae96533e786",
+    "courses": [],
+    "added": [],
+    "notices": [],
+    "result": {
+      "root": {
+        "kind": "any_of",
+        "label": "Synthetic align options",
+        "status": "unknown",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [],
+        "possible": [],
+        "missing": [
+          "Algorithms option (synthetic)（CS 5800）",
+          "Synthetic area electives（还差 2 门；还差 2 个领域）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Algorithms option (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5800"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "optional",
+            "label": "Synthetic thesis branch",
+            "status": "not_evaluated",
+            "reasons": [
+              "可选分支，不自动判断：Only for students who choose the thesis option (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": [
+              {
+                "kind": "course",
+                "label": "Thesis (synthetic)",
+                "status": null,
+                "reasons": [],
+                "reasons_omitted": 0,
+                "counted": [],
+                "possible": [],
+                "missing": [],
+                "missing_omitted": 0,
+                "shortfall": {},
+                "children": []
+              }
+            ]
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic area electives",
+            "status": "missing",
+            "reasons": [
+              "还差 2 门（含可能候选的门数上限）。",
+              "还差 2 个领域。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5200",
+              "CS 6140"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 2,
+              "areas": 2
+            },
+            "children": []
+          },
+          {
+            "kind": "condition",
+            "label": "A program GPA of at least 3.0 (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "文字条件，草案不判断：A program GPA of at least 3.0 (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 0,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

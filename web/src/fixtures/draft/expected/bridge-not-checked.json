@@ -1,0 +1,15 @@
+{
+  "name": "bridge-not-checked",
+  "notes": "A plan not checked against its sources: the component shows nothing.",
+  "props": {
+    "plan": {
+      "fixture": "plans-cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-bridge"
+    },
+    "planContentSha256": "974b3a8bb7d77e49c1e2933d78e2756d53097feeab8ac5c73c78b779de9376fd",
+    "answer": null,
+    "status": "idle",
+    "failure": null
+  },
+  "visible": []
+}
