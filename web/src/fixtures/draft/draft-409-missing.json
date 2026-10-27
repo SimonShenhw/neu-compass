@@ -1,0 +1,26 @@
+{
+  "case": "draft-409-missing",
+  "notes": "A plan ID the program does not have.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-gone/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": []
+    }
+  },
+  "status": 409,
+  "body": {
+    "detail": "The selected plan is not available.",
+    "error_type": "conflict",
+    "status_code": 409,
+    "reason": "missing"
+  },
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": "missing"
+  }
+}

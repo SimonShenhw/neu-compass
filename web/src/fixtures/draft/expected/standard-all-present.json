@@ -1,0 +1,100 @@
+{
+  "name": "standard-all-present",
+  "notes": "Codes already in the draft (an info line).",
+  "props": {
+    "plan": {
+      "fixture": "plans-cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-standard"
+    },
+    "planContentSha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "answer": "draft-standard-all-present",
+    "status": "idle",
+    "failure": null
+  },
+  "visible": [
+    {
+      "kind": "heading",
+      "text": "我的选课草案（只在本次会话）"
+    },
+    {
+      "kind": "note",
+      "text": "填写修过或打算修的课，只按填写课号解释已记录规则；不看成绩、免修、审批或开课学期，不判断能否注册或毕业。"
+    },
+    {
+      "kind": "note",
+      "text": "仅本次会话保存；刷新为新会话、登出或换账号后清空，不写数据库、不分享清单，也不交给聊天。"
+    },
+    {
+      "kind": "note",
+      "text": "学分按核对时的课程记录，不确认具体班次或个人学位计入。"
+    },
+    {
+      "kind": "button",
+      "text": "清空草案",
+      "action": "clear"
+    },
+    {
+      "kind": "textarea",
+      "label": "课号（逗号、空格或换行分开，例如 CS 5010, CS 5800）",
+      "max_length": 4000
+    },
+    {
+      "kind": "button",
+      "text": "加入草案",
+      "action": "add",
+      "disabled": false
+    },
+    {
+      "kind": "notice",
+      "level": "info",
+      "text": "这些课号已在草案里，不会重复加入。"
+    },
+    {
+      "kind": "count",
+      "text": "已填 1/20 门（不区分已修与打算修）"
+    },
+    {
+      "kind": "course",
+      "text": "CS 5800 · Algorithms · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "CS 5800 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-cs-5800"
+    },
+    {
+      "kind": "button",
+      "text": "移除 CS 5800",
+      "action": "remove",
+      "course_id": "c-cs-5800"
+    },
+    {
+      "kind": "summary",
+      "text": "按记录到的规则：0 组满足、2 组还缺、0 组不确定。"
+    },
+    {
+      "kind": "note",
+      "text": "这个方案只记录了部分规则；上述统计不是个人学位或注册审核。"
+    },
+    {
+      "kind": "tree",
+      "lines": [
+        "还缺 — 全部分支（AND） Synthetic core and electives",
+        "  按填写计入：CS 5800",
+        "  缺项候选：CS 5010、Synthetic elective pool（还差 2 门）、Synthetic breadth（按已知确定学分距目标差 8 学分）",
+        "  还缺 — Programming design core (synthetic)",
+        "    缺项候选：CS 5010",
+        "  按你填的满足 — Algorithms core (synthetic)",
+        "    按填写计入：CS 5800",
+        "  还缺 — 组选（非全部必修） Synthetic elective pool",
+        "    缺项候选：CS 6140、CS 5200、CS 6220",
+        "    原因：还差 2 门（含可能候选的门数上限）。",
+        "  还缺 — 组选（非全部必修） Synthetic breadth",
+        "    原因：按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+        "  不确定 — Further rules not modeled yet (synthetic)",
+        "    原因：方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+      ]
+    }
+  ]
+}

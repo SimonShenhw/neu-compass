@@ -1,0 +1,220 @@
+{
+  "case": "draft-standard-invalid-many",
+  "notes": "Twelve badly formatted tokens: ten by name, then a count; the valid code is added.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [],
+      "input": "Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8 Q9 Q10 Q11 Q12 CS 5010"
+    }
+  },
+  "status": 200,
+  "body": {
+    "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "courses": [
+      {
+        "course_id": "c-cs-5010",
+        "code": "CS 5010",
+        "name": "Programming Design Paradigm",
+        "credits": 4
+      }
+    ],
+    "added": [
+      "CS 5010"
+    ],
+    "notices": [
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q1",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q2",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q3",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q4",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q5",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q6",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q7",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q8",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q9",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format",
+        "level": "warning",
+        "text": "课号格式不正确，未加入：Q10",
+        "candidates": [],
+        "candidates_omitted": 0
+      },
+      {
+        "kind": "invalid_format_more",
+        "level": "warning",
+        "text": "另有 2 项格式不正确；未加入。",
+        "candidates": [],
+        "candidates_omitted": 0
+      }
+    ],
+    "result": {
+      "root": {
+        "kind": "all_of",
+        "label": "Synthetic core and electives",
+        "status": "missing",
+        "reasons": [],
+        "reasons_omitted": 0,
+        "counted": [
+          "CS 5010"
+        ],
+        "possible": [],
+        "missing": [
+          "CS 5800",
+          "Synthetic elective pool（还差 2 门）",
+          "Synthetic breadth（按已知确定学分距目标差 8 学分）"
+        ],
+        "missing_omitted": 0,
+        "shortfall": {},
+        "children": [
+          {
+            "kind": "course",
+            "label": "Programming design core (synthetic)",
+            "status": "met",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [
+              "CS 5010"
+            ],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "course",
+            "label": "Algorithms core (synthetic)",
+            "status": "missing",
+            "reasons": [],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 5800"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic elective pool",
+            "status": "missing",
+            "reasons": [
+              "还差 2 门（含可能候选的门数上限）。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [
+              "CS 6140",
+              "CS 5200",
+              "CS 6220"
+            ],
+            "missing_omitted": 0,
+            "shortfall": {
+              "courses": 2
+            },
+            "children": []
+          },
+          {
+            "kind": "select",
+            "label": "Synthetic breadth",
+            "status": "missing",
+            "reasons": [
+              "按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+              "CS 5010 在这一组被明确排除，不算。"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {
+              "credits": 8
+            },
+            "children": []
+          },
+          {
+            "kind": "unmodeled",
+            "label": "Further rules not modeled yet (synthetic)",
+            "status": "unknown",
+            "reasons": [
+              "方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+            ],
+            "reasons_omitted": 0,
+            "counted": [],
+            "possible": [],
+            "missing": [],
+            "missing_omitted": 0,
+            "shortfall": {},
+            "children": []
+          }
+        ]
+      },
+      "unplaced": [],
+      "summary_counts": {
+        "met": 0,
+        "missing": 2,
+        "unknown": 0
+      }
+    }
+  },
+  "failure": null
+}

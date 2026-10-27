@@ -1,0 +1,160 @@
+.draft {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.draft h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+.draft p,
+.draft ul {
+  margin: 0;
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--ink3);
+  white-space: pre-wrap;
+}
+.text {
+  white-space: pre-wrap;
+}
+.field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.field label {
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+.field textarea {
+  width: 100%;
+  min-width: var(--space-0);
+  min-height: var(--touch);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface);
+  resize: vertical;
+}
+.addRow,
+.failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.add[aria-disabled='true'],
+.retry[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.addRow [data-kind='status'] {
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+/* A live region that is always there: when it has nothing to say it takes no space in the layout. */
+.live:empty {
+  position: absolute;
+}
+.stack {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.alert {
+  padding: var(--space-3) var(--space-4);
+  background: var(--accent-soft);
+  border-left: var(--focus-width) solid var(--accent);
+  white-space: pre-wrap;
+  min-width: 0;
+}
+.failure .alert {
+  flex: 1 1 auto;
+}
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-width: 0;
+}
+.notice[data-level='warning'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.notice svg {
+  color: var(--accent);
+  margin-top: var(--space-1);
+}
+.noticeBody {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.noticeBody p,
+.candidates {
+  white-space: pre-wrap;
+}
+.candidates {
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+.courses {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+.course {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-width: 0;
+}
+.courseText {
+  white-space: pre-wrap;
+}
+.courseActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.courseActions button {
+  max-width: 100%;
+  text-align: start;
+}
+/* The demo's plan line above the draft (R4a's scopeLabel). */
+.scope {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--ink2);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.tree {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--canvas);
+  border: var(--border) solid var(--line);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}

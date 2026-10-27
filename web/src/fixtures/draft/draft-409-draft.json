@@ -1,0 +1,27 @@
+{
+  "case": "draft-409-draft",
+  "notes": "The bridge plan is not source-checked.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-bridge/draft",
+    "body": {
+      "plan_content_sha256": "974b3a8bb7d77e49c1e2933d78e2756d53097feeab8ac5c73c78b779de9376fd",
+      "course_ids": [],
+      "input": "CS 5010"
+    }
+  },
+  "status": 409,
+  "body": {
+    "detail": "The selected plan has not been checked against its sources.",
+    "error_type": "conflict",
+    "status_code": 409,
+    "reason": "draft"
+  },
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": "draft"
+  }
+}

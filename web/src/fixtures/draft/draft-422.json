@@ -1,0 +1,49 @@
+{
+  "case": "draft-422",
+  "notes": "21 course IDs: the body is out of bounds.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+      "course_ids": [
+        "c-zz-00",
+        "c-zz-01",
+        "c-zz-02",
+        "c-zz-03",
+        "c-zz-04",
+        "c-zz-05",
+        "c-zz-06",
+        "c-zz-07",
+        "c-zz-08",
+        "c-zz-09",
+        "c-zz-10",
+        "c-zz-11",
+        "c-zz-12",
+        "c-zz-13",
+        "c-zz-14",
+        "c-zz-15",
+        "c-zz-16",
+        "c-zz-17",
+        "c-zz-18",
+        "c-zz-19",
+        "c-zz-20"
+      ]
+    }
+  },
+  "status": 422,
+  "body": {
+    "detail": "course_ids: List should have at most 20 items after validation, not 21",
+    "error_type": "invalid_input",
+    "status_code": 422
+  },
+  "failure": {
+    "status": 422,
+    "errorType": "invalid_input",
+    "retryAfter": null,
+    "invalidFields": [
+      "course_ids"
+    ],
+    "reason": null
+  }
+}

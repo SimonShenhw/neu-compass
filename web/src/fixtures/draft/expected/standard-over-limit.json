@@ -1,0 +1,395 @@
+{
+  "name": "standard-over-limit",
+  "notes": "19 in the draft, two more typed.",
+  "props": {
+    "plan": {
+      "fixture": "plans-cs-ms",
+      "plan_id": "cs-ms-boston-2026-2027-standard"
+    },
+    "planContentSha256": "d99a2ba098fc258afcf26c976b827d57b711da6a83b1b0ee5ebf65861c7c5c7e",
+    "answer": "draft-standard-over-limit",
+    "status": "idle",
+    "failure": null
+  },
+  "visible": [
+    {
+      "kind": "heading",
+      "text": "我的选课草案（只在本次会话）"
+    },
+    {
+      "kind": "note",
+      "text": "填写修过或打算修的课，只按填写课号解释已记录规则；不看成绩、免修、审批或开课学期，不判断能否注册或毕业。"
+    },
+    {
+      "kind": "note",
+      "text": "仅本次会话保存；刷新为新会话、登出或换账号后清空，不写数据库、不分享清单，也不交给聊天。"
+    },
+    {
+      "kind": "note",
+      "text": "学分按核对时的课程记录，不确认具体班次或个人学位计入。"
+    },
+    {
+      "kind": "button",
+      "text": "清空草案",
+      "action": "clear"
+    },
+    {
+      "kind": "textarea",
+      "label": "课号（逗号、空格或换行分开，例如 CS 5010, CS 5800）",
+      "max_length": 4000
+    },
+    {
+      "kind": "button",
+      "text": "加入草案",
+      "action": "add",
+      "disabled": false
+    },
+    {
+      "kind": "notice",
+      "level": "warning",
+      "text": "草案最多 20 门，本次尚未核对；请从输入减少 1 门，或从草案移除至少 1 门。"
+    },
+    {
+      "kind": "count",
+      "text": "已填 19/20 门（不区分已修与打算修）"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7001 · Synthetic filler 00 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7001 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-00"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7001",
+      "action": "remove",
+      "course_id": "c-zz-00"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7002 · Synthetic filler 01 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7002 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-01"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7002",
+      "action": "remove",
+      "course_id": "c-zz-01"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7003 · Synthetic filler 02 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7003 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-02"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7003",
+      "action": "remove",
+      "course_id": "c-zz-02"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7004 · Synthetic filler 03 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7004 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-03"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7004",
+      "action": "remove",
+      "course_id": "c-zz-03"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7005 · Synthetic filler 04 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7005 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-04"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7005",
+      "action": "remove",
+      "course_id": "c-zz-04"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7006 · Synthetic filler 05 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7006 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-05"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7006",
+      "action": "remove",
+      "course_id": "c-zz-05"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7007 · Synthetic filler 06 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7007 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-06"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7007",
+      "action": "remove",
+      "course_id": "c-zz-06"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7008 · Synthetic filler 07 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7008 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-07"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7008",
+      "action": "remove",
+      "course_id": "c-zz-07"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7009 · Synthetic filler 08 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7009 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-08"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7009",
+      "action": "remove",
+      "course_id": "c-zz-08"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7010 · Synthetic filler 09 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7010 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-09"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7010",
+      "action": "remove",
+      "course_id": "c-zz-09"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7011 · Synthetic filler 10 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7011 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-10"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7011",
+      "action": "remove",
+      "course_id": "c-zz-10"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7012 · Synthetic filler 11 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7012 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-11"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7012",
+      "action": "remove",
+      "course_id": "c-zz-11"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7013 · Synthetic filler 12 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7013 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-12"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7013",
+      "action": "remove",
+      "course_id": "c-zz-12"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7014 · Synthetic filler 13 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7014 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-13"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7014",
+      "action": "remove",
+      "course_id": "c-zz-13"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7015 · Synthetic filler 14 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7015 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-14"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7015",
+      "action": "remove",
+      "course_id": "c-zz-14"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7016 · Synthetic filler 15 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7016 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-15"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7016",
+      "action": "remove",
+      "course_id": "c-zz-15"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7017 · Synthetic filler 16 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7017 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-16"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7017",
+      "action": "remove",
+      "course_id": "c-zz-16"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7018 · Synthetic filler 17 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7018 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-17"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7018",
+      "action": "remove",
+      "course_id": "c-zz-17"
+    },
+    {
+      "kind": "course",
+      "text": "ZZ 7019 · Synthetic filler 18 · 4 学分"
+    },
+    {
+      "kind": "button",
+      "text": "ZZ 7019 · 课程页／年度先修",
+      "action": "view",
+      "course_id": "c-zz-18"
+    },
+    {
+      "kind": "button",
+      "text": "移除 ZZ 7019",
+      "action": "remove",
+      "course_id": "c-zz-18"
+    },
+    {
+      "kind": "summary",
+      "text": "按记录到的规则：0 组满足、2 组还缺、0 组不确定。"
+    },
+    {
+      "kind": "note",
+      "text": "这个方案只记录了部分规则；上述统计不是个人学位或注册审核。"
+    },
+    {
+      "kind": "tree",
+      "lines": [
+        "还缺 — 全部分支（AND） Synthetic core and electives",
+        "  缺项候选：CS 5010、CS 5800、Synthetic elective pool（还差 2 门）、Synthetic breadth（按已知确定学分距目标差 8 学分）",
+        "  还缺 — Programming design core (synthetic)",
+        "    缺项候选：CS 5010",
+        "  还缺 — Algorithms core (synthetic)",
+        "    缺项候选：CS 5800",
+        "  还缺 — 组选（非全部必修） Synthetic elective pool",
+        "    缺项候选：CS 6140、CS 5200、CS 6220",
+        "    原因：还差 2 门（含可能候选的门数上限）。",
+        "  还缺 — 组选（非全部必修） Synthetic breadth",
+        "    原因：按已知确定学分距目标差 8 学分；不是确认还需补修的学分。",
+        "  不确定 — Further rules not modeled yet (synthetic)",
+        "    原因：方案里这部分没有建模：Further rules not modeled yet (synthetic)"
+      ]
+    },
+    {
+      "kind": "unplaced",
+      "text": "方案里没有写到：ZZ 7001、ZZ 7002、ZZ 7003、ZZ 7004、ZZ 7005、ZZ 7006、ZZ 7007、ZZ 7008、ZZ 7009、ZZ 7010、ZZ 7011、ZZ 7012、ZZ 7013、ZZ 7014、ZZ 7015、ZZ 7016、ZZ 7017、ZZ 7018、ZZ 7019"
+    },
+    {
+      "kind": "note",
+      "text": "方案里没有写到这门课；不代表不能算，也不代表能算，请向项目核实。"
+    }
+  ]
+}

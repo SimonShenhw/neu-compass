@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import type { Load } from '../../api/load';
 import { Button } from '../../components/Button';
 import { CourseCode } from '../../components/CourseCode';
@@ -36,6 +36,9 @@ export interface ProgramCurriculumProps {
   onBack: () => void;
   onRefresh: () => void;
   onViewCourse: (courseId: string) => void;
+  // R4b: the course draft for the selected plan, shown as given right after that plan's block (R4a spec 6.9);
+  // nothing when no plan is selected or none is passed.
+  draft?: ReactNode;
   ref?: Ref<HTMLElement>;
 }
 function CurriculumBody(props: ProgramCurriculumProps) {
@@ -140,6 +143,7 @@ function CurriculumBody(props: ProgramCurriculumProps) {
           />
         </section>
       )}
+      {plan && props.draft}
       <Line kind="note">
         以下是旧课程表的课程分类与学期建议，未经官方核验；校区/年度/路径未知。
       </Line>

@@ -1,0 +1,147 @@
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, it } from 'vitest';
+const expected = {
+  'draft-404.json':
+    '38fe60990c760f4621319021792ad40710ca56029b376b4f57ed79e0870381a1',
+  'draft-409-draft.json':
+    'f806d9670121e8666957b262b87b1985a2dcc3c818a271040afb6f0cdd362dc1',
+  'draft-409-missing.json':
+    'f64f2109d12c61747fef7c03bec45c818e7bb9b1d458f1cac017a568ff1de59b',
+  'draft-409-stale.json':
+    '1ac0601261d8be300e65658bccdadede37793dab0b925a3749ea3e5ea37bbd2e',
+  'draft-409-unavailable.json':
+    '8c1d40e1d267fa4680ec71db59be1033e3206efdb060c90afde2c35f05bebf8d',
+  'draft-409-unusable.json':
+    'a9d8e85d794333c6b7e5288fdcc78f9f95fdcc21ebabb8d6858d9eaa3175eac1',
+  'draft-422.json':
+    '5637d733869847d864828da3bd2240b5a7186210ac18c48e2c5585124e397933',
+  'draft-align-empty.json':
+    'beaf78c440aa2ea7b4b25e5bf18788265d3156132e04a8bd7b519cf280d1c75e',
+  'draft-align-mixed.json':
+    '0e91e048f97e919701fe89417848c16533c348b9d8b50f5c7963c18edbf92013',
+  'draft-ds-mixed.json':
+    '13968d60b62ad06ca92160360864884bff44e0bb6e344dc1c5a7300deb1c9f5d',
+  'draft-malformed.json':
+    'b5ae2b0b3544159b27505a88deaf7c1b546b30f12428c4b58c0bc79f83a1c3e4',
+  'draft-older-add.json':
+    'ebad741bc9582b07cbf62afba7c24d53e5c2b31f062506715c73b21c148ed435',
+  'draft-other-revision.json':
+    'dbd824b5192994b1d1952e9ca67556344ad9d12d1eb741c33283ea7d6ed4d60a',
+  'draft-standard-add.json':
+    '0e0aea07e60c1af9ebcd889265f713f98368f68d09987a0150c26d35ee108469',
+  'draft-standard-all-present.json':
+    '95d23cd181861916512c0863a4e9e98062160f5ecf021427ce968dd60bb4d68d',
+  'draft-standard-empty.json':
+    '545ab9dba05e20943721681550562e5a8cb356ceed2898b9fed92c5ea7dc773d',
+  'draft-standard-full.json':
+    'e8dcbaca5eea38826fab12bf5254df6170f1ff1960c54aafe6a432bc00b3c1fa',
+  'draft-standard-invalid-many.json':
+    'f998eba2bea2237a79eb4f0e324c94bd4d309800a1fa5f5ca843509adc61532a',
+  'draft-standard-mixed.json':
+    'f0ad7cabb46596d9cddb18e8cc97ac0ce2ab042f54e336024d3ab5b84d369b86',
+  'draft-standard-nothing-new.json':
+    'a292371a6e7179105bc3fdd25668ea3a01addaa62d251eb07635fa352ea08de2',
+  'draft-standard-notices.json':
+    '4c725758965e64d16ee642edd182653e6f29809a642625d21d1be3b7b000c0c1',
+  'draft-standard-over-limit.json':
+    'bb4ef66b1f83f15805b1c379f7c348508f79d0c3b25f866ac0ee5abd4b587acf',
+  'draft-standard-records-changed.json':
+    '3e24d66b3b80d146c97da9e755505cccc9f408277965308ddf8d4d8edbd6943f',
+  'draft-standard-text-input.json':
+    '2ffbc13d1946b11876fcfe9e423bcbf0985ba49eec3706f2a2e73efce0670db5',
+  'draft-standard-too-many.json':
+    '279e0e0def3ff616e9e1cccc515ea4d034fc58c04c67d523ba8d80f9d5d2bba0',
+  'draft-text-edge.json':
+    '2c85a3e3e38ea8e17bacb3289e82a4aac856725b05432e43f3928a02edf76e61',
+  'expected/align-empty.json':
+    '7a65ec22a17e41f1a44960729d203706d47affb5fc8d0d6c56643c7873f78868',
+  'expected/align-mixed.json':
+    '42dbd1ff79485b57c5df767ad68ccc25d37f6ad9f0003e685b2ec8e820fc04b1',
+  'expected/bridge-not-checked.json':
+    'e2de51964dc041436c2acc0a05419d2356d6c026ef7b36d47dbdd29c8ebdbb0e',
+  'expected/ds-mixed.json':
+    'ba84aa0393193213486f6ab639f515b458625789d9d36d9bdaa5dd09023d4e2c',
+  'expected/failure-vectors.json':
+    'ee08edbbcb6718b02382fdb2a0129a1276d361bd93fe60400a4e6e11838ed241',
+  'expected/older-add.json':
+    '0986b984ad5cfecef26269e497df8ace31821c5af0b1724a2dde0aa5ad8c2262',
+  'expected/standard-404.json':
+    '1899a76a2c2dd298eb27ca83a673aaa8ac3f35de55f97f0568279cca3b0274d4',
+  'expected/standard-409-unavailable.json':
+    'd860a762696d7cdb691b60370e4da3fc4a112552b596e98ccf5025dafa153830',
+  'expected/standard-422.json':
+    'fdcb7d1b0d074a8d15ee253618f0c470dbfb88fd7690a08124776840f209094e',
+  'expected/standard-429.json':
+    '9b46e0dcd4c6971734770568e9ba6311c66876497523a37ea2556c9f03ea1887',
+  'expected/standard-502-unreadable.json':
+    'c436a877d092cb1e6c7c3a36d94dbba7b9f23bff3b948137c499e5c49efbc081',
+  'expected/standard-503-transport.json':
+    'dca345c41d26ec2825df3d574e77df51a32eefce251120b0d29e932852d58c95',
+  'expected/standard-504-timeout.json':
+    '6ad1e4e75d40415af8e18a544cdce7d88df19274f3aec4195cc2d6f13e3466e3',
+  'expected/standard-add.json':
+    'f2adbc0c8f472598c10dba8d68a9dc194f5608275ea893315753c7e855ee302b',
+  'expected/standard-all-present.json':
+    'a693d8dbf60f426da35f0d29a62c4447087483cc6ed9a84120ae00664331670b',
+  'expected/standard-checking-again.json':
+    '103dc83a99bead925af8a5577a9083c1738ee4f3ea6f5730192ad441ed99bbee',
+  'expected/standard-checking-first.json':
+    'f9453c07aef7397a770db21f97a155b1da921af64d4f9886ee1913342fac59e1',
+  'expected/standard-empty.json':
+    '350cf3fcddaaf49cadae54cb1bd05e503a2d4f4e0284aa294baec20e99544c11',
+  'expected/standard-full.json':
+    'b35a192f0c33f1ccf32f5537ec02f3ae2b1090d2169a8448fc14951f11a5882a',
+  'expected/standard-invalid-many.json':
+    '6956e24685d5e1da85b318dd48248dcd7dba6613ba9f1690d973a425de1fe0cc',
+  'expected/standard-malformed.json':
+    'd201d1dc279b3e48c266d84355ba383f9a5a4e3d3aab7750ee79363ba8f2ad53',
+  'expected/standard-mixed.json':
+    'cc8e18459233646ec843a52fee349ef80f35324e7ac49d59e07849f6836d6554',
+  'expected/standard-nothing-new.json':
+    'a87753cb1c457971f9ef4eef134680b1138beae7a29020d63ef8422e04cdb4fa',
+  'expected/standard-notices.json':
+    '393971082b05fb748ff42f8220f58593c6fc919b4de948694d3363cd69fd5f60',
+  'expected/standard-other-revision.json':
+    'e9fcc78afe9481e1b0467b4a71ff28397ec684a036585c58d9b5f2a60ff8e992',
+  'expected/standard-over-limit.json':
+    '4bcafce044edde4acd451e1aff4140b94d2eb2a8f6f84b98259fd920f046bc4c',
+  'expected/standard-records-changed.json':
+    '468662254d4539d68080009c6fc9c5087e2f4e5db61f2892a7266bc2d0e7daa9',
+  'expected/standard-text-edge.json':
+    'ecab4a7a003e51099d1f12ecebe4ce3601cdb51fdb0901aa4c2ff5473ed10bac',
+  'expected/standard-text-input.json':
+    '6e6114906fcee9d0b79161e6a04aa61e089ba42c74668586880f3ce3955149c6',
+  'expected/standard-too-many.json':
+    'b636f4ec7d6b49ccdcd4c21a9fc68a5d30c878c5ebe3a35533f2ac616c120b72',
+  'expected/tree-vectors.json':
+    '9609660e2fa508a04b164be7c67d7e5bfea31af2919369f789b06cc679918069',
+  'failure-429.json':
+    'a205c9a772d2d432a4ed40b0b93b78622e7e9d5fcb26d6b73fdbd3cca26bdad4',
+  'failure-502-unreadable.json':
+    '93292ef043d0a3ad8f8af02657b36d8afe80cf848cdd3191972ecc9738922025',
+  'failure-503-transport.json':
+    '3d231b616ead111d4e9ac0cc92211c638e3602ebb1aa1729bed981373b7f30a0',
+  'failure-504-timeout.json':
+    '3682ae99db87f12ca74e369cefb0ca48491c80cc9afb9149911df81853d87ada',
+  'plans-cs-ms.json':
+    'aae31c2b51bb6d84e0aa8d56a627493f0ed84a687e64b1d10d733f2e2c707948',
+  'plans-ds-ms.json':
+    'c3b3d1607e19eb0fae6deee9c1b72252e27d461765a7106f4053bc18c38852a0',
+};
+it('freezes all 63 draft fixture names and original bytes', () => {
+  const root = resolve('src/fixtures/draft');
+  const names = [
+    ...readdirSync(root).filter((n) => n.endsWith('.json')),
+    ...readdirSync(root + '/expected').map((n) => 'expected/' + n),
+  ].sort();
+  expect(names).toEqual(Object.keys(expected).sort());
+  for (const [name, hash] of Object.entries(expected))
+    expect(
+      createHash('sha256')
+        .update(readFileSync(root + '/' + name))
+        .digest('hex'),
+      name,
+    ).toBe(hash);
+});

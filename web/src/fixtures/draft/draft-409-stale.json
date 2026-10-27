@@ -1,0 +1,29 @@
+{
+  "case": "draft-409-stale",
+  "notes": "The page's content version is not the stored one.",
+  "request": {
+    "method": "POST",
+    "path": "/programs/cs-ms/plans/cs-ms-boston-2026-2027-standard/draft",
+    "body": {
+      "plan_content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "course_ids": [
+        "c-cs-5010"
+      ],
+      "input": "CS 5800"
+    }
+  },
+  "status": 409,
+  "body": {
+    "detail": "The selected plan's scope or content version has changed.",
+    "error_type": "conflict",
+    "status_code": 409,
+    "reason": "stale"
+  },
+  "failure": {
+    "status": 409,
+    "errorType": "conflict",
+    "retryAfter": null,
+    "invalidFields": [],
+    "reason": "stale"
+  }
+}
