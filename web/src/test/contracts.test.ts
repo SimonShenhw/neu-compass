@@ -2,7 +2,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
-import { courses } from '../fixtures/courses';
 
 const root = process.cwd();
 function files(directory: string): string[] {
@@ -55,16 +54,6 @@ it('the build for the API on this machine never lands where the production build
     / node scripts\/check-bundle\.mjs dist-dev-api$/,
   );
   expect(scripts['preview:dev-api']).toMatch(/ --outDir dist-dev-api$/);
-});
-
-it('fixtures contain only the five approved course codes', () => {
-  expect(courses.map((course) => course.code).sort()).toEqual([
-    'CS 5100',
-    'CS 5800',
-    'CS 6140',
-    'CS 7800',
-    'DS 5220',
-  ]);
 });
 
 // R2b: the API layer is the one place that talks to the network: the client, and the /chat stream next to it. Any

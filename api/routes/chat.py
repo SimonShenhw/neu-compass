@@ -60,6 +60,7 @@ from api.dependencies import (
     get_program_repo,
     get_reranker,
 )
+from api.exceptions import ChatConflict
 from api.models import ChatRequest
 from api.query_fields import query_fields
 from api.routes.common import (
@@ -170,7 +171,10 @@ def _stream_error_event(error_type: str) -> bytes:
             "content": {"application/x-ndjson": {}},
         },
         422: {"description": "Invalid query / k / delivery_mode."},
-        409: {"description": "Program selection is ambiguous or conflicts with the query's program prefix."},
+        409: {"description": "The selected plan cannot be confirmed, or the program selection is ambiguous or conflicts "
+                             "with the query's program prefix; `reason` says which (`plan_missing`, `plan_stale`, "
+                             "`plan_draft`, `plan_unusable`, `plan_unavailable`, `program_ambiguous`, "
+                             "`program_conflict`)."},
     },
 )
 def chat(
@@ -239,7 +243,7 @@ def chat(
         if resolution.outcome != "selected":
             # Controlled outcome and bounded plan ID only; no query/scope/exception reflection.
             log.warning("chat.plan_selection", plan_outcome=resolution.outcome, plan_id=req.plan.plan_id)
-            raise HTTPException(status_code=409, detail=PLAN_SELECTION_MESSAGES[resolution.outcome])
+            raise ChatConflict("plan_" + resolution.outcome, PLAN_SELECTION_MESSAGES[resolution.outcome])
         plan = resolution.plan
     try:
         hits, matched_via, hard_filters, notices = _retrieve(
@@ -249,7 +253,7 @@ def chat(
         # The UI shows `detail` verbatim to the student — lead with Chinese.
         # 中文：UI 会把 detail 原样展示给学生，所以中文在前。
         choices = ", ".join(p.program_id for p in exc.programs)
-        raise HTTPException(status_code=409, detail=(
+        raise ChatConflict("program_ambiguous", (
             f"这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：{choices}。"
         )) from exc
     retrieval_ms = (time.perf_counter() - started) * 1000
@@ -542,7 +546,7 @@ def _retrieve(
                    else program_repo.find_by_prefix(extracted.program_prefix))
         if program is not None:
             if req.program_id and extracted.program_prefix and program.prefix.upper() != extracted.program_prefix.upper():
-                raise HTTPException(status_code=409, detail=(
+                raise ChatConflict("program_conflict", (
                     "上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
                     " (Selected program_id conflicts with the detected program prefix.)"
                 ))

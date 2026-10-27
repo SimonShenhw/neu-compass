@@ -4,12 +4,13 @@ For this machine only: `npm run dev` in web/ talks to it, and the browser accept
 never deployed, production code never imports it, and the API has no test mode; this is the test suite's own
 stand-ins put together:
 
-  - a synthetic database in a temporary file: db/init.sql, the three courses of tests/conftest.py and made-up Co-op
-    records (R5d): three curated seeds, one per field tier, and two groups of uploads that went through the real
-    review, each with two different contributors (k=2), so the sign-in page's dev-one and dev-two have one and two
-    contributions credited the way production credits them (a third contributor, who never signs in here, completes
-    the second group). Deleting an account runs the real deletion on this database, so a group left with one
-    contributor is withdrawn; a restart brings everything back;
+  - a synthetic database in a temporary file: db/init.sql, the three courses of tests/conftest.py, the synthetic
+    catalog of tests/support/dev_catalog.py (R3e: programs, their plans, more courses and their requisites) and
+    made-up Co-op records (R5d): three curated seeds, one per field tier, and two groups of uploads that went through
+    the real review, each with two different contributors (k=2), so the sign-in page's dev-one and dev-two have one
+    and two contributions credited the way production credits them (a third contributor, who never signs in here,
+    completes the second group). Deleting an account runs the real deletion on this database, so a group left with
+    one contributor is withdrawn; a restart brings everything back;
   - Google replaced: /auth/login-url sends the browser to a sign-in page served here (/__dev/google) whose links
     bring it back to the front end with a code, and /auth/callback exchanges that code with a stand-in; some codes are
     refused the way Google or the claim checks refuse them, one link carries a wrong state, one is "cancel";
@@ -25,11 +26,13 @@ every start, so a restart logs everyone out. The access log is filtered as in pr
 loses its query too (it carries the state). Both this and the dev server are on 127.0.0.1: one host name keeps them one
 site for the browser, so the SameSite=Lax session cookie goes along.
 
-Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8000]
+Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8000] [--web-port 5173]
+--web-port is the dev server's port when 5173 cannot be used (web/'s VITE_DEV_PORT; Windows can reserve 5173).
 
 中文：给新前端开发和验收用的本机 API，不连 Google、不加载模型、不用真实数据（R2b）。只在本机用，不部署，生产代码不
-import 它，API 里也没有任何测试模式；这里只是把测试套件自己的替身拼在一起：临时文件里的合成数据库，里面还有编出来的
-Co-op 记录（R5d）：三条策展种子，每个字段层级一条；两组照真的审核流程公开的投稿，每组两个不同的投稿人（k=2），所以登录页上
+import 它，API 里也没有任何测试模式；这里只是把测试套件自己的替身拼在一起：临时文件里的合成数据库，里面有
+tests/support/dev_catalog.py 的合成目录（R3e：项目、方案、更多课程和先修），还有编出来的 Co-op 记录（R5d）：
+三条策展种子，每个字段层级一条；两组照真的审核流程公开的投稿，每组两个不同的投稿人（k=2），所以登录页上
 dev-one、dev-two 的贡献和生产一样记功，一次和两次（第二组的另一个投稿人不在登录页上）；删号在这个库上照真的走，只剩一个
 投稿人的组会撤回，重启就都回来了；假的 Google 登录页
 （/__dev/google），点链接带着 code 回到前端，回调用替身换 code，有几个 code 会像 Google 或身份检查那样被拒，还有一个
@@ -37,7 +40,8 @@ state 不对的链接和一个「取消」；模型换成 tests/conftest.py 的�
 补救也关掉。问题里带上面那几个词，就换成对应的脚本：模型中途出错、没有回答、今天的次数用完、流没有 done 就结束、连接中途
 断开、停得比前端等的还久。每个设置都从代码里的默认值开始，不管 .env 或环境变量怎么写；每次启动换一个会话密钥，所以重启
 就都登出了。访问日志和生产一样过滤，假登录页那条也去掉查询串（里面有 state）。它和开发服务器都在 127.0.0.1，同一个主机名，
-浏览器才把它们算作同一个站点，SameSite=Lax 的会话 cookie 才会跟着请求走。
+浏览器才把它们算作同一个站点，SameSite=Lax 的会话 cookie 才会跟着请求走。--web-port 是 5173 用不了时开发服务器的
+端口（web/ 的 VITE_DEV_PORT；Windows 可能把 5173 保留掉）。
 """
 
 from __future__ import annotations
@@ -57,8 +61,17 @@ from fastapi.responses import HTMLResponse
 
 ROOT = Path(__file__).resolve().parents[2]
 HOST = "127.0.0.1"
-# The dev server and `npm run preview`. 中文：开发服务器和 `npm run preview`。
-FRONT_ENDS = ("http://127.0.0.1:5173", "http://127.0.0.1:4173")
+# The ports of the dev server (unless --web-port names another) and `npm run preview`, as in web/src/api/apiBase.ts.
+# 中文：开发服务器（除非 --web-port 另给）和 `npm run preview` 的端口，和 web/src/api/apiBase.ts 一样。
+DEV_PORT, PREVIEW_PORT = 5173, 4173
+
+
+def front_ends(web_port: int = DEV_PORT) -> tuple[str, str]:
+    """The dev server on its port, and the preview. 中文：开发服务器（它的端口）和 preview。"""
+    return (f"http://{HOST}:{web_port}", f"http://{HOST}:{PREVIEW_PORT}")
+
+
+FRONT_ENDS = front_ends()
 # code -> (what the sign-in page says, the identity Google would vouch for). 中文：code -> （登录页上的字，身份）。
 ACCOUNTS = {
     "dev-student": ("Synthetic Student · husky.neu.edu",
@@ -140,22 +153,24 @@ def pinned(settings) -> list[str]:
     return [name for name, field in type(settings).model_fields.items() if not field.is_required()]
 
 
-def configure(settings, db_path: Path) -> None:
+def configure(settings, db_path: Path, *, web_port: int = DEV_PORT) -> None:
     """Point the process's settings at the synthetic world. Every setting first goes back to the code's default,
     whatever .env or the environment says (a request limit or a data path there would change what this API does),
     then the few this API needs are set. Only the Gemini key has no default and stays as it is; nothing here calls
-    Gemini.
+    Gemini. `web_port` is the dev server's (--web-port).
     中文：把这个进程的设置指向合成的那一套。每个设置先恢复成代码里的默认值，不管 .env 或环境变量怎么写（那里的限流或
-    数据路径会改变这个 API 的行为），再设它需要的几项。只有 Gemini key 没有默认值，保持原样；这里不会调用 Gemini。"""
+    数据路径会改变这个 API 的行为），再设它需要的几项。只有 Gemini key 没有默认值，保持原样；这里不会调用 Gemini。
+    `web_port` 是开发服务器的端口（--web-port）。"""
     fields = type(settings).model_fields
     for name in pinned(settings):
         setattr(settings, name, fields[name].get_default(call_default_factory=True))
+    origins = front_ends(web_port)
     settings.sqlite_path = str(db_path)
-    settings.web_origins = list(FRONT_ENDS)
+    settings.web_origins = list(origins)
     settings.session_secret = secrets.token_urlsafe(32)
     settings.google_oauth_client_id = "dev-client-id"
     settings.google_oauth_client_secret = "dev-client-secret"
-    settings.google_oauth_redirect_uri = f"{FRONT_ENDS[0]}/"
+    settings.google_oauth_redirect_uri = f"{origins[0]}/"
     settings.answer_feedback_enabled = False
 
 
@@ -197,11 +212,13 @@ def seed_coop(conn) -> None:
 def make_database(db_path: Path) -> None:
     from db.connection import connect  # noqa: PLC0415
     from tests.conftest import seed_minimal_corpus  # noqa: PLC0415
+    from tests.support.dev_catalog import seed_catalog  # noqa: PLC0415
 
     conn = connect(db_path)
     try:
         conn.executescript((ROOT / "db" / "init.sql").read_text(encoding="utf-8"))
         seed_minimal_corpus(conn)
+        seed_catalog(conn)
         seed_coop(conn)
         conn.commit()
     finally:
@@ -311,15 +328,17 @@ class CutChat:
         await self.app(scope, replay, stop_early if how else send)
 
 
-def build_dev_app(db_path: Path, *, base: str) -> FastAPI:
-    """The real app (create_app) over the synthetic world; `base` is where this API answers, for the sign-in page.
-    中文：真正的应用（create_app），跑在合成的那一套上；`base` 是这个 API 的地址，给登录页用。"""
+def build_dev_app(db_path: Path, *, base: str, web_port: int = DEV_PORT) -> FastAPI:
+    """The real app (create_app) over the synthetic world; `base` is where this API answers, for the sign-in page, and
+    `web_port` the dev server's port.
+    中文：真正的应用（create_app），跑在合成的那一套上；`base` 是这个 API 的地址，给登录页用；`web_port` 是开发服务器
+    的端口。"""
     from config import settings  # noqa: PLC0415
 
     # Before anything imports the routes: api/routes/common.py copies rerank_pool_size when it is first imported, and
     # in this API's own process that happens just below (B26). 中文：要在任何东西 import 路由之前：api/routes/common.py
     # 第一次被 import 时就把 rerank_pool_size 拷走了，在这个 API 自己的进程里那就发生在下面几行（B26）。
-    configure(settings, db_path)
+    configure(settings, db_path, web_port=web_port)
 
     import api.google_oauth  # noqa: PLC0415
     from api.dependencies import (  # noqa: PLC0415
@@ -379,13 +398,20 @@ def build_dev_app(db_path: Path, *, base: str) -> FastAPI:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Local API for the web front end (synthetic data, fake Google).")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--web-port", type=int, default=DEV_PORT,
+                        help="the dev server's port, as web/'s VITE_DEV_PORT (default 5173)")
     args = parser.parse_args(argv)
+    # The range web/'s devPort takes; never the preview's port or this API's own. 中文：和 web/ 的 devPort 同一个范围；
+    # 不能是 preview 的端口，也不能是这个 API 自己的。
+    if not 1024 <= args.web_port <= 65535 or args.web_port in (PREVIEW_PORT, args.port):
+        parser.error(f"--web-port must be a port from 1024 to 65535, other than {PREVIEW_PORT} and --port.")
     import uvicorn  # noqa: PLC0415
 
     with tempfile.TemporaryDirectory(prefix="nc-dev-api-") as directory:
         base = f"http://{HOST}:{args.port}"
-        app = build_dev_app(Path(directory) / "dev.sqlite3", base=base)
-        print(f"Dev API on {base} for {', '.join(FRONT_ENDS)}. Synthetic data; fake Google at {base}{SIGN_IN_PATH}.")
+        app = build_dev_app(Path(directory) / "dev.sqlite3", base=base, web_port=args.web_port)
+        print(f"Dev API on {base} for {', '.join(front_ends(args.web_port))}. Synthetic data; fake Google at "
+              f"{base}{SIGN_IN_PATH}.")
         uvicorn.run(app, host=HOST, port=args.port, log_level="info")
     return 0
 

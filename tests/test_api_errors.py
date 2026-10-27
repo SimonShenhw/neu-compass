@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 
 from structlog.testing import capture_logs
 
-from api.exceptions import register_exception_handlers
+from api.exceptions import ChatConflict, register_exception_handlers
 from app.auth import OAuthError
 from db.repository import CourseNotFound
 from llm.gemini_client import GeminiError
@@ -45,6 +45,14 @@ def app() -> FastAPI:
     @app.get("/raise-http-404")
     def _r404() -> None:
         raise HTTPException(status_code=404, detail="missing")
+
+    @app.get("/raise-http-409")
+    def _r409() -> None:
+        raise HTTPException(status_code=409, detail="duplicate")
+
+    @app.get("/raise-chat-conflict")
+    def _chat_conflict() -> None:
+        raise ChatConflict("plan_stale", "所选方案的范围或内容版本已变化")
 
     @app.get("/raise-oauth")
     def _oauth() -> None:
@@ -96,6 +104,23 @@ def test_http_exception_404_has_not_found_type(client: TestClient) -> None:
     r = client.get("/raise-http-404")
     assert r.status_code == 404
     assert r.json()["error_type"] == "not_found"
+
+
+def test_a_chat_conflict_carries_its_reason_next_to_the_unchanged_detail(client: TestClient) -> None:
+    # R3e: /chat's 409s name their reason for the web front end; other 409s stay as they were.
+    # 中文：/chat 的 409 给新前端带上原因；别的 409 照旧。
+    assert client.get("/raise-chat-conflict").json() == {
+        "detail": "所选方案的范围或内容版本已变化", "error_type": "conflict", "status_code": 409, "reason": "plan_stale"}
+    plain = client.get("/raise-http-409")
+    assert plain.status_code == 409 and plain.json() == {"detail": "duplicate", "error_type": "conflict",
+                                                          "status_code": 409}
+
+
+def test_a_chat_conflict_takes_only_its_seven_reasons() -> None:
+    for reason in ChatConflict.REASONS:
+        assert ChatConflict(reason, "x").reason == reason
+    with pytest.raises(ValueError):
+        ChatConflict("stale", "x")  # The draft check's spelling, without the prefix. 中文：草案核对那种不带前缀的写法。
 
 
 # === Domain exceptions → handler-mapped types ===

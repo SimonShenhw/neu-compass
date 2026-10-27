@@ -5,7 +5,6 @@ import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import type { ComparePageProps } from '../api/course';
 import { ComparePage } from './ComparePage';
-import { PrototypeProvider } from '../layout/PrototypeContext';
 import cs5800 from '../fixtures/compare/course-cs-5800.json';
 import cs6140 from '../fixtures/compare/course-cs-6140.json';
 import ds5220 from '../fixtures/compare/course-ds-5220.json';
@@ -41,9 +40,7 @@ function page(overrides: Partial<ComparePageProps> = {}) {
     input,
     ...render(
       <MemoryRouter>
-        <PrototypeProvider>
-          <ComparePage {...input} />
-        </PrototypeProvider>
+        <ComparePage {...input} />
       </MemoryRouter>,
     ),
   };
@@ -283,9 +280,7 @@ it('unrelated column updates do not steal focus after a remove', async () => {
   };
   const view = () => (
     <MemoryRouter>
-      <PrototypeProvider>
-        <ComparePage {...input} />
-      </PrototypeProvider>
+      <ComparePage {...input} />
     </MemoryRouter>
   );
   rerender(view());

@@ -1,17 +1,37 @@
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
-import { chooseApiBase } from './src/api/apiBase.ts';
+import {
+  PREVIEW_PORT,
+  chooseApiBase,
+  choosePublicBase,
+  devPort,
+} from './src/api/apiBase.ts';
 
 export default defineConfig(({ command, mode }) => {
-  // R2b: the API address is fixed here, at build time (src/api/apiBase.ts says which one for which build).
-  const { VITE_API_BASE_URL } = loadEnv(mode, process.cwd(), 'VITE_');
+  // R2b: the API address is fixed here, at build time (src/api/apiBase.ts says which one for which build); R3e: so is
+  // the site a shared link names, and the dev server's port.
+  const { VITE_API_BASE_URL, VITE_PUBLIC_BASE_URL, VITE_DEV_PORT } = loadEnv(
+    mode,
+    process.cwd(),
+    'VITE_',
+  );
   const apiBase = chooseApiBase(command, mode, VITE_API_BASE_URL);
+  const port = devPort(VITE_DEV_PORT);
+  const publicBase = choosePublicBase(
+    command,
+    mode,
+    VITE_PUBLIC_BASE_URL,
+    port,
+  );
   return {
     plugins: [react()],
-    define: { __API_BASE_URL__: JSON.stringify(apiBase) },
-    server: { host: '127.0.0.1', port: 5173, strictPort: true },
-    preview: { host: '127.0.0.1', port: 4173, strictPort: true },
+    define: {
+      __API_BASE_URL__: JSON.stringify(apiBase),
+      __PUBLIC_BASE_URL__: JSON.stringify(publicBase),
+    },
+    server: { host: '127.0.0.1', port, strictPort: true },
+    preview: { host: '127.0.0.1', port: PREVIEW_PORT, strictPort: true },
     build: { manifest: true },
     test: {
       environment: 'jsdom',

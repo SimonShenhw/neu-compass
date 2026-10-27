@@ -51,7 +51,7 @@ def test_privacy_is_built_from_the_apis_own_settings(client, monkeypatch, days, 
     body = client.get("/privacy").json()
     assert body == {
         "intro": INTRO,
-        "sections": [{"heading": h, "sentences": s} for h, s in privacy_sections(settings)],
+        "sections": [{"heading": h, "sentences": s} for h, s in privacy_sections(settings, web=True)],
         "delete_what": DELETE_WHAT,
         "query_log_notice": QUERY_LOG_NOTICE_BASE,
         "capture_notice": capture_notice(days) if feedback else None,
@@ -59,6 +59,22 @@ def test_privacy_is_built_from_the_apis_own_settings(client, monkeypatch, days, 
     text = repr(body)
     assert (f"原文保存 {days} 天" in text) is bool(days)
     assert ((contact or "@@") in text) is bool(contact)
+
+
+def test_only_the_web_page_says_course_pages_stay_in_the_browser_history(client):
+    # R3e: each course page of the web front end has its own address; the Streamlit page never puts a course in its
+    # address, so its sections stay as they were. 中文：新前端每门课一个网址；Streamlit 页的网址里没有课，它的文字不变。
+    from api.privacy_text import privacy_sections
+
+    sections = {section["heading"]: section["sentences"] for section in client.get("/privacy").json()["sections"]}
+    assert any("/course/CS-6140" in sentence and "浏览器历史" in sentence for sentence in sections["记了什么"])
+    assert not any("浏览器历史" in sentence for _, sentences in privacy_sections(settings) for sentence in sentences)
+    # It is the last sentence of 「记了什么」, and the rest is Streamlit's word for word (review B32).
+    # 中文：它是「记了什么」的最后一句，别的和 Streamlit 一字不差。
+    streamlit = {heading: list(sentences) for heading, sentences in privacy_sections(settings)}
+    assert sections["记了什么"][:-1] == streamlit["记了什么"] and "浏览器历史" in sections["记了什么"][-1]
+    assert {h: s for h, s in sections.items() if h != "记了什么"} == {
+        h: s for h, s in streamlit.items() if h != "记了什么"}
 
 
 def test_the_notice_has_no_streamlit_layout_words(client):

@@ -74,5 +74,13 @@ export function useConversation() {
       }
     })();
   }, []);
-  return { turns, busy, ask };
+  // R3e: the conversation belongs to who is looking, so a logout or another person's login empties it. The question on
+  // its way is cancelled first; its stream then updates nothing (it is no longer the owner).
+  const reset = useCallback(() => {
+    owner.current?.abort();
+    owner.current = null;
+    setTurns([]);
+    setBusy(false);
+  }, []);
+  return { turns, busy, ask, reset };
 }

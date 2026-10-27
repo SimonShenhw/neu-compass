@@ -6,7 +6,11 @@ import { Select } from './Select';
 import { Toggle } from './Toggle';
 import { RequisiteTree } from './RequisiteTree';
 import type { RequisiteNode } from './RequisiteTree';
-import { projectOptions } from '../fixtures/courses';
+
+const projectOptions = [
+  { value: 'none', label: '不指定' },
+  { value: 'cs-ms', label: 'MSCS' },
+];
 
 function SelectExample() {
   const [value, setValue] = useState('none');

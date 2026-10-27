@@ -192,3 +192,38 @@ it.each(['error', 'done'] as const)(
     expect(hook.result.current.turns[0]!.text).toBe('');
   },
 );
+it('reset (R3e) empties the conversation and cancels the question on its way, which then changes nothing', async () => {
+  let release!: () => void, signal!: AbortSignal;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const hook = run(async function* (s) {
+    signal = s;
+    yield meta;
+    await gate;
+    yield { type: 'token', text: 'late' };
+    yield { type: 'done', feedback: null };
+  });
+  await waitFor(() =>
+    expect(hook.result.current.turns[0]?.status).toBe('answering'),
+  );
+  act(() => hook.result.current.reset());
+  expect(hook.result.current.turns).toEqual([]);
+  expect(hook.result.current.busy).toBe(false);
+  expect(signal.aborted).toBe(true);
+  // The next question goes through at once, before the cancelled one has even ended, and the numbering carries on.
+  act(() =>
+    hook.result.current.ask({
+      question: 'next',
+      allowSave: false,
+      source: source([meta, { type: 'done', feedback: null }]),
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.busy).toBe(false));
+  await act(async () => {
+    release();
+  });
+  expect(
+    hook.result.current.turns.map((t) => [t.id, t.question, t.status]),
+  ).toEqual([[2, 'next', 'done']]);
+});

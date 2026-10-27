@@ -132,6 +132,7 @@ def test_unconfirmed_plan_409_is_fixed_before_retrieval_logging_or_feedback(api_
         response = api_client.post("/chat", json={"query": "private-query-sentinel", "program_id": plan.program_id,
             "plan": selection_data(plan), "allow_feedback_capture": True})
     assert response.status_code == 409 and response.json()["detail"] == PLAN_SELECTION_MESSAGES[outcome]
+    assert response.json()["reason"] == "plan_" + outcome  # The web front end words it from here (R3e).
     assert PLAN_SELECTOR_LABEL in response.json()["detail"]
     assert "private-query-sentinel" not in response.text + json.dumps(logs)
     assert empty_db.execute("SELECT COUNT(*) FROM query_log").fetchone()[0] == 0
