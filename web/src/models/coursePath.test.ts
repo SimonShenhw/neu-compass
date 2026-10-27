@@ -30,4 +30,6 @@ it('what an address names is said back on one line, without backticks, cut to 64
   // Characters, not UTF-16 units: one outside the BMP counts once.
   expect(refLabel('𝟙'.repeat(70))).toBe('𝟙'.repeat(64));
   expect(refLabel('a'.repeat(64) + 'b')).toBe('a'.repeat(64));
+  // Direction and zero-width characters go, so they cannot turn the page's own sentence around (review A32).
+  expect(refLabel('CS\u202e 6140\u2066\u200b\u200f\ufeff')).toBe('CS 6140');
 });

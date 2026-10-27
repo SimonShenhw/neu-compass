@@ -108,6 +108,20 @@ it('offers no plan whose ID or scope another plan shares, nor another program’
   ).toEqual(offered(all));
 });
 
+it('as Streamlit: a list with one document that is not a plan offers none, and another program’s IDs count too', () => {
+  const align = plan('cs-ms-boston-2026-2027-align');
+  const all = curriculum.body.plans;
+  expect(offered(all)).toHaveLength(3);
+  expect(
+    offered([...all, { ...align, plan_id: 'broken', catalog_year: '26-27' }]),
+  ).toEqual([]);
+  // The same plan ID under another program: neither is offered.
+  expect(offered([...all, { ...align, program_id: 'ds-ms' }])).toEqual([
+    'cs-ms-boston-2026-2027-standard',
+    'cs-ms-boston-2025-2026-standard',
+  ]);
+});
+
 it('a question carries the plan’s scope and the version the page showed', () => {
   const [align] = chatPlans(body, 'cs-ms');
   expect(planSelection(align!)).toEqual({

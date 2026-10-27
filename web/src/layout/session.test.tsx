@@ -554,6 +554,23 @@ describe('the account box', () => {
     );
     expect(returnNote()).toBeEmptyDOMElement();
   });
+
+  it('so does a second logout press (review B32)', async () => {
+    const calls = held();
+    page('/compare', seededQueryClient({ viewer: MEMBER }));
+    await userEvent.click(accountButton('退出登录'));
+    calls[0]!.fail(new TypeError('Failed to fetch'));
+    await waitFor(() =>
+      expect(boxNote()).toHaveTextContent('没能退出登录，请再试一次。'),
+    );
+    // Shown, not only said: the line is hidden only while it is empty (review B32).
+    expect(boxNote()).not.toHaveClass('visually-hidden');
+    await userEvent.click(accountButton('退出登录'));
+    expect(boxNote()).toBeEmptyDOMElement();
+    expect(boxNote()).toHaveClass('visually-hidden');
+    calls[1]!.answer(new Response(null, { status: 204 }));
+    await waitFor(() => expect(boxNote()).toHaveTextContent('已退出登录。'));
+  });
 });
 
 describe('the hook', () => {

@@ -1,8 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../../layout/Sidebar';
 import { TopBar } from '../../layout/TopBar';
-import { useNotice } from '../../layout/NoticeContext';
 import { pagePresentation } from '../../layout/routePresentation';
 import { useCompareList } from '../../models/compareList';
 import styles from '../../layout/AppShell.module.css';
@@ -10,7 +9,8 @@ import styles from '../../layout/AppShell.module.css';
 // Only synthetic demo routes use this shell. It never mounts useSession or API queries.
 export default function OfflineDemoShell() {
   const { pathname } = useLocation();
-  const { notice, announce } = useNotice();
+  // The demo's own note under the page, never the live shell's (review A32).
+  const [notice, announce] = useState('');
   const { title } = pagePresentation(pathname);
   const count = useCompareList().length;
   const account = {

@@ -64,6 +64,9 @@ it('a link inside the site hands the course ID along: no lookup', async () => {
 it.each([
   ['an ID that is not text', { courseId: 5 }],
   ['an empty ID', { courseId: '' }],
+  // No API path can carry these (apiPath), so they are not taken for an ID either (review A32).
+  ['the ID "."', { courseId: '.' }],
+  ['the ID ".."', { courseId: '..' }],
   ['something else', 'c-cs-6140'],
 ])(
   'state with %s is not a course ID: the code is looked up',
@@ -95,6 +98,13 @@ it('the share box gives the page’s address on the site, spelled from the cours
   expect(box).toHaveValue('http://127.0.0.1:5173/course/CS-6140');
   expect(box).toHaveAttribute('readonly');
   expect(screen.getByText(SHARE_NOTE)).toBeVisible();
+  // Focus selects the whole link, ready to copy (review B32).
+  const field = box as HTMLInputElement;
+  act(() => field.focus());
+  expect([field.selectionStart, field.selectionEnd]).toEqual([
+    0,
+    field.value.length,
+  ]);
 });
 
 it.each([
@@ -136,6 +146,30 @@ it('a lookup that fails for a moment says so and can be tried again', async () =
   await userEvent.click(screen.getByRole('button', { name: '重新加载' }));
   expect(await heading('Machine Learning')).toBeInTheDocument();
   expect(api.count('GET', '/resolve/course')).toBe(2);
+});
+
+it('the other courses’ codes and names from the API are said on one line (review A32)', async () => {
+  world((call) =>
+    call.path === '/resolve/course'
+      ? json({
+          ref: 'CS-6140',
+          matches: [
+            identity(courses[0]!),
+            {
+              course_id: 'c-x',
+              primary_code: 'CS\n6141',
+              primary_name: 'Two\nlines',
+            },
+          ],
+        })
+      : undefined,
+  );
+  page('/course/CS-6140');
+  await heading('Machine Learning');
+  const others = screen.getByRole('group', { name: '同一个课号的其他课程' });
+  expect(within(others).getByRole('button').textContent).toBe(
+    'CS 6141 · Two lines',
+  );
 });
 
 // TanStack keeps a query that once had data in its error state while it tries again: a lookup or a detail asked again
@@ -288,6 +322,31 @@ it('a course the requisites name opens its page by its code', async () => {
     'GET /resolve/course?ref=CS-5800',
     'GET /course/c-cs-5800',
   ]);
+});
+
+it('another course opens as a page of its own: what was opened on the last one is closed (review B32)', async () => {
+  world();
+  page('/course/CS-7800');
+  await heading('Advanced Algorithms');
+  const toAlgorithms = () =>
+    userEvent.click(
+      screen
+        .getAllByRole('button', { name: '查看' })
+        .find((button) => button.dataset.opens === 'CS 5800')!,
+    );
+  // Both courses are read once first, so the second time no loading sentence comes in between to close it anyway.
+  await toAlgorithms();
+  await heading('Algorithms');
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  await heading('Advanced Algorithms');
+  await userEvent.click(screen.getByText('分享这门课'));
+  const shared = () => screen.getByText('分享这门课').closest('details')!;
+  expect(shared()).toHaveAttribute('open');
+  await toAlgorithms();
+  expect(
+    screen.getByRole('heading', { name: 'Algorithms' }),
+  ).toBeInTheDocument();
+  expect(shared()).not.toHaveAttribute('open');
 });
 
 it('what the address names is said back on one line, without backticks, at most 64 characters; it is looked up as it is', async () => {

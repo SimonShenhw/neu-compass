@@ -1,8 +1,9 @@
 """The dev API's synthetic catalog (R3e): programs with their per-semester lists, version-checked plans, more courses
 and their catalog requisites, so the web front end's search page and course pages have something to show on this
 machine. The records are taken from the fixture generators of R3d (the landing), R4a (the plans) and R3a (the
-requisites), without their policy archives; every one is made up and goes in through production's own schemas and
-repositories, on top of tests/conftest.py's three courses.
+requisites), without their policy archives. As in those fixtures, the course codes and names are the public
+catalog's; the descriptions, ratings, instructors, policies and plans are made up, and none of it is user data. All of
+it goes in through production's own schemas and repositories, on top of tests/conftest.py's three courses.
 
   - four programs, three of them featured on the landing (aai-ms, cs-ms, ds-ms): aai-ms and cs-ms have a course to
     start with in semester 1, ds-ms has only an elective there, so it has none;
@@ -13,8 +14,9 @@ repositories, on top of tests/conftest.py's three courses.
     that names two courses.
 
 中文：开发 API 的合成目录（R3e）：带每学期课表的项目、核对过版本的方案、更多课程和它们在目录里的先修要求，好让前端的搜索页
-和课程页在本机有东西可看。数据取自 R3d（落地页）、R4a（方案）、R3a（先修）的假数据生成脚本，不带政策存档；每一条都是编的，
-都走生产自己的 schema 和 repository，加在 tests/conftest.py 那三门课之上：四个项目，落地页推荐其中三个；cs-ms 四份方案
+和课程页在本机有东西可看。数据取自 R3d（落地页）、R4a（方案）、R3a（先修）的假数据生成脚本，不带政策存档；和那些假数据一样，课号和
+课名是公开目录里的，描述、评价、老师、政策和方案都是编的，没有用户数据。都走生产自己的 schema 和 repository，加在
+tests/conftest.py 那三门课之上：四个项目，落地页推荐其中三个；cs-ms 四份方案
 （三份核对过来源，一份草稿，草稿不能随问题带上），ds-ms 一份带 concentration；CS 6140 课程页能显示的全都有（R3b 的
 假数据），还有两年的目录先修，CS 7800 只有旧的平铺先修；「ML」同时是 CS 6140 和 DS 5220 的简称，所以 /course/ML 是指向
 两门课的链接。

@@ -18,13 +18,15 @@ import type { ChatSource } from '../api/chat';
 import { streamChat } from '../api/chatStream';
 import type { ChatRequest } from '../api/chatStream';
 import { ApiError } from '../api/client';
-import { curriculumQuery } from '../api/programs';
+import { askNotices, privacyQuery } from '../api/privacy';
+import { curriculumQuery, programListQuery } from '../api/programs';
 import { configQuery, shownData } from '../api/queries';
 import { useConversation } from '../features/search-answer/useConversation';
 import { chatPlans, planSelection, plansSignature } from '../models/chatPlans';
 import type { ChatPlan } from '../models/chatPlans';
 import type { Turn } from '../models/chatTurn';
 import { contextCourseIds, recentHistory } from '../models/conversation';
+import { parseProgramList } from '../models/programs';
 
 // The API takes a question of 1 to 500 characters (api/models.py); the ask box says so instead of sending one longer.
 export const MAX_QUESTION_CHARS = 500;
@@ -148,9 +150,28 @@ export function SearchProvider({
     last.current = owner;
   }, [owner, reset]);
 
-  // Streamlit clears the opt-in while answer feedback is off (put right while rendering, as above), so it is never
-  // ticked then, whatever was set, and no question asks to save its answer.
-  if (!feedbackEnabled && allowSave) setAllowSave(false);
+  // A question carries no more than the page shows (review A32): the selectors are there only while the program list
+  // reads (SearchRoute asks for it), so while it does not, no program or plan goes along, as in Streamlit, and the
+  // choice is kept for when the list is back.
+  const programList = useQuery({ ...programListQuery, enabled: false });
+  const listed = (() => {
+    const read = shownData(programList);
+    const parsed = read === undefined ? null : parseProgramList(read);
+    return parsed?.kind === 'ok' ? parsed.data : null;
+  })();
+  const programShown =
+    programId !== null &&
+    listed !== null &&
+    listed.some((row) => row.program_id === programId);
+
+  // The opt-in is there only while answer feedback is on and /privacy says what saving means (AskBar asks for it).
+  // Streamlit clears it while feedback is off; here it goes as well while its notice cannot be read, so it is never
+  // ticked unseen and can always be unticked (R0 14.4). Put right while rendering, as above.
+  const privacy = useQuery({ ...privacyQuery, enabled: false });
+  const offered =
+    feedbackEnabled &&
+    (askNotices(shownData(privacy))?.capture ?? null) !== null;
+  if (!offered && allowSave) setAllowSave(false);
 
   const chooseProgram = useCallback((id: string | null) => {
     setProgramId(id);
@@ -171,8 +192,10 @@ export function SearchProvider({
     (question: string) => {
       const query = question.trim();
       if (query === '' || questionLength(query) > MAX_QUESTION_CHARS) return;
-      const asked = programId;
-      const refused = plan?.plan.plan_id ?? null;
+      const asked = programShown ? programId : null;
+      const sent = asked === null ? null : plan;
+      // The choice as it was when this question went: a refusal takes only that plan of that list.
+      const refused = sent === null ? null : choice;
       const request: ChatRequest = {
         query,
         k: RESULTS,
@@ -180,15 +203,21 @@ export function SearchProvider({
         history: recentHistory(turns),
         context_course_ids: contextCourseIds(turns),
         ...(asked === null ? {} : { program_id: asked }),
-        ...(plan === null ? {} : { plan: planSelection(plan) }),
+        ...(sent === null ? {} : { plan: planSelection(sent) }),
       };
       askWith({
         question: query,
         allowSave,
         source: chatSource(request, () => {
-          // Only the plan that was refused: a choice made since stays.
+          // Only the plan that was refused, from the list it was chosen in: a choice made since, the same plan picked
+          // again from a list asked for since included, stays.
           setChoice((current) =>
-            current !== null && current.planId === refused ? null : current,
+            current !== null &&
+            refused !== null &&
+            current.planId === refused.planId &&
+            current.signature === refused.signature
+              ? null
+              : current,
           );
           if (asked !== null)
             void queryClient.invalidateQueries({
@@ -197,7 +226,16 @@ export function SearchProvider({
         }),
       });
     },
-    [allowSave, askWith, plan, programId, queryClient, turns],
+    [
+      allowSave,
+      askWith,
+      choice,
+      plan,
+      programId,
+      programShown,
+      queryClient,
+      turns,
+    ],
   );
 
   const value = useMemo<SearchState>(

@@ -2,9 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { expect, it } from 'vitest';
-import { curriculumQuery } from '../api/programs';
+import { privacyQuery } from '../api/privacy';
+import { curriculumQuery, programListQuery } from '../api/programs';
 import { configQuery, createQueryClient } from '../api/queries';
 import ds from '../fixtures/landing/curriculum-ds-ms.json';
+import programs from '../fixtures/landing/programs.json';
+import privacy from '../fixtures/privacy/privacy-90-days-feedback-contact.json';
 import curriculum from '../fixtures/programs/curriculum-cs-ms.json';
 import alias from '../fixtures/search/alias-cs-6140.json';
 import { fakeApi, json } from '../test/fakeApi';
@@ -60,6 +63,10 @@ function setup({
   const client: QueryClient = seededQueryClient({
     config: { answer_feedback_enabled: feedback, login_available: true },
   });
+  // What the page around it has read: the program list (the selectors) and the privacy words (the opt-in's notice). A
+  // question carries only what is on screen.
+  client.setQueryData(programListQuery.queryKey, programs.body);
+  client.setQueryData(privacyQuery.queryKey, privacy.body);
   const props: { owner: string | undefined } = {
     owner: unknown ? undefined : 'guest',
   };
@@ -85,7 +92,8 @@ async function asked(hook: ReturnType<typeof setup>['hook'], question: string) {
   await waitFor(() => expect(hook.result.current.busy).toBe(false));
 }
 
-it('a question carries what Streamlit sends: the window of history, the last answer’s courses, the program and the exact plan', async () => {
+// The window itself (6 turns, 4000 characters each, 10 courses) is R3c's, kept by models/searchCore.test.tsx.
+it('a question carries what Streamlit sends: the history so far, the last answer’s courses, the program and the exact plan', async () => {
   const { hook, chats } = setup();
   await asked(hook, 'CS 6140 讲什么？');
   expect(chats()).toEqual([
@@ -157,6 +165,68 @@ it('the opt-in goes while answer feedback is off, and stays unticked when it is 
   expect(hook.result.current.allowSave).toBe(false);
 });
 
+it('the opt-in goes as well when /privacy no longer says what saving means, so nothing is saved unseen', async () => {
+  const { client, hook, chats } = setup();
+  act(() => hook.result.current.setAllowSave(true));
+  expect(hook.result.current.allowSave).toBe(true);
+  act(() =>
+    client.setQueryData(privacyQuery.queryKey, {
+      ...privacy.body,
+      capture_notice: null,
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.allowSave).toBe(false));
+  await asked(hook, 'CS 5800');
+  expect(chats()[0]).toMatchObject({ allow_feedback_capture: false });
+});
+
+it('while the program list cannot be read, a question goes without the program and plan, which stay for when it is back', async () => {
+  const { client, hook, chats } = setup();
+  await choose(hook, ALIGN);
+  // The query cache tells its observers a moment later.
+  const list = async (value: unknown) => {
+    act(() => client.setQueryData(programListQuery.queryKey, value));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+  };
+  await list([{ program_id: CS }]);
+  await asked(hook, 'CS 5800');
+  expect(chats()[0]).not.toHaveProperty('program_id');
+  expect(chats()[0]).not.toHaveProperty('plan');
+  expect(hook.result.current.programId).toBe(CS);
+  expect(hook.result.current.plan?.plan.plan_id).toBe(ALIGN);
+  await list(programs.body);
+  await asked(hook, 'CS 6140');
+  expect(chats()[1]).toMatchObject({
+    program_id: CS,
+    plan: { plan_id: ALIGN },
+  });
+});
+
+it('a list that reads but no longer names the program sends neither it nor its plan', async () => {
+  const { client, hook, chats } = setup();
+  await choose(hook, ALIGN);
+  act(() =>
+    client.setQueryData(
+      programListQuery.queryKey,
+      programs.body.filter((row) => row.program_id !== CS),
+    ),
+  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+  await asked(hook, 'CS 5800');
+  expect(chats()[0]).not.toHaveProperty('program_id');
+  expect(chats()[0]).not.toHaveProperty('plan');
+});
+
+it('a /config read once that now fails outright says nothing of answer feedback either (review B32)', async () => {
+  const { client, hook } = setup();
+  expect(hook.result.current.feedback).toBe(true);
+  // The fake API answers /config with a 404: what was read before goes with it, as shownData has it.
+  await act(() =>
+    client.fetchQuery({ ...configQuery, staleTime: 0 }).catch(() => undefined),
+  );
+  await waitFor(() => expect(hook.result.current.feedback).toBeNull());
+});
+
 it('says nothing of answer feedback until /config has answered', () => {
   fakeApi(() => json({}, 404));
   const client = createQueryClient();
@@ -223,6 +293,30 @@ it('a refusal clears only the plan it refused: one chosen since stays', async ()
   release(refusal('plan_stale'));
   await waitFor(() => expect(hook.result.current.busy).toBe(false));
   expect(hook.result.current.plan?.plan.plan_id).toBe(ALIGN);
+});
+
+it('a refusal keeps the same plan picked again from a list asked for since (review A32)', async () => {
+  let release: (response: Response) => void = () => {};
+  const held = new Promise<Response>((resolve) => (release = resolve));
+  let body = programBody();
+  const { api, client, hook } = setup({
+    answer: () => held,
+    program: () => json(body),
+  });
+  await choose(hook, ALIGN);
+  act(() => hook.result.current.ask('CS 5800'));
+  // A new list comes while the question is on its way, and the same plan is picked from it.
+  body = programBody({ ...revisions, [ALIGN]: 'e'.repeat(64) });
+  act(() => client.setQueryData(curriculumQuery(CS).queryKey, body));
+  await waitFor(() => expect(hook.result.current.planRevised).toBe(true));
+  act(() => hook.result.current.choosePlan(ALIGN));
+  release(refusal('plan_stale'));
+  await waitFor(() => expect(hook.result.current.busy).toBe(false));
+  // The refusal asks for the plans again; the answer is the same new list.
+  await waitFor(() => expect(api.count('GET', `/programs/${CS}`)).toBe(2));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+  expect(hook.result.current.plan?.plan.plan_id).toBe(ALIGN);
+  expect(hook.result.current.plan?.revision).toBe('e'.repeat(64));
 });
 
 it('a plan list that changed under the choice takes it, once, and says so until the next choice', async () => {

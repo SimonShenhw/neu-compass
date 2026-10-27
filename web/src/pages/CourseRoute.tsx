@@ -18,6 +18,7 @@ import {
   DetailText,
 } from '../features/course-detail/DetailPrimitives';
 import { addToCompare, useCompareList } from '../models/compareList';
+import { oneLine } from '../models/courseDetailFormat';
 import { codeFromPath, courseShareUrl, refLabel } from '../models/coursePath';
 import { SearchWorkspace, useOpenCourse } from './SearchRoute';
 import styles from './CourseRoute.module.css';
@@ -29,11 +30,12 @@ export const SHARE_NOTE = '把链接发给同学，他们打开就直接看到�
 // Streamlit lists at most three other courses a code also names.
 const OTHERS = 3;
 
-// The course ID a link inside the site handed along (SearchRoute's useOpenCourse), or null.
+// The course ID a link inside the site handed along (SearchRoute's useOpenCourse), or null: only one the API's path can
+// carry (apiPath refuses "", "." and ".."), so anything else is looked up by its code instead (review A32).
 function knownId(state: unknown): string | null {
   return isJsonObject(state) &&
     typeof state.courseId === 'string' &&
-    state.courseId !== ''
+    !['', '.', '..'].includes(state.courseId)
     ? state.courseId
     : null;
 }
@@ -89,7 +91,7 @@ function Detail({
           aria-label="同一个课号的其他课程"
         >
           <DetailText kind="note">
-            {`「${refLabel(codeFromPath(segment))}」对应多门课程，已打开 ${code}；其他：`}
+            {`「${refLabel(codeFromPath(segment))}」对应多门课程，已打开 ${oneLine(code)}；其他：`}
           </DetailText>
           <div className={styles.links}>
             {others.slice(0, OTHERS).map((course) => (
@@ -100,7 +102,7 @@ function Detail({
                   openCourse(course.course_id, course.primary_code)
                 }
               >
-                {`${course.primary_code} · ${course.primary_name}`}
+                {`${oneLine(course.primary_code)} · ${oneLine(course.primary_name)}`}
               </Button>
             ))}
           </div>

@@ -1,11 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { refreshReads, shownData, useShowingOld } from '../api/queries';
 import { coursesIndexed, readyQuery } from '../api/ready';
 import { AccountContext, viewerOwner } from './account';
 import { AskBar } from './AskBar';
-import { useNotice } from './NoticeContext';
 import { SearchProvider, useSearch } from './SearchContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -39,7 +38,9 @@ function SearchAskBar() {
 export function AppShell() {
   const { pathname } = useLocation();
   const queryClient = useQueryClient();
-  const { notice, announce } = useNotice();
+  // What came back from Google, said at the top of the page. This shell's own: the offline demo shell keeps its note
+  // to itself, so neither shows up in the other (review A32).
+  const [notice, announce] = useState('');
   const comparison = useCompareList();
   const { session, login, logout, account, settled, note } =
     useSession(announce);

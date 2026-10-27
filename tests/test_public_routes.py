@@ -69,6 +69,12 @@ def test_only_the_web_page_says_course_pages_stay_in_the_browser_history(client)
     sections = {section["heading"]: section["sentences"] for section in client.get("/privacy").json()["sections"]}
     assert any("/course/CS-6140" in sentence and "浏览器历史" in sentence for sentence in sections["记了什么"])
     assert not any("浏览器历史" in sentence for _, sentences in privacy_sections(settings) for sentence in sentences)
+    # It is the last sentence of 「记了什么」, and the rest is Streamlit's word for word (review B32).
+    # 中文：它是「记了什么」的最后一句，别的和 Streamlit 一字不差。
+    streamlit = {heading: list(sentences) for heading, sentences in privacy_sections(settings)}
+    assert sections["记了什么"][:-1] == streamlit["记了什么"] and "浏览器历史" in sections["记了什么"][-1]
+    assert {h: s for h, s in sections.items() if h != "记了什么"} == {
+        h: s for h, s in streamlit.items() if h != "记了什么"}
 
 
 def test_the_notice_has_no_streamlit_layout_words(client):

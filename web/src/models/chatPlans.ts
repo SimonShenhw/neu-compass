@@ -1,11 +1,11 @@
 // The plans the search page offers for a question (R3e), as Streamlit's selectable_chat_plans (app/chat_plan_view.py):
-// a source-checked plan of this program whose ID and scope each appear once (R4a's availablePlans), and only with its
+// a source-checked plan of this program whose ID and scope each appear once in the whole list, and only with its
 // content version from the answer's plan_revisions (#36), which the question sends back as it is, so the page never
 // computes Python's JSON digest.
 import type { ProgramPlanDoc } from '../api/programs';
 import type { Schemas } from '../api/types';
-import { hash } from './programGuard';
-import { availablePlans } from './programPlans';
+import { hash, scopeKey } from './programGuard';
+import { parsePlan } from './programPlans';
 import { parseCurriculum } from './programs';
 import { object } from './searchGuard';
 
@@ -24,7 +24,9 @@ export function planRevisions(body: unknown): Readonly<Record<string, string>> {
   return revisions;
 }
 
-// Streamlit reads the plans only while the plan table is there, and offers none from a list of more than 100.
+// Streamlit reads the plans only while the plan table is there, and offers none from a list of more than 100, nor from
+// one with a document that is not a plan. An ID or a scope found twice offers neither plan, another program's
+// documents counted too. (The program page's availablePlans is gentler: it drops only what is wrong, and says so.)
 export function chatPlans(body: unknown, programId: string): ChatPlan[] {
   const parsed = parseCurriculum(body, programId);
   if (
@@ -33,9 +35,23 @@ export function chatPlans(body: unknown, programId: string): ChatPlan[] {
     parsed.data.plans.length > 100
   )
     return [];
+  const mine: ProgramPlanDoc[] = [];
+  const ids = new Map<string, number>();
+  const scopes = new Map<string, number>();
+  for (const value of parsed.data.plans) {
+    const read = parsePlan(value, programId);
+    if (read.kind === 'invalid') return [];
+    // Another program's document reads as a plan, only not this program's: its ID and scope count all the same.
+    const doc = read.kind === 'ok' ? read.plan : (value as ProgramPlanDoc);
+    ids.set(doc.plan_id, (ids.get(doc.plan_id) ?? 0) + 1);
+    scopes.set(scopeKey(doc), (scopes.get(scopeKey(doc)) ?? 0) + 1);
+    if (read.kind === 'ok') mine.push(read.plan);
+  }
   const revisions = planRevisions(body);
-  return availablePlans(parsed.data.plans, programId).plans.flatMap((plan) =>
+  return mine.flatMap((plan) =>
     plan.review_status === 'source_checked' &&
+    ids.get(plan.plan_id) === 1 &&
+    scopes.get(scopeKey(plan)) === 1 &&
     Object.hasOwn(revisions, plan.plan_id)
       ? [{ plan, revision: revisions[plan.plan_id]! }]
       : [],

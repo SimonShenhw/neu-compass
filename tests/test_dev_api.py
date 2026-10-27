@@ -181,17 +181,26 @@ def test_a_dev_server_on_another_port_is_the_one_let_in_and_signed_in_back_to(se
         assert refused.status_code == 422
 
 
-def test_the_web_port_is_passed_on(settings_back, monkeypatch, capsys):
+@pytest.mark.parametrize("port", ["5300", "1024", "65535"])
+def test_the_web_port_is_passed_on(port, settings_back, monkeypatch, capsys):
+    # Both ends of the range are ports the dev server may have (review B32).
     import uvicorn  # noqa: PLC0415
 
     monkeypatch.setattr(uvicorn, "run", lambda app, **options: None)
-    assert dev_api.main(["--port", "8123", "--web-port", "5300"]) == 0
-    assert settings.web_origins[0] == "http://127.0.0.1:5300"
-    assert "http://127.0.0.1:5300" in capsys.readouterr().out
+    assert dev_api.main(["--port", "8123", "--web-port", port]) == 0
+    assert settings.web_origins[0] == f"http://127.0.0.1:{port}"
+    assert f"http://127.0.0.1:{port}" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("port", ["1023", "65536", "4173", "8123"])
-def test_a_web_port_the_dev_server_cannot_have_is_refused(port, capsys):
+def test_a_web_port_the_dev_server_cannot_have_is_refused(port, monkeypatch, capsys):
+    # Were one let through, main would start a real server and the test would hang instead of failing (review B32).
+    import uvicorn  # noqa: PLC0415
+
+    def started(app, **options):
+        raise AssertionError(f"--web-port {port} was let through")
+
+    monkeypatch.setattr(uvicorn, "run", started)
     with pytest.raises(SystemExit) as refused:
         dev_api.main(["--port", "8123", "--web-port", port])
     assert refused.value.code == 2 and "--web-port" in capsys.readouterr().err
@@ -314,6 +323,10 @@ def test_the_catalog_has_programs_to_start_with_and_plans_to_ask_under(client):
         "cs-ms-boston-2026-2027-standard": "source_checked", "cs-ms-boston-2026-2027-align": "source_checked",
         "cs-ms-boston-2026-2027-bridge": "draft", "cs-ms-boston-2025-2026-standard": "source_checked"}
     assert set(cs["plan_revisions"]) == {plan["plan_id"] for plan in cs["plans"]}
+    # ds-ms's one plan is the one with a concentration (review B32). 中文：ds-ms 唯一的方案带 concentration。
+    ds = client.get("/programs/ds-ms").json()
+    assert [(plan["plan_id"], plan["concentration"], plan["review_status"]) for plan in ds["plans"]] == [
+        ("ds-ms-boston-2026-2027-standard-ai", "Synthetic AI concentration", "source_checked")]
 
 
 def plan_question(client, plan_id, *, revision=None):

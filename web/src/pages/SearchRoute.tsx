@@ -263,11 +263,14 @@ export function SearchRoute() {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
   // An old shared link, /?course=CS-5800, opens the course's page, in place of this address (R0 11). A return from
-  // Google is useSession's; the link it came back to is handled after it.
-  const ref = params.get('course')?.trim() ?? '';
+  // Google is useSession's; the link it came back to is handled after it. As in Streamlit (app/deep_links.py
+  // _read_param), a key written twice counts by its last value. "." and ".." cannot be a path's segment (the address
+  // would read them as this path and the one above it), so they stay here like a blank one (review A32).
+  const ref = params.getAll('course').at(-1)?.trim() ?? '';
   const login = isLoginReturn(pathname, search);
   useEffect(() => {
-    if (ref !== '' && !login) void navigate(coursePath(ref), { replace: true });
+    if (ref !== '' && ref !== '.' && ref !== '..' && !login)
+      void navigate(coursePath(ref), { replace: true });
   }, [ref, login, navigate]);
   return <SearchWorkspace />;
 }

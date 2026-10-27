@@ -121,17 +121,17 @@ it('asks nothing before it is known who is looking (R2b: back from Google, only 
   expect(screen.getByText(QUERY_LOG_FALLBACK, { exact: false })).toBeVisible();
 });
 
-it('with answer feedback on: the opt-in and the API’s notice, still ticked after a question', async () => {
+it('with answer feedback on: the opt-in and the API’s notice', async () => {
   const { user, send, input, button } = setup();
   const box = await screen.findByRole('checkbox', { name: CAPTURE_LABEL });
   expect(box).not.toBeChecked();
   expect(screen.getByText(CAPTURE)).toBeVisible();
   await user.click(box);
+  expect(box).toBeChecked();
   await user.type(input, 'CS 6140');
   await user.click(button);
   expect(send).toHaveBeenCalledExactlyOnceWith('CS 6140');
-  // Once ticked, the answers after it are saved until it is unticked (the API's notice says so).
-  expect(box).toBeChecked();
+  // That it stays ticked after a question is the search state's to keep: SearchRoute.test asks it on the whole page.
 });
 
 it('with answer feedback off: no opt-in, and Streamlit’s line that nothing is saved', async () => {

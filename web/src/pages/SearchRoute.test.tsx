@@ -2,10 +2,13 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
+import { privacyQuery } from '../api/privacy';
 import { curriculumQuery, programListQuery } from '../api/programs';
-import { configQuery, createQueryClient } from '../api/queries';
+import { configQuery, createQueryClient, meQuery } from '../api/queries';
 import type { Member } from '../api/queries';
 import { readyQuery } from '../api/ready';
+import coop from '../fixtures/landing/coop-guest.json';
+import privacy from '../fixtures/privacy/privacy-90-days-feedback-contact.json';
 import alias from '../fixtures/search/alias-cs-6140.json';
 import receipt from '../fixtures/search/feedback-receipt.json';
 import votes from '../fixtures/search/feedback-responses.json';
@@ -253,12 +256,14 @@ it('without the opt-in, a question does not ask to save its answer, and the answ
   const api = world((call) =>
     call.path === '/chat' ? stream(receipt.lines) : undefined,
   );
-  page(
-    '/',
-    seededQueryClient({
-      config: { answer_feedback_enabled: true, login_available: true },
-    }),
-  );
+  const client = seededQueryClient({
+    config: { answer_feedback_enabled: true, login_available: true },
+  });
+  // The privacy words are known before the search state starts (as when the shell mounts again on a warm cache), so
+  // the opt-in is offered from the first render and its default is what shows: were they still on their way, the
+  // render that finds no notice would clear it anyway (the project's mutation M12).
+  client.setQueryData(privacyQuery.queryKey, privacy.body);
+  page('/', client);
   expect(
     await screen.findByRole('checkbox', { name: CAPTURE_LABEL }),
   ).not.toBeChecked();
@@ -269,6 +274,36 @@ it('without the opt-in, a question does not ask to save its answer, and the answ
     await new Promise((resolve) => setTimeout(resolve, 50));
   });
   expect(screen.queryByRole('button', { name: '有帮助' })).toBeNull();
+  expect(chats(api.calls)[0]).toMatchObject({ allow_feedback_capture: false });
+});
+
+it('once /privacy can no longer be read, the opt-in is gone from the page and nothing is saved unseen (review A32)', async () => {
+  let privacyGone = false;
+  const api = world((call) =>
+    call.path === '/chat'
+      ? stream(receipt.lines)
+      : call.path === '/privacy' && privacyGone
+        ? apiError(404, 'not_found', 'Not found')
+        : undefined,
+  );
+  const { client } = page(
+    '/',
+    seededQueryClient({
+      config: { answer_feedback_enabled: true, login_available: true },
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole('checkbox', { name: CAPTURE_LABEL }),
+  );
+  privacyGone = true;
+  await act(() => client.invalidateQueries({ queryKey: ['privacy'] }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('checkbox', { name: CAPTURE_LABEL }),
+    ).not.toBeInTheDocument(),
+  );
+  await ask(receipt.request.body.query);
+  await waitFor(() => expect(chats(api.calls)).toHaveLength(1));
   expect(chats(api.calls)[0]).toMatchObject({ allow_feedback_capture: false });
 });
 
@@ -304,15 +339,44 @@ it('an old ?course= link opens the course’s page in its place, so Back goes wh
   expect(where()).toBe('/compare');
 });
 
-it('a blank ?course= stays on the search page', async () => {
-  const api = world();
-  page('/?course=%20%20');
-  await landed();
-  expect(where()).toBe('/?course=%20%20');
-  expect(api.count('GET', '/resolve/course')).toBe(0);
+it.each(['%20%20', '.', '..'])(
+  'a ?course= of %s stays on the search page (no address can carry it)',
+  async (ref) => {
+    const api = world();
+    page(`/?course=${ref}`);
+    await landed();
+    expect(where()).toBe(`/?course=${ref}`);
+    expect(api.count('GET', '/resolve/course')).toBe(0);
+  },
+);
+
+it('a ?course= written twice counts by its last value, as in Streamlit', async () => {
+  world();
+  page('/?course=CS-5800&course=CS-6140');
+  await waitFor(() => expect(where()).toBe('/course/CS-6140'));
 });
 
-it('a return from Google is the login’s: the course in its address is not opened meanwhile', async () => {
+it.each([
+  ['CS%206140', '/course/CS-6140', 'CS-6140'],
+  [
+    '%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0',
+    '/course/%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0',
+    '机器学习',
+  ],
+  ['CS%23%3F6140', '/course/CS%23%3F6140', 'CS#?6140'],
+])(
+  'a ?course= of %s opens an address that carries it whole, and that is what is looked up (review B32)',
+  async (ref, path, sent) => {
+    const api = world();
+    page(`/?course=${ref}`);
+    await waitFor(() => expect(where()).toBe(path));
+    await waitFor(() => expect(api.count('GET', '/resolve/course')).toBe(1));
+    const lookup = api.calls.find((call) => call.path === '/resolve/course')!;
+    expect(new URLSearchParams(lookup.search).get('ref')).toBe(sent);
+  },
+);
+
+it('a return from Google is the login’s: the course in its address is not opened', async () => {
   const api = world();
   page('/?code=abc&state=xyz&course=CS-6140');
   expect(
@@ -464,6 +528,7 @@ it('a question goes with the program and the exact plan chosen; the selector off
     'boston · Catalog 2025-2026 · 普通 MS · 共同部分／未限定 concentration',
   ]);
   await userEvent.click(screen.getByRole('option', { name: ALIGN_PLAN }));
+  expect(combobox('方案')).toHaveTextContent(ALIGN_PLAN);
   expect(screen.getByText(PLAN_NOTE)).toBeInTheDocument();
   expect(screen.queryByText(PROGRAM_NOTE)).not.toBeInTheDocument();
   await ask('第一学期选什么？');
@@ -482,6 +547,33 @@ it('a question goes with the program and the exact plan chosen; the selector off
   });
   // cs-ms was asked once, for the landing; the selector reads the same answer.
   expect(api.count('GET', '/programs/cs-ms')).toBe(1);
+});
+
+it('while the program list cannot be read, a question carries no program or plan, as the page shows none (review A32)', async () => {
+  let listGone = false;
+  const api = world((call) =>
+    call.path === '/programs' && listGone
+      ? apiError(404, 'not_found', 'Not found')
+      : undefined,
+  );
+  const { client } = page('/');
+  await landed();
+  await choose('项目', CS_PROGRAM);
+  await choose('方案', ALIGN_PLAN);
+  listGone = true;
+  await act(() =>
+    client.invalidateQueries({
+      queryKey: programListQuery.queryKey,
+      exact: true,
+    }),
+  );
+  expect(await screen.findByText(PROGRAMS_UNAVAILABLE)).toBeInTheDocument();
+  expect(combobox('项目')).toBeNull();
+  expect(combobox('方案')).toBeNull();
+  await ask('第一学期选什么？');
+  await waitFor(() => expect(chats(api.calls)).toHaveLength(1));
+  expect(chats(api.calls)[0]).not.toHaveProperty('program_id');
+  expect(chats(api.calls)[0]).not.toHaveProperty('plan');
 });
 
 it('a plan refusal clears the plan on the page, keeps the program and asks for its plans again', async () => {
@@ -561,6 +653,16 @@ it('a plan list that can no longer be read takes the choice and the selector, an
   expect(screen.queryByText(PLAN_REVISED)).not.toBeInTheDocument();
 });
 
+it('an empty program list shows no selectors, and says nothing failed (R0 3 ①, review B32)', async () => {
+  world((call) => (call.path === '/programs' ? json([]) : undefined));
+  page('/');
+  expect(
+    await screen.findByRole('button', { name: '去看看' }),
+  ).toBeInTheDocument();
+  expect(combobox('项目')).toBeNull();
+  expect(screen.queryByText(PROGRAMS_UNAVAILABLE)).toBeNull();
+});
+
 it('a program no longer listed goes from the choice', async () => {
   world();
   const { client } = page('/');
@@ -575,6 +677,107 @@ it('a program no longer listed goes from the choice', async () => {
   await waitFor(() => expect(combobox('项目')).toHaveTextContent('不指定'));
   expect(combobox('方案')).toBeNull();
   expect(screen.queryByText(PROGRAM_NOTE)).not.toBeInTheDocument();
+});
+
+it('the program and plan chosen stay on a course page and after it (review B32)', async () => {
+  world();
+  page('/');
+  await landed();
+  await choose('项目', CS_PROGRAM);
+  await choose('方案', ALIGN_PLAN);
+  await userEvent.click(screen.getByRole('button', { name: '查看 CS 5010' }));
+  await waitFor(() => expect(where()).toBe('/course/CS-5010'));
+  expect(combobox('项目')).toHaveTextContent(CS_PROGRAM);
+  expect(combobox('方案')).toHaveTextContent(ALIGN_PLAN);
+  await userEvent.click(screen.getByRole('link', { name: '回到课程搜索' }));
+  await waitFor(() => expect(where()).toBe('/'));
+  expect(combobox('项目')).toHaveTextContent(CS_PROGRAM);
+  expect(combobox('方案')).toHaveTextContent(ALIGN_PLAN);
+});
+
+it('a question on its way goes on while the student looks at another page (plan 3, review B32)', async () => {
+  const chat = held();
+  const api = world((call) =>
+    call.path === '/chat' ? chat.response : undefined,
+  );
+  page('/');
+  await landed();
+  await ask('CS 6140 讲什么？');
+  await waitFor(() => expect(chats(api.calls)).toHaveLength(1));
+  await userEvent.click(
+    within(screen.getByRole('navigation', { name: '主导航' })).getByRole(
+      'link',
+      { name: /课程对比/ },
+    ),
+  );
+  await waitFor(() => expect(where()).toBe('/compare'));
+  chat.answer(stream(alias.lines));
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  await waitFor(() => expect(where()).toBe('/'));
+  expect(await answered()).toBeInTheDocument();
+  expect(chats(api.calls)).toHaveLength(1);
+});
+
+it('a logout on the page empties the conversation, the choices and the opt-in (review B32)', async () => {
+  world((call) =>
+    call.path === '/auth/logout'
+      ? new Response(null, { status: 204 })
+      : undefined,
+  );
+  page(
+    '/',
+    seededQueryClient({
+      viewer: member,
+      config: { answer_feedback_enabled: true, login_available: true },
+    }),
+  );
+  await landed();
+  await choose('项目', CS_PROGRAM);
+  await choose('方案', ALIGN_PLAN);
+  await userEvent.click(screen.getByRole('checkbox', { name: CAPTURE_LABEL }));
+  await ask('CS 6140 讲什么？');
+  await answered();
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '退出登录' })[0]!,
+  );
+  await landed();
+  expect(screen.queryByText('CS 6140 讲什么？')).not.toBeInTheDocument();
+  expect(combobox('项目')).toHaveTextContent('不指定');
+  expect(combobox('方案')).toBeNull();
+  expect(
+    screen.getByRole('checkbox', { name: CAPTURE_LABEL }),
+  ).not.toBeChecked();
+  expect(screen.getByText(GUEST_NOTE)).toBeInTheDocument();
+});
+
+it('the same member with a new contribution count keeps the conversation and the choices (review B32)', async () => {
+  world();
+  const { client } = page('/', seededQueryClient({ viewer: member }));
+  await landed();
+  await choose('项目', CS_PROGRAM);
+  await ask('CS 6140 讲什么？');
+  await answered();
+  // What a Co-op upload's 201 does to the session (useSession's contributed): the same person, one more credited.
+  const credited: Member = { ...member, contributionCount: 1 };
+  act(() => {
+    client.setQueryData(meQuery.queryKey, credited);
+  });
+  expect((await screen.findAllByText('贡献数：1')).length).toBeGreaterThan(0);
+  // Long enough for a reset after that render to have come, had there been one.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+  expect(screen.getByText('CS 6140 讲什么？')).toBeInTheDocument();
+  expect(combobox('项目')).toHaveTextContent(CS_PROGRAM);
+});
+
+it('the landing’s Co-op is asked as the member looking, who is shown what a guest is not (review B32)', async () => {
+  const unlocked = { ...coop.body[0]!, salary_range_usd: '40–45 USD/hour' };
+  const api = world((call) =>
+    call.path === '/coop' ? json([unlocked]) : undefined,
+  );
+  page('/', seededQueryClient({ viewer: { ...member, contributionCount: 2 } }));
+  expect(await screen.findByText(unlocked.company)).toBeInTheDocument();
+  expect(screen.queryByText(/你分享的经验公开后解锁/)).toBeNull();
+  expect(api.count('GET', '/coop')).toBe(1);
 });
 
 it('has no DOM axe violations with the landing, and with a conversation', async () => {

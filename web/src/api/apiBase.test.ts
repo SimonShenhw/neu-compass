@@ -174,6 +174,9 @@ describe('the site a shared link names (R3e)', () => {
     expect(devPort(undefined)).toBe(5173);
     expect(devPort(' ')).toBe(5173);
     expect(devPort('5300')).toBe(5300);
+    // Both ends of the range are ports (review B32).
+    expect(devPort('1024')).toBe(1024);
+    expect(devPort('65535')).toBe(65535);
     for (const value of ['80', '1023', '65536', '5300x', '-1', '5e3'])
       expect(() => devPort(value), value).toThrow('VITE_DEV_PORT');
   });
