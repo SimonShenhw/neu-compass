@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { PlanDraft } from './PlanDraft';
+import styles from './PlanDraft.module.css';
 import {
   answerOf,
   draftGoldens,
@@ -88,8 +89,9 @@ it('a notice looks like its level: the warning box and icon, or the plain box an
   for (const name of ['standard-notices', 'standard-nothing-new']) {
     const { container, unmount } = render(<PlanDraft {...draftProps(name)} />);
     for (const notice of container.querySelectorAll('[data-kind="notice"]')) {
-      // The level is on the box that holds the icon, not on the sentence.
+      // The level is on the styled box that holds the icon, not on the sentence.
       const box = notice.closest<HTMLElement>('[data-level]')!;
+      expect(box).toHaveClass(styles.notice!);
       const level = box.dataset.level!;
       levels.push(level);
       const icon = box.querySelector(':scope > svg');
@@ -385,6 +387,25 @@ describe('focus', () => {
     expect(
       screen.getByRole('heading', { level: 3, name: HEADING }),
     ).toHaveFocus();
+    view.unmount();
+    // Or the check fails again in a way that cannot be retried: the button goes, the failure stays.
+    const failing = draftProps('standard-503-transport', { checking: true });
+    const again = render(<PlanDraft {...failing} />);
+    screen.getByRole('button', { name: '重新核对' }).focus();
+    again.rerender(
+      <PlanDraft
+        {...failing}
+        checking={false}
+        failure={draftFixture('draft-404').failure}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: '重新核对' })).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '找不到这个培养方案或方案，草案没有计算。',
+    );
+    expect(
+      screen.getByRole('heading', { level: 3, name: HEADING }),
+    ).toHaveFocus();
   });
   it('when the course count goes while nothing has focus, nothing takes it', () => {
     const props = draftProps('standard-mixed');
@@ -394,14 +415,25 @@ describe('focus', () => {
     expect(countLine()).toBeNull();
     expect(document.activeElement).toBe(document.body);
   });
-  it('when the course count goes while focus is elsewhere, focus stays there', async () => {
+  // React gives focus back to the element that had it before an update, so where focus ends up shows nothing; a
+  // moment of focus on the heading would still blur the box (and break an input method's composition), so the events
+  // are watched too.
+  it('when the course count goes while focus is elsewhere, focus stays there, not even for a moment elsewhere', async () => {
     const props = draftProps('standard-mixed');
     const { rerender } = render(<PlanDraft {...props} />);
     const box = screen.getByLabelText(LABEL);
     await userEvent.click(box);
+    const headingFocused = vi.fn();
+    screen
+      .getByRole('heading', { level: 3, name: HEADING })
+      .addEventListener('focus', headingFocused);
+    const boxBlurred = vi.fn();
+    box.addEventListener('blur', boxBlurred);
     rerender(<PlanDraft {...props} planContentSha256={'f'.repeat(64)} />);
     expect(countLine()).toBeNull();
     expect(box).toHaveFocus();
+    expect(headingFocused).not.toHaveBeenCalled();
+    expect(boxBlurred).not.toHaveBeenCalled();
   });
   it('the heading and the course count take focus from the page but are not Tab stops', async () => {
     render(<PlanDraft {...draftProps()} />);
@@ -472,19 +504,26 @@ it('a course line keeps its line breaks and spaces as text, with no anchor', () 
   expect(container.querySelector('a')).toBeNull();
 });
 
-// jsdom applies no stylesheet, so the declarations that show line breaks and wrap long words are read from the file.
+// jsdom applies no stylesheet, so the declarations that matter are read from the file; a line break in front, so the
+// first rule starts a line like the others.
+const css = `\n${readFileSync(
+  resolve(process.cwd(), 'src/features/programs/PlanDraft.module.css'),
+  'utf8',
+)}`;
+const cssRule = (selector: string) => {
+  const start = css.indexOf(`\n${selector} {`);
+  expect(start, selector).toBeGreaterThanOrEqual(0);
+  return css.slice(start, css.indexOf('}', start));
+};
+const cssValues = (property: string) =>
+  new Set(
+    [...css.matchAll(new RegExp(`${property}:\\s*([^;]+);`, 'g'))].map(
+      (m) => m[1],
+    ),
+  );
+
 it('the stylesheet shows line breaks and spaces and wraps long words', () => {
-  // A line break in front, so the first rule starts a line like the others.
-  const css = `\n${readFileSync(
-    resolve(process.cwd(), 'src/features/programs/PlanDraft.module.css'),
-    'utf8',
-  )}`;
-  const rule = (selector: string) => {
-    const start = css.indexOf(`\n${selector} {`);
-    expect(start, selector).toBeGreaterThanOrEqual(0);
-    return css.slice(start, css.indexOf('}', start));
-  };
-  expect(rule('.draft')).toContain('overflow-wrap: anywhere;');
+  expect(cssRule('.draft')).toContain('overflow-wrap: anywhere;');
   for (const selector of [
     '.note',
     '.text',
@@ -493,12 +532,24 @@ it('the stylesheet shows line breaks and spaces and wraps long words', () => {
     '.courseText',
     '.tree',
   ])
-    expect(rule(selector), selector).toContain('white-space: pre-wrap;');
-  expect(rule('.tree')).toContain('overflow-wrap: anywhere;');
+    expect(cssRule(selector), selector).toContain('white-space: pre-wrap;');
+  expect(cssRule('.tree')).toContain('overflow-wrap: anywhere;');
+  // And no rule anywhere in the file takes it back.
+  expect(cssValues('white-space')).toEqual(new Set(['pre-wrap']));
+  expect(cssValues('overflow-wrap')).toEqual(new Set(['anywhere']));
+});
+
+it('the stylesheet gives a warning notice its border and greys out a button that waits', () => {
   // The two looks of a notice hang on its box's level.
-  expect(rule(".notice[data-level='warning']")).toContain(
+  expect(cssRule(".notice[data-level='warning']")).toContain(
     'border-color: var(--accent);',
   );
+  // Add and retry while a check is on its way.
+  const waiting = cssRule(
+    ".add[aria-disabled='true'],\n.retry[aria-disabled='true']",
+  );
+  expect(waiting).toContain('cursor: not-allowed;');
+  expect(waiting).toContain('opacity: 0.55;');
 });
 
 it('typing and every button keep nothing: no storage and no address', () => {
@@ -737,6 +788,23 @@ describe('what a screen reader hears', () => {
       expect(again).toHaveTextContent(text);
       unmount();
     }
+  });
+  it('a new failure draws only its sentence afresh: the notices and the count’s words stay', () => {
+    const props = draftProps('standard-notices', {
+      failure: draftFixture('draft-409-unavailable').failure,
+    });
+    const { container, rerender } = render(<PlanDraft {...props} />);
+    const notices = [...container.querySelectorAll('[data-kind="notice"]')];
+    const words = countLine().firstElementChild;
+    const sentence = container.querySelector('[data-kind="failure"]');
+    rerender(<PlanDraft {...props} failure={{ ...props.failure! }} />);
+    expect(container.querySelector('[data-kind="failure"]')).not.toBe(sentence);
+    expect(
+      [...container.querySelectorAll('[data-kind="notice"]')].every(
+        (n, i) => n === notices[i],
+      ),
+    ).toBe(true);
+    expect(countLine().firstElementChild).toBe(words);
   });
   it('drawing again with the same answer and failure redraws nothing', () => {
     const props = draftProps('standard-notices', {

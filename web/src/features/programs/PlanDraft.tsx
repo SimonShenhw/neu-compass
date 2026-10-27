@@ -172,9 +172,10 @@ function Draft(props: PlanDraftProps) {
   const answerRound = useRound(props.answer);
   const failureRound = useRound(props.failure);
   // A new answer or outcome can take away a part of the draft that has focus: the course count a remove left focus
-  // on (when the answer cannot be shown), a course's buttons, the retry button after a success. Focus would fall back
-  // to the page, so it goes to the heading first, again without scrolling. A ref cleanup runs before React takes the
-  // node out, while focus is still in it; focus anywhere else, or nowhere, is left alone.
+  // on (when the answer cannot be shown), a course's buttons, the retry button (after a success, or a new failure that
+  // cannot be retried). Focus would fall back to the page, so it goes to the heading first, again without scrolling.
+  // A ref cleanup runs before React takes the node out, while focus is still in it; focus anywhere else, or nowhere,
+  // is left alone.
   const keepFocus = useCallback(
     (el: HTMLElement | null) => () => {
       if (el?.contains(document.activeElement))
@@ -261,14 +262,16 @@ function Draft(props: PlanDraftProps) {
         </div>
       </div>
       {props.failure && (
-        <div ref={keepFocus} className={styles.failure}>
+        <div className={styles.failure}>
           {/* Only the sentence is drawn afresh; the retry button stays, and so does any focus on it. */}
           <Alert key={failureRound} kind="failure">
             {draftFailureMessage(props.failure)}
           </Alert>
           {canRetryDraft(props.failure) && (
-            // While the retry is on its way, like add: no second call, and focus stays.
+            // While the retry is on its way, like add: no second call, and focus stays. It hands focus on when it goes,
+            // with the failure (a success) or on its own (a new failure that cannot be retried).
             <Button
+              ref={keepFocus}
               data-kind="button"
               data-action="retry"
               aria-disabled={props.checking}

@@ -2,11 +2,13 @@
 // Each runs against an isolated copy of src/ (a junction to node_modules) after a clean baseline of types and tests;
 // a mutation counts as killed only when Vitest fails and one of the failed tests is the named one, whatever failed
 // it (an assertion, a missing element or a thrown error); a type mutation, only when the named type test fails to
-// compile on that field. The working tree is hashed before and after and must not change; the copy is removed at the
-// end, its junctions first.
+// compile on that field. The working tree is hashed before and after and must not change; the copy is removed when
+// the process exits, however the run ends, its junctions first.
 import { createHash } from 'node:crypto';
 import {
   cpSync,
+  existsSync,
+  lstatSync,
   readFileSync,
   writeFileSync,
   readdirSync,
@@ -58,6 +60,19 @@ const frozen = freeze(),
   );
 mkdirSync(output, { recursive: true });
 const snapshot = mkdtempSync(join(realpathSync.native(tmpdir()), 'neu-draft-'));
+// The copy goes however the run ends, a failed baseline or a bad anchor included. Its junctions go first, so removing
+// it cannot reach the node_modules behind them; if one cannot be removed, the copy stays.
+process.on('exit', () => {
+  const links = ['node_modules', 'tools/openapi-types/node_modules'].map((l) =>
+    join(snapshot, l),
+  );
+  for (const link of links)
+    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
+      unlinkSync(link);
+  if (links.some((link) => existsSync(link)))
+    console.error('Copy kept, a link is still there: ' + snapshot);
+  else rmSync(snapshot, { recursive: true, force: true });
+});
 cpSync(join(root, 'src'), join(snapshot, 'src'), { recursive: true });
 for (const file of config) {
   const target = join(snapshot, file);
@@ -828,8 +843,8 @@ add(
 add(
   'a failure like the last rebuilds the retry button',
   ui,
-  '<div ref={keepFocus} className={styles.failure}>',
-  '<div key={failureRound} ref={keepFocus} className={styles.failure}>',
+  '<div className={styles.failure}>',
+  '<div key={failureRound} className={styles.failure}>',
   view,
   'a retry that fails the same way again draws its sentence afresh',
 );
@@ -861,7 +876,7 @@ add(
   'each answer rebuilds the count line',
   ui,
   '<p ref={countRef} tabIndex={-1} data-kind="count">',
-  '<p key={answerRound} ref={countRef} tabIndex={-1} data-kind="count">',
+  '<p key={"count" + answerRound} ref={countRef} tabIndex={-1} data-kind="count">',
   view,
   'an answer like the last one draws its notices',
 );
@@ -1131,7 +1146,7 @@ add(
   ".notice[data-level='warning'] {\n  border-color: var(--accent);",
   ".notice[data-level='warning'] {",
   view,
-  'the stylesheet shows line breaks',
+  'the stylesheet gives a warning notice its border',
 );
 add(
   'B50: changing one control drops the other',
@@ -1231,10 +1246,16 @@ add(
   'when the buttons of a course or the retry button go',
 );
 add(
-  'the retry button takes focus away with it',
+  'only the failure block hands focus on, not the retry button alone',
   ui,
-  '<div ref={keepFocus} className={styles.failure}>',
-  '<div className={styles.failure}>',
+  [
+    '<div className={styles.failure}>',
+    'ref={keepFocus}\n              data-kind="button"\n              data-action="retry"',
+  ],
+  [
+    '<div ref={keepFocus} className={styles.failure}>',
+    'data-kind="button"\n              data-action="retry"',
+  ],
   view,
   'when the buttons of a course or the retry button go',
 );
@@ -1245,6 +1266,63 @@ add(
   'count.current = null;',
   view,
   'when the course count goes while it has focus',
+);
+// Recheck round 1.
+add(
+  'the retry button alone takes focus away with it',
+  ui,
+  'ref={keepFocus}\n              data-kind="button"\n              data-action="retry"',
+  'data-kind="button"\n              data-action="retry"',
+  view,
+  'when the buttons of a course or the retry button go',
+);
+add(
+  'B80b: focus borrowed from another element for a moment',
+  ui,
+  'if (el?.contains(document.activeElement))',
+  'if (document.activeElement !== document.body && document.activeElement !== heading.current)',
+  view,
+  'when the course count goes while focus is elsewhere',
+);
+add(
+  'B94: a new failure redraws the notices',
+  ui,
+  '<Notices key={answerRound} answer={answer} />',
+  '<Notices key={answerRound + ":" + failureRound} answer={answer} />',
+  view,
+  'a new failure draws only its sentence afresh',
+);
+add(
+  'a new failure redraws the count’s words',
+  ui,
+  '<span key={answerRound}>',
+  '<span key={answerRound + ":" + failureRound}>',
+  view,
+  'a new failure draws only its sentence afresh',
+);
+add(
+  'B81: the notice box loses its look',
+  ui,
+  '<div key={i} className={styles.notice} data-level={n.level}>',
+  '<div key={i} data-level={n.level}>',
+  view,
+  'a notice looks like its level',
+);
+add(
+  'B82: a later rule takes the line breaks back',
+  css,
+  '.courseActions {',
+  '.course p {\n  white-space: normal;\n}\n.courseActions {',
+  view,
+  'the stylesheet shows line breaks',
+);
+add(
+  'B83: a waiting retry is not greyed out',
+  css,
+  ".add[aria-disabled='true'],\n.retry[aria-disabled='true'] {",
+  ".add[aria-disabled='true'] {",
+  view,
+  'the stylesheet gives a warning notice its border',
 );
 
 // Check every anchor before starting baseline or mutating the isolated copy.
@@ -1330,10 +1408,6 @@ writeFileSync(
   ),
   { flag: 'wx' },
 );
-// The junctions go first, so removing the copy cannot reach the node_modules behind them.
-for (const link of ['node_modules', 'tools/openapi-types/node_modules'])
-  unlinkSync(join(snapshot, link));
-rmSync(snapshot, { recursive: true });
 console.info(
   `${results.filter((r) => r.killed).length}/${results.length} killed; source unchanged: ${sourceUnchanged}`,
 );
