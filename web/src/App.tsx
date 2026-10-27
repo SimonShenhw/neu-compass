@@ -5,7 +5,7 @@ import { SearchRoute } from './pages/SearchRoute';
 import { CourseRoute } from './pages/CourseRoute';
 import { CompareRoute } from './pages/CompareRoute';
 import { CompareDemoPage } from './pages/CompareDemoPage';
-import { ProgramsPage } from './pages/ProgramsPage';
+import { ProgramRoute, ProgramsRoute } from './pages/ProgramsRoute';
 import { CoopRoute } from './pages/CoopRoute';
 import { CoopDemoPage } from './pages/CoopDemoPage';
 import { PrivacyRoute } from './pages/PrivacyRoute';
@@ -52,7 +52,8 @@ export function App() {
         <Route path="/" element={<SearchRoute />} />
         <Route path="/course/:code" element={<CourseRoute />} />
         <Route path="/compare" element={<CompareRoute />} />
-        <Route path="/programs" element={<ProgramsPage />} />
+        <Route path="/programs" element={<ProgramsRoute />} />
+        <Route path="/programs/:programId" element={<ProgramRoute />} />
         <Route path="/coop" element={<CoopRoute />} />
         <Route path="/privacy" element={<PrivacyRoute />} />
         <Route path="/compare-demo" element={<CompareDemoPage />} />

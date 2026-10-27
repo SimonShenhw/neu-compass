@@ -110,7 +110,7 @@ it('a program opens its page, and Co-op its own', async () => {
   page('/');
   await landed();
   await userEvent.click(screen.getByRole('button', { name: 'CS · 6 门课' }));
-  expect(where()).toBe('/programs?program=cs-ms');
+  expect(where()).toBe('/programs/cs-ms');
   await userEvent.click(screen.getByRole('button', { name: 'back' }));
   await userEvent.click(await screen.findByRole('button', { name: '去看看' }));
   expect(where()).toBe('/coop');
@@ -134,7 +134,7 @@ it('a program’s ID goes into its page’s address encoded', async () => {
   page('/');
   await landed();
   await userEvent.click(screen.getByRole('button', { name: 'XY · 1 门课' }));
-  expect(where()).toBe('/programs?program=x%26y%20z');
+  expect(where()).toBe('/programs/x%26y%20z');
 });
 
 it('the landing’s retry asks again only what failed: here a featured program and Co-op', async () => {

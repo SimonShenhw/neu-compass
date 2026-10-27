@@ -57,7 +57,7 @@
     {
       "depth": 1,
       "kind": "code",
-      "value": "https://compass.example.test/?program=pjm-ms"
+      "value": "https://compass.example.test/programs/pjm-ms"
     },
     {
       "depth": 1,
@@ -139,7 +139,7 @@
     {
       "depth": 1,
       "kind": "share_url",
-      "text": "https://compass.example.test/?program=pjm-ms"
+      "text": "https://compass.example.test/programs/pjm-ms"
     },
     {
       "depth": 1,

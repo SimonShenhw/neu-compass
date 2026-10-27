@@ -4886,3 +4886,110 @@ A32 的 N6、B32 的 N12、L15 和 N18 写进「已知」。
 ### 发布状态
 
 分支 `feat/web-search-api`，从 main `cbb91f7`（#36 合并以后）开，四个提交：`fd39175`（这一批）、`bc9b923`（第 32 轮的修复）、`6141ecf`（复核第 1 轮的修复）和它后面复核第 2 轮（最后一轮）的措辞。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
+
+## 39 — 培养方案页接上真实接口（R4c，2026-10-27）
+
+### 范围与原因
+
+R4a 的课程表组件（#35）和 R4b 的草案（接口 #36，组件 #37）都只用在演示路由上，真实的 `/programs` 还是一句「这一页正在搬到新版」。这一批把它换成接真实接口的页面，方案 `R4C_PLAN.md`（事实的出处 `r4c/FACTS_R4c.md`，都在评审目录）。10-27 用户定了方案第 8 节的三条：每个项目一个网址（`/programs/cs-ms`）；搜索页和培养方案页的项目、方案选择分开，和 Streamlit 一样；旧的方案链接没通过时打开这个项目、不选方案（Streamlit 是回到列表）。从 main `9dd490e`（#38 合并以后）开 `feat/web-programs-api`。#37 还没合并：选课草案的接线等它合并以后，把 main 合进来再做，这一节先记不用草案的部分。
+
+线上不变：新前端还没部署。后端只改了网页版隐私说明的一句。
+
+### 已实现
+
+**页面**（新文件 `src/pages/ProgramsRoute.tsx`）
+
+1. **两个路由**（`App.tsx`）：`/programs` 是 R4a 的 `ProgramList`，`/programs/:programId` 是 `ProgramCurriculum`；占位页 `ProgramsPage.tsx` 删了。`routePresentation` 照 `/course/:code` 的写法，把 `/programs/:programId` 归到「培养方案」（标题和导航当前项）。
+2. **取数**：列表 `programListQuery`、课程表 `curriculumQuery(id)`，和落地页、搜索页共用缓存；知道「现在是谁」以前不问（`viewerScope`，和搜索页一样）。地址里的 ID 不合 API 的格式（`^[a-z0-9][a-z0-9-]{0,63}$`）就不问，交给 R4a 的组件说「找不到这个培养方案」；API 的 404 也是这句。
+3. **列表**：打开项目是换页（外壳照旧把焦点放到 main）；「重新加载」以后焦点交给列表，因为按下的按钮没了（照 R4a 的演示）。
+4. **课程表**：「刷新方案及政策证据」照 Streamlit 删掉这个项目的缓存（`resetQueries`，只这一个键），重取失败也不退回旧的课程表，同时清掉选择。课程表暂时读不到时，R4a 的组件没有单独的重试按钮，就用这个重试。「← 所有培养方案」回列表。课程行的「查看」去 `/course/<课号>`，带着课程 ID（R3e 的 `useOpenCourse`）。
+5. **政策证据**（`api/programs.ts` 新的 `policiesQuery`）：键 `['programs', id, 'plans', planId, 'policies', 内容版本]`，`staleTime`、`gcTime` 都是 0；页面上每次读取都只给 loading，不套 `shownData`。所以选回之前选过的方案、按侧栏的「刷新页面内容」，都不会先显示上一次的证据（R0 第 14 节第 10 条）。没选方案时不问。
+6. **改版提示**：R4a 那行是普通的字，读屏不会主动念（R4b README 给接线的第四点）。页面另放一个一直在的 `role="status"`（视觉上藏起来），选择因为改版被清掉时说同一句。
+7. **分享框**（`models/programFormat.ts`）：只分享项目时给 `/programs/<ID>`（新的 `programPath`）；选了核对过的方案时照旧给 8 个参数的方案链接，它是唯一带着内容版本的链接，Streamlit 也认。R4a 的标准答案里，15 个文件 31 处项目地址照新格式改了（`r4c/update_share_fixtures.py`，只换 `<站点>/?program=<ID>`，40 处方案链接没动）；`programsFixtures.test.ts` 冻结的 15 个哈希跟着换了（`r4c/repin_share_fixtures.py`，旧哈希按 HEAD 的内容算，每个在文件里正好出现一次）。R4a 变异脚本里 `shareUrl` 的三个变异，锚点都还在。
+
+**状态**（新文件 `src/layout/ProgramsContext.tsx`）
+
+8. **每个项目一个方案选择**，连同选的时候方案列表的签名（R3e 的 `plansSignature`），放在外壳里（`AppShell` 里 `SearchProvider` 的下面），换页保留，刷新页面就没了。
+   - 改版检测照 R3e：provider 用 `enabled: false` 的 `useQueries` 读有选择的那些项目的课程表缓存，签名变了就在渲染时清掉选择、记下改版。列表又变回来，也不会把旧的选择带回来。
+   - 签名没变、所选的方案却不再提供了（`availablePlans` 去掉了它）：静静清掉（Streamlit 的 `program_plan_view`）。
+   - 登出、删号、别人登录时清空，`/auth/me` 第一次回答不算换人（和 `SearchContext` 一样）。
+   - 和搜索页的选择分开（用户 10-27 定的）：两边只共用课程表缓存。搜索页的方案类 409 会让这个项目重取，方案真变了，这边的选择也跟着清，和 Streamlit 一样。
+
+**旧链接**（新文件 `src/models/programLinks.ts`；`SearchRoute.tsx`）
+
+9. **顺序照 Streamlit 的 `apply_deep_link`**：地址里有 `program` 以外的任何一个方案参数，就是方案链接（坏的也是，不再当 `?program=`）；然后 `?course=`（R3e）；最后 `?program=`。`?course=` 和 `?program=` 都有时开课程页，项目不备（Streamlit 会在培养方案页备好，见「已知」）。都用替换；从 Google 回来的那一次照旧不处理。
+10. **方案链接**（`readPlanLink`，照 `read_plan_link` 和 `PlanSelection`）：
+    - 8 个参数各正好出现一次，合计不超过 2048 字，`concentration` 是 JSON 的 `null` 或字符串，各项的格式都对（项目、方案、校区的格式，连续两年，三种路径，1–100 字且不全是空白，64 位小写十六进制），并且没带 `course`。不过关就开列表，说一句。
+    - 过关就打开那个项目，把原样的查询串放进这一条历史记录的 state。项目页先清掉这个项目原来的选择（照 Streamlit），再不读缓存地取一次（`fetchQuery`，`staleTime: 0`），用 `checkPlanLink`（照 `resolve_plan_link`）判断：项目 ID 对不上、方案表不可用、超过 100 份、有一份不是这个项目的方案、ID 或范围重复、没有这个方案、回答里没有它的版本、范围或版本不同、不是核对过的。
+    - 都过了才选上；不然不选方案（用户定的：留在这个项目），说为什么。
+    - 暂时取不到（408、429、5xx）：说一句，等下一次成功的读取（按「刷新方案及政策证据」）再核对；缓存里的旧回答不顶替这次失败的读取。404 不另外说，页面已经说找不到。
+    - 提示的句子都重写过，去掉了 emoji 和「旧 seed」这种内部的话。
+11. **`/?program=<ref>`**：去列表，把 ref 放进 state；列表回来以后照 `match_program_ref` 找（先按 ID、再按前缀，都不分大小写，前缀对上多个算没找到）。找到了换成那个项目的页面；没找到留在列表，说「没有找到链接里的培养方案「…」」（ref 照 R3e 的 `refLabel` 净化）。Streamlit 说「已打开完整列表」，其实没跳页，这里照话做。列表读不到时就是列表页的样子，按「重新加载」以后接着找。
+12. **落地页的项目按钮**从 `/programs?program=<ID>` 改成 `/programs/<ID>`（R3e 留下的那个跳转）。
+
+**别的**
+
+13. **隐私说明**（`api/privacy_text.py`）：`GET /privacy` 网页版「记了什么」的最后一句，改成课程页和培养方案页都有自己的网址、都会留在浏览器历史里，例子加了 `/programs/cs-ms`；Streamlit 不传 `web=True`，不变。
+14. **侧栏页脚**「搜索、课程详情…已接真实接口；培养方案还是假数据原型」那句去掉了。
+15. **项目的变异脚本**（`web/scripts/mutations.mjs`）退出时删副本：先删每份副本的 `node_modules` 联接（`unlinkSync`），都删掉了才递归删整个目录；删不掉联接就留下副本、报一句（照 R4b 的 `draft-mutations.mjs`）。原来每跑一次就在系统临时目录留一个 `neu-compass-r1-*`，10-27 清理时一共 36 个。README 照改。
+
+**测试**
+
+16. **新测试**：
+    - `models/programLinks.test.ts`：方案链接读得出、16 种读不了、六种核对结果、`?program=` 的匹配；
+    - `layout/ProgramsContext.test.tsx`：每个项目一个选择、改版清掉并说、列表变回来不复活、不再提供的静静清掉、清掉提示、换人清空而第一次回答不算；
+    - `pages/ProgramsRoute.test.tsx`（37 条）：
+      - 列表：打开项目、重试后的焦点、知道是谁以前不问；
+      - 课程表：选方案读政策证据、分享地址、没选方案不问政策证据、选择跨页保留、两种重读都只显示加载、刷新不回退并清选择、改版提示和读屏、课程行、三种不合格式的 ID、API 的 404、登出清空；
+      - 旧链接：四种 `?program=`、没找到、列表读不到时等着、课程和项目都有、方案链接选上且不读缓存、三种不选方案的结果、两种方案表的问题、三种坏链接、暂时失败后刷新再核对、旧回答不顶替、核对中和 404、原来的选择不顶替；
+    - `searchRouteTestUtils.tsx` 加了「forward」按钮和 `page()` 的起始位置。
+17. **改过的旧测试**：`Programs.test.tsx` 一处、`SearchRoute.test.tsx` 两处写死的项目地址；`session.test.tsx` 从 `/programs` 登出的那条，先放好项目列表（这一页现在会取数据）；后端 `test_public_routes.py` 那条加了 `/programs/cs-ms` 的断言。
+
+### 修改文件
+
+- 后端改：`api/privacy_text.py`；后端测试改：`tests/test_public_routes.py`。
+- 前端新建：`web/src/layout/ProgramsContext.tsx`、`web/src/models/programLinks.ts`、`web/src/pages/ProgramsRoute.tsx`。
+- 前端改：`src/App.tsx`；`api/programs.ts`；`layout/AppShell.tsx`、`Sidebar.tsx`、`routePresentation.ts`；`models/programFormat.ts`；`pages/SearchRoute.tsx`；`web/scripts/mutations.mjs`。
+- 前端删除：`src/pages/ProgramsPage.tsx`。
+- 前端测试新建：`layout/ProgramsContext.test.tsx`、`models/programLinks.test.ts`、`pages/ProgramsRoute.test.tsx`；改：`features/programs/Programs.test.tsx`、`fixtures/programsFixtures.test.ts`、`layout/session.test.tsx`、`pages/SearchRoute.test.tsx`、`searchRouteTestUtils.tsx`。
+- R4a 的标准答案（`src/fixtures/programs/expected/`）15 份，只换了项目地址：`cs-bad-plan`、`cs-bridge-draft`、`cs-duplicate-plan`、`cs-duplicate-scope`、`cs-foreign-plan`、`cs-no-plan-table`、`cs-nothing-selected`、`cs-plan-revised`、`cs-selected-plan-gone`、`cs-share-base-slashes`、`cs-standard-revision-unknown`、`cs-unknown-requirement`、`info-empty`、`pjm-no-plans`、`share-url-vectors`（都是 `.json`）。
+- 文档：`web/README.md`（开头、变异副本那句、路由表和它下面两句、R4a 和 R3e 两节里已经不对的三句、新的 R4c 一节），本节。
+
+数据库结构、检索、提示词和 Streamlit 版都没改。
+
+### 验证记录
+
+- **前端检查**（最后一版代码）：类型、零警告 lint、构建、格式、生成的类型都过；Vitest **79 个文件 2239 条**全过（新的三个文件 86 条：`ProgramsRoute.test` 37、`programLinks.test` 43、`ProgramsContext.test` 6）；首屏 JavaScript gzip **204,977 字节**（预算 250,000；R3e 结束时 197,929，见「已知」）。构建的「有块超过 500 kB」提示开工前就有。
+- **后端**：`test_public_routes.py`、`test_privacy_view.py`、`test_dev_api.py` 142 条过。第一次跑时 `test_dev_api.py` 里一条账号贡献的测试挂了：登录以后马上问 `/auth/me` 得到 401，日志里后一条记录的时间比前一条早 5 秒，是 WSL 的时钟往回跳、刚签的令牌被拒的老毛病，重跑两次都过。Ruff F／E9／B 在改过的两个 Python 文件上通过；改动和新建的文件里没有 CR。按码位扫过改动和新建的 23 个文本文件（控制、格式、私用、未分配的字符和变体选择符）：代码、测试和 README 都干净；本文件里标出来的是前面几节原有的 emoji 和变体选择符，这一批只在末尾加了本节；R4a 的 12 份标准答案各有一个 U+2060，改前就有，改前改后个数一样（`r4c/count_unseen.py`）。后端只改了一句话和它的测试，没有跑全量。
+- **变异**（都在副本里跑，规则同第 38 节：这一批的测试文件里有具名测试因断言失败才算杀掉）：
+  - 我自己的 `r4c_mutants.py`，最后是 61 个：读方案链接和核对 25 个（PL）、选择的状态 8 个（PC）、两个页面 19 个（PR）、搜索页的旧链接 5 个（SR）、分享地址 2 个（PF）、政策证据的查询 1 个（AP）、标题和导航 1 个（RP）。故意不写的两处写在脚本的文件头：方案链接 2048 字的总长（每一项都合格式时，8 个值加起来不到 1,500 字，超长的链接先被格式拦住），和 `JSON.parse` 以后「是不是字符串」那一步（首尾都是引号的值，解析出来要么是字符串，要么解析不了）。
+  - 第一轮 62 个，分 4 份副本并行跑：56 个由对口的断言杀掉，4 个存活（PL16、PL18、PC05、PR13），1 个出错（PC02）；PR06 只被一条不相干、又不稳的测试杀掉，查下来是等价的。
+    - 那条不稳的测试是「`/?program=` 没找到」：提示还没写进第二次跳转的 state 就断言，机器忙时会挂，出现在十几个变异的失败名单里；那些变异另外都有对口的测试挂了，只有 PR06 没有。改成 `waitFor` 等提示。
+    - PR06（没选方案也问政策证据）：`apiPath` 遇到空的路径段直接抛错，请求发不出去，等价，从清单里拿掉，写进脚本的文件头。
+    - PL16（超过 100 份不拒）、PL18（ID 重复不拒）：测试数据造得不好，101 份方案的范围全一样，重复的那份 ID 和范围都重复，都被「范围重复」那一关先拦住了。改成 101 份范围各不相同、只有 ID 重复。
+    - PC05（第一次知道是谁也当换人）：测试的 `setup(owner = 'member:u-1')` 是默认参数，传 `undefined` 会用回默认值，「第一次回答不算换人」从来没测到。改成 `setup(known = true)`。
+    - PC02 出错：删掉 `gone.push(id);` 以后 `if` 后面没有语句，整个文件读不进来；变异改成 `void id;`。
+    - PR13（暂时失败以后拿缓存里的旧回答核对）：失败的读取让查询变成 error，`isSuccess` 已经挡住了，代码里的 `dataUpdatedAt > failedAt` 是多余的。删掉 `failedAt`，变异改成去掉 `isSuccess`。
+  - 第二轮：PL16、PL18、PC02、PC05，和 `ProgramRoute` 里的 16 个（这个函数改过），20 个全由断言杀掉；列表页的 PR01–PR03 在那条测试改好以后补跑，3 个都杀掉。最后 61 个都由对口的断言杀掉。
+  - 项目自己的 `npm run test:mutations`：基线通过，**152／152** 都由对口的测试杀掉，`sourceUnchanged: true`，403.9 秒；跑完副本删掉了（第 15 条），系统临时目录里只剩 R4b 的两个。第一次跑不算数：跑的时候我往 `ProgramsRoute.test.tsx` 加了四条测试，脚本发现源文件变了，退出码 1（那次 152 个也都杀掉了）。
+- **浏览器验收**（内置浏览器，开发 API 在 8000，`build:dev-api` 的预览在 4173，合成数据）：
+  - `/programs` 列出开发目录的四个项目；打开 CS 去 `/programs/cs-ms`，标题「培养方案」，焦点在 main 上，分享框是 `http://127.0.0.1:4173/programs/cs-ms`。
+  - 选了 2026–2027 的标准方案：分享框换成 8 个参数的方案链接（内容版本 `971e289f…`），政策证据只问了一次；开发 API 回答的是 stale（见「已知」），页面照 R4a 的写法说「方案范围或内容版本已变化…」，不显示旧证据。
+  - `/?program=CS` 换成 `/programs/cs-ms`。方案链接：对得上的选上了；内容版本不对的打开项目、不选方案、说一句；少了参数的开列表、说一句。
+  - 「刷新方案及政策证据」以后选择清掉，焦点还在按钮上；375 宽没有横向滚动；控制台只有游客 `/auth/me` 的 401。
+
+### 已知、未处理
+
+- **选课草案还没接**：#37 合并以后把 main 合进来再接（`PlanDraft`、`POST …/draft`、每个标签页放在内存里的草案、四种 409 清掉选择并重取、`unavailable` 留着选择），接完再审查（第 33 轮）。
+- **本机看不到正常的政策证据**：开发 API 读的是仓库里的政策包（`data/program_policy_seed/boston_2026_2027_evidence.json`），里面 cs-ms 标准方案的链接对的是真实方案的内容版本，和开发目录编的方案对不上，所以选了方案只会看到 stale 那句。要看到正常的证据，得给开发目录配一份政策包、存档的 HTML 和哈希，太重，没做；正常的证据由 R4a 的演示和测试管着。
+- **`?course=` 和 `?program=` 都有时，项目不备**：开课程页（R3e 的做法），不替培养方案页备好那个项目；Streamlit 打开课程的同时会备好。要看项目得自己去培养方案页。
+- **`catalog_year` 写成别的文字的数字**（比如全角的 `２０２６-２０２７`）：Streamlit 读方案链接走 `PlanSelection`，它的 `\d` 认这种数字（本文件前面记过），读得出，核对时范围对不上，当成版本变了；这里只认 ASCII 数字，当坏链接，开列表。两边都不选方案，只是说的那句不同。
+- **回到没核对完的方案链接，会再核对一次**：核对没完（暂时失败，或者请求还没回来就走开了）时，这一条历史记录里还带着链接。学生在这期间手选了方案、去了别的页面、再按后退回来，页面会再核对一次，照 Streamlit 先清掉这个项目的选择，手选的也清掉。Streamlit 每个链接只处理一次。要改可以在手选方案时把 state 里的链接拿掉；先不做。
+- **变异运行被打断时副本留下**：按 Ctrl+C、从外面结束进程或者机器重启时，项目的变异脚本走不到退出时的清理，副本留在系统临时目录（README 写了：删之前先删里面的联接）。
+- **首屏多了 7,048 字节**：R4a 的课程表组件原来只在演示的懒加载块里，现在进了首屏，204,977 字节（预算 250,000）。演示外壳和这些页面都没改成懒加载（第 35 节「已知」）。
+- **等价的变异体**：PR06（没选方案也问政策证据），见验证记录。`enabled` 里的 `planId !== null` 留着，是为了不靠 `apiPath` 抛错来挡。
+- **和 R4b 页面合并**：两边都改了 `web/src/App.tsx`、`layout/routePresentation.ts`、`web/README.md` 和本文件；#37 合并以后把 main 合进来，冲突由这一边解。
+
+### 发布状态
+
+分支 `feat/web-programs-api`，从 main `9dd490e`（#38 合并以后）开；第一个提交是这一批不用草案的部分，草案在 #37 合并以后接。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。

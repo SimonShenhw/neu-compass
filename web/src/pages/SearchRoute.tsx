@@ -5,12 +5,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { Info } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { coopListQuery } from '../api/coop';
 import { sendFeedback } from '../api/feedback';
 import { loadOf } from '../api/load';
@@ -25,7 +20,16 @@ import { useSearch } from '../layout/SearchContext';
 import { oneLine } from '../models/courseDetailFormat';
 import { coursePath } from '../models/coursePath';
 import { FEATURED_PROGRAM_IDS, showLanding } from '../models/landing';
-import { PLAN_PLACEHOLDER, scopeLabel } from '../models/programFormat';
+import {
+  PLAN_PLACEHOLDER,
+  programPath,
+  scopeLabel,
+} from '../models/programFormat';
+import {
+  hasPlanLink,
+  PLAN_LINK_NOTICES,
+  readPlanLink,
+} from '../models/programLinks';
 import { parseCurriculum, parseProgramList } from '../models/programs';
 import styles from './SearchPage.module.css';
 
@@ -185,9 +189,7 @@ function SearchColumn() {
         programs={loadOf(programs)}
         curricula={loads}
         coop={loadOf(coop)}
-        onOpenProgram={(id) =>
-          void navigate(`/programs?program=${encodeURIComponent(id)}`)
-        }
+        onOpenProgram={(id) => void navigate(programPath(id))}
         onViewCourse={(courseId) =>
           openCourse(courseId, codeOf(courseId) ?? courseId)
         }
@@ -261,18 +263,46 @@ export function SearchWorkspace({ detail }: { detail?: ReactNode }) {
 }
 
 export function SearchRoute() {
-  const [params] = useSearchParams();
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  // An old shared link, /?course=CS-5800, opens the course's page, in place of this address (R0 11). A return from
-  // Google is useSession's; the link it came back to is handled after it. As in Streamlit (app/deep_links.py
-  // _read_param), a key written twice counts by its last value. "." and ".." cannot be a path's segment (the address
-  // would read them as this path and the one above it), so they stay here like a blank one (review A32).
-  const ref = params.getAll('course').at(-1)?.trim() ?? '';
+  // Old shared links open what they name, in place of this address (R0 11). A return from Google is useSession's; the
+  // link it came back to is handled after it. As in Streamlit (app/deep_links.py), a key written twice counts by its
+  // last value, and the kinds go in this order:
+  // - A plan link (any of its keys but `program`, R4c) opens the program it names, which checks the plan; one that
+  //   cannot be read, a `course` with it included, opens the list with a sentence.
+  // - /?course=CS-5800 opens the course's page. "." and ".." cannot be a path's segment (the address would read them
+  //   as this path and the one above it), so they stay here like a blank one (review A32).
+  // - /?program=<ref> (R4c) opens the list, which matches the ref once it reads; a course with it wins.
   const login = isLoginReturn(pathname, search);
   useEffect(() => {
-    if (ref !== '' && ref !== '.' && ref !== '..' && !login)
-      void navigate(coursePath(ref), { replace: true });
-  }, [ref, login, navigate]);
+    if (login) return;
+    const params = new URLSearchParams(search);
+    if (hasPlanLink(params)) {
+      const link = readPlanLink(params);
+      void navigate(
+        link === null ? '/programs' : programPath(link.program_id),
+        {
+          replace: true,
+          state:
+            link === null
+              ? { notice: PLAN_LINK_NOTICES.invalid }
+              : { planQuery: search },
+        },
+      );
+      return;
+    }
+    const course = params.getAll('course').at(-1)?.trim() ?? '';
+    if (course !== '') {
+      if (course !== '.' && course !== '..')
+        void navigate(coursePath(course), { replace: true });
+      return;
+    }
+    const program = params.getAll('program').at(-1)?.trim() ?? '';
+    if (program !== '')
+      void navigate('/programs', {
+        replace: true,
+        state: { programRef: program },
+      });
+  }, [search, login, navigate]);
   return <SearchWorkspace />;
 }

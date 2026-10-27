@@ -3,25 +3,25 @@
     "base": "https://compass.example.test",
     "program_id": "cs-ms",
     "link": null,
-    "url": "https://compass.example.test/?program=cs-ms"
+    "url": "https://compass.example.test/programs/cs-ms"
   },
   {
     "base": "https://compass.example.test/",
     "program_id": "cs-ms",
     "link": null,
-    "url": "https://compass.example.test/?program=cs-ms"
+    "url": "https://compass.example.test/programs/cs-ms"
   },
   {
     "base": "https://compass.example.test//",
     "program_id": "cs-ms",
     "link": null,
-    "url": "https://compass.example.test/?program=cs-ms"
+    "url": "https://compass.example.test/programs/cs-ms"
   },
   {
     "base": "https://compass.example.test/beta/",
     "program_id": "cs-ms",
     "link": null,
-    "url": "https://compass.example.test/beta/?program=cs-ms"
+    "url": "https://compass.example.test/beta/programs/cs-ms"
   },
   {
     "base": "https://compass.example.test",

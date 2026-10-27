@@ -57,7 +57,7 @@
     {
       "depth": 1,
       "kind": "code",
-      "value": "https://compass.example.test/?program=info-ms"
+      "value": "https://compass.example.test/programs/info-ms"
     },
     {
       "depth": 1,
@@ -112,7 +112,7 @@
     {
       "depth": 1,
       "kind": "share_url",
-      "text": "https://compass.example.test/?program=info-ms"
+      "text": "https://compass.example.test/programs/info-ms"
     },
     {
       "depth": 1,

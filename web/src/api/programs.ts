@@ -25,6 +25,29 @@ export function curriculumQuery(programId: string) {
   });
 }
 
+// GET /programs/{id}/plans/{plan_id}/policies (R4c): policy evidence is never shown from an earlier answer (R0 14.10),
+// so nothing is kept. The key names the plan and the content version the page shows, the answer goes as soon as no one
+// reads it, and the page shows every new read as loading (ProgramRoute), never the last one.
+export function policiesQuery(
+  programId: string,
+  planId: string,
+  revision: string,
+) {
+  return queryOptions({
+    queryKey: ['programs', programId, 'plans', planId, 'policies', revision],
+    queryFn: ({ signal }) =>
+      apiGet(
+        apiPath('/programs/{program_id}/plans/{plan_id}/policies', {
+          program_id: programId,
+          plan_id: planId,
+        }),
+        { timeout: 'read', signal },
+      ),
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
 export interface ProgramSummary {
   program_id: string;
   full_name: string;

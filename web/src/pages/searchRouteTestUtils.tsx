@@ -112,7 +112,7 @@ export function world(
   return fakeApi((call) => own(call) ?? standard(call));
 }
 
-// Where the page is, with the state a link handed along, and a Back button.
+// Where the page is, with the state a link handed along, and Back and Forward buttons.
 function Where() {
   const { pathname, search, state } = useLocation();
   const navigate = useNavigate();
@@ -124,19 +124,23 @@ function Where() {
       <button type="button" onClick={() => void navigate(-1)}>
         back
       </button>
+      <button type="button" onClick={() => void navigate(1)}>
+        forward
+      </button>
     </>
   );
 }
 type Entry = NonNullable<MemoryRouterProps['initialEntries']>[number];
-// The whole app at the last of these addresses, the others behind it in the history.
+// The whole app at one of these addresses (the last, unless `at` says which), the others around it in the history.
 export function page(
   entries: Entry | readonly Entry[],
   client: QueryClient = seededQueryClient(),
+  at?: number,
 ) {
   const list = Array.isArray(entries) ? [...entries] : [entries as Entry];
   const view = render(
     <WithApi client={client}>
-      <MemoryRouter initialEntries={list} initialIndex={list.length - 1}>
+      <MemoryRouter initialEntries={list} initialIndex={at ?? list.length - 1}>
         <App />
         <Where />
       </MemoryRouter>

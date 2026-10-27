@@ -79,7 +79,7 @@
     {
       "depth": 1,
       "kind": "code",
-      "value": "https://compass.example.test/?program=cs-ms"
+      "value": "https://compass.example.test/programs/cs-ms"
     },
     {
       "depth": 1,
@@ -216,7 +216,7 @@
     {
       "depth": 1,
       "kind": "share_url",
-      "text": "https://compass.example.test/?program=cs-ms"
+      "text": "https://compass.example.test/programs/cs-ms"
     },
     {
       "depth": 1,

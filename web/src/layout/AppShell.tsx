@@ -5,6 +5,7 @@ import { refreshReads, shownData, useShowingOld } from '../api/queries';
 import { coursesIndexed, readyQuery } from '../api/ready';
 import { AccountContext, viewerOwner } from './account';
 import { AskBar } from './AskBar';
+import { ProgramsProvider } from './ProgramsContext';
 import { SearchProvider, useSearch } from './SearchContext';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -55,6 +56,8 @@ export function AppShell() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [pathname, title]);
   const refresh = () => void refreshReads(queryClient);
+  const owner =
+    account.viewer === undefined ? undefined : viewerOwner(account.viewer);
   return (
     <div className={styles.shell}>
       <a href="#main-content" className="skip-link">
@@ -80,32 +83,28 @@ export function AppShell() {
           account={box}
         />
         <AccountContext.Provider value={account}>
-          <SearchProvider
-            owner={
-              account.viewer === undefined
-                ? undefined
-                : viewerOwner(account.viewer)
-            }
-          >
-            <main id="main-content" tabIndex={-1} className={styles.main}>
-              <div
-                role="status"
-                aria-label="内容更新"
-                className={styles.fallback}
-              >
-                {showingOld && <p>{FALLBACK_NOTICE}</p>}
-              </div>
-              {/* What came back from Google, at the top where the page opens (R3e). */}
-              <p
-                role="status"
-                aria-label="登录结果"
-                className={styles.returnNote}
-              >
-                {notice}
-              </p>
-              <Outlet />
-            </main>
-            {isSearch && <SearchAskBar />}
+          <SearchProvider owner={owner}>
+            <ProgramsProvider owner={owner}>
+              <main id="main-content" tabIndex={-1} className={styles.main}>
+                <div
+                  role="status"
+                  aria-label="内容更新"
+                  className={styles.fallback}
+                >
+                  {showingOld && <p>{FALLBACK_NOTICE}</p>}
+                </div>
+                {/* What came back from Google, at the top where the page opens (R3e). */}
+                <p
+                  role="status"
+                  aria-label="登录结果"
+                  className={styles.returnNote}
+                >
+                  {notice}
+                </p>
+                <Outlet />
+              </main>
+              {isSearch && <SearchAskBar />}
+            </ProgramsProvider>
           </SearchProvider>
         </AccountContext.Provider>
       </div>

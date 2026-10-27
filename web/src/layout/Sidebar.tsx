@@ -152,9 +152,6 @@ export function Sidebar({
           刷新页面内容
         </Button>
         <small>非官方学生工具 · 选课以官方目录为准</small>
-        <small>
-          搜索、课程详情、Co-op、课程对比、数据与隐私已接真实接口；培养方案还是假数据原型
-        </small>
       </div>
     </div>
   );
