@@ -2,12 +2,15 @@ import { createHash } from 'node:crypto';
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   readdirSync,
+  rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +31,23 @@ const taskTemp = mkdtempSync(
   join(realpathSync.native(tmpdir()), 'neu-compass-r1-'),
 );
 console.info(`Evidence: ${output}`);
+// The copies go when the process exits, after the run or an error (a baseline that fails, an anchor not found): each
+// copy's node_modules junction first, so removing the copies never reaches what the junctions point to (R4c; each run
+// used to leave its folder behind). A run stopped from outside (Ctrl+C, a killed process, a restart) skips the exit
+// event and leaves the folder under the system temp folder: remove the junctions in it first.
+const links = [];
+process.on('exit', () => {
+  for (const link of links)
+    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
+      try {
+        unlinkSync(link);
+      } catch {
+        // The next link is still tried; the check below keeps the copies and says where they are (review B33).
+      }
+  if (links.some((link) => existsSync(link)))
+    console.error(`Copies kept, a link is still there: ${taskTemp}`);
+  else rmSync(taskTemp, { recursive: true, force: true });
+});
 // Everything the tests read besides src/ (R2b: the page, the API document and the generator's pins).
 const configFiles = [
   'package.json',
@@ -72,6 +92,7 @@ function snapshot(name) {
     join(path, 'node_modules'),
     process.platform === 'win32' ? 'junction' : 'dir',
   );
+  links.push(join(path, 'node_modules'));
   return path;
 }
 function run(cwd, args, name) {

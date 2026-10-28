@@ -1,10 +1,11 @@
 import { matchPath } from 'react-router-dom';
 
 const searchPage = { path: '/', title: '课程搜索' };
+const programsPage = { path: '/programs', title: '培养方案' };
 const pages = [
   searchPage,
   { path: '/compare', title: '课程对比' },
-  { path: '/programs', title: '培养方案' },
+  programsPage,
   { path: '/coop', title: 'Co-op 经验' },
   { path: '/privacy', title: '数据与隐私' },
   { path: '/compare-demo', title: '课程对比演示' },
@@ -20,9 +21,14 @@ const pages = [
 
 export function pagePresentation(pathname: string) {
   // Match the router's case/trailing-slash rules, without rewriting the URL.
+  // A course page belongs to the search page, a program's page to the program list (R4c).
   const page =
     pages.find(({ path }) => matchPath(path, pathname)) ??
-    (matchPath('/course/:code', pathname) ? searchPage : undefined);
+    (matchPath('/course/:code', pathname)
+      ? searchPage
+      : matchPath('/programs/:programId', pathname)
+        ? programsPage
+        : undefined);
   return {
     title: page?.title ?? '找不到页面',
     navigationPath: page?.path,

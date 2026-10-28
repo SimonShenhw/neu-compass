@@ -12,6 +12,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import { LOGIN_MESSAGES, PENDING_KEY } from '../api/login';
+import { programListQuery } from '../api/programs';
 import { GUEST, configQuery, createQueryClient, meQuery } from '../api/queries';
 import type { Member } from '../api/queries';
 import { addToCompare, getCompareList } from '../models/compareList';
@@ -322,6 +323,8 @@ describe('logging out', () => {
     const client = seededQueryClient({ viewer: MEMBER });
     client.setQueryData([...VIEWER_KEY, 'u-1', 'coop'], ['private']);
     client.setQueryData(['course', 'c-cs-5800'], { public: true });
+    // The program list is there already, so the page asks for nothing before the logout (R4c).
+    client.setQueryData(programListQuery.queryKey, []);
     page('/programs', client);
     addToCompare('c-cs-5800');
     await user.click(screen.getAllByRole('button', { name: '退出登录' })[0]!);

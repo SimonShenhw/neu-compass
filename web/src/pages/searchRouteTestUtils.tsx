@@ -4,9 +4,13 @@ import type { QueryClient } from '@tanstack/react-query';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import type { MemoryRouterProps } from 'react-router-dom';
 import { App } from '../App';
+import type { DraftRequest } from '../api/draft';
 import cs5800 from '../fixtures/course-detail/cs-5800-identity-only.json';
 import cs6140 from '../fixtures/course-detail/cs-6140-everything.json';
 import ds5220 from '../fixtures/course-detail/ds-5220-conflicts.json';
+import alignEmpty from '../fixtures/draft/draft-align-empty.json';
+import standardAdd from '../fixtures/draft/draft-standard-add.json';
+import standardEmpty from '../fixtures/draft/draft-standard-empty.json';
 import coop from '../fixtures/landing/coop-guest.json';
 import aai from '../fixtures/landing/curriculum-aai-ms.json';
 import ds from '../fixtures/landing/curriculum-ds-ms.json';
@@ -60,6 +64,45 @@ export const identity = (body: Record<string, unknown>) => ({
 // /resolve/course reads any separator; so does this.
 const spelled = (code: string) => code.replace(/[^0-9a-z]/gi, '').toUpperCase();
 
+// The draft check (R4c), from R4b's answers exported from the API: CS 5010 and CS 5800 added to the standard plan's
+// empty draft is the export itself; anything else is the plan's empty draft with the courses asked for and those typed
+// (only these two are known). The rule tree is the empty draft's: these tests read the courses, not the rules.
+const draftCourses = standardAdd.body.courses;
+export function draftAnswer(planId: string, request: DraftRequest) {
+  const kept = draftCourses.filter((c) =>
+    request.course_ids.includes(c.course_id),
+  );
+  const typed = new Set(request.input?.match(/[A-Z]{2,4} \d{4}/g) ?? []);
+  const added = draftCourses.filter(
+    (c) => typed.has(c.code) && !kept.includes(c),
+  );
+  const courses = [...kept, ...added];
+  if (
+    planId === STANDARD &&
+    request.course_ids.length === 0 &&
+    added.length === draftCourses.length
+  )
+    return {
+      ...standardAdd.body,
+      plan_content_sha256: request.plan_content_sha256,
+    };
+  return {
+    ...structuredClone(planId === ALIGN ? alignEmpty.body : standardEmpty.body),
+    plan_content_sha256: request.plan_content_sha256,
+    courses,
+    added: added.map((c) => c.code),
+  };
+}
+const DRAFT_PATH = /^\/programs\/([^/]+)\/plans\/([^/]+)\/draft$/;
+// The draft checks the page sent, in order: the plan and the body.
+export const draftChecks = (calls: readonly Call[]) =>
+  calls.flatMap((call) => {
+    const path = DRAFT_PATH.exec(call.path);
+    return call.method === 'POST' && path
+      ? [{ plan: decodeURIComponent(path[2]!), body: call.body }]
+      : [];
+  });
+
 export const stream = (lines: readonly unknown[]) =>
   new Response(lines.map((line) => JSON.stringify(line)).join('\n') + '\n');
 export const answerText = (lines: readonly { type: string; text?: string }[]) =>
@@ -71,6 +114,11 @@ export const answerText = (lines: readonly { type: string; text?: string }[]) =>
 function standard(call: Call): Response {
   const asked = `${call.method} ${call.path}`;
   if (asked === 'GET /programs') return json(programRows);
+  const draft = DRAFT_PATH.exec(call.path);
+  if (call.method === 'POST' && draft)
+    return json(
+      draftAnswer(decodeURIComponent(draft[2]!), call.body as DraftRequest),
+    );
   if (call.method === 'GET' && call.path.startsWith('/programs/')) {
     const body = curricula.get(
       decodeURIComponent(call.path.slice('/programs/'.length)),
@@ -112,7 +160,7 @@ export function world(
   return fakeApi((call) => own(call) ?? standard(call));
 }
 
-// Where the page is, with the state a link handed along, and a Back button.
+// Where the page is, with the state a link handed along, and Back and Forward buttons.
 function Where() {
   const { pathname, search, state } = useLocation();
   const navigate = useNavigate();
@@ -124,19 +172,23 @@ function Where() {
       <button type="button" onClick={() => void navigate(-1)}>
         back
       </button>
+      <button type="button" onClick={() => void navigate(1)}>
+        forward
+      </button>
     </>
   );
 }
 type Entry = NonNullable<MemoryRouterProps['initialEntries']>[number];
-// The whole app at the last of these addresses, the others behind it in the history.
+// The whole app at one of these addresses (the last, unless `at` says which), the others around it in the history.
 export function page(
   entries: Entry | readonly Entry[],
   client: QueryClient = seededQueryClient(),
+  at?: number,
 ) {
   const list = Array.isArray(entries) ? [...entries] : [entries as Entry];
   const view = render(
     <WithApi client={client}>
-      <MemoryRouter initialEntries={list} initialIndex={list.length - 1}>
+      <MemoryRouter initialEntries={list} initialIndex={at ?? list.length - 1}>
         <App />
         <Where />
       </MemoryRouter>

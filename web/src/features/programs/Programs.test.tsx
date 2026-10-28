@@ -68,7 +68,7 @@ it.each([undefined, 'x', 'A'.repeat(64)])(
     ).toBeInTheDocument();
     expect(
       container.querySelector('[data-kind="share_url"]'),
-    ).toHaveTextContent(/^https:\/\/compass.example.test\/\?program=cs-ms$/);
+    ).toHaveTextContent(/^https:\/\/compass.example.test\/programs\/cs-ms$/);
     expect(screen.queryByText('官方政策来源')).not.toBeInTheDocument();
   },
 );

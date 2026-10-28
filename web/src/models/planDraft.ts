@@ -161,15 +161,16 @@ export function draftTreeLines(node: DraftNode, depth = 0): string[] {
   return out;
 }
 
-// Spec section 8. The four plan-gone reasons never reach the component on the real page: the wiring clears the plan
-// choice and R4a's planRevised notice shows instead; the sentence is a fallback. Never the API's detail.
+// Spec section 8. The four plan-gone reasons never reach the component on the real page: the wiring (R4c,
+// ProgramsContext) clears the plan choice and reads the plans again; R4a's planRevised notice shows when they changed,
+// this sentence on the page when they did not. Never the API's detail.
 const PLAN_GONE: readonly (string | null)[] = [
   'stale',
   'missing',
   'draft',
   'unusable',
 ];
-const planGone = (failure: ApiFailure) =>
+export const planGone = (failure: ApiFailure) =>
   failure.status === 409 && PLAN_GONE.includes(failure.reason);
 export function draftFailureMessage(failure: ApiFailure) {
   if (planGone(failure))

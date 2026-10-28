@@ -84,27 +84,27 @@ const expected = {
   'expected/cs-align-not-linked.json':
     '3a185b90f8a5320f6718feeb06bcd5d6520b9811cf08352aacb5b82ddee22357',
   'expected/cs-bad-plan.json':
-    'd9cfeb8d9569879c147b840511e278033f7c29d6df319cbc7c591a843d8e6e3c',
+    '69c5d4220ab1b7836498ac0c7ccbdad802ce4167863579d62ff57406020d3321',
   'expected/cs-bridge-draft.json':
-    '60ff6a7a08420a661e3c9eefadc1114260dee7e2dd8bca5c0bb3964623ed5925',
+    '425c7c2a9cc936c5bc341272d4e10e4b6bac8425fa47dd211770cdd2247a3d7f',
   'expected/cs-duplicate-plan.json':
-    '3b8eef5a4470b8c089f86c5d378b59fc2e73692f911defb6d3fd9f687c055cc4',
+    'd70ced00df9e0026752d676d62d1fa10ba91aa5dc23d98ab8fefe0c513b0c7c0',
   'expected/cs-duplicate-scope.json':
-    'b0102587306d2e1c1b8e27f27a7c529048595640eaadb140066cb8b1e46d6f02',
+    'd99bfd55336809026d016209e0d6b6726434e86872cabceb3586b7d19704c7f4',
   'expected/cs-foreign-plan.json':
-    '1fee4ca58ef8656f9b5d51f3735288b1bda9c08e84140803513f7223be202b94',
+    '782dcfaae4712438919a2e28afe7a1fdf7968cad4701a190b436059c14360be6',
   'expected/cs-malformed.json':
     'caf1cbcdea0be717f3febe8bd4803dc41cad885e20d1a188bcbca0d64b4a90f0',
   'expected/cs-no-plan-table.json':
-    'e46dcce986a86cc6c8e02cf562b7aba8399c8d5484dda6ec0fbe69cfd50af6a7',
+    '5e8fbe6fccbe4d7f65d70643b3673339d16b1acb7f05203b39273245ec403a1f',
   'expected/cs-nothing-selected.json':
-    '04ef24000f34e02d623cf27d15a769065b9632c39abc51232b3cfe9709631445',
+    '2d6705dc3d406e03ce5f403b4f05090e56b84c6bfe08989801b46707286bbfd6',
   'expected/cs-plan-revised.json':
-    'a701e8174d8edd7dbc5ed4020901e27824ba88286771e9d69d9515d2a602a876',
+    'c515b53ca8ff752ff9374c831bb8137ed92d14e53b50e4dfd2b4e6bda29dcd27',
   'expected/cs-selected-plan-gone.json':
-    'ef106c53eb56f01f054f28ca174edf3190891f03823f1674ef2f1fd657a7ab12',
+    '7209b3c98768701dfee035eae752e1bd0da9dd4bc1f2a56d2a80b631f43966a6',
   'expected/cs-share-base-slashes.json':
-    '79cf592345710c59bc32ee96b7032b1a1c44a82a710d8007a794beb505aeb753',
+    'd4cd81b306c289d65ad1d9b7084405e366ebff109d308273eb682eb5a60fb74e',
   'expected/cs-standard-policies-404.json':
     '77749c344da5b54b2fb6617686bd6165f5aa93625ce612a9342dea1a9f4a8981',
   'expected/cs-standard-policies-503.json':
@@ -122,7 +122,7 @@ const expected = {
   'expected/cs-standard-ready.json':
     '83878d0b14bc82a17fc53efa0882f4e5ff1d534e7b1c0883e5b6247af99d52c9',
   'expected/cs-standard-revision-unknown.json':
-    'f7b76dfbb6c889d7cd76e7ec46807e801dfad875eeea380db2ca5db78eb25eab',
+    '4f3828bdd64e851bc44495264e7232d88bc9b6d0182a369833f9ca5be5fb5150',
   'expected/cs-standard-unavailable.json':
     'e0c5c7c985e02aa0e821915fc92de5247fabfd49f1e14fa563f425a4b14a8b8c',
   'expected/cs-standard-unusable.json':
@@ -130,13 +130,13 @@ const expected = {
   'expected/cs-text-edge.json':
     '6a2f6bded95891a73554dcddea4d61363b558fdbfa7d0548811c547f4db1e2e3',
   'expected/cs-unknown-requirement.json':
-    'ed3999634feb14adb11de98d9efb413fe941aaaf705189a26bf3672a32b18145',
+    'a46c8a2a1a142d3fa7b8f16ce39f98e2375ce9a28c4356202039bade9f2f3eb0',
   'expected/ds-plan-selected.json':
     '27182f098f169ac91021d0159a851aa128a145e7d33fe9fbb14d718fe2a0d48b',
   'expected/failure-vectors.json':
     'b04892ca4494c2776e271b2a9e1dd2caaf71bf5b5198c850995bafb356e391de',
   'expected/info-empty.json':
-    'c135eadf4cd26ebf12dcfc944881d7203299e3285659f175607fda4750ec66e0',
+    '63414d1686cf3f30b5a7ee8fafb0cdf1b98d26a02f275a4f13d73800b3624685',
   'expected/list-429.json':
     '2feea980a0aef7765d76468da3ef6d1acc5cc6ccfa31416d35d2685986ba2e01',
   'expected/list-503.json':
@@ -150,9 +150,9 @@ const expected = {
   'expected/list.json':
     '9ba57b0486ac85da3dba9ba567178f577d569d99f2efb3f06dce4fa9c3e2b08e',
   'expected/pjm-no-plans.json':
-    '5273e87595109f4758e78212a19ecb1afc3f9cd0db090699fcc490c15088e84c',
+    '63190552994a5707d180615fa892189623d5ee5f6c785eb691c078343977ae39',
   'expected/share-url-vectors.json':
-    'e4beacc578ea03b194448d6a67bdc37ec735fc6cb923b7e883762cec11445c8a',
+    'dc77d165b7caedf7f82a8b82bfece0084090d1866dc65f7a89d5d7ebda8c13d8',
 };
 it('freezes all 75 program fixture names and original bytes', () => {
   const root = resolve('src/fixtures/programs');

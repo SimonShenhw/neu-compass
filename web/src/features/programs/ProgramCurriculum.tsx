@@ -39,9 +39,19 @@ export interface ProgramCurriculumProps {
   // R4b: the course draft for the selected plan, shown as given right after that plan's block (R4a spec 6.9);
   // nothing when no plan is selected or none is passed.
   draft?: ReactNode;
+  // R4c: the selected plan's block, which goes with the draft, and the plan selector, which goes when no plan is left to
+  // offer or the curriculum goes; the page hands focus on when one goes with focus in it.
+  planRef?: Ref<HTMLElement>;
+  selectRef?: Ref<HTMLDivElement>;
   ref?: Ref<HTMLElement>;
 }
-function CurriculumBody(props: ProgramCurriculumProps) {
+// The refs come out first: the React Compiler takes a prop named like a ref for one, and every later props.x for
+// reading it during render.
+function CurriculumBody({
+  planRef,
+  selectRef,
+  ...props
+}: ProgramCurriculumProps) {
   const { curriculum, programId } = props;
   if (curriculum.status === 'loading')
     return <p role="status">正在加载课程表…</p>;
@@ -89,7 +99,7 @@ function CurriculumBody(props: ProgramCurriculumProps) {
           尚无可用版本化方案；旧课程表的校区、目录年度和路径未知。
         </Line>
       ) : (
-        <div data-kind="select">
+        <div data-kind="select" ref={selectRef}>
           <Select
             label={PLAN_LABEL}
             value={plan?.plan_id ?? '__none__'}
@@ -104,6 +114,7 @@ function CurriculumBody(props: ProgramCurriculumProps) {
       {plan && (
         <section
           key={plan.plan_id}
+          ref={planRef}
           className={styles.plan}
           aria-label="已选方案的版本化规则"
         >

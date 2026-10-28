@@ -49,22 +49,27 @@ function quote(text: string) {
     )
     .replaceAll('%20', '+');
 }
+// A program's page (R4c: one address per program, the user's choice of 10-27).
+export const programPath = (programId: string) =>
+  `/programs/${encodeURIComponent(programId)}`;
+// The share box: a program by its page; a source-checked plan by Streamlit's eight-key link, the one link that carries
+// the plan's content version, which both front ends read (R4c).
 export function shareUrl(
   base: string,
   programId: string,
   link: SharePlan | null,
 ) {
-  const pairs = link
-    ? [
-        ['plan_v', '1'],
-        ['program', programId],
-        ['plan', link.plan_id],
-        ['campus', link.campus],
-        ['catalog_year', link.catalog_year],
-        ['pathway', link.pathway],
-        ['concentration', JSON.stringify(link.concentration)],
-        ['plan_revision', link.plan_content_sha256],
-      ]
-    : [['program', programId]];
-  return `${base.replace(/\/+$/, '')}/?${pairs.map(([k, v]) => `${quote(k!)}=${quote(v!)}`).join('&')}`;
+  const root = base.replace(/\/+$/, '');
+  if (!link) return `${root}${programPath(programId)}`;
+  const pairs = [
+    ['plan_v', '1'],
+    ['program', programId],
+    ['plan', link.plan_id],
+    ['campus', link.campus],
+    ['catalog_year', link.catalog_year],
+    ['pathway', link.pathway],
+    ['concentration', JSON.stringify(link.concentration)],
+    ['plan_revision', link.plan_content_sha256],
+  ];
+  return `${root}/?${pairs.map(([k, v]) => `${quote(k!)}=${quote(v!)}`).join('&')}`;
 }

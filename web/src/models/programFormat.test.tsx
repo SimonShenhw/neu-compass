@@ -17,7 +17,7 @@ import { ProgramList } from '../features/programs/ProgramList';
 import { ProgramCurriculum } from '../features/programs/ProgramCurriculum';
 import { curriculumProps } from '../features/programs/programTestUtils';
 it.each(shares.map((v, i) => ({ ...v, i })))(
-  'share URL vector $i matches Python urlencode',
+  'share URL vector $i matches: a program at its own address, a plan as Python urlencode writes it',
   (v) =>
     expect(shareUrl(v.base, v.program_id, v.link as SharePlan | null)).toBe(
       v.url,

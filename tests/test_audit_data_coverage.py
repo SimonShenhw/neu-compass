@@ -587,8 +587,9 @@ def test_a_copy_with_shared_pages_is_refused_before_any_row_is_read(tmp_path):
 
 
 def swapped_copy(path, user_ids):
-    """A copy whose programs and users tables trade b-trees: every page is used once and every NOT NULL column of
-    users still has a value, so quick_check passes, but the users table no longer matches its own indexes."""
+    """A copy whose programs and users tables trade b-trees: every page is used once, every NOT NULL column of users
+    still has a value and each of its indexes has as many entries as the table has rows, so quick_check passes, but
+    the users table no longer matches its own indexes."""
     conn = sqlite3.connect(path)
     conn.executescript((ROOT / "db/init.sql").read_text(encoding="utf-8"))
     for user_id in user_ids:
@@ -597,7 +598,10 @@ def swapped_copy(path, user_ids):
     conn.execute("DROP TABLE program_required_courses")
     conn.execute("DROP TABLE programs")
     conn.execute("CREATE TABLE programs(program_id TEXT, c2, c3, c4, c5, c6, c7)")  # As many columns as users.
-    conn.execute("INSERT INTO programs VALUES('cs-ms', 'a', 'b', 'c', 0, '2026-10-01', 'd')")
+    # And as many rows: SQLite 3.50.4's quick_check counts each index's entries against its table's rows (3.45.1's
+    # does not; CI has the newer one since ubuntu-latest became 26.04), so with fewer rows quick_check fails too.
+    for number in range(len(user_ids)):
+        conn.execute("INSERT INTO programs VALUES(?, 'a', 'b', 'c', 0, '2026-10-01', 'd')", (f"program-{number}",))
     conn.commit()
     roots = dict(conn.execute("SELECT name, rootpage FROM sqlite_schema WHERE type='table'").fetchall())
     version = conn.execute("PRAGMA schema_version").fetchone()[0]
