@@ -5085,7 +5085,7 @@ A32 的 N6、B32 的 N12、L15 和 N18 写进「已知」。
 
 ### 范围与原因
 
-R4a 的课程表组件（#35）和 R4b 的草案（接口 #36，组件 #37）都只用在演示路由上，真实的 `/programs` 还是一句「这一页正在搬到新版」。这一批把它换成接真实接口的页面，方案 `R4C_PLAN.md`（事实的出处 `r4c/FACTS_R4c.md`，都在评审目录）。10-27 用户定了方案第 8 节的三条：每个项目一个网址（`/programs/cs-ms`）；搜索页和培养方案页的项目、方案选择分开，和 Streamlit 一样；旧的方案链接没通过时打开这个项目、不选方案（Streamlit 是回到列表）。从 main `9dd490e`（#38 合并以后）开 `feat/web-programs-api`。第一个提交是不用草案的部分；#37 当天合并以后，把 main 合进来（合并提交 `93f40fc`），第二个提交接上选课草案（第 18–26 条），顺带让另外三个变异脚本也删自己的副本（第 15 条）。第三个提交是第 33 轮审查的修复（见「审查」），第四个提交是它的复核第 1 轮的修复，第五个提交是复核第 2 轮（最后一轮）以后补的测试和本节的记录，正文各条已经改成修完的样子。
+R4a 的课程表组件（#35）和 R4b 的草案（接口 #36，组件 #37）都只用在演示路由上，真实的 `/programs` 还是一句「这一页正在搬到新版」。这一批把它换成接真实接口的页面，方案 `R4C_PLAN.md`（事实的出处 `r4c/FACTS_R4c.md`，都在评审目录）。10-27 用户定了方案第 8 节的三条：每个项目一个网址（`/programs/cs-ms`）；搜索页和培养方案页的项目、方案选择分开，和 Streamlit 一样；旧的方案链接没通过时打开这个项目、不选方案（Streamlit 是回到列表）。从 main `9dd490e`（#38 合并以后）开 `feat/web-programs-api`。第一个提交是不用草案的部分；#37 当天合并以后，把 main 合进来（合并提交 `93f40fc`），第二个提交接上选课草案（第 18–26 条），顺带让另外三个变异脚本也删自己的副本（第 15 条）。第三个提交是第 33 轮审查的修复（见「审查」），第四个提交是它的复核第 1 轮的修复，第五个提交是复核第 2 轮（最后一轮）以后补的测试和本节的记录，第六个提交修了 PR 的 CI 换了 runner 镜像以后挂掉的一条后端测试（见验证记录），正文各条已经改成修完的样子。
 
 线上不变：新前端还没部署。后端只改了网页版隐私说明的一句。
 
@@ -5184,6 +5184,7 @@ R4a 的课程表组件（#35）和 R4b 的草案（接口 #36，组件 #37）都
 - 第三个提交（第 33 轮的修复）只动了这些：`api/privacy_text.py`；`web/src/features/programs/ProgramCurriculum.tsx`（加 `selectRef`）；`layout/ProgramsContext.tsx`、`ProgramsContext.test.tsx`；`pages/ProgramsRoute.tsx`、`ProgramsRoute.test.tsx`；`models/programLinks.test.ts`、`programFormat.test.tsx`（只改了一个测试名）；`web/scripts/draft-mutations.mjs`、`programs-mutations.mjs`、`search-mutations.mjs`、`landing-mutations.mjs`；`web/README.md`（R4c 一节）；本节。
 - 第四个提交（第 33 轮复核第 1 轮的修复）只动了这些：`web/src/pages/ProgramsRoute.tsx`、`ProgramsRoute.test.tsx`；`web/scripts/mutations.mjs`；后端测试 `tests/test_public_routes.py`；`web/README.md`（开头变异副本那句、R4c 一节）；本节。
 - 第五个提交（第 33 轮复核第 2 轮以后）只动了这些：`web/src/pages/ProgramsRoute.test.tsx`；本节。
+- 第六个提交（CI 换了 runner 镜像以后）只动了这些：`tests/test_audit_data_coverage.py`（OPT-03 一条测试造的副本）；本节。
 
 数据库结构、检索、提示词和 Streamlit 版都没改。
 
@@ -5271,6 +5272,11 @@ R4a 的课程表组件（#35）和 R4b 的草案（接口 #36，组件 #37）都
   - 前端：类型、零警告 lint、构建、格式、生成的类型都过；Vitest **86 个文件 2715 条**全过（`ProgramsRoute.test` 91 → 96：竞态那组加两行，后退再前进的一组三条；「后退到…」那组每行加了读取停没停、读了几次的断言），`ProgramsRoute.test` 单独连跑三遍都过；首屏 JavaScript gzip **209,919 字节**，没变。
   - 我自己的变异：照 B33 把 PR29、PR30 原来的样子（只去掉页面记的那一半）和 PR32（页面没了不清空）加回来，是 PR45–PR47，再加它的 B108（失败那条路上 history 那一半不把记录记成没核对，PR48），一共 156 个。这 4 个都由对口的断言杀掉，而且只被新加的那几条杀：PR45 被后退再前进那组「回答成功」的两条，PR46 被「被拒」那条，PR47 被「后退到对比页」那条，PR48 被竞态那组新加的两行。其余 152 个所在的代码没改，测试只加了行和断言，不重跑；复核第 2 轮 B33 在它的副本里刚把这 152 个全部跑过，都杀掉。中途又有一轮忘了给 ID 加 `*`，什么也没跑；我的脚本现在选不到变异体就报错退出。
   - 项目的 `test:mutations` 和另外四个变异脚本：产品代码没改，不重跑。
+- **第六个提交（CI 的 runner 换成 ubuntu-26.04 以后）**：PR 的 CI 里后端挂了一条，OPT-03 的 `test_a_copy_whose_tables_trade_b_trees_is_refused`，和这一批的改动无关。
+  - 原因：10-27 main 上那次 CI 跑在 ubuntu-24.04 上，这次 `ubuntu-latest` 已经是 26.04。Python 同是 3.12.15，用的是系统的 SQLite。新的 SQLite 的 `quick_check` 会拿每个索引的条目数和表的行数比；这条测试造的副本里 `programs` 只有一行、用户有两个，互换 b-tree 以后 quick_check 当场报 `wrong # of entries in index idx_users_domain`，测试开头那句「quick_check 查不出」就不成立了。
+  - 本地复现：同样的构造，SQLite 3.45.1（WSL 的 venv）的 quick_check 说 ok，3.50.4（Windows 的 Python 3.14）报的就是这句。
+  - 改法：`programs` 放和用户一样多的行。两个版本的 quick_check 都说 ok，integrity_check 照样查出表和自己的索引对不上（`row 1 missing from index …`），审计照样拒绝这份副本。审计本身用的就是 integrity_check，没动。
+  - 这个测试文件 221 条在本地过，Ruff F/E9/B 过；新 SQLite 上的整个后端测试由这次 CI 跑。
 
 ### 审查
 
@@ -5348,4 +5354,4 @@ A33 的 N2、N3 和两处等价的变异体（A33 的 M1 即 B33 的 B35，B33 �
 
 ### 发布状态
 
-分支 `feat/web-programs-api`，从 main `9dd490e`（#38 合并以后）开：`a687840`（不用草案的部分）、`93f40fc`（合并 main 的 #37）、`54896b8`（草案）、`9a5075a`（第 33 轮的修复）、`e7ade58`（复核第 1 轮的修复）和它后面的第五个提交（复核第 2 轮以后补的测试和记录）。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
+分支 `feat/web-programs-api`，从 main `9dd490e`（#38 合并以后）开：`a687840`（不用草案的部分）、`93f40fc`（合并 main 的 #37）、`54896b8`（草案）、`9a5075a`（第 33 轮的修复）、`e7ade58`（复核第 1 轮的修复）、`fead991`（复核第 2 轮以后补的测试和记录）和它后面的第六个提交（CI 换了 runner 镜像以后的一条后端测试）。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
