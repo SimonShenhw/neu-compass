@@ -125,6 +125,41 @@ it('another person, or nobody, looking empties it; the first answer of /auth/me 
   expect(result.current.chosenPlan(CS)).toBeNull();
 });
 
+it('another person looking takes what the page said about the choice too', async () => {
+  const { result, props, rerender, answer } = setup();
+  act(() => result.current.choosePlan(CS, STANDARD, plansSignature(body())));
+  answer(revised());
+  await waitFor(() => expect(result.current.planRevised(CS)).toBe(true));
+  props.owner = 'guest';
+  rerender();
+  expect(result.current.planRevised(CS)).toBe(false);
+});
+
+it('a link’s choice says so while it stays chosen', async () => {
+  const { result, answer } = setup();
+  const signature = plansSignature(body());
+  act(() => result.current.choosePlan(CS, STANDARD, signature, true));
+  expect(result.current.chosenPlan(CS)).toBe(STANDARD);
+  expect(result.current.planLinked(CS)).toBe(true);
+  act(() => result.current.choosePlan(CS, ALIGN, signature));
+  expect(result.current.planLinked(CS)).toBe(false);
+  act(() => result.current.choosePlan(CS, STANDARD, signature, true));
+  act(() => result.current.forget(CS));
+  expect(result.current.planLinked(CS)).toBe(false);
+  // A plan no longer offered goes without a word, and what the link said with it.
+  act(() => result.current.choosePlan(CS, STANDARD, signature, true));
+  answer(
+    body(
+      revisions,
+      curriculum.body.plans.map((plan) =>
+        plan.plan_id === STANDARD ? { ...plan, coverage: 'whole' } : plan,
+      ),
+    ),
+  );
+  await waitFor(() => expect(result.current.chosenPlan(CS)).toBeNull());
+  expect(result.current.planLinked(CS)).toBe(false);
+});
+
 // The draft. The checks are answered from R4b's exported answers (draftAnswer) unless a test holds one back.
 const shownUnder = (over: Partial<DraftPlan> = {}): DraftPlan => ({
   programId: CS,
@@ -222,6 +257,7 @@ it('forget drops a check on its way under the program’s plan, and shown again 
   const { result } = setup();
   act(() => result.current.showDraft(shownUnder()));
   act(() => result.current.forget(CS));
+  expect(api.calls[0]!.init.signal?.aborted).toBe(true);
   later.answer(
     json(
       draftAnswer(STANDARD, {
@@ -308,4 +344,177 @@ it('a refused plan chosen again before the plans are read again leaves nothing t
   expect(result.current.planRefused(CS)).toBe(false);
   expect(result.current.planRevised(CS)).toBe(false);
   expect(result.current.chosenPlan(CS)).toBe(STANDARD);
+});
+
+it.each([
+  ['another person looking', 'owner'],
+  ['forget', 'forget'],
+])(
+  'a refusal still being decided says nothing after %s',
+  async (_name, how) => {
+    const read = held();
+    fakeApi((call) =>
+      call.method === 'POST' ? json(stale.body, 409) : read.response,
+    );
+    const { client, result, props, rerender } = setup();
+    pageReading(client);
+    act(() => result.current.choosePlan(CS, STANDARD, plansSignature(body())));
+    act(() => result.current.showDraft(shownUnder()));
+    await waitFor(() => expect(result.current.chosenPlan(CS)).toBeNull());
+    if (how === 'owner') {
+      props.owner = 'guest';
+      rerender();
+    } else act(() => result.current.forget(CS));
+    // Plans that did not change would have said R4b's sentence.
+    read.answer(json(body()));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    await moment();
+    expect(result.current.planRefused(CS)).toBe(false);
+  },
+);
+
+it('a refused plan’s check goes with its outcome, so the draft shown again under that plan is checked again', async () => {
+  let refusing = true;
+  const api = fakeApi((call) => {
+    if (call.method !== 'POST') return json(body());
+    return refusing
+      ? json(stale.body, 409)
+      : json(draftAnswer(STANDARD, call.body as DraftRequest));
+  });
+  const { client, result } = setup();
+  pageReading(client);
+  act(() => result.current.choosePlan(CS, STANDARD, plansSignature(body())));
+  act(() => result.current.showDraft(shownUnder()));
+  await waitFor(() => expect(result.current.planRefused(CS)).toBe(true));
+  expect(result.current.draftView(shownUnder())).toEqual(nothing);
+  refusing = false;
+  act(() => result.current.choosePlan(CS, STANDARD, plansSignature(body())));
+  act(() => result.current.showDraft(shownUnder()));
+  expect(result.current.draftView(shownUnder())).toEqual({
+    ...nothing,
+    checking: true,
+  });
+  await waitFor(() =>
+    expect(result.current.draftView(shownUnder()).answer).not.toBeNull(),
+  );
+  expect(api.calls.filter((call) => call.method === 'POST')).toHaveLength(2);
+});
+
+it.each([
+  ['another plan', 'cs-ms-boston-2026-2027-bridge'],
+  ['no plan', null],
+])(
+  '%s chosen stops the check on its way under the plan before, and its refusal says nothing',
+  async (_name, next) => {
+    const late = held();
+    const api = fakeApi((call) =>
+      call.method === 'POST' ? late.response : json(body()),
+    );
+    const { client, result } = setup();
+    pageReading(client);
+    act(() => result.current.choosePlan(CS, STANDARD, plansSignature(body())));
+    act(() => result.current.showDraft(shownUnder()));
+    act(() => result.current.choosePlan(CS, next, plansSignature(body())));
+    expect(api.calls[0]!.init.signal?.aborted).toBe(true);
+    late.answer(json(stale.body, 409));
+    await moment();
+    expect(result.current.chosenPlan(CS)).toBe(next);
+    expect(result.current.planRefused(CS)).toBe(false);
+    expect(api.count('GET', `/programs/${CS}`)).toBe(0);
+  },
+);
+
+it('the same plan chosen from a newer list stops the check on its way too; the choice as it is, or one in another program, does not', () => {
+  const api = fakeApi(() => held().response);
+  const { result } = setup();
+  const signature = plansSignature(body());
+  act(() => result.current.choosePlan(CS, STANDARD, signature));
+  act(() => result.current.showDraft(shownUnder()));
+  act(() => result.current.choosePlan(CS, STANDARD, signature));
+  act(() => result.current.choosePlan(DS, 'ds-ms-plan', '[]'));
+  expect(api.calls[0]!.init.signal?.aborted).toBe(false);
+  act(() => result.current.choosePlan(CS, STANDARD, plansSignature(revised())));
+  expect(api.calls[0]!.init.signal?.aborted).toBe(true);
+});
+
+it('another plan chosen after a check was answered keeps its outcome, shown again without a check', async () => {
+  const api = fakeApi((call) =>
+    json(draftAnswer(STANDARD, call.body as DraftRequest)),
+  );
+  const { result } = setup();
+  const signature = plansSignature(body());
+  act(() => result.current.choosePlan(CS, STANDARD, signature));
+  act(() => result.current.showDraft(shownUnder()));
+  await waitFor(() =>
+    expect(result.current.draftView(shownUnder()).checking).toBe(false),
+  );
+  act(() =>
+    result.current.choosePlan(CS, 'cs-ms-boston-2026-2027-bridge', signature),
+  );
+  act(() => result.current.choosePlan(CS, STANDARD, signature));
+  act(() => result.current.showDraft(shownUnder()));
+  expect(api.calls).toHaveLength(1);
+  expect(result.current.draftView(shownUnder()).answer).not.toBeNull();
+});
+
+it('a plan at a new content version is checked there, under the same plan too', async () => {
+  const api = fakeApi((call) =>
+    json(draftAnswer(STANDARD, call.body as DraftRequest)),
+  );
+  const { result } = setup();
+  act(() => result.current.showDraft(shownUnder()));
+  await waitFor(() =>
+    expect(result.current.draftView(shownUnder()).checking).toBe(false),
+  );
+  act(() => result.current.showDraft(shownUnder({ revision: 'f'.repeat(64) })));
+  expect(
+    api.calls.map((call) => (call.body as DraftRequest).plan_content_sha256),
+  ).toEqual([revisions[STANDARD], 'f'.repeat(64)]);
+});
+
+// R4b README, the third point for the wiring: PlanDraft tells a new outcome by its object.
+it('each outcome is a new object, even word for word the last, and stays the same one until the next: an answer through a failure, a failure until an answer', async () => {
+  // A check is answered at once from R4b's answers, or held back for the test to answer.
+  let gate: ReturnType<typeof held> | null = null;
+  fakeApi((call) =>
+    gate !== null
+      ? gate.response
+      : json(draftAnswer(STANDARD, call.body as DraftRequest)),
+  );
+  const { result } = setup();
+  const view = () => result.current.draftView(shownUnder());
+  const answered = () => waitFor(() => expect(view().checking).toBe(false));
+  act(() => result.current.showDraft(shownUnder()));
+  await answered();
+  const first = view().answer;
+  act(() => result.current.retryDraft(shownUnder()));
+  await answered();
+  const answer = view().answer;
+  expect(answer).toEqual(first);
+  expect(answer).not.toBe(first);
+  // While a check is on its way the answer is the same object.
+  gate = held();
+  act(() => result.current.retryDraft(shownUnder()));
+  expect(view().checking).toBe(true);
+  expect(view().answer).toBe(answer);
+  gate.answer(json({ error_type: 'server_error' }, 503));
+  gate = null;
+  await answered();
+  const failure = view().failure;
+  expect(failure).not.toBeNull();
+  expect(view().answer).toBe(answer);
+  // The failure stays the same object while the next check is on its way; the same failure again is a new one.
+  gate = held();
+  act(() => result.current.retryDraft(shownUnder()));
+  expect(view().failure).toBe(failure);
+  gate.answer(json({ error_type: 'server_error' }, 503));
+  gate = null;
+  await answered();
+  expect(view().failure).toEqual(failure);
+  expect(view().failure).not.toBe(failure);
+  // An answer takes the failure.
+  act(() => result.current.retryDraft(shownUnder()));
+  await answered();
+  expect(view().failure).toBeNull();
+  expect(view().answer).not.toBeNull();
 });

@@ -65,7 +65,11 @@ const snapshot = mkdtempSync(
 process.on('exit', () => {
   const link = join(snapshot, 'node_modules');
   if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
-    unlinkSync(link);
+    try {
+      unlinkSync(link);
+    } catch {
+      // The check below keeps the copy and says where it is.
+    }
   if (existsSync(link))
     console.error('Copy kept, the link is still there: ' + snapshot);
   else rmSync(snapshot, { recursive: true, force: true });

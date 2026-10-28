@@ -68,7 +68,8 @@ def privacy_sections(settings: Any, *, web: bool = False) -> list[tuple[str, lis
     ]
     if web:
         kept.append("每门课、每个培养方案的页面都有自己的网址（比如 /course/CS-6140、/programs/cs-ms）：打开过的这些页面会和"
-                    "浏览别的网站一样，留在你这台设备的浏览器历史里，可以在浏览器里清除；分享出去的链接里也带着课号或项目。")
+                    "浏览别的网站一样，留在你这台设备的浏览器历史里，可以在浏览器里清除；分享出去的链接里也带着课号或项目，"
+                    "分享一份方案时还带着它的校区、目录年度、路径、concentration 和内容版本。")
     who = ["服务器上的数据只有维护者能看，不卖、也不交给第三方；公开的 Co-op 经验按贡献等级给访客看；"
            "生成回答要把问题发给 Google Gemini，见上。",
            "网站经 Cloudflare 转发到服务器：连接在 Cloudflare 那里解密再转发，所以 Cloudflare 能看到传输的内容。"]

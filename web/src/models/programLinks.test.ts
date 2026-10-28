@@ -87,9 +87,28 @@ describe('reading a plan link (read_plan_link)', () => {
       'a content version in capitals',
       query({ plan_revision: link.plan_content_sha256.toUpperCase() }),
     ],
-    ['values over 2048 characters together', query({ plan: 'p'.repeat(2100) })],
+    // Streamlit's 2048 characters for all eight together cannot be reached by values that keep to their patterns
+    // (under 1,500 at most), so the pattern refuses an overlong link first.
+    ['a program ID of 65 characters', query({ program: 'c'.repeat(65) })],
+    ['a plan ID of 101 characters', query({ plan: 'p'.repeat(101) })],
+    ['a campus of 41 characters', query({ campus: 'b'.repeat(41) })],
   ])('refuses a link with %s', (_name, params) => {
     expect(readPlanLink(params)).toBeNull();
+  });
+  it('takes a program ID, a plan ID and a campus at their longest', () => {
+    expect(
+      readPlanLink(
+        query({
+          program: 'c'.repeat(64),
+          plan: 'p'.repeat(100),
+          campus: 'b'.repeat(40),
+        }),
+      ),
+    ).toMatchObject({
+      program_id: 'c'.repeat(64),
+      plan_id: 'p'.repeat(100),
+      campus: 'b'.repeat(40),
+    });
   });
   it('takes a concentration of 100 characters, counted as characters', () => {
     const hundred = '😀'.repeat(100);
@@ -138,6 +157,16 @@ describe('checking a plan link against the program read now (resolve_plan_link)'
         plan_content_sha256: revisions[BRIDGE]!,
       }),
     ).toBe('draft');
+  });
+  it('a draft at another content version is stale: the version is checked first, as in Streamlit', () => {
+    expect(
+      checkPlanLink(body, {
+        ...link,
+        plan_id: BRIDGE,
+        pathway: 'bridge',
+        plan_content_sha256: 'f'.repeat(64),
+      }),
+    ).toBe('stale');
   });
   it('a program without its plan table is unavailable', () => {
     expect(checkPlanLink({ ...body, plan_schema_available: false }, link)).toBe(

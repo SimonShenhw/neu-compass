@@ -3,7 +3,11 @@
 // plan chosen in each program and the draft are kept in the shell (ProgramsContext). Old links come in through the
 // search page (SearchRoute) and are finished here: a /?program= ref is matched once the list reads, and a plan link is
 // checked against the program's answer read fresh.
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  isCancelledError,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ApiError, isTransientError } from '../api/client';
@@ -214,17 +218,20 @@ export function ProgramRoute() {
   // first. When one goes with focus in it, focus goes to the plan selector first, or to the curriculum when there is
   // none, without scrolling (R4b README, the fourth point); each has this ref, whose cleanup runs while the node is
   // still there. Focus anywhere else, or nowhere, is not touched, not even for a moment (the unified focus rule, as in
-  // PlanDraft): React would put it back after the commit, but the selector would have had it in between.
+  // PlanDraft): React would put it back after the commit, but the selector would have had it in between. The selector
+  // has it too: it goes when the plans read again leave none to offer or the curriculum goes, often a commit after it
+  // was handed focus, and then focus goes to the curriculum (review A33).
   const curriculumView = useRef<HTMLElement>(null);
   const handOff = useCallback(
     (node: HTMLElement | null) => () => {
       if (!node?.contains(document.activeElement)) return;
       const section = curriculumView.current;
-      (
-        section?.querySelector<HTMLElement>(
-          '[data-kind="select"] [role="combobox"]',
-        ) ?? section
-      )?.focus({ preventScroll: true });
+      const selector = section?.querySelector<HTMLElement>(
+        '[data-kind="select"] [role="combobox"]',
+      );
+      (selector && !node.contains(selector) ? selector : section)?.focus({
+        preventScroll: true,
+      });
     },
     [],
   );
@@ -260,52 +267,83 @@ export function ProgramRoute() {
         : readPlanLink(new URLSearchParams(planQuery));
     return read !== null && read.program_id === programId ? read : null;
   }, [planQuery, programId]);
-  const [retrying, setRetrying] = useState(false);
-  const alive = useRef(true);
+  // The history entry shown, or null once the page is gone. A link's check counts only while its entry is shown:
+  // Back or Forward from one program to another keeps this page, and an entry left before its check settled is checked
+  // again when the student comes back to it (review B33).
+  const shownEntry = useRef<string | null>(null);
   useEffect(() => {
-    alive.current = true;
+    shownEntry.current = location.key;
     return () => {
-      alive.current = false;
+      shownEntry.current = null;
     };
-  }, []);
+  }, [location.key]);
+  // The entry whose check failed for a moment, waiting for the next read of the program that succeeds.
+  const [retrying, setRetrying] = useState<string | null>(null);
   const { pathname } = location;
+  // What the check of this entry comes to, settled while the entry is shown; false once it is not.
   const settle = useCallback(
-    (fresh: unknown) => {
-      if (link === null || !alive.current) return;
+    (fresh: unknown, entry: string) => {
+      if (link === null || shownEntry.current !== entry) return false;
       const status = checkPlanLink(fresh, link);
+      // The plan chosen is what says so (planLinked), while it stays chosen: the entry would say it after the choice
+      // went, or after a reload, which keeps the entry and not the choice (review A33).
       if (status === 'ready')
-        programs.choosePlan(programId, link.plan_id, plansSignature(fresh));
-      setRetrying(false);
+        programs.choosePlan(
+          programId,
+          link.plan_id,
+          plansSignature(fresh),
+          true,
+        );
+      setRetrying(null);
       void navigate(pathname, {
         replace: true,
-        state: { notice: PLAN_LINK_NOTICES[status] },
+        state:
+          status === 'ready' ? null : { notice: PLAN_LINK_NOTICES[status] },
       });
+      return true;
     },
     [link, navigate, pathname, programId, programs],
   );
   const handled = useRef<string | null>(null);
   useEffect(() => {
-    if (link === null || !ready || handled.current === location.key) return;
-    handled.current = location.key;
+    const entry = location.key;
+    if (link === null || !ready || handled.current === entry) return;
+    handled.current = entry;
     // The linked program's earlier choice goes first, as in Streamlit.
     programs.forget(programId);
-    queryClient
-      .fetchQuery({ ...curriculumQuery(programId), staleTime: 0 })
-      .then(settle, (error: unknown) => {
-        if (!alive.current) return;
-        if (isTransientError(error)) {
-          setRetrying(true);
-          return;
-        }
-        // The program is not there (the page says so) or cannot be read as it is.
-        void navigate(pathname, {
-          replace: true,
-          state:
-            error instanceof ApiError && error.status === 404
-              ? null
-              : { notice: PLAN_LINK_NOTICES.unavailable },
-        });
-      });
+    const left = () => {
+      if (handled.current === entry) handled.current = null;
+    };
+    const check = (): Promise<void> =>
+      queryClient
+        .fetchQuery({ ...curriculumQuery(programId), staleTime: 0 })
+        .then(
+          (fresh) => {
+            if (!settle(fresh, entry)) left();
+          },
+          (error: unknown) => {
+            if (shownEntry.current !== entry) {
+              left();
+              return;
+            }
+            // The read was cancelled: 「刷新方案及政策证据」 or 「刷新页面内容」 read the program again in its place,
+            // and this joins that read (review A33).
+            if (isCancelledError(error)) return check();
+            if (isTransientError(error)) {
+              setRetrying(entry);
+              return;
+            }
+            // The program is not there (the page says so) or cannot be read as it is.
+            void navigate(pathname, {
+              replace: true,
+              state:
+                error instanceof ApiError && error.status === 404
+                  ? null
+                  : { notice: PLAN_LINK_NOTICES.unavailable },
+            });
+          },
+        );
+    void check();
   }, [
     link,
     ready,
@@ -320,11 +358,17 @@ export function ProgramRoute() {
   // The failed read left the program's query in error, its older answer kept; only a read that succeeds after it puts
   // the query back to success.
   useEffect(() => {
-    if (retrying && curriculum.isSuccess) settle(curriculum.data);
-  }, [retrying, curriculum.isSuccess, curriculum.data, settle]);
+    if (retrying === location.key && curriculum.isSuccess)
+      settle(curriculum.data, location.key);
+  }, [retrying, location.key, curriculum.isSuccess, curriculum.data, settle]);
 
   const said =
-    link === null ? notice : retrying ? PLAN_LINK_NOTICES.retry : CHECKING_LINK;
+    link !== null
+      ? retrying === location.key
+        ? PLAN_LINK_NOTICES.retry
+        : CHECKING_LINK
+      : (notice ??
+        (programs.planLinked(programId) ? PLAN_LINK_NOTICES.ready : undefined));
   return (
     <>
       <LinkNotice text={said} />
@@ -366,6 +410,7 @@ export function ProgramRoute() {
         }
         draft={draft}
         planRef={handOff}
+        selectRef={handOff}
       />
     </>
   );

@@ -70,7 +70,11 @@ process.on('exit', () => {
   );
   for (const link of links)
     if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
-      unlinkSync(link);
+      try {
+        unlinkSync(link);
+      } catch {
+        // The next link is still tried; the check below keeps the copy and says where it is.
+      }
   if (links.some((link) => existsSync(link)))
     console.error('Copy kept, a link is still there: ' + snapshot);
   else rmSync(snapshot, { recursive: true, force: true });

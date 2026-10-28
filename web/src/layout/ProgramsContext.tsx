@@ -1,10 +1,10 @@
 // The program pages' state (R4c), kept above the pages like the search page's (SearchContext): the plan chosen in each
 // program, as Streamlit keeps one choice per program (program-plan-{id}) through a visit elsewhere; what the page says
-// about a choice that went; and the course draft (R4b's PlanDraft). The program itself is in the address
-// (/programs/<ID>). Apart from the search page's choice, as in Streamlit (the user's choice, 10-27); the two share only
-// the curriculum cache. It belongs to who is looking: a logout, an account deletion or another person's login empties
-// it, as Streamlit's logout sets every program's plan choice to None and clears the draft. It lives in this tab's
-// memory only: the draft goes to the API's check and nowhere else, no address, storage or question.
+// about a choice that went, or one a shared link made; and the course draft (R4b's PlanDraft). The program itself is
+// in the address (/programs/<ID>). Apart from the search page's choice, as in Streamlit (the user's choice, 10-27);
+// the two share only the curriculum cache. It belongs to who is looking: a logout, an account deletion or another
+// person's login empties it, as Streamlit's logout sets every program's plan choice to None and clears the draft. It
+// lives in this tab's memory only: the draft goes to the API's check and nowhere else, no address, storage or question.
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import {
   createContext,
@@ -31,9 +31,10 @@ interface Choice {
   // The program's plan list when the plan was chosen (plansSignature).
   signature: string;
 }
-// What the page says about a choice that went: R4a's line that the plans were updated, or R4b's that the plan cannot
-// be used (the draft check refused it, and the plans read again had not changed).
-type Notice = 'revised' | 'refused';
+// What the page says about the choice: R4a's line that the plans were updated, or R4b's that the plan cannot be used
+// (the draft check refused it, and the plans read again had not changed), both about a choice that went; or that a
+// shared link chose it, said while it stays chosen (a reload keeps the link's history entry, not the choice).
+type Notice = 'revised' | 'refused' | 'linked';
 
 // A plan the page shows the draft under: the program, the plan, the content version the page shows for it
 // (planRevisions) and the plan list it is in (plansSignature).
@@ -73,11 +74,15 @@ export interface ProgramsState {
   // The draft check refused the chosen plan, which went, and the plans read again had not changed (R4b's sentence
   // for it), until the next choice or refresh.
   planRefused: (programId: string) => boolean;
-  // signature: plansSignature of the answer the choice was made from.
+  // A shared link chose the plan chosen now (the link's sentence that it did), until the next choice or refresh.
+  planLinked: (programId: string) => boolean;
+  // signature: plansSignature of the answer the choice was made from; linked: a shared link chose it. A check on its
+  // way in the program stops unless this is the choice it was sent under: what it comes to is not this choice's.
   choosePlan: (
     programId: string,
     planId: string | null,
     signature: string,
+    linked?: boolean,
   ) => void;
   // The choice and the notice go: 「刷新方案及政策证据」 (Streamlit sets the choice to None and says nothing) and a plan
   // link being checked. A draft checked under the program's plan is checked again when the page next shows it.
@@ -183,6 +188,7 @@ export function ProgramsProvider({
       refusals.current.clear();
       drop();
       courses.current = [];
+      // Not shown again (the next check sends its own), but the words the last person typed do not stay in memory.
       sent.current.input = undefined;
       setShown(NOTHING);
     }
@@ -193,6 +199,8 @@ export function ProgramsProvider({
   // choice goes at once, the draft's courses stay, and the program is read again past the cache (Streamlit lets the
   // curriculum go stale after a refused plan): plans that changed say R4a's line, unchanged ones, or none read, R4b's.
   // A read the program page stops reading (the student left it) is stopped by TanStack and counts as none read.
+  // The refused plan is still the choice, or none is left: any other choice in the program stopped the check
+  // (choosePlan), so its refusal is never said of a plan chosen since.
   const refuse = useCallback(
     (plan: DraftPlan) => {
       const { programId } = plan;
@@ -276,11 +284,18 @@ export function ProgramsProvider({
           if (sent.current.seq !== seq) return;
           sent.current.stop = null;
           const failure = failureOf(error);
+          // These never reach the component, which goes with the choice (R4b spec section 8). The check goes with its
+          // outcome, so the plan chosen again is checked again there (review A33).
+          if (planGone(failure)) {
+            sent.current.plan = null;
+            setShown(NOTHING);
+            refuse(plan);
+            return;
+          }
           setShown((current) => ({
             plan,
             view: { ...current.view, failure, checking: false },
           }));
-          if (planGone(failure)) refuse(plan);
         },
       );
     },
@@ -302,17 +317,41 @@ export function ProgramsProvider({
       Object.hasOwn(notices, programId) && notices[programId] === 'refused',
     [notices],
   );
+  // Only while the choice the link made is there: the plans read again, or a refusal, can take it first.
+  const planLinked = useCallback(
+    (programId: string) =>
+      Object.hasOwn(notices, programId) &&
+      notices[programId] === 'linked' &&
+      Object.hasOwn(choices, programId),
+    [notices, choices],
+  );
   const choosePlan = useCallback(
-    (programId: string, planId: string | null, signature: string) => {
+    (
+      programId: string,
+      planId: string | null,
+      signature: string,
+      linked = false,
+    ) => {
+      const last = sent.current;
+      if (
+        last.stop !== null &&
+        last.plan?.programId === programId &&
+        (last.plan.planId !== planId || last.plan.signature !== signature)
+      )
+        drop();
       setChoices((current) =>
         planId === null
           ? omit(current, programId)
           : { ...current, [programId]: { planId, signature } },
       );
-      setNotices((current) => omit(current, programId));
+      setNotices((current) =>
+        linked
+          ? { ...current, [programId]: 'linked' }
+          : omit(current, programId),
+      );
       refusals.current.delete(programId);
     },
-    [],
+    [drop],
   );
   const forget = useCallback(
     (programId: string) => {
@@ -371,6 +410,7 @@ export function ProgramsProvider({
       chosenPlan,
       planRevised,
       planRefused,
+      planLinked,
       choosePlan,
       forget,
       draftView,
@@ -384,6 +424,7 @@ export function ProgramsProvider({
       chosenPlan,
       planRevised,
       planRefused,
+      planLinked,
       choosePlan,
       forget,
       draftView,
