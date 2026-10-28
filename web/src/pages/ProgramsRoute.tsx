@@ -8,8 +8,20 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  UNSAFE_NavigationContext,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 import { ApiError, isTransientError } from '../api/client';
 import { failureOf, loadOf } from '../api/load';
 import type { Load } from '../api/load';
@@ -77,6 +89,20 @@ function usePageReady() {
   return viewerScope(useAccount()) !== null;
 }
 
+// The history entry the router is at now. A navigation moves the router's history at once, while the page it leads
+// to shows only once React has rendered it (react-router renders a navigation as a transition): until then the
+// location a page has, and what its effects recorded of it, is still the entry being left. Work that replaces the
+// current entry when it ends asks this first, or it would replace the entry the student has just gone to (review A33).
+// Both routers here (BrowserRouter, and MemoryRouter in the tests) navigate through their history, which says where it
+// is; a router whose navigator does not say leaves the caller's own check.
+function useHistoryEntry() {
+  const { navigator } = useContext(UNSAFE_NavigationContext);
+  return useCallback(() => {
+    const at = (navigator as { location?: { key?: unknown } }).location;
+    return typeof at?.key === 'string' ? at.key : undefined;
+  }, [navigator]);
+}
+
 // Always there, so what a link came to is heard when it appears.
 function LinkNotice({ text }: { text: string | undefined }) {
   return (
@@ -90,8 +116,9 @@ export function ProgramsRoute() {
   const ready = usePageReady();
   const programs = useQuery({ ...programListQuery, enabled: ready });
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const { state, key } = useLocation();
   const { notice, programRef } = linkState(state);
+  const historyEntry = useHistoryEntry();
   const body = shownData(programs);
   const rows = useMemo(() => {
     if (body === undefined) return null;
@@ -102,12 +129,15 @@ export function ProgramsRoute() {
   // read the list says so and offers to load it again; the ref waits for it.
   useEffect(() => {
     if (programRef === undefined || rows === null) return;
+    // Not once the history has moved on: the student went elsewhere while the list was on its way, and coming back to
+    // this entry finds the ref still there (review A33).
+    if ((historyEntry() ?? key) !== key) return;
     const id = matchProgramRef(programRef, rows);
     void navigate(id === null ? '/programs' : programPath(id), {
       replace: true,
       state: id === null ? { notice: programNotFound(programRef) } : null,
     });
-  }, [programRef, rows, navigate]);
+  }, [programRef, rows, navigate, historyEntry, key]);
   // Loading again takes the pressed button away: focus goes to the list, as in R4a's demo.
   const view = useRef<HTMLElement>(null);
   const [retried, setRetried] = useState(0);
@@ -267,9 +297,11 @@ export function ProgramRoute() {
         : readPlanLink(new URLSearchParams(planQuery));
     return read !== null && read.program_id === programId ? read : null;
   }, [planQuery, programId]);
-  // The history entry shown, or null once the page is gone. A link's check counts only while its entry is shown:
-  // Back or Forward from one program to another keeps this page, and an entry left before its check settled is checked
-  // again when the student comes back to it (review B33).
+  // The history entry shown, or null once the page is gone. A link's check counts only while its entry is shown and the
+  // history is still at it (useHistoryEntry): Back or Forward from one program to another keeps this page, a
+  // navigation shows its page only once it has rendered, and an entry left before its check settled is checked again
+  // when the student comes back to it (review B33, A33).
+  const historyEntry = useHistoryEntry();
   const shownEntry = useRef<string | null>(null);
   useEffect(() => {
     shownEntry.current = location.key;
@@ -280,10 +312,15 @@ export function ProgramRoute() {
   // The entry whose check failed for a moment, waiting for the next read of the program that succeeds.
   const [retrying, setRetrying] = useState<string | null>(null);
   const { pathname } = location;
-  // What the check of this entry comes to, settled while the entry is shown; false once it is not.
+  // What the check of this entry comes to, settled while the entry is shown and the history is at it; false once not.
   const settle = useCallback(
     (fresh: unknown, entry: string) => {
-      if (link === null || shownEntry.current !== entry) return false;
+      if (
+        link === null ||
+        shownEntry.current !== entry ||
+        (historyEntry() ?? entry) !== entry
+      )
+        return false;
       const status = checkPlanLink(fresh, link);
       // The plan chosen is what says so (planLinked), while it stays chosen: the entry would say it after the choice
       // went, or after a reload, which keeps the entry and not the choice (review A33).
@@ -302,7 +339,7 @@ export function ProgramRoute() {
       });
       return true;
     },
-    [link, navigate, pathname, programId, programs],
+    [historyEntry, link, navigate, pathname, programId, programs],
   );
   const handled = useRef<string | null>(null);
   useEffect(() => {
@@ -322,7 +359,10 @@ export function ProgramRoute() {
             if (!settle(fresh, entry)) left();
           },
           (error: unknown) => {
-            if (shownEntry.current !== entry) {
+            if (
+              shownEntry.current !== entry ||
+              (historyEntry() ?? entry) !== entry
+            ) {
               left();
               return;
             }
@@ -354,6 +394,7 @@ export function ProgramRoute() {
     settle,
     navigate,
     pathname,
+    historyEntry,
   ]);
   // The failed read left the program's query in error, its older answer kept; only a read that succeeds after it puts
   // the query back to success.

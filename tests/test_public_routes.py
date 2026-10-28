@@ -70,6 +70,9 @@ def test_only_the_web_page_says_course_pages_stay_in_the_browser_history(client)
     sections = {section["heading"]: section["sentences"] for section in client.get("/privacy").json()["sections"]}
     assert any("/course/CS-6140" in sentence and "/programs/cs-ms" in sentence and "浏览器历史" in sentence
                for sentence in sections["记了什么"])
+    # A shared plan link carries the plan's scope and content version too (review A33, recheck B33).
+    # 中文：分享一份方案的链接还带着它的范围和内容版本。
+    assert sections["记了什么"][-1].endswith("分享一份方案时还带着它的校区、目录年度、路径、concentration 和内容版本。")
     assert not any("浏览器历史" in sentence for _, sentences in privacy_sections(settings) for sentence in sentences)
     # It is the last sentence of 「记了什么」, and the rest is Streamlit's word for word (review B32).
     # 中文：它是「记了什么」的最后一句，别的和 Streamlit 一字不差。

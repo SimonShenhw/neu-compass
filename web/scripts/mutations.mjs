@@ -39,7 +39,11 @@ const links = [];
 process.on('exit', () => {
   for (const link of links)
     if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
-      unlinkSync(link);
+      try {
+        unlinkSync(link);
+      } catch {
+        // The next link is still tried; the check below keeps the copies and says where they are (review B33).
+      }
   if (links.some((link) => existsSync(link)))
     console.error(`Copies kept, a link is still there: ${taskTemp}`);
   else rmSync(taskTemp, { recursive: true, force: true });

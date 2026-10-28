@@ -34,6 +34,7 @@ import {
   draftAnswer,
   draftChecks,
   page,
+  programRows,
   revisions,
   stateOf,
   where,
@@ -365,8 +366,9 @@ it('a blank /?program= stays on the search page', async () => {
 });
 
 it('a list that reads as no list says so, and a /?program= ref waits for one that does', async () => {
+  let broken = true;
   world((call) =>
-    call.path === '/programs' ? json({ nope: true }) : undefined,
+    call.path === '/programs' && broken ? json({ nope: true }) : undefined,
   );
   page('/?program=cs');
   expect(
@@ -375,6 +377,12 @@ it('a list that reads as no list says so, and a /?program= ref waits for one tha
   await moment();
   expect(where()).toBe('/programs');
   expect(linkNotice()).toHaveTextContent('');
+  // The ref is still there when a list reads: the sidebar's 刷新页面内容 reads it again (recheck B33).
+  broken = false;
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '刷新页面内容' })[0]!,
+  );
+  await waitFor(() => expect(where()).toBe('/programs/cs-ms'));
 });
 
 it('while the list cannot be read a /?program= ref waits, and loading the list again opens the program', async () => {
@@ -520,23 +528,29 @@ it.each([
   },
 );
 
+// Without another reader the read is cancelled as the page goes: React runs the page's unmount effects before the
+// next page's mount effects, so the landing, which reads cs-ms too, reads it anew after (recheck B33).
 it.each([
-  ['the comparison page', '/compare', () => json(csBody()), false],
   [
-    'the comparison page, the read refused',
+    'the comparison page, the read cancelled as the page goes',
     '/compare',
-    () => apiError(422, 'validation_error', 'Bad request'),
+    () => json(csBody()),
     false,
   ],
-  ['the landing', '/', () => json(csBody()), false],
   [
-    'the comparison page, the read kept going by another reader',
+    'the landing, the read cancelled as the page goes and the landing reading anew',
+    '/',
+    () => json(csBody()),
+    false,
+  ],
+  [
+    'the comparison page, the read kept going by another reader and answered',
     '/compare',
     () => json(csBody()),
     true,
   ],
   [
-    'the comparison page, the read kept going and refused',
+    'the comparison page, the read kept going by another reader and refused',
     '/compare',
     () => apiError(422, 'validation_error', 'Bad request'),
     true,
@@ -545,8 +559,9 @@ it.each([
   'Back to %s while a plan link is checked stays there',
   async (_name, before, answer, kept) => {
     const later = held();
+    let reads = 0;
     world((call) =>
-      call.method === 'GET' && call.path === CURRICULUM
+      call.method === 'GET' && call.path === CURRICULUM && ++reads === 1
         ? later.response
         : undefined,
     );
@@ -561,6 +576,91 @@ it.each([
     expect(where()).toBe(before);
   },
 );
+
+// A navigation moves the history at once, and the page it leads to shows only once React has rendered it (a
+// transition). The click and the answer in one act scope: React renders the navigation only after the answer is in,
+// the order an answer takes when it comes back in between (recheck A33).
+const sidebarCompare = () =>
+  screen.getAllByRole('link', { name: /^课程对比/ })[0]!.click();
+it.each<[string, () => void, () => Response, string, 'back' | 'forward']>([
+  [
+    '← 所有培养方案 pressed',
+    () => screen.getByRole('button', { name: /所有培养方案/ }).click(),
+    () => json(csBody()),
+    '/programs',
+    'back',
+  ],
+  [
+    'the sidebar’s 课程对比 followed',
+    sidebarCompare,
+    () => json(csBody()),
+    '/compare',
+    'back',
+  ],
+  [
+    'the sidebar’s 课程对比 followed, the read refused',
+    sidebarCompare,
+    () => apiError(422, 'validation_error', 'Bad request'),
+    '/compare',
+    'back',
+  ],
+  [
+    'Back to another program',
+    () => screen.getByRole('button', { name: 'back' }).click(),
+    () => json(csBody()),
+    '/programs/ds-ms',
+    'forward',
+  ],
+])(
+  'a plan link’s check that comes back while a navigation is on its way (%s) leaves the page gone to, and the link is checked on the way back',
+  async (_name, go, answer, gone, back) => {
+    const later = held();
+    let reads = 0;
+    world((call) =>
+      call.method === 'GET' && call.path === CURRICULUM && ++reads === 1
+        ? later.response
+        : policies(call),
+    );
+    page(['/programs/ds-ms', planLink()]);
+    await waitFor(() => expect(linkNotice()).toHaveTextContent(CHECKING_LINK));
+    await act(async () => {
+      go();
+      later.answer(answer());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    await moment();
+    expect(where()).toBe(gone);
+    expect(stateOf()).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: back }));
+    await waitFor(() =>
+      expect(linkNotice()).toHaveTextContent(PLAN_LINK_NOTICES.ready),
+    );
+    expect(where()).toBe('/programs/cs-ms');
+    expect(combobox(PLAN)).toHaveTextContent(STANDARD_PLAN);
+    expect(reads).toBe(2);
+  },
+);
+
+it('a /?program= ref whose list comes back while a navigation is on its way leaves the page gone to, and is matched on the way back', async () => {
+  const list = held();
+  let reads = 0;
+  world((call) =>
+    call.method === 'GET' && call.path === '/programs' && ++reads === 1
+      ? list.response
+      : undefined,
+  );
+  page(['/compare', '/?program=cs']);
+  await waitFor(() => expect(where()).toBe('/programs'));
+  await act(async () => {
+    sidebarCompare();
+    list.answer(json(programRows));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+  await moment();
+  expect(where()).toBe('/compare');
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  await waitFor(() => expect(where()).toBe('/programs/cs-ms'));
+});
 
 it('a plan link whose program cannot be read as it is says the plans cannot be had', async () => {
   world((call) =>
@@ -1175,6 +1275,29 @@ it.each([
     expect(api.count('GET', CURRICULUM)).toBe(1);
   },
 );
+
+it('a check stopped by another choice is sent again once the plan before is chosen again, and its answer shows', async () => {
+  const late = held();
+  let holding = false;
+  const api = world((call) =>
+    isDraft(call) && holding ? late.response : policies(call),
+  );
+  page('/programs/cs-ms');
+  await standardChosen();
+  holding = true;
+  await add('CS 5010');
+  await screen.findByText('正在核对课程…');
+  await choose(PLAN, BRIDGE_PLAN);
+  holding = false;
+  await choose(PLAN, STANDARD_PLAN);
+  // The stopped check went with its outcome (recheck B33): the plan is checked again, with the draft as it stands.
+  await waitFor(() => expect(draftChecks(api.calls)).toHaveLength(3));
+  await waitFor(() =>
+    expect(screen.queryByText('正在核对课程…')).not.toBeInTheDocument(),
+  );
+  expect(sentBodies(api.calls)[2]).toEqual(nothingYet());
+  expect(screen.getByText(count(0))).toBeInTheDocument();
+});
 
 // The plans are read again after the hand-off, as over a network: the selector goes a commit later.
 it.each([
