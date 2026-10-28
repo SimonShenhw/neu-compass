@@ -529,38 +529,44 @@ it.each([
 );
 
 // Without another reader the read is cancelled as the page goes: React runs the page's unmount effects before the
-// next page's mount effects, so the landing, which reads cs-ms too, reads it anew after (recheck B33).
+// next page's mount effects, so the landing, which reads cs-ms too, reads it anew after (recheck B33). Each row also
+// checks that the read went as its name says: stopped or not, and how many reads of the program there were (recheck 2,
+// B33).
 it.each([
   [
     'the comparison page, the read cancelled as the page goes',
     '/compare',
     () => json(csBody()),
     false,
+    1,
   ],
   [
     'the landing, the read cancelled as the page goes and the landing reading anew',
     '/',
     () => json(csBody()),
     false,
+    2,
   ],
   [
     'the comparison page, the read kept going by another reader and answered',
     '/compare',
     () => json(csBody()),
     true,
+    1,
   ],
   [
     'the comparison page, the read kept going by another reader and refused',
     '/compare',
     () => apiError(422, 'validation_error', 'Bad request'),
     true,
+    1,
   ],
 ])(
   'Back to %s while a plan link is checked stays there',
-  async (_name, before, answer, kept) => {
+  async (_name, before, answer, kept, programReads) => {
     const later = held();
     let reads = 0;
-    world((call) =>
+    const api = world((call) =>
       call.method === 'GET' && call.path === CURRICULUM && ++reads === 1
         ? later.response
         : undefined,
@@ -574,12 +580,19 @@ it.each([
     later.answer(answer());
     await moment();
     expect(where()).toBe(before);
+    const read = api.calls.find(
+      (call) => call.method === 'GET' && call.path === CURRICULUM,
+    );
+    expect(read!.init.signal?.aborted).toBe(!kept);
+    await waitFor(() => expect(reads).toBe(programReads));
   },
 );
 
 // A navigation moves the history at once, and the page it leads to shows only once React has rendered it (a
 // transition). The click and the answer in one act scope: React renders the navigation only after the answer is in,
-// the order an answer takes when it comes back in between (recheck A33).
+// the order an answer takes when it comes back in between (recheck A33). Only Back to another program keeps the page,
+// so only those rows show that the entry left is recorded as not checked: a page left for another is new when the
+// student comes back (recheck 2, B33).
 const sidebarCompare = () =>
   screen.getAllByRole('link', { name: /^课程对比/ })[0]!.click();
 it.each<[string, () => void, () => Response, string, 'back' | 'forward']>([
@@ -611,6 +624,20 @@ it.each<[string, () => void, () => Response, string, 'back' | 'forward']>([
     '/programs/ds-ms',
     'forward',
   ],
+  [
+    'Back to another program, the read refused',
+    () => screen.getByRole('button', { name: 'back' }).click(),
+    () => apiError(422, 'validation_error', 'Bad request'),
+    '/programs/ds-ms',
+    'forward',
+  ],
+  [
+    'Back to another program, the read failing for a moment',
+    () => screen.getByRole('button', { name: 'back' }).click(),
+    down,
+    '/programs/ds-ms',
+    'forward',
+  ],
 ])(
   'a plan link’s check that comes back while a navigation is on its way (%s) leaves the page gone to, and the link is checked on the way back',
   async (_name, go, answer, gone, back) => {
@@ -632,6 +659,51 @@ it.each<[string, () => void, () => Response, string, 'back' | 'forward']>([
     expect(where()).toBe(gone);
     expect(stateOf()).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: back }));
+    await waitFor(() =>
+      expect(linkNotice()).toHaveTextContent(PLAN_LINK_NOTICES.ready),
+    );
+    expect(where()).toBe('/programs/cs-ms');
+    expect(combobox(PLAN)).toHaveTextContent(STANDARD_PLAN);
+    expect(reads).toBe(2);
+  },
+);
+
+// Back, then Forward with the answer in one act scope: the history is at the link's entry again at once, while the page
+// still shows another program, or none. The check counts only while its entry is shown as well, so that answer is
+// dropped, a refusal too, and the entry is checked once it shows (recheck 2, B33).
+it.each<[string, string, () => Response]>([
+  [
+    'another program, the read answered',
+    '/programs/ds-ms',
+    () => json(csBody()),
+  ],
+  [
+    'another program, the read refused',
+    '/programs/ds-ms',
+    () => apiError(422, 'validation_error', 'Bad request'),
+  ],
+  ['the comparison page, the read answered', '/compare', () => json(csBody())],
+])(
+  'a plan link’s check that comes back while Forward to its entry is on its way, after Back to %s, waits for the entry to show',
+  async (_name, before, answer) => {
+    const later = held();
+    let reads = 0;
+    world((call) =>
+      call.method === 'GET' && call.path === CURRICULUM && ++reads === 1
+        ? later.response
+        : policies(call),
+    );
+    const client = seededQueryClient();
+    otherReader(client);
+    page([before, planLink()], client);
+    await waitFor(() => expect(linkNotice()).toHaveTextContent(CHECKING_LINK));
+    await userEvent.click(screen.getByRole('button', { name: 'back' }));
+    await waitFor(() => expect(where()).toBe(before));
+    await act(async () => {
+      screen.getByRole('button', { name: 'forward' }).click();
+      later.answer(answer());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
     await waitFor(() =>
       expect(linkNotice()).toHaveTextContent(PLAN_LINK_NOTICES.ready),
     );
