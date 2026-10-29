@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RequisiteDocument, RequisiteSection } from '../../api/requisites';
 import { Button } from '../../components/Button';
+import { oneLine } from '../../models/courseDetailFormat';
 import {
   legacyLabelsAllowed,
   legacyPrerequisites,
@@ -195,6 +196,9 @@ export function CourseRequisites({
                     data-part="legacy"
                     data-depth="0"
                     data-opens={row.primary_code}
+                    // Named for its course, as the rule tree's buttons are: a screen reader's list of buttons would
+                    // otherwise say only 「查看」 for every row (R6).
+                    aria-label={`查看 ${oneLine(row.primary_code)}`}
                     onClick={() => onOpenCourse(row.primary_code!)}
                   >
                     查看

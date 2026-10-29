@@ -5,8 +5,11 @@ import { MobileNav } from './MobileNav';
 import type { Sidebar } from './Sidebar';
 import styles from './TopBar.module.css';
 
-// The privacy page and its demo carry the lock (R5c, R5d).
-const PRIVACY = new Set(['数据与隐私', '数据与隐私演示']);
+// The privacy page and its demo carry the lock (R5c, R5d); the demo is only where the demo pages are (R6).
+const PRIVACY = new Set([
+  '数据与隐私',
+  ...(__DEMO_ROUTES__ ? ['数据与隐私演示'] : []),
+]);
 // Streamlit's hero says this while it has no course count (app/ui_theme.py), and so does the top bar (R3e).
 export const CATALOG_NAME = 'NEU 研究生课程目录';
 

@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { configQuery, createQueryClient } from '../api/queries';
 import type { Member } from '../api/queries';
@@ -332,6 +332,33 @@ it('while 重试 is on its way the page shows as loading, not as the failure', a
   expect(screen.getByText('正在加载')).toBeInTheDocument();
   second.answer(json(privacy.body));
   expect(await screen.findByText(intro)).toBeInTheDocument();
+});
+
+// The whole page gives way to the loading line, so nothing of it stays; focus used to fall to the body (section 35's
+// known item), and now goes to the main content, without scrolling (R6).
+it('重试 hands focus to the main content, where it still is once the words have come', async () => {
+  const user = userEvent.setup();
+  const second = held();
+  let tries = 0;
+  fakeApi(({ path }) =>
+    path === '/privacy'
+      ? tries++
+        ? second.response
+        : apiError(503, 'service_unavailable', 'down')
+      : json(null, 404),
+  );
+  livePage('/privacy');
+  const retry = await screen.findByRole('button', { name: '重试' });
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  await user.click(retry);
+  const main = screen.getByRole('main');
+  expect(main).toHaveFocus();
+  expect(focus.mock.calls[focus.mock.contexts.lastIndexOf(main)]).toEqual([
+    { preventScroll: true },
+  ]);
+  second.answer(json(privacy.body));
+  expect(await screen.findByText(intro)).toBeInTheDocument();
+  expect(main).toHaveFocus();
 });
 
 it('a temporary failure keeps the words and says so above the page; a definite answer does not', async () => {

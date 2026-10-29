@@ -48,7 +48,8 @@ process.on('exit', () => {
     console.error(`Copies kept, a link is still there: ${taskTemp}`);
   else rmSync(taskTemp, { recursive: true, force: true });
 });
-// Everything the tests read besides src/ (R2b: the page, the API document and the generator's pins).
+// Everything the tests read besides src/ (R2b: the page, the API document and the generator's pins; R6: the page's
+// icon).
 const configFiles = [
   'package.json',
   'package-lock.json',
@@ -56,6 +57,7 @@ const configFiles = [
   'vite.config.ts',
   'eslint.config.js',
   'index.html',
+  'public/favicon.svg',
   'openapi.json',
   'tools/openapi-types/package.json',
 ];
@@ -265,12 +267,13 @@ const cases = [
     'src/models/compareList.test.tsx',
     'store preserves ID order',
   ],
+  // R6: the shell focuses its main through focusMainContent (layout/mainContent.ts).
   [
     'M17',
     'focus without scroll jump',
     'src/layout/AppShell.tsx',
-    '.focus({ preventScroll: true })',
-    '.focus()',
+    'focusMainContent({ preventScroll: true })',
+    'focusMainContent()',
     'src/pages/pages.test.tsx',
     'route focus does not scroll',
   ],

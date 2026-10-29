@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUp, LockKeyhole } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { askNotices, privacyQuery } from '../api/privacy';
 import { shownData } from '../api/queries';
@@ -19,6 +19,8 @@ export const CAPTURE_OFF = '回答内容不会保存（回答反馈功能目前�
 export const CAPTURE_LABEL = '允许保存本次会话之后的回答，用于回答反馈';
 export const PLACEHOLDER =
   '问任何课程问题：CS 5800 / 适合入门的 ML 课 / algo …';
+// The custom property base.css reads for html's scroll-padding-bottom.
+export const ASK_BAR_HEIGHT = '--ask-bar-height';
 
 export function AskBar({ onSend }: { onSend: (question: string) => void }) {
   const search = useSearch();
@@ -30,6 +32,30 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
   );
   const [text, setText] = useState('');
   const id = useId();
+  // Held at the bottom of the window (AskBar.module.css): while it is on the page, the page keeps what is focused or
+  // scrolled into view clear of it, by its height (base.css's scroll-padding-bottom; R6).
+  const form = useRef<HTMLFormElement>(null);
+  const measure = useCallback(() => {
+    const element = form.current;
+    if (element)
+      document.documentElement.style.setProperty(
+        ASK_BAR_HEIGHT,
+        `${element.offsetHeight}px`,
+      );
+  }, []);
+  // After every render, as the notices, the opt-in and the length warning change its height, and on every resize, as
+  // a narrower window wraps its lines.
+  useLayoutEffect(measure);
+  useLayoutEffect(() => {
+    const element = form.current;
+    if (!element) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty(ASK_BAR_HEIGHT);
+    };
+  }, [measure]);
   const length = questionLength(text.trim());
   const tooLong = length > MAX_QUESTION_CHARS;
   // One question at a time: the next waits until this answer has ended (R3c's conversation takes one).
@@ -41,6 +67,7 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
   }
   return (
     <form
+      ref={form}
       className={styles.askBar}
       aria-label="提问"
       onSubmit={(event) => {

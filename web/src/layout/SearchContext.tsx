@@ -66,6 +66,17 @@ export interface SearchState {
 // Exported for tests that give a component a search state of their own.
 export const SearchContext = createContext<SearchState | null>(null);
 
+// The state a question asked away from the search page opens it with: its newest question is brought into view there,
+// where the answer is read (R6, the user's choice of 10-29).
+export const NEWEST_QUESTION = { show: 'newest-question' } as const;
+export function showsNewestQuestion(state: unknown) {
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    (state as { show?: unknown }).show === NEWEST_QUESTION.show
+  );
+}
+
 // R2b's stream; a plan refusal is handled before the conversation shows R3c's sentence for it.
 function chatSource(request: ChatRequest, planRefused: () => void): ChatSource {
   return async function* source(signal) {

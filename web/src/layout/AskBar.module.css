@@ -1,9 +1,16 @@
+/* Held at the window's bottom edge while the page scrolls behind it, as Streamlit's chat input is (R6, the user's
+   choice of 10-29). html's scroll-padding-bottom (AskBar sets --ask-bar-height) keeps what is focused or scrolled
+   into view out from under it. */
 .askBar {
+  position: sticky;
+  bottom: var(--space-0);
+  z-index: var(--z-sticky);
   display: grid;
   gap: var(--space-2);
   padding-block: var(--space-4) var(--space-5);
   margin-top: var(--space-5);
   border-top: var(--border) solid var(--line);
+  background: var(--canvas);
 }
 .privacy {
   display: flex;

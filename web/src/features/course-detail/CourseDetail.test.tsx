@@ -316,7 +316,12 @@ it('R3a callbacks are passed through and course keys reset its annual selection 
   await chooseYear();
   await user.click(screen.getByRole('button', { name: '查看 DS 5220' }));
   expect(props.onOpenCourse).toHaveBeenLastCalledWith('DS 5220');
-  await user.click(screen.getAllByRole('button', { name: '查看' })[0]!);
+  // The legacy rows' buttons, named for their courses as the rule tree's are (R6).
+  await user.click(
+    screen
+      .getAllByRole('button', { name: /^查看 / })
+      .find((button) => button.dataset.part === 'legacy')!,
+  );
   expect(props.onOpenCourse).toHaveBeenLastCalledWith('CS 5100');
   const next = structuredClone(data);
   next.course_id = 'c-cs-6150';

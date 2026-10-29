@@ -16,7 +16,7 @@ import { Select } from '../components/Select';
 import { SearchConversation } from '../features/search-answer/SearchConversation';
 import { SearchLanding } from '../features/search-landing/SearchLanding';
 import { useAccount, viewerScope } from '../layout/account';
-import { useSearch } from '../layout/SearchContext';
+import { showsNewestQuestion, useSearch } from '../layout/SearchContext';
 import { oneLine } from '../models/courseDetailFormat';
 import { coursePath } from '../models/coursePath';
 import { FEATURED_PROGRAM_IDS, showLanding } from '../models/landing';
@@ -168,6 +168,22 @@ function SearchColumn() {
       region.current?.focus({ preventScroll: true });
     wasLanding.current = landing;
   }, [landing]);
+  // A question just asked comes into view, with its answer to be read below it: one asked here (the ask box, a
+  // follow-up), and one asked from a course page, which opens the search page with NEWEST_QUESTION. Not when the page
+  // only shows the conversation again (R6, the user's choice of 10-29). The shell's own scroll to the top runs first.
+  const { state } = useLocation();
+  const seen = useRef(search.turns.length);
+  const arrived = useRef(showsNewestQuestion(state));
+  useEffect(() => {
+    const asked = search.turns.length > seen.current || arrived.current;
+    seen.current = search.turns.length;
+    arrived.current = false;
+    if (!asked || landing) return;
+    const questions = region.current?.querySelectorAll<HTMLElement>(
+      '[data-kind="question"]',
+    );
+    questions?.[questions.length - 1]?.scrollIntoView({ block: 'start' });
+  }, [search.turns.length, landing]);
 
   if (landing) {
     const loads = Object.fromEntries(
@@ -252,11 +268,13 @@ export function SearchWorkspace({ detail }: { detail?: ReactNode }) {
       <div
         className={`${styles.columns} ${detail ? styles.detailOpen : styles.single}`}
       >
+        {/* The course first, to the eye and to a screen reader: under 1200 wide it shows above the conversation, and
+            wider the grid puts the conversation back on the left (R6, the user's choice of 10-29). */}
+        {detail}
         <section className={styles.chat} aria-label="课程问答">
           <ProgramChoice />
           <SearchColumn />
         </section>
-        {detail}
       </div>
     </>
   );

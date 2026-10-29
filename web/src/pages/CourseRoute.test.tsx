@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { addToCompare, getCompareList } from '../models/compareList';
 import { apiError, asked, held, json } from '../test/fakeApi';
@@ -147,6 +147,38 @@ it('a lookup that fails for a moment says so and can be tried again', async () =
   expect(await heading('Machine Learning')).toBeInTheDocument();
   expect(api.count('GET', '/resolve/course')).toBe(2);
 });
+
+// The failure and its button give way to the loading line, so focus used to fall to the body (section 38's known
+// item); now it goes to the course's panel, which stays, without scrolling (R6).
+it.each([
+  ['the code’s lookup', '/resolve/course', LOOKUP_FAILED],
+  ['the detail', '/course/c-cs-6140', /^无法加载课程详情。/],
+])(
+  '重新加载 after %s failed for a moment hands focus to the course’s panel, still there once the course is shown',
+  async (_name, path, failed) => {
+    const user = userEvent.setup();
+    let down = true;
+    world((call) =>
+      call.path === path && down
+        ? apiError(503, 'service_unavailable', 'down')
+        : undefined,
+    );
+    page('/course/CS-6140');
+    expect(await screen.findByText(failed)).toBeInTheDocument();
+    down = false;
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    await user.click(screen.getByRole('button', { name: '重新加载' }));
+    const panel = screen.getByRole('link', {
+      name: '回到课程搜索',
+    }).parentElement!;
+    expect(panel).toHaveFocus();
+    expect(focus.mock.calls[focus.mock.contexts.indexOf(panel)]).toEqual([
+      { preventScroll: true },
+    ]);
+    expect(await heading('Machine Learning')).toBeInTheDocument();
+    expect(panel).toHaveFocus();
+  },
+);
 
 it('the other courses’ codes and names from the API are said on one line (review A32)', async () => {
   world((call) =>
@@ -310,8 +342,8 @@ it('a course the requisites name opens its page by its code', async () => {
   page('/course/CS-7800');
   await heading('Advanced Algorithms');
   const view = screen
-    .getAllByRole('button', { name: '查看' })
-    .find((button) => button.dataset.opens === 'CS 5800')!;
+    .getAllByRole('button', { name: '查看 CS 5800' })
+    .find((button) => button.dataset.part === 'legacy')!;
   await userEvent.click(view);
   expect(where()).toBe('/course/CS-5800');
   expect(stateOf()).toBeNull();
@@ -331,8 +363,8 @@ it('another course opens as a page of its own: what was opened on the last one i
   const toAlgorithms = () =>
     userEvent.click(
       screen
-        .getAllByRole('button', { name: '查看' })
-        .find((button) => button.dataset.opens === 'CS 5800')!,
+        .getAllByRole('button', { name: '查看 CS 5800' })
+        .find((button) => button.dataset.part === 'legacy')!,
     );
   // Both courses are read once first, so the second time no loading sentence comes in between to close it anyway.
   await toAlgorithms();
@@ -402,6 +434,26 @@ it('the conversation stays beside a course and after it', async () => {
   expect(api.count('GET', '/coop')).toBe(1);
 });
 
+// Only a question just asked brings the conversation into view (R6): a course opened from it comes with state of its
+// own (the course ID), and opens with the course first, not scrolled down to the conversation beside it.
+it('a course opened from the conversation brings no question into view', async () => {
+  world();
+  page('/');
+  await userEvent.type(
+    screen.getByRole('textbox', { name: '课程问题' }),
+    'CS 6140 讲什么？{Enter}',
+  );
+  await screen.findByRole('group', { name: '接着问' });
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await userEvent.click(screen.getByRole('button', { name: '查看 CS 6140' }));
+  expect(await heading('Machine Learning')).toBeInTheDocument();
+  expect(stateOf()).toEqual({ courseId: 'c-cs-6140' });
+  expect(
+    screen.getByRole('region', { name: '第 1 轮问答' }),
+  ).toBeInTheDocument();
+  expect(into).not.toHaveBeenCalled();
+});
+
 it('a question asked on a course page goes to the search page, where the conversation is', async () => {
   const api = world();
   page('/course/CS-6140');
@@ -416,6 +468,50 @@ it('a question asked on a course page goes to the search page, where the convers
   ).toBeInTheDocument();
   expect(chats(api.calls)).toHaveLength(1);
   expect(screen.queryByRole('region', { name: '课程详情' })).toBeNull();
+});
+
+// The search page used to open at its top, with the question at the end of the conversation (R6, the user's choice
+// of 10-29). The shell's scroll to the top runs first, in a layout effect, and the question's after it.
+it('a question asked on a course page opens the search page with that question in view, after the shell’s scroll to the top', async () => {
+  world();
+  page('/course/CS-6140');
+  await heading('Machine Learning');
+  const order: string[] = [];
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {
+    order.push('top');
+  });
+  const into = vi
+    .spyOn(Element.prototype, 'scrollIntoView')
+    .mockImplementation(function (this: Element) {
+      order.push(`into ${this.textContent}`);
+    });
+  await userEvent.type(
+    screen.getByRole('textbox', { name: '课程问题' }),
+    'CS 6140 讲什么？{Enter}',
+  );
+  await waitFor(() => expect(where()).toBe('/'));
+  expect(stateOf()).toEqual({ show: 'newest-question' });
+  await waitFor(() => expect(order.at(-1)).toBe('into CS 6140 讲什么？'));
+  expect(order.lastIndexOf('top')).toBeGreaterThan(-1);
+  expect(order.lastIndexOf('top')).toBeLessThan(
+    order.lastIndexOf('into CS 6140 讲什么？'),
+  );
+  expect(into.mock.calls.at(-1)).toEqual([{ block: 'start' }]);
+  expect(screen.getByRole('main')).toHaveFocus();
+});
+
+// On a laptop's width the course showed under the whole conversation, or under the landing (R6, the user's choice of
+// 10-29): it is first in the page now, and only two columns put the conversation back on the left.
+it('a course page has the course before the conversation in the page', async () => {
+  world();
+  page('/course/CS-6140');
+  await heading('Machine Learning');
+  const course = screen.getByRole('region', { name: '课程详情' });
+  const conversation = screen.getByRole('region', { name: '课程问答' });
+  expect(
+    course.compareDocumentPosition(conversation) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });
 
 it('has no DOM axe violations with a course open, the others offered and the search column beside it', async () => {

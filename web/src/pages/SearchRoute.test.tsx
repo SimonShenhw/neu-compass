@@ -810,3 +810,80 @@ it('has no DOM axe violations with the landing, and with a conversation', async 
   await answered();
   expect((await axe(container, rules)).violations).toEqual([]);
 });
+
+// The ask box is held at the window's bottom edge now, so a question asked comes into view where its answer is read
+// below it (R6, the user's choice of 10-29).
+it('each question asked on the search page comes into view; coming back to the page without asking scrolls nowhere', async () => {
+  world();
+  page('/');
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await ask('CS 6140 讲什么？');
+  await answered();
+  expect(into.mock.contexts.at(-1)).toHaveTextContent('CS 6140 讲什么？');
+  expect(into.mock.calls.at(-1)).toEqual([{ block: 'start' }]);
+  // A follow-up is asked on this page too.
+  const [followUp] = within(
+    screen.getByRole('group', { name: '接着问' }),
+  ).getAllByRole('button');
+  await userEvent.click(followUp!);
+  await waitFor(() =>
+    expect(into.mock.contexts.at(-1)).toHaveTextContent(followUp!.textContent!),
+  );
+  expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2);
+  into.mockClear();
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '查看 CS 6140' })[0]!,
+  );
+  await screen.findByRole('heading', { name: 'Machine Learning' });
+  await userEvent.click(screen.getByRole('link', { name: '回到课程搜索' }));
+  expect(where()).toBe('/');
+  await screen.findByRole('region', { name: '第 2 轮问答' });
+  expect(into).not.toHaveBeenCalled();
+});
+
+// What the page has seen goes down with the conversation: back on the page with one, a logout empties it, and the
+// first question asked after that comes into view as well (R6).
+it('after a logout empties the conversation the page came back to, the next question asked comes into view', async () => {
+  world((call) =>
+    call.path === '/auth/logout'
+      ? new Response(null, { status: 204 })
+      : undefined,
+  );
+  page('/', seededQueryClient({ viewer: member }));
+  await landed();
+  await ask('CS 6140 讲什么？');
+  await answered();
+  // Away and back: the page is drawn anew, with the conversation it had.
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '查看 CS 6140' })[0]!,
+  );
+  await screen.findByRole('heading', { name: 'Machine Learning' });
+  await userEvent.click(screen.getByRole('link', { name: '回到课程搜索' }));
+  await screen.findByRole('region', { name: '第 1 轮问答' });
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '退出登录' })[0]!,
+  );
+  await landed();
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await ask('CS 5800 讲什么？');
+  await answered();
+  expect(into.mock.contexts.at(-1)).toHaveTextContent('CS 5800 讲什么？');
+});
+
+it('while the ask box is on the page, html keeps its height clear at the bottom, and lets it go with the box', async () => {
+  world();
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(152);
+  page('/');
+  const root = document.documentElement;
+  await waitFor(() =>
+    expect(root.style.getPropertyValue('--ask-bar-height')).toBe('152px'),
+  );
+  await userEvent.click(
+    within(screen.getByRole('navigation', { name: '主导航' })).getByRole(
+      'link',
+      { name: /课程对比/ },
+    ),
+  );
+  expect(screen.queryByRole('form', { name: '提问' })).toBeNull();
+  expect(root.style.getPropertyValue('--ask-bar-height')).toBe('');
+});

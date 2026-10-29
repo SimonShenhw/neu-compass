@@ -25,6 +25,13 @@
 .detailOpen {
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
 }
+/* The course comes first in the page; with two columns the conversation goes back on the left (R6). */
+@media (min-width: 1200px) {
+  .detailOpen > .chat {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
 .chat {
   display: flex;
   flex-direction: column;

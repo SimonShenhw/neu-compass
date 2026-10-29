@@ -28,6 +28,7 @@ const config = [
   'eslint.config.js',
   '.prettierrc',
   'index.html',
+  'public/favicon.svg',
   'openapi.json',
   'tools/openapi-types/package.json',
   'tools/openapi-types/package-lock.json',

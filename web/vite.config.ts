@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import {
   PREVIEW_PORT,
@@ -7,6 +8,46 @@ import {
   choosePublicBase,
   devPort,
 } from './src/api/apiBase.ts';
+
+// R6: the demo pages are on the dev server and in the tests, and in no build. A build gets demoRoutes.none.tsx where
+// App imports demoRoutes (a path from the project root, which Vite resolves there), and stops if a demo page, its
+// data or a test helper reaches it by any other import.
+export const NO_DEMO_ROUTES = '/src/demoRoutes.none.tsx';
+// Under the project's src/: the demo pages, shell and hooks, and the data behind them; the tests' helpers; every
+// fixture. Compared without case and with / for separators, as module IDs come on Windows.
+const DEMO_OR_TEST =
+  /^(?:fixtures\/|test\/|demoRoutes\.tsx$|(?:[^/]*\/)*[^/]*(?:Demo|TestUtils)[^/]*$)/;
+export function demoOrTestModule(id: string, root: string) {
+  const source = `${root.replaceAll('\\', '/').replace(/\/+$/, '')}/src/`;
+  const path = id.replaceAll('\\', '/');
+  return (
+    path.toLowerCase().startsWith(source.toLowerCase()) &&
+    DEMO_OR_TEST.test(path.slice(source.length))
+  );
+}
+export function noDemoModules(): Plugin {
+  let root = '';
+  return {
+    name: 'neu-compass:no-demo-modules',
+    configResolved(resolved) {
+      root = resolved.root;
+    },
+    generateBundle(_options, bundle) {
+      if (!root)
+        this.error('The project root is not known, so nothing was checked.');
+      for (const output of Object.values(bundle)) {
+        if (output.type !== 'chunk') continue;
+        const found = output.moduleIds.filter((id) =>
+          demoOrTestModule(id, root),
+        );
+        if (found.length)
+          this.error(
+            `A build carries demo or test modules: ${found.join(', ')}`,
+          );
+      }
+    },
+  };
+}
 
 export default defineConfig(({ command, mode }) => {
   // R2b: the API address is fixed here, at build time (src/api/apiBase.ts says which one for which build); R3e: so is
@@ -24,12 +65,17 @@ export default defineConfig(({ command, mode }) => {
     VITE_PUBLIC_BASE_URL,
     port,
   );
+  const demos = command === 'serve';
   return {
-    plugins: [react()],
+    plugins: demos ? [react()] : [react(), noDemoModules()],
     define: {
       __API_BASE_URL__: JSON.stringify(apiBase),
       __PUBLIC_BASE_URL__: JSON.stringify(publicBase),
+      __DEMO_ROUTES__: JSON.stringify(demos),
     },
+    resolve: demos
+      ? {}
+      : { alias: [{ find: /^\.\/demoRoutes$/, replacement: NO_DEMO_ROUTES }] },
     server: { host: '127.0.0.1', port, strictPort: true },
     preview: { host: '127.0.0.1', port: PREVIEW_PORT, strictPort: true },
     build: { manifest: true },

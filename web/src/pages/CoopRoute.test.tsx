@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { configQuery, createQueryClient, meQuery } from '../api/queries';
 import type { Member } from '../api/queries';
@@ -286,6 +286,33 @@ it('while 重试 is on its way the list shows as loading, not as the failure', a
   ).toHaveTextContent('正在加载');
   second.answer(json(guest.body));
   expect(await screen.findAllByRole('article')).toHaveLength(4);
+});
+
+// The failure and its button give way to the loading line, so focus used to fall to the body (section 35's known
+// item); now it goes to the list's section, which stays, without scrolling (R6).
+it('重试 hands focus to the list, which is still there once its answer has come', async () => {
+  const user = userEvent.setup();
+  const second = held();
+  let lists = 0;
+  fakeApi(({ path }) =>
+    path === '/coop'
+      ? lists++
+        ? second.response
+        : apiError(503, 'service_unavailable', 'down')
+      : json(null, 404),
+  );
+  livePage('/coop');
+  const retry = await screen.findByRole('button', { name: '重试' });
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  await user.click(retry);
+  const list = screen.getByRole('region', { name: 'Co-op 经历列表' });
+  expect(list).toHaveFocus();
+  expect(focus.mock.calls[focus.mock.contexts.indexOf(list)]).toEqual([
+    { preventScroll: true },
+  ]);
+  second.answer(json(guest.body));
+  expect(await screen.findAllByRole('article')).toHaveLength(4);
+  expect(list).toHaveFocus();
 });
 
 // After a success the failure stays on the query while it is asked again (only a query that never had data goes back

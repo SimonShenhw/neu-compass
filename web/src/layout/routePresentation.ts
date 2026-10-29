@@ -8,15 +8,20 @@ const pages = [
   programsPage,
   { path: '/coop', title: 'Co-op 经验' },
   { path: '/privacy', title: '数据与隐私' },
-  { path: '/compare-demo', title: '课程对比演示' },
-  { path: '/coop-demo', title: 'Co-op 演示' },
-  { path: '/privacy-demo', title: '数据与隐私演示' },
-  { path: '/requisites-demo', title: '先修要求演示' },
-  { path: '/course-detail-demo', title: '课程详情演示' },
-  { path: '/search-demo', title: '搜索回答演示' },
-  { path: '/search-landing-demo', title: '搜索落地演示' },
-  { path: '/programs-demo', title: '培养方案演示' },
-  { path: '/programs-draft-demo', title: '选课草案演示' },
+  // The demo pages, only where they are: the dev server and the tests (R6, see demoRoutes.tsx).
+  ...(__DEMO_ROUTES__
+    ? [
+        { path: '/compare-demo', title: '课程对比演示' },
+        { path: '/coop-demo', title: 'Co-op 演示' },
+        { path: '/privacy-demo', title: '数据与隐私演示' },
+        { path: '/requisites-demo', title: '先修要求演示' },
+        { path: '/course-detail-demo', title: '课程详情演示' },
+        { path: '/search-demo', title: '搜索回答演示' },
+        { path: '/search-landing-demo', title: '搜索落地演示' },
+        { path: '/programs-demo', title: '培养方案演示' },
+        { path: '/programs-draft-demo', title: '选课草案演示' },
+      ]
+    : []),
 ];
 
 export function pagePresentation(pathname: string) {

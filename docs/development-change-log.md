@@ -5355,3 +5355,96 @@ A33 的 N2、N3 和两处等价的变异体（A33 的 M1 即 B33 的 B35，B33 �
 ### 发布状态
 
 分支 `feat/web-programs-api`，从 main `9dd490e`（#38 合并以后）开：`a687840`（不用草案的部分）、`93f40fc`（合并 main 的 #37）、`54896b8`（草案）、`9a5075a`（第 33 轮的修复）、`e7ade58`（复核第 1 轮的修复）、`fead991`（复核第 2 轮以后补的测试和记录）和它后面的第六个提交（CI 换了 runner 镜像以后的一条后端测试）。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
+
+## 40 — 上线前的修补（R6 的第一个 PR，2026-10-29）
+
+### 范围与原因
+
+R4c（#39）10-28 合并以后，React 前端的每一页都接上了真实接口。R6 是上线前的对齐检查，方案 `R6_PLAN.md`，盘点 `r6_survey/SURVEY_R6.md`（都在评审目录）。10-29 用户定了：加 Playwright（单独一个包，只用 Chromium，做成第二个 PR）；侧栏「高级筛选」先拿掉入口，隐私说明里「筛选条件」那半句跟着改准；页脚补回 Streamlit 的两句。走查以后用户又定了三处布局：提问框固定在窗口底部；低于 1200 宽时课程页先显示课程；提问以后滚到新问题。从 main `4629e5f`（#39 合并以后）开 `feat/web-alignment`。这个 PR 是方案第 1 节第 1–6 条（第 6 条只做了一半，见「已知」）、第 2 节 b、c 的决定和走查找到的问题；Playwright 和只有它测得到的东西在第二个 PR。
+
+线上不变：新前端还没部署。后端只改了「允许保存」旁边那句说明，两个前端共用。
+
+### 已实现
+
+1. **侧栏**：拿掉「高级筛选」（R1 只放了入口，里面一句「筛选交互将在后续接入；R1 只保留入口。」）和它的样式。页脚补回 Streamlit 页脚里的「课程数据可能滞后」「非商业 / F1 合规」，不带品牌名（侧栏上面已经有）。
+2. **演示页不进构建**（`vite.config.ts`；新文件 `src/demoRoutes.tsx`、`src/demoRoutes.none.tsx`）：
+   - 九个演示路由从 `App.tsx` 搬进 `demoRoutes.tsx`：`offlineDemoRoutes` 是自己的离线外壳里的三个，`shellDemoRoutes` 是真实外壳里的六个（片段）。原来九个都在正式站点上，`/privacy-demo` 还套在真的外壳里演示删号。
+   - 构建（`command === 'build'`，`build` 和 `build:dev-api` 都是）用 `resolve.alias` 把 `./demoRoutes` 换成 `demoRoutes.none.tsx`（两个都是 `null`），这些地址就落到 404。替换的路径写成从项目根起的 `/src/demoRoutes.none.tsx`，Vite 从项目根解析；没用 `import.meta.url`：Vitest 在 jsdom 下按网页转换配置，那里不是 `file:`（见验证记录）。
+   - 插件 `neu-compass:no-demo-modules` 再查一遍：`configResolved` 拿项目根，`generateBundle` 看每个块的 `moduleIds`，项目 `src/` 下的 `fixtures/`、`test/`、`demoRoutes.tsx`，以及文件名带 `Demo` 或 `TestUtils` 的（演示页、演示外壳、演示的 hook 和数据、测试的帮手），不管从哪条 import 进了构建都报错；不分大小写，`\` 和 `/` 一样；别的包自己的 `src/` 不算。拿不到项目根也报错，不当作查过了。
+   - 常量 `__DEMO_ROUTES__`（开发服务器和测试里是 true，构建里是 false）管 `routePresentation` 的九个演示标题、`TopBar` 给隐私演示的锁、`AppShell` 里不显示访客标记的那两个演示。
+   - 首屏 JavaScript gzip 从 209,919 字节降到 186,240（预算 250,000），构建只剩一个 JS 文件。
+3. **错误边界**（新文件 `src/components/ErrorBoundary.tsx`）：外壳里包着 `<Outlet />`（`where` 是现在的地址）：页面画的时候出错，侧栏和顶栏还在，页面那块说「这一页出了问题，没能显示出来。」，给「重新加载」；换一个地址就再试一次（`componentDidUpdate` 看 `where`，不用 `key`，没出错时换地址不会重画下面的页面）。`main.tsx` 最外层还有一层（`where` 是 null）：外壳自己出错时说「页面出了问题，没能显示出来。」。都是 `role="alert"`，不显示异常的原文（R0 第 14 节第 12 条）。
+4. **跳过链接**（`AppShell`；新文件 `src/layout/mainContent.ts`）：原来是页内链接 `#main-content`，在 BrowserRouter 下浏览器为它加一条 state 为空的历史记录，路由跟过去，核对中的方案链接、等列表的 `/?program=`、课程页带的课程 ID 都会丢（第 39 节「已知」，第 33 轮复核 A33 R2-1）。现在 `preventDefault()`，把焦点交给 main（`focusMainContent`，外壳换页时也用它），地址和历史都不动。
+5. **重试以后的焦点**（第 38 节「已知」）：按下的按钮跟着失败的那一块一起换成加载中，焦点原来掉到 body。现在交给留下来的那一块，都不滚动：对比页给对比表（本来就能聚焦）；Co-op 给经历列表的 section（加了 `tabIndex={-1}`）；隐私页整页重来，给 main；课程页给课程那一栏（加了 ref 和 `tabIndex={-1}`，解析课号和取详情两处「重新加载」都用）。
+6. **先修面板旧平铺行的「查看」**：`aria-label` 是「查看 <课号>」（课号里的换行说成一行，`oneLine`），和规则树的按钮一样；原来读屏的按钮列表里每一行都只说「查看」。R3a 的快照只记 `textContent` 和 `data-opens`，标准答案不变。
+7. **`index.html`**：描述从「本地设计原型」改成「NEU-Compass 选课助手：查 Northeastern 研究生课程、培养方案和 Co-op 经验。非官方学生工具，选课请以官方目录为准。」；加了网页图标 `public/favicon.svg`（指南针，主题色 #2b56c9）。
+8. **提问框固定在窗口底部**（用户 10-29 定的；`AskBar.module.css`、`AskBar.tsx`、`styles/base.css`）：走查时首页的提问框在四种宽度下都在首屏下面（见验证记录）。`.askBar` 改成 `position: sticky; bottom: 0`，带画布的底色和 `--z-sticky`。它挡住的那一截：提问框把自己的高度写进 html 的 `--ask-bar-height`（每次渲染以后量一次，另有 ResizeObserver 管窗口变窄以后换行），`base.css` 的 `html { scroll-padding-bottom: var(--ask-bar-height, 0) }`，用 Tab 走到的、滚进视野的东西不会落在它下面（WCAG 2.4.11）；提问框不在页面上时去掉这个值。原来只靠 ResizeObserver：内置浏览器的面板被挡住时回调没送到，量出 193（实际 221），所以加了每次渲染都量。
+9. **课程页先显示课程**（用户 10-29 定的；`SearchRoute.tsx` 的 `SearchWorkspace`、`SearchPage.module.css`）：768–1199 宽原来一栏、对话在上，直接打开课程链接时 1024×768 的课程从 1054 像素才开始。现在 DOM 里课程在对话前面（读屏也先读到课程），1200 宽以上用 `grid-column`、`grid-row` 把对话放回左边。
+10. **提问以后滚到新问题**（用户 10-29 定的；`SearchRoute.tsx` 的 `SearchColumn`、`SearchContext.tsx`、`AppShell`）：
+    - 原来在课程页提问会回到首页顶上，问题和回答在对话的最后；首页提问也不滚。现在问题条数变多（提问框、追问）时，把最后一个问题（`[data-kind="question"]`）`scrollIntoView({ block: 'start' })`，回答接着在它下面出来。条数从页面打开时算起，对话清空时跟着变少。
+    - 课程页的提问去首页时带 state `NEWEST_QUESTION`（`{ show: 'newest-question' }`），首页带着它打开时也滚；别的 state（比如从对话、对比页打开课程时带的课程 ID）不算。只是回到这一页时不滚。
+    - 外壳换页的标题、聚焦、回页顶改成 `useLayoutEffect`：子组件的 effect 比父组件的先跑，原来外壳在 effect 里回页顶，会把页面刚滚好的新问题拉回顶上。
+11. **「允许保存」旁边那句说明**（`api/privacy_text.py` 的 `capture_notice`，`GET /privacy` 和 Streamlit 共用）：照 `api/routes/chat.py` 的 `_store_completed_answer` 实际存的写：回答，连同提问时带的条件（筛选、项目和方案、接着问的课程）；去掉「清空对话」，两个前端都没有这个按钮。Streamlit 的两份布局快照（`tests/fixtures/page_layout/history.json`、`history-3.json`）用 `scripts/regenerate_page_layout.py --write` 重写，diff 只有这一句。
+12. **变异脚本**（`web/scripts/`）：五个脚本的副本都多带 `public/favicon.svg`：新的 `contracts.test.ts` 读它，副本里原来只有 `src/`、配置和测试要读的几个文件，基线过不了（见验证记录）。项目的 `mutations.mjs` 里 M17 的锚点改成 `focusMainContent({ preventScroll: true })`，外壳不再直接调 `focus`。
+
+**测试**
+
+13. **新测试**：
+    - `src/demoRoutes.test.tsx`：把 `./demoRoutes` mock 成 none（构建里的样子），九个演示地址都是 404，真页面都在；
+    - `api/apiBase.test.ts`：构建和开发服务器的 `define`、alias、插件；插件对各种演示和测试模块报错（Windows 的 `\` 和盘符大小写、带结尾 `/` 的项目根），对真页面、`demoRoutes.none.tsx`、别的包的 `src/` 不报错；拿不到项目根时报错；
+    - `components/ErrorBoundary.test.tsx`（4 条）、`main.test.tsx`（外壳自己出错时最外层接住，不显示原文）；
+    - `layout/skipLink.test.tsx`（BrowserRouter，jsdom 自己的 history：按跳过链接以后地址、历史条数、state 都不变，焦点在 main；方案链接核对中按下，照样选上）；
+    - 对比、Co-op、隐私、课程页的 route 测试各加重试以后的焦点（课程页两种）；
+    - `SearchRoute.test.tsx` 加 3 条（提问和追问滚到新问题、不提问回来不滚；回到有对话的页面、登出清空以后再提问也滚；`--ask-bar-height` 跟着提问框来去），`CourseRoute.test.tsx` 加 3 条（课程页提问到首页，先回页顶再滚到新问题，焦点在 main；从对话打开课程不滚；课程在 DOM 里排在对话前）；
+    - `navigation.test.tsx` 页脚一条、`contracts.test.ts` 描述和图标一条、`CourseRequisites.test.tsx` 课号带换行的「查看」一条；后端 `tests/test_public_routes.py` 一条（90 天、0 天）。
+14. **改过的旧测试**：7 处按名字「查看」找旧平铺行按钮的（`CourseRequisites.test.tsx`、`CourseDetail.test.tsx`、`CourseDetailDemoPage.test.tsx`、`RequisitesDemoPage.test.tsx`）改成按 `data-part="legacy"` 挑；`CourseRequisites.test.tsx` 键盘那条挑规则树的按钮（规则树和旧平铺行现在都叫「查看 CS 5800」）。
+
+### 修改文件
+
+- 后端改：`api/privacy_text.py`；后端测试改：`tests/test_public_routes.py`；Streamlit 布局快照：`tests/fixtures/page_layout/history.json`、`history-3.json`。
+- 前端新建：`web/public/favicon.svg`、`web/src/components/ErrorBoundary.tsx`、`web/src/demoRoutes.tsx`、`web/src/demoRoutes.none.tsx`、`web/src/layout/mainContent.ts`。
+- 前端改：`web/index.html`、`web/vite.config.ts`；`src/App.tsx`、`main.tsx`、`api/env.d.ts`；`layout/AppShell.tsx`、`AskBar.tsx`、`AskBar.module.css`、`SearchContext.tsx`、`Sidebar.tsx`、`Sidebar.module.css`、`TopBar.tsx`、`routePresentation.ts`；`pages/ComparePage.tsx`、`CoopPage.tsx`、`CourseRoute.tsx`、`PrivacyPage.tsx`、`SearchRoute.tsx`、`SearchPage.module.css`；`features/requisites/CourseRequisites.tsx`；`styles/base.css`；`web/scripts/mutations.mjs`、`draft-mutations.mjs`、`landing-mutations.mjs`、`programs-mutations.mjs`、`search-mutations.mjs`。
+- 前端测试新建：`src/demoRoutes.test.tsx`、`src/main.test.tsx`、`components/ErrorBoundary.test.tsx`、`layout/skipLink.test.tsx`；改：`api/apiBase.test.ts`、`features/course-detail/CourseDetail.test.tsx`、`features/requisites/CourseRequisites.test.tsx`、`layout/navigation.test.tsx`、`pages/CompareRoute.test.tsx`、`CoopRoute.test.tsx`、`CourseDetailDemoPage.test.tsx`、`CourseRoute.test.tsx`、`PrivacyRoute.test.tsx`、`RequisitesDemoPage.test.tsx`、`SearchRoute.test.tsx`、`test/contracts.test.ts`。
+- 文档：`web/README.md`（开头、路由表一行和下面一句、R3e 一节两句、设计选择一句、新的 R6 一节），本节。
+
+数据库结构、检索和提示词都没改；Streamlit 只跟着换了那句说明。
+
+### 验证记录
+
+- **前端检查**：类型、零警告 lint、构建、格式、生成的类型都过；Vitest **90 个文件 2749 条**全过；首屏 JavaScript gzip **186,240 字节**（预算 250,000；#39 结束时 209,919）。构建的「有块超过 500 kB」提示开工前就有。中途挂过的：
+  - alias 的替换路径一开始用 `fileURLToPath(import.meta.url)` 从配置文件算，`apiBase.test.ts` 读配置就挂了（「The URL must be of scheme file」）：Vitest 在 jsdom 下按网页转换 `vite.config.ts`。改成从项目根起的路径，插件在 `configResolved` 里拿项目根。
+  - 错误边界的测试一开始用 `queryByRole('alert')` 判断出错的那句不在了，可是培养方案列表自己的警告也是 alert；改成看列表的字。
+  - 第一次全量（三处布局改动以前，89 个文件 2741 条）挂了 1 条：先修面板的键盘测试按名字找「查看 CS 5800」，规则树和旧平铺行现在都叫这个，找到两个；改成挑规则树那个。
+- **后端**：`test_public_routes.py`、`test_privacy_view.py`、`test_feedback_release_gate.py`、`test_answer_feedback.py`、`test_dev_api.py` 243 条过；Ruff F／E9／B 在改过的两个 Python 文件上通过；Streamlit 的布局测试改前 2 条挂（就是那两份快照），重写以后检查模式 9 份全对。后端全量 **5312 条**全过（9 分 45 秒）；跑前跑后比了 53 个改动文件的哈希，变了的只有本文件，是跑的时候我在填本节的数。
+- **按码位扫过**改动和新建的 53 个文本文件（控制、格式、私用、未分配的字符和变体选择符），没有 CR：代码、测试、脚本和 README 都干净；本文件里标出来的是前面几节原有的 emoji 和变体选择符（第 1281、1303、3146、3401 行），本节没有；两份布局快照里标出来的指南针表情（U+1F9ED）和 U+FE0F 是 Streamlit 页面原有的，main 上同样的行就有，这次只改了第 6 行那句。
+- **变异**（都在副本里跑，规则同第 38 节：对口的测试文件里有具名测试因断言失败才算杀掉）：
+  - 我自己的 `r6_mutants.py`（评审目录 `r6/`）：第一轮 63 个，分 4 份副本并行，60 个由对口的断言杀掉，3 个存活：
+    - NQ11（「带着标记来过」读过以后不清掉）：等价。对话只会变长或者清空，effect 只在有新问题（本来就滚）或落地切换（直接返回）时再跑。拿掉，写进脚本的文件头。
+    - EB08（外壳的错误边界加 `key={pathname}`，每换一个地址都重画下面的页面）：学生和测试都看不出区别：同一种页面换了地址，显示的本来就是另一门课或另一个项目，跨地址留着的东西都在外壳的 context 里。「没出错时换地址不重画」由 `ErrorBoundary.test` 的那条直接测。拿掉，写进文件头。
+    - NQ10（「看到过几轮」不跟着更新）：不等价：回到一个已经有对话的搜索页，登出清空了对话，再提问时新问题不滚进视野。`SearchRoute.test.tsx` 补了一条，第二轮杀掉。
+    - 最后 61 个都由对口的断言杀掉：页脚 4（SB）、演示守关 17（DG）、错误边界 7（EB）、跳过链接 2（SK）、换页复位 2（NR）、滚到新问题 10（NQ）、课程在前 1（SW）、提问框的高度 3（AH）、重试焦点 11（RF）、按钮名 2（RQ）、`index.html` 2（IX）。
+    - 故意不写的也在文件头：CSS（粘底、`scroll-padding-bottom`、1200 宽以上对话回到左边），jsdom 没有布局；三处 `__DEMO_ROUTES__`，测试里总有演示路由；提问框的 ResizeObserver，jsdom 没有，`test/setup.ts` 给的是空壳。这些都在走查里量过，留给第二个 PR 的 Playwright。等价的：落地时不滚的那个判断（落地没有对话那一块，本来就找不到问题）、`root` 里的 `\` 换 `/`（Vite 给的项目根就是 `/`）、`componentDidUpdate` 里的 `this.state.failed &&`（没出错时复位，画的还是同样的子树）。
+    - 写清单时补的测试：`main.test.tsx`（最外层的错误边界原来没有测试碰到）、课号带换行的「查看」（去掉 `oneLine` 原来没有测试挂）、从对话打开课程不滚（`showsNewestQuestion` 放宽到任何 state 原来没有测试挂）、`apiBase.test.ts` 带结尾 `/` 的项目根也拦得住演示模块（原来只测了不拦正常的模块）。
+  - 后端两个（`r6/privacy_mut.sh`，在 main 的副本上盖这两个文件）：说明里放回「清空对话」、改回只说「回答和筛选条件」，新测试的 90、0 天两条都挂。
+  - 项目的五个变异脚本：第一次五个都在基线停下，`contracts.test.ts` 读不到副本里没有的 `public/favicon.svg`（第 12 条）。加上以后 R3c 的 `search-mutations.mjs` **36／36**、R3d 的 `landing-mutations.mjs` **29／29**、R4a 的 `programs-mutations.mjs` **29／29**、R4b 的 `draft-mutations.mjs` **152／152**，都是基线通过、源文件没变、跑完副本删掉了。项目的 `test:mutations` 跑到 M17 停下（锚点不在了，第 12 条）；我用 `r6/check_project_anchors.py` 把它 152 个锚点在现在的源码里各数了一遍，改了 M17 以后都正好一次；重跑 **152／152** 都由对口的测试杀掉，`sourceUnchanged: true`，444.3 秒，跑完副本删掉了。
+- **浏览器走查**（内置浏览器；开发 API 在 8000，`build:dev-api` 的预览在 4173，合成数据和假 Google）：
+  - 构建里 `/compare-demo` 是 404、标题「找不到页面」；描述、图标、页脚两句都在，没有「高级筛选」；四种宽度（390、768、1024、1440）下 `/programs`、`/programs/cs-ms`、`/coop`、`/privacy`、`/course/CS-6140` 都没有横向溢出。
+  - 改布局以前：首页的提问框在四种宽度下都在首屏下面（1440×900 差 65 像素、1024×768 差 219、768×1024 差 46、390×844 差 700）；768–1199 宽的课程页，详情排在对话或落地内容下面；课程页提问以后回到首页顶上。截图给用户看过，改法是用户定的。
+  - 改了以后：四种宽度提问框都贴着窗口底边；课程页 1024 宽详情从 185 开始、768 宽从 208，DOM 里详情在对话前；首页连问三次，每次新问题都滚到眼前；1024 宽在课程页提问，落到首页，新问题在 503（提问框上沿 617），焦点在 main；390 宽同样（509／624）。`--ask-bar-height` 和提问框的实际高度一致。
+  - 第二遍（测试和变异清单写完以后，产品代码和构建没变）：假 Google 登录、退出（账号框说「已退出登录。」，焦点到登录按钮）；Co-op 投稿（说已私有收集、给记录编号，焦点在结果上，表单清空）；培养方案选 2026–2027 标准方案，草案加两门课（2/20，规则树跟着变），去课程页再后退，方案和草案都在；从草案进两门课的课程页加入对比（1024 宽课程在最前、对话在下面，提问框贴底，`scroll-padding-bottom` 151px 和它的高度一样），对比页两列；手机菜单（焦点进菜单，页脚两句在，Escape 关上以后焦点回到打开它的按钮）；键盘：跳过链接按 Enter 以后焦点到 main，地址、历史条数、state 都不变；首页一条回答里用 Tab 往下走，每个按钮都停在提问框上沿以上；删号（说已经删除、本页已登出，焦点在结果上）。整个过程只连了 4173 和 8000。开发 API 写死关着回答反馈，「允许保存」和它那句说明在浏览器里看不到，由测试核对。
+  - 截图在评审目录 `r6/walkthrough/`。内置浏览器的面板被挡住时截图会超时，ResizeObserver 也送不到（第 8 条），那几次改用量的数；面板不是当前窗口时 `:focus` 不生效，看跳过链接以前先点一下页面。
+
+### 审查
+
+第一个提交时还没有审查（第 34 轮，开以前先问用户）。
+
+### 已知、未处理
+
+- **「旧 seed」没统一**（方案第 1 节第 6 条的前半）：方案以为还有三处，实际在 52 个文件里，多数是照 Streamlit 生成、钉了哈希的标准答案（课程详情、对比、先修、培养方案）。改这几个字等于改一批标准答案、重钉哈希，「和 Streamlit 一字不差」也就没了。等 Streamlit 退役以后连同标准答案一起改。对比页「在培养方案里的位置」那一行现在还是「旧 seed 关系，未核验」。
+- **前端隐私的合成数据还是旧的那句**：R5c 从 API 导出、钉了哈希的隐私说明（`src/fixtures/privacy/`）里，「允许保存」的说明还是改以前的（有「清空对话」）。它只是接口的形状，页面照原样显示 API 给的字，没改。
+- **只在浏览器里量过的**：提问框粘底、`scroll-padding-bottom`、1200 宽以上对话放回左边、提问框的 ResizeObserver，jsdom 都测不到；三处 `__DEMO_ROUTES__` 的守关只在构建里起作用，测试里总有演示路由。这次都在走查里量过，第二个 PR 的 Playwright 对着构建测。
+- **方案第 1 节第 7 条还差的**：开着对比度的 axe 留给第二个 PR（要真浏览器）；聊天流的几种故障这次没再走（R3e 走过，这一批没改聊天）。
+
+### 发布状态
+
+分支 `feat/web-alignment`，从 main `4629e5f`（#39 合并以后）开。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。

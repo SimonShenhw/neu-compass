@@ -142,16 +142,16 @@ export function Sidebar({
           );
         })}
       </nav>
-      <details className={styles.filters}>
-        <summary>高级筛选</summary>
-        <p>筛选交互将在后续接入；R1 只保留入口。</p>
-      </details>
       <div className={styles.footer}>
         <Button size="sm" variant="ghost" onClick={onRefresh}>
           <RefreshCw aria-hidden="true" />
           刷新页面内容
         </Button>
-        <small>非官方学生工具 · 选课以官方目录为准</small>
+        {/* Streamlit's footer, without the name the brand above already gives (R6, the user's choice of 10-29). */}
+        <small>
+          非官方学生工具 · 课程数据可能滞后，选课请以官方目录为准 · 非商业 / F1
+          合规
+        </small>
       </div>
     </div>
   );
