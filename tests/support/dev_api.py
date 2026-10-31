@@ -30,8 +30,9 @@ Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8
 [--answer-feedback] [--query-log-retention-days N]
 --web-port is the dev server's port when 5173 cannot be used (web/'s VITE_DEV_PORT; Windows can reserve 5173).
 --answer-feedback turns answer feedback on and --query-log-retention-days sets the query log's days, as production's
-compose does (on, 90); without them both are the code's defaults (off, 0). The web front end's end-to-end tests run
-with both (R6).
+compose does (on, 90); without them both are the code's defaults (off, 0). The days are only what /privacy and the
+opt-in's notice say: the app runs without its startup (create_app(run_startup=False)), so the daily deletion never
+starts here. The web front end's end-to-end tests run with both (R6).
 
 中文：给新前端开发和验收用的本机 API，不连 Google、不加载模型、不用真实数据（R2b）。只在本机用，不部署，生产代码不
 import 它，API 里也没有任何测试模式；这里只是把测试套件自己的替身拼在一起：临时文件里的合成数据库，里面有
@@ -46,7 +47,8 @@ state 不对的链接和一个「取消」；模型换成 tests/conftest.py 的�
 就都登出了。访问日志和生产一样过滤，假登录页那条也去掉查询串（里面有 state）。它和开发服务器都在 127.0.0.1，同一个主机名，
 浏览器才把它们算作同一个站点，SameSite=Lax 的会话 cookie 才会跟着请求走。--web-port 是 5173 用不了时开发服务器的
 端口（web/ 的 VITE_DEV_PORT；Windows 可能把 5173 保留掉）。--answer-feedback 打开回答反馈，--query-log-retention-days
-设查询日志留几天，和生产的 compose 一样（开、90）；不给就都是代码的默认值（关、0）。新前端的端到端测试两个都给（R6）。
+设查询日志留几天，和生产的 compose 一样（开、90）；不给就都是代码的默认值（关、0）。天数只改 /privacy 和勾选说明里的字：
+这里的 app 不跑启动的那些事（create_app(run_startup=False)），每天的到期清理不会启动。新前端的端到端测试两个都给（R6）。
 """
 
 from __future__ import annotations

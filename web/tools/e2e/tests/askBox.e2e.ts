@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   answer,
@@ -10,6 +10,7 @@ import {
   field,
   landed,
   optIn,
+  test,
 } from './support';
 
 // R6: the ask box held at the bottom of the window (AskBar.module.css, styles/base.css), which jsdom cannot lay out.
@@ -130,10 +131,13 @@ test('clicking into the question field moves the page nowhere', async ({
 });
 
 // Tab through an answer with its votes: what takes focus in main is clear of the box, its focus ring too (WCAG
-// 2.4.11; the margin counts the ring since recheck 1 of round 34).
+// 2.4.11; the margin counts the ring since recheck 1 of round 34). In a window the answer does not fit above the box,
+// so that Tab scrolls the page: on the desktop the zoomed laptop's, as 1440×900 holds all of it (review B35).
 test('Tab through an answer: every control in the conversation, focus ring and all, stays above the box', async ({
   page,
-}) => {
+}, { project }) => {
+  if (project.name === 'desktop')
+    await page.setViewportSize({ width: 1093, height: 614 });
   await page.goto('/');
   await landed(page);
   await optIn(page).check();
@@ -144,6 +148,8 @@ test('Tab through an answer: every control in the conversation, focus ring and a
   ).toBeVisible();
   await conversation(page).focus();
   const seen: string[] = [];
+  const scrolledTo: string[] = [];
+  let y = await page.evaluate(() => scrollY);
   for (let step = 0; step < 40; step += 1) {
     await page.keyboard.press('Tab');
     const where = await page.evaluate(() => {
@@ -164,13 +170,18 @@ test('Tab through an answer: every control in the conversation, focus ring and a
           parseFloat(style.outlineOffset) +
           parseFloat(style.outlineWidth),
         boxTop: form.getBoundingClientRect().top,
+        y: scrollY,
       };
     });
     if (!where || where.done) break;
     seen.push(where.name);
+    if (where.y !== y) scrolledTo.push(where.name);
+    y = where.y;
     expect(where.bottom, where.name).toBeLessThanOrEqual(where.boxTop + 0.5);
   }
-  // It went through the conversation's controls, the votes among them, before reaching the box.
+  // It went through the conversation's controls, the votes among them, before reaching the box, and the page
+  // scrolled to show some of them.
   expect(seen.length).toBeGreaterThan(3);
   expect(seen.join(' / ')).toMatch(/有帮助|没帮助/);
+  expect(scrolledTo).not.toEqual([]);
 });

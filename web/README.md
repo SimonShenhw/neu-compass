@@ -419,39 +419,39 @@ R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLO
 
 R6 的第二个 PR，从 main `1f5b5d8`（#40 合并以后）开 `feat/web-e2e`，依据评审目录 `frontend_react/r6/PR2_PLAYWRIGHT_PLAN.md`。jsdom 量不到的布局、真浏览器里的焦点和整页 axe（连对比度），在 `tools/e2e/` 里用 Playwright 对着构建测。下载经用户同意，只装 Chromium 的无头版（Chrome for Testing 156 的 `chrome-headless-shell`，连 FFmpeg、Winldd 约 120 MB），不装完整的 Chromium。
 
-**本机怎么跑**（`web/` 下）：
+**本机怎么跑**：先在 WSL 里、仓库根目录起开发 API，它一直占着那个终端（下面第二条）；再在 `web/` 下：
 
 ```powershell
 npm.cmd ci --prefix tools/e2e
 npm.cmd run browser --prefix tools/e2e
 npm.cmd run build:dev-api
-npm.cmd run preview:dev-api
 npm.cmd test --prefix tools/e2e
 ```
 
+- 预览没开着时 Playwright 自己起、跑完关掉；也可以另开一个终端先 `npm.cmd run preview:dev-api`（它也一直占着终端），Playwright 就直接用它。开发 API 要先在 WSL 里起好：仓库的 Python 环境在 WSL 里，它没开着的话，Playwright 会在 Windows 上用 `uv run` 去起。
 - `browser` 把无头版装进 `tools/e2e/.browsers/`：`tools/e2e/playwright.mjs` 在没设 `PLAYWRIGHT_BROWSERS_PATH` 时设成它，不装进用户目录。`tools/e2e` 是单独的包，自带 lockfile；TypeScript 和 `@types/node` 和 web 同版本，Playwright 和 `@axe-core/playwright` 只在这里，`src/` 不 import 它们（`contracts.test.ts` 查）。类型检查是 `npm.cmd run typecheck --prefix tools/e2e`。
-- 开发 API 要照生产开着回答反馈、查询日志留 90 天：在仓库根目录（WSL）运行 `uv run python -m tests.support.dev_api --answer-feedback --query-log-retention-days 90`。两个开关是这一批加的，默认关着、0 天，天数只收设置本身认的 0–3650；别的照「接口层与登录 R2b」一节。
-- 开发 API 和预览都开着时 Playwright 直接用；CI 里由它自己起（`playwright.config.ts` 的 `webServer`）。开测以前 `globalSetup.ts` 核对两件事：开发 API 开着回答反馈；4173 上的构建连的是本机的开发 API，不是正式 API（不然每条测试的问题都会发到正式站）。
+- 开发 API 要照生产开着回答反馈、查询日志留 90 天：在仓库根目录（WSL）运行 `uv run python -m tests.support.dev_api --answer-feedback --query-log-retention-days 90`。两个开关是这一批加的，默认关着、0 天，天数只收设置本身认的 0–3650；天数只改 `/privacy` 和勾选说明里的字，开发 API 不跑每天的到期清理。别的照「接口层与登录 R2b」一节。
+- CI 里两个都由 Playwright 自己起（`playwright.config.ts` 的 `webServer`）。开测以前 `globalSetup.ts` 核对三件事：8000 上是开发 API（只有它有假 Google 的登录页），不是别的 API；它开着回答反馈，勾选说明写的是 90 天；4173 上的构建连的是本机的开发 API，不是正式 API（不然每条测试的问题都会发到正式站）。
 - 一个 worker、按顺序跑：开发 API 只有一个，投稿、删号会改后面的测试看到的东西。每条在桌面 1440×900 和手机 390×844 各跑一遍；登录、方案、对比、Co-op 这些流程和构建的检查只在桌面，手机菜单只在手机。文件叫 `*.e2e.ts`，不叫 `.test.`、`.spec.`，免得 Vitest 当成自己的。
 - `.browsers/`、`test-results/`、`playwright-report/` 不提交，ESLint、Prettier 和 `contracts.test.ts` 都跳过它们。
 
 **测什么**（`tools/e2e/tests/`）：
 
-- `askBox.e2e.ts`：粘底的只有查询日志那句和输入框，桌面不超过窗口的 15%，手机不超过 30%，`--ask-bar-height` 就是它的高度；「保存回答」那块在表单后面，不粘。放大到 1093×614、960×540 仍粘，不超过三成；矮于 500 像素（844×390、640×360、320×256）不粘，不横向滚动，main 里也不留边距；没有提问框的页面不留边距。点进输入框，页面不动；用 Tab 走一遍带评价的回答，每个控件连焦点框都在提问框上面。
-- `newestQuestion.e2e.ts`：问的问题到窗口顶上，回答在它下面开始，桌面上整条在提问框上面（手机上问题和回答比窗口减去提问框高，剩下的要往下滚）；第二轮起提问框贴着窗口底边。从课程页提问，去首页、问题到顶，后退一次回到课程页，前进不再滚；从课程页回到搜索页，也不滚。
-- `focus.e2e.ts`：回车、发送按钮、Tab 到按钮再按空格，焦点都留在输入框；示例问题和「接着问」（鼠标、键盘，焦点不在按钮上时用脚本按的也算），焦点到对话；课程页上提问，焦点在 main。
+- `askBox.e2e.ts`：粘底的只有查询日志那句和输入框，桌面不超过窗口的 15%，手机不超过 30%，`--ask-bar-height` 就是它的高度；「保存回答」那块在表单后面，不粘。放大到 1093×614、960×540 仍粘，不超过三成；矮于 500 像素（844×390、640×360、320×256）不粘，不横向滚动，main 里也不留边距；没有提问框的页面不留边距。点进输入框，页面不动；用 Tab 走一遍带评价的回答，每个控件连焦点框都在提问框上面，而且有几下 Tab 让页面滚了（桌面那遍用 1093×614：1440×900 上回答整条都在提问框上面，一下都不滚）。
+- `newestQuestion.e2e.ts`：问的问题到窗口顶上，回答在它下面开始，桌面上整条在提问框上面（手机上问题和回答比窗口减去提问框高，剩下的要往下滚）；第二轮起提问框贴着窗口底边。从课程页提问，去首页、问题到顶，后退一次回到课程页；前进时页面不再自己把问题滚进来（浏览器会回到离开时的位置，那时问题正在顶上，所以只数页面自己的滚动）；从课程页回到搜索页，也不滚，页面停在顶上。
+- `focus.e2e.ts`：回车、发送按钮、Tab 到按钮再按空格，焦点都留在输入框；示例问题（鼠标点、键盘按，焦点不在按钮上时用脚本按）和「接着问」（键盘按、脚本按），焦点到对话；课程页上提问，焦点在 main。
 - `coursePage.e2e.ts`：768、1024 宽时课程在对话前面（DOM 里和屏幕上都是）；手机上课程页只显示课程（照 R1 的版式，对话那栏在页面里但不显示），在第一屏；1440 宽对话在左、课程在右。
-- `build.e2e.ts`：九个演示地址都是 404；跳过链接把焦点交给 main，地址和历史不变；整站走一遍只请求本站和 API。
-- `flows.e2e.ts`：假 Google 登录、登出（侧栏说是谁，退出以后焦点回到登录按钮）；选方案、加草案，去课程页再后退都还在；从课程页加两门课对比；另一个账号投一条 Co-op，再删号（投稿跟着账号删掉，开发 API 回到原样）。
-- `menu.e2e.ts`：手机菜单打开时焦点在里面、看得到页脚，按 Escape 关上，焦点回到菜单按钮。
-- `axe.e2e.ts`：七个页面（隐私页另有一遍是登录以后、带删号那一块的）和两轮带评价的对话，axe 默认的规则全开，连对比度。
+- `build.e2e.ts`：九个演示地址都是 404；跳过链接把焦点交给 main，地址和历史不变；整站走一遍只请求本站和 API。不只这一条：每条测试都核对页面只请求本站和 API（`tests/support.ts` 的自动 fixture），对比表、选好的方案、登录以后这些状态也管到。
+- `flows.e2e.ts`：假 Google 登录、登出（侧栏说是谁，退出以后焦点回到登录按钮）；选方案、加草案，课程页画出来（培养方案页没了）以后再后退，方案和草案都还在，草案也不再重新核对成别的；从课程页加两门课对比；另一个账号投一条 Co-op，再删号（投稿跟着账号删掉，开发 API 回到原样）。
+- `menu.e2e.ts`：手机菜单打开时焦点在里面、页脚那两句看得见（不只是在文字里），按 Escape 关上，焦点回到菜单按钮。
+- `axe.e2e.ts`：七个页面（隐私页另有一遍是登录以后、带删号那一块的）和两轮带评价的对话（等两条回答的评价和课程卡片都出来再查），axe 默认的规则全开，连对比度。
 
 **axe 找出来、这次改了的**（都是 R6 以前就有的）：
 
-- 句子里的链接加了下划线（`base.css` 的 `p a, li a`）：游客提示里的「规则」、提问框那句里的「数据与隐私」、课程详情和对比表里官方目录的链接、回答里的链接，原来只靠颜色和正文分开（WCAG 1.4.1）。单独放着的链接（导航、站名、来源、按钮样子的）不变。
-- 每条回答的评价「回答反馈」和结果卡片「相关课程 N」从 region 改成 group：每一轮都有同名的，地标重名，读屏按地标跳分不出是哪一轮。地标是每一轮自己（「第 n 轮问答」）。
+- 句子里的链接加了下划线（`base.css` 的 `p a, li a`）：游客提示里的「规则」、提问框那句里的「数据与隐私」、课程详情和对比表里官方目录的链接、课程页证据里的「官方目录来源」、回答里的链接，原来只靠颜色和正文分开（WCAG 1.4.1）。单独放着的链接（导航、站名、方案和政策的来源、按钮样子的）不变。`contracts.test.ts` 也静态查这条规则在（jsdom 不加载全局样式）。
+- 每条回答的评价「回答反馈」和结果卡片「相关课程 N」从 region 改成 group：每一轮都有同名的，地标重名，读屏按地标跳分不出是哪一轮。地标是每一轮自己（「第 n 轮问答」）。`SearchConversation.test.tsx` 有一条两轮都带课程和评价的，按 group 找、没有同名的 region，再跑 axe。
 - 培养方案列表的按钮，名字从「查看 CS 的课程表」改成「查看课程表（CS）」：名字要以按钮上看得见的字开头（WCAG 2.5.3），语音控制说「查看课程表」才点得到。
 
-**CI**：`.github/workflows/ci.yml` 加了 e2e job，跑在 ubuntu-24.04 上（Playwright 1.64 列了这一版要的系统库；`ubuntu-latest` 现在是更新的一版）：装 API 的依赖和 web、`tools/e2e` 的依赖，缓存 `.browsers/`，用 `--with-deps` 装无头版和它要的系统库，查 e2e 的类型，`build:dev-api`，跑测试；挂了就上传报告和 trace（留 7 天）。
+**CI**：`.github/workflows/ci.yml` 加了 e2e job，跑在钉住的 ubuntu-24.04 上（`ubuntu-latest` 10-28 起是 26.04；钉住以后，布局测试用的字体和系统库只有改了这里才会变，Playwright 1.64 两版都支持）：装 API 的依赖和 web、`tools/e2e` 的依赖，缓存 `.browsers/`，用 `--with-deps` 装无头版和它要的系统库，查 e2e 的类型，`build:dev-api`，跑测试；挂了就上传报告和 trace（留 7 天）。
 
 修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 41 节。

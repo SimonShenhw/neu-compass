@@ -4,27 +4,32 @@ import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 const root = process.cwd();
+// What is installed, by its name wherever it is; what is built, or installed and left by tools/e2e's runs, where it
+// is made (.gitignore). A directory of src by one of those names is read like any other (review B35).
+const INSTALLED = ['node_modules'];
+const MADE = [
+  'dist',
+  'dist-dev-api',
+  'coverage',
+  '.vite',
+  'artifacts',
+  'tools/e2e/.browsers',
+  'tools/e2e/test-results',
+  'tools/e2e/playwright-report',
+];
 function files(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name);
     if (
-      [
-        'node_modules',
-        'dist',
-        'dist-dev-api',
-        'coverage',
-        '.vite',
-        'artifacts',
-        // What tools/e2e installs and what a run of it leaves (.gitignore).
-        '.browsers',
-        'test-results',
-        'playwright-report',
-      ].includes(entry.name)
+      INSTALLED.includes(entry.name) ||
+      MADE.includes(relative(root, path).split(sep).join('/'))
     )
       return [];
-    const path = resolve(directory, entry.name);
     return entry.isDirectory() ? files(path) : [path];
   });
 }
+// The files TypeScript reads as code, JavaScript among them.
+const CODE = /\.[cm]?[jt]sx?$/;
 
 type Package = {
   engines?: Record<string, string>;
@@ -34,6 +39,25 @@ type Package = {
 };
 const readPackage = (file: string) =>
   JSON.parse(readFileSync(resolve(root, file), 'utf8')) as Package;
+const PACKAGES = [
+  'package.json',
+  'tools/openapi-types/package.json',
+  'tools/e2e/package.json',
+];
+
+// npm installs optional dependencies by default and peer ones since npm 7, and overrides change what it installs:
+// no package has them, so dependencies and devDependencies are all there is to check (review B35).
+it('no package has optional, peer or bundled dependencies, or overrides', () => {
+  for (const file of PACKAGES)
+    expect(
+      Object.keys(readPackage(file)).filter((field) =>
+        /^(optional|peer|bundle|bundled)Dependencies(Meta)?$|^overrides$/.test(
+          field,
+        ),
+      ),
+      file,
+    ).toEqual([]);
+});
 
 it('direct dependencies are exact, stable pins; TanStack Query is the only data library and the site installs no e2e library', () => {
   for (const file of ['package.json', 'tools/openapi-types/package.json']) {
@@ -81,7 +105,7 @@ it('Playwright is in tools/e2e only, exactly pinned, with the TypeScript and Nod
       .filter((name) => /\.(test|spec)\./.test(name)),
   ).toEqual([]);
   for (const path of files(resolve(root, 'src')).filter((path) =>
-    /\.tsx?$/.test(path),
+    CODE.test(path),
   )) {
     const source = ts.createSourceFile(
       path,
@@ -162,7 +186,7 @@ it('the page describes itself to students, not as a prototype, and has an icon (
 
 it('first-party TypeScript has no any types and only the API client makes requests', () => {
   for (const path of files(resolve(root, 'src')).filter((path) =>
-    /\.tsx?$/.test(path),
+    CODE.test(path),
   )) {
     const name = relative(root, path).split(sep).join('/');
     const source = ts.createSourceFile(
@@ -206,6 +230,16 @@ it('all authored files use LF and CSS colors and font sizes come from tokens', (
       expect(withoutComments).not.toMatch(/https?:/);
     }
   }
+});
+
+// A link in a sentence is underlined, not set apart by its colour alone (WCAG 1.4.1, R6). jsdom loads no global style:
+// otherwise only the end-to-end tests' axe sees the rule, on the pages that have such a link (review B35).
+it('links in a paragraph or a list item are underlined', () => {
+  const css = readFileSync(
+    resolve(root, 'src/styles/base.css'),
+    'utf8',
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+  expect(css).toContain('\np a,\nli a {\n  text-decoration: underline;\n}\n');
 });
 
 it('normal text token pairs meet a 4.5:1 contrast threshold', () => {

@@ -5543,20 +5543,26 @@ R4c（#39）10-28 合并以后，React 前端的每一页都接上了真实接�
 
 ### 已实现
 
-1. **开发 API 的两个开关**（`tests/support/dev_api.py`）：`--answer-feedback` 打开回答反馈，`--query-log-retention-days N` 设查询日志留几天，照生产的 compose（开着、90 天）。原来写死关着，页面上看不到生产那样带着勾选框和说明的提问框，第 34 轮审查 A34 的 HIGH 就是这样漏过走查的。默认照旧关着、0 天，原来的用法和测试都不变；天数只收设置本身认的 0–3650（`Field(ge=0, le=3650)`），别的数启动时就报错。`configure()`、`build_dev_app()` 各多两个参数；启动时那行字说开没开、留几天。
+1. **开发 API 的两个开关**（`tests/support/dev_api.py`）：`--answer-feedback` 打开回答反馈，`--query-log-retention-days N` 设查询日志留几天，照生产的 compose（开着、90 天）。原来写死关着，页面上看不到生产那样带着勾选框和说明的提问框，第 34 轮审查 A34 的 HIGH 就是这样漏过走查的。默认照旧关着、0 天，原来的用法和测试都不变；天数只收设置本身认的 0–3650（`Field(ge=0, le=3650)`），别的数启动时就报错。天数只改 `/privacy` 和勾选说明里的字：开发 API 用 `create_app(run_startup=False)`，每天的到期清理不会启动。`configure()`、`build_dev_app()` 各多两个参数；启动时那行字说开没开、留几天。
 2. **`web/tools/e2e/`，单独的包**：`@playwright/test` 1.64.1、`@axe-core/playwright` 4.14.0，TypeScript 6.0.3、`@types/node` 24.19.2 和 web 一样，自带 lockfile；web 的依赖里没有 Playwright。
    - `playwright.mjs` 包一层 Playwright 的命令行：没设 `PLAYWRIGHT_BROWSERS_PATH` 时设成 `tools/e2e/.browsers`，浏览器装在项目里，装的和用的是同一个地方，不进用户目录。`npm run browser` 是 `install --only-shell chromium`，只装无头版。
    - `playwright.config.ts`：测试文件叫 `*.e2e.ts`（`.test.`、`.spec.` 会被 Vitest 收走）；一个 worker、按顺序跑，因为只有一个开发 API，投稿、删号会改后面的测试看到的东西；不重试；两个项目，桌面 1440×900、手机 390×844，登录、方案、对比、Co-op 这些流程和构建的检查只在桌面，手机菜单只在手机；挂了留 trace 和截图，CI 里另出一份 HTML 报告。`webServer` 起开发 API（`uv run --frozen --no-sync python -m tests.support.dev_api --answer-feedback --query-log-retention-days 90`，等 `/ready`）和预览（`npm run preview:dev-api`）；本机已经开着就直接用（Windows 上开发 API 在 WSL 里跑）。
-   - `globalSetup.ts`：开测以前核对开发 API 开着回答反馈、`/privacy` 给了说明，4173 上的构建连的是 `http://127.0.0.1:8000`、里面没有正式 API 的地址。少一个开关时提问框只是矮一点，测试照样过，过得没道理；连正式 API 的构建，每条测试的问题都会发到正式站。
-   - 八个测试文件，两个项目各算一次共 66 条，其中 10 条按项目跳过（只在一种窗口跑的那几条）。每个文件测什么见 README「端到端测试 R6」。阈值：桌面提问框粘住的那块不超过窗口的 15%（第 40 节量的是 1440×900 上 118 像素，13%），手机不超过 30%（390×844 上 189），放大的两种不超过 30%。
+   - `globalSetup.ts`：开测以前核对三件事。8000 上是开发 API：只有它有假 Google 的登录页（`/__dev/google`），换成别的 API，测试就不是对着合成数据了。它开着回答反馈，`/privacy` 的勾选说明里写着「保存的回答和评价 90 天后删除」：少了回答反馈，提问框只是矮一点，测试照样过，过得没道理；反馈开着时说明总是有的，天数要从那一句看。4173 上的构建连的是 `http://127.0.0.1:8000`、里面没有正式 API 的地址：连正式 API 的构建，每条测试的问题都会发到正式站。
+   - 八个测试文件，两个项目各算一次共 66 条，其中 10 条按项目跳过（只在一种窗口跑的那几条）。每个文件测什么见 README「端到端测试 R6」。每条测试都带一个自动 fixture（`tests/support.ts` 的 `test`），核对页面只请求本站和 API：对比表、选好的方案、登录以后这些状态也管到，不只是 `build.e2e.ts` 那一遍走查。阈值：桌面提问框粘住的那块不超过窗口的 15%（第 40 节量的是 1440×900 上 118 像素，13%），手机不超过 30%（390×844 上 189），放大的两种不超过 30%。
 3. **整页 axe 找出来的三样**（都是 R6 以前就有的）：
    - `link-in-text-block`（serious，WCAG 1.4.1；复核第 1 轮 C1 记过）：句子里的链接只靠颜色和正文分开，`base.css` 给链接去掉了下划线。加了 `p a, li a { text-decoration: underline; }`：游客提示里的「规则」、提问框那句里的「数据与隐私」、课程详情和对比表里官方目录的链接、回答里的链接（段落和列表里的）。单独放着的链接不在段落和列表项里，不变：侧栏导航、站名、方案和政策的来源、对比页的「查看」、「回到课程搜索」、404 的「返回首页」。axe 报的是首页、课程页上的三处；回答里的链接开发 API 的回答里没有，规则是同一条。
    - `landmark-unique`（moderate，best-practice；复核第 2 轮 R2C1 记过）：两轮以上带评价的对话里，每条回答的「回答反馈」region 同名，结果卡片的「相关课程 1」也重名。`AnswerFeedback.tsx`、`SearchParts.tsx` 的 `section` 换成 `role="group"` 的 `div`，名字不变：地标是每一轮自己（「第 n 轮问答」），读屏按地标跳到的是轮次，进去以后照样听得到评价和第几门课。没改成「第 n 轮回答反馈」这样的名字：每轮多出几个地标，地标列表更长。
    - `label-content-name-mismatch`（serious，WCAG 2.5.3）：培养方案列表的按钮看得见的是「查看课程表」，名字是「查看 CS 的课程表」，看得见的字不在名字里，语音控制说「查看课程表」点不到它。名字改成「查看课程表（CS）」：以看得见的字开头，四个按钮仍然各是各的。
-4. **测试跟着名字走**：`SearchConversation.golden.test.tsx` 按 group 找「回答反馈」；`Programs.test.tsx`、`ProgramsDemoPage.test.tsx`、`ProgramsRoute.test.tsx` 按新名字找按钮（14 处，另有一个正则）。`AskBar.tsx` 的注释跟着改：「保存回答」不叫「回答反馈」，那是每条回答的评价，现在是 group。
-5. **CI**：`.github/workflows/ci.yml` 加 e2e job（End-to-end tests），跑在 ubuntu-24.04 上：Playwright 1.64 列了这一版要的系统库，`ubuntu-latest` 10-28 起是 26.04，不在它的列表里。装 uv、Python 3.12、`uv sync --frozen --extra dev`，Node 24、`npm ci`、`npm ci --prefix tools/e2e`；缓存 `web/tools/e2e/.browsers`（键是 e2e 的 lockfile）；`npm run browser --prefix tools/e2e -- --with-deps` 装无头版和它要的系统库；查 e2e 的类型；`build:dev-api`；`npm test --prefix tools/e2e`；挂了上传报告和 trace（留 7 天）。`GEMINI_API_KEY` 和测试 job 一样是占位的。
-6. **守关**：`contracts.test.ts` 遍历 web/ 时跳过 `.browsers`、`test-results`、`playwright-report`（不然要读浏览器的二进制）；新的一条查 `tools/e2e/package.json` 只有那四个依赖、都是精确版本，TypeScript、`@types/node`、`engines` 和 web 一样，`browser` 只装无头版，`tools/e2e` 里没有 `.test.`、`.spec.` 文件，`src/` 不 import `tools/e2e` 和 Playwright（静态、动态的都查）。第一条的名字改成「站点的包里没有 e2e 的库」。`eslint.config.js`、`.prettierignore` 也跳过这三个文件夹（Prettier 本来就读 `.gitignore`，写出来好查）。
-7. **文档**：README 新的「端到端测试 R6」一节，开头、「检查」、「无障碍与验收边界」和 R6 一节末句各改一处；第 40 节「已知」里这一批处理了的四条后面注明了。
+4. **测试跟着名字走**：`SearchConversation.golden.test.tsx` 按 group 找「回答反馈」；`Programs.test.tsx`、`ProgramsDemoPage.test.tsx`、`ProgramsRoute.test.tsx` 按新名字找按钮（14 处，另有一个正则）。`AskBar.tsx` 的注释跟着改：「保存回答」不叫「回答反馈」，那是每条回答的评价，现在是 group。`SearchConversation.test.tsx` 加一条两轮都带课程和评价的：按 group 找到两个「相关课程 1」、两个「回答反馈」，没有这两个名字的 region，axe 没有违规（一轮的对话里不会有重名的地标）。
+5. **CI**：`.github/workflows/ci.yml` 加 e2e job（End-to-end tests），跑在钉住的 ubuntu-24.04 上：`ubuntu-latest` 10-28 起是 26.04，钉住以后，布局测试用的字体和系统库只有改了这里才会变（Playwright 1.64 两版都支持）。装 uv、Python 3.12、`uv sync --frozen --extra dev`，Node 24、`npm ci`、`npm ci --prefix tools/e2e`；缓存 `web/tools/e2e/.browsers`（键是 e2e 的 lockfile）；`npm run browser --prefix tools/e2e -- --with-deps` 装无头版和它要的系统库；查 e2e 的类型；`build:dev-api`；`npm test --prefix tools/e2e`；挂了上传报告和 trace（留 7 天）。`GEMINI_API_KEY` 和测试 job 一样是占位的。
+6. **守关**（`contracts.test.ts`）：
+   - 遍历 web/ 时，`node_modules` 按名字跳过，构建和运行留下的东西按路径跳过：`dist`、`dist-dev-api`、`coverage`、`.vite`、`artifacts` 在 web/ 下，`.browsers`、`test-results`、`playwright-report` 在 `tools/e2e/` 下（不然要读浏览器的二进制）。`src` 里同名的目录照样查。
+   - 新的一条查 `tools/e2e/package.json` 只有那四个依赖、都是精确版本，TypeScript、`@types/node`、`engines` 和 web 一样，`browser` 只装无头版，`tools/e2e` 里没有 `.test.`、`.spec.` 文件，`src/` 不 import `tools/e2e` 和 Playwright（静态、动态的都查）。
+   - 两条看语法树的（不 import Playwright；没有 any、只有 API 客户端发请求）也查 `.js`、`.jsx`、`.mjs`、`.cjs`、`.mts`、`.cts`。
+   - 三个包都没有 optional、peer、bundle 依赖和 overrides：npm 默认会装 optional，npm 7 起也装 peer，overrides 会改装的是什么，这样只看 dependencies、devDependencies 就够了。
+   - `base.css` 里有 `p a, li a` 的下划线规则：jsdom 不加载全局样式，不然只有 e2e 的 axe 看得到它，而且只在有这种链接的页面上。
+   - 第一条的名字改成「站点的包里没有 e2e 的库」。`eslint.config.js`、`.prettierignore` 也跳过 `tools/e2e` 那三个文件夹（Prettier 本来就读 `.gitignore`，写出来好查）。
+7. **文档**：README 新的「端到端测试 R6」一节；开头、「无障碍与验收边界」和 R6 一节末句各改一处，「检查」一节新加一条、改了一条；第 40 节「已知」里这一批处理了的四条后面注明了。
 
 ### 修改文件
 
@@ -5564,7 +5570,7 @@ R4c（#39）10-28 合并以后，React 前端的每一页都接上了真实接�
 - CI：`.github/workflows/ci.yml`。
 - 前端新建：`web/tools/e2e/` 的 `package.json`、`package-lock.json`、`playwright.mjs`、`playwright.config.ts`、`globalSetup.ts`、`tsconfig.json`，`tests/support.ts` 和八个 `*.e2e.ts`（`askBox`、`newestQuestion`、`focus`、`coursePage`、`build`、`flows`、`menu`、`axe`）。
 - 前端改：`web/.gitignore`、`.prettierignore`、`eslint.config.js`；`src/styles/base.css`；`features/search-answer/AnswerFeedback.tsx`、`SearchParts.tsx`；`features/programs/ProgramList.tsx`；`layout/AskBar.tsx`（注释）。
-- 前端测试改：`src/test/contracts.test.ts`、`features/search-answer/SearchConversation.golden.test.tsx`、`features/programs/Programs.test.tsx`、`pages/ProgramsDemoPage.test.tsx`、`pages/ProgramsRoute.test.tsx`。
+- 前端测试改：`src/test/contracts.test.ts`、`features/search-answer/SearchConversation.golden.test.tsx`、`SearchConversation.test.tsx`、`features/programs/Programs.test.tsx`、`pages/ProgramsDemoPage.test.tsx`、`pages/ProgramsRoute.test.tsx`。
 - 文档：`web/README.md`；本节，第 40 节「已知」四处。
 
 数据库结构、检索、提示词和生产的 API 都没改。
@@ -5579,21 +5585,48 @@ R4c（#39）10-28 合并以后，React 前端的每一页都接上了真实接�
 - **改完以后**：e2e 全套 66 条，56 过、10 条按项目跳过，本机约 52 秒。最后补了 `coursePage.e2e.ts` 手机那条：原来只看课程在第一屏，现在也核对对话那栏在页面里、不显示（手机上课程页只显示课程，照 R1 的版式）。
 - **e2e 变异**（评审目录 `r6/pr2/e2e_mutants.mjs`）：14 个，都杀掉了。每个在 web/ 的副本里改，`vite build --mode dev-api` 重新构建，换到 4173 上预览，再跑对口的用例；先跑不改的副本，11 条对口用例都过；跑完 worktree 一个文件都没变。布局 9 个：不粘底、两处 500 像素改成 300（提问框粘底和 `base.css` 留的边距）、勾选框放回表单、`scroll-margin-bottom` 不算提问框、最后一轮不留高度、第二轮起不加边框和内边距、两栏从 1500 宽起、手机的课程页显示对话；这次的产品改动 4 个：不加下划线、评价和课程卡片改回 region、按钮名改回去；跳过链接改回页内链接 1 个。`scroll-margin-bottom` 那个只有手机那遍杀得掉：桌面上回答短，控件本来就在提问框上面。
 - **开发 API 的变异**（`r6/pr2/dev_api_mutants.sh`）：7 个，都杀掉了：开关不生效、天数不生效、范围放宽一天（上下各一个）、`main` 不传开关和天数、`build_dev_app` 不传开关。
-- **前端检查**：类型、零警告 lint、两种构建、格式、`gen:api:check`、e2e 的类型都过；Vitest **92 个文件 2782 条**全过（多的一条是新的合约测试）；首屏 JavaScript gzip **186,441 字节**（`build:dev-api` 的 186,443）。按码位扫了 33 个改动文件：只有改动记录和 README 里原来就有的两个表情符号。
+- **前端检查**：类型、零警告 lint、两种构建、格式、`gen:api:check`、e2e 的类型都过；Vitest **92 个文件 2782 条**全过（多的一条是新的合约测试）；首屏 JavaScript gzip **186,441 字节**（`build:dev-api` 的 186,443）。按码位扫了 33 个改动文件：表情符号只在改动记录和 README 原来就有的段落里，新写的内容里没有。
 - **后端**：`test_dev_api.py` 48 条过；全量 **5319 条**全过（9 分 31 秒），跑前跑后比了 33 个改动文件的哈希，没变。
+- **第 35 轮修完以后**（第二个提交）：
+  - e2e 全套 56 过、10 跳过（53.8 秒）。
+  - e2e 变异补了 9 个，共 23 个。新的 9 个和对口用例改过的 3 个（E05、E10、E11）重跑，12 个都杀掉；E05 现在桌面那遍也杀得掉。补的是 B35 LOW-8 的四个（html 的 `scroll-padding-bottom` 加回去、768 宽起就两栏、`index.html` 引外站的样式表、没有提问框时也留边距），和 A35 用来证明上面几处的五个（换页就丢掉方案和草案、回来以后把草案当空的重新核对、回到搜索页时用 `window.scrollTo` 滚到最新问题、菜单里藏起页脚、只在对比表上引一张外站的图）。外站用 `.invalid` 的主机名，解析不出来，什么都发不出去。
+  - 开发 API 的变异补了 4 个（`build_dev_app`、`configure` 不给参数时默认 90 天或开着反馈，报错不说范围），11 个都杀掉。
+  - B35 的合约探针在一份新副本里重跑，加了 7 个，共 45 个，41 个拦下：原来漏掉的 10 个现在都拦住了。漏过的 4 个本来就不归合约管：`test` 脚本绕过 `playwright.mjs`；两种只出现在类型里的 `import()`（ESLint 的 `consistent-type-imports` 拦）；新加的那个放在 `tools/e2e/.browsers` 里的文件（本来就该跳过）。B35 的 Vitest 变异也重跑了：原来活下来的 5 个（课程卡片改回 region、去掉 role、所有卡片同名，下划线规则整条去掉、只去掉 `li a`）现在都杀掉了，连同原来就杀得掉的 3 个，8 个都杀。
+  - `globalSetup.ts` 用打桩的 fetch 探了 9 种情形（不起服务、不占端口，构建用 B35 从磁盘读的两份）：开发 API 开着反馈、90 天、构建对的，放行；8000 上没有假 Google（这时别的都不读）、那个路径上不是假 Google 的页、反馈关着、0 天、30 天、900 天、没有说明、正式构建，8 种都拦下，报的是对的那句。
+  - 前端：类型、零警告 lint、两种构建、格式、e2e 的类型都过；Vitest **92 个文件 2785 条**全过（多的三条：两条合约、一条两轮对话）；首屏没变。按码位逐行查了这个 PR 加的所有行，没有表情符号和格式字符。
+  - 后端：`test_dev_api.py` 49 条过，ruff 干净；全量 **5320 条**全过（10 分 7 秒）。封条只差改动记录：跑的时候在改本节，测试没写任何文件。
 
 ### 审查
 
-还没开（开以前先问用户）。
+**第 35 轮**（10-31 用户同意开），两路只读：A35 看浏览器和 e2e（CRITICAL 0／HIGH 0／MEDIUM 1／LOW 3／NIT 3），B35 看守关、CI、变异和文档（0／0／0／LOW 9／NIT 7）。都没有挡上线的。A35 整套连跑三遍、每个文件单独跑、时间敏感的四个文件各跑 10 遍、CPU 降速 6 倍，都过；`globalSetup` 的两道核对都在浏览器启动以前就让整套停下。B35 写了 38 个合约探针、11 个 Vitest 变异、11 个开发 API 变异。修了的（除了 B35 LOW-9，都在第二个提交里）：
+
+- **A35 MEDIUM-1**：草案那条只等地址变了就后退，那时培养方案页还没卸载（点下去约 38 毫秒地址变，约 78 毫秒课程页才出来），换页就丢掉选择和草案也照样过。改成等课程页画出来、方案选择框没了再后退，回来以后等草案核对完再看。
+- **A35 LOW-1**：「回到搜索页不滚」只数 `scrollIntoView`，换成 `window.scrollTo` 滚也过：末尾加了页面停在顶上。前进那一步不能这样查，浏览器自己会回到离开时的位置（那时问题正在顶上），README 的说法跟着改准。
+- **A35 LOW-2**：手机菜单的页脚只查了文字，`display: none` 藏起来也过：改成看得见。
+- **A35 LOW-3**：请求来源只在一遍游客走查里查：改成每条测试都带的自动 fixture。
+- **A35 NIT-1、B35 LOW-2**：`globalSetup` 不查天数（反馈开着时说明总是有的），也不查 8000 上是不是开发 API：见上面「已实现」第 2 条。
+- **B35 LOW-1**：钉 ubuntu-24.04 的理由写错了，Playwright 1.64 是支持 26.04 的：CI 的注释、README、本节第 5 条都改了。
+- **B35 LOW-3、LOW-4、NIT-7**：合约按名字跳过目录、只看两种依赖字段、语法树只看 `.ts`／`.tsx`：见「已实现」第 6 条。
+- **B35 LOW-5**：课程卡片的 group 和名字 Vitest 没钉，下划线规则只靠 e2e：加了两轮带课程和评价的那条，和 `base.css` 的静态检查。
+- **B35 LOW-6**：Tab 走回答那条在桌面上一下都不滚，`scroll-margin-bottom` 有没有都过：桌面那遍换成 1093×614，两个项目都要有几下 Tab 让页面滚了。
+- **B35 LOW-7**：两轮对话的 axe 不等评价出来就跑：先等两组评价和两张课程卡片。
+- **B35 LOW-8**：四条 e2e 断言没有对口的变异：补了 E15–E18；A35 用来证明上面几处的变异也补进来（E19–E23）。
+- **B35 NIT-1–NIT-6**：README 写明开发 API 要先在 WSL 里起、预览可以让 Playwright 自己起；天数只改字（本节第 1 条、开发 API 的 docstring）；`build_dev_app`、`configure` 不给参数时的默认值和超出范围时的报错原话都有测试了；「接着问」测的是键盘按和脚本按；改动记录的两处数字和 README 里「来源」那句改准了。
+- **B35 LOW-9**：部署打包不排除 web/ 下装的和留下的东西，留给 R7（下面「已知」）。
+
+复核：还没开（开以前先问用户）。
 
 ### 已知、未处理
 
 - **页面打开时焦点在 main**，键盘用户从页面开头按 Tab 到不了跳过链接，要 Shift+Tab 往回走。外壳一直是这样（打开、换页都把焦点交给 main），这一批没改；跳过链接是给已经走到侧栏的人用的。
-- **CI 的 e2e job 还没在 GitHub 上跑过**：Linux 上中文用 `--with-deps` 装的系统字体，和 Windows 的不一样，阈值是在 Windows 上量的，CI 里可能差一点。挂了先看原因。
+- **CI 的 e2e job 还没在 GitHub 上跑过**：Linux 上中文用 `--with-deps` 装的系统字体，和 Windows 的不一样，阈值是在 Windows 上量的，CI 里可能差一点。A35 估计影响不大：行高按打包进来的西文字体算，换了九种中文后备字体，量出来的高度都一样；离阈值最近的是桌面那块粘底（差 16 像素，多一行字才超）。挂了先看原因。
+- **部署打包没排除 web/ 下装的和留下的东西**（B35 LOW-9）：在主检出里跑过一次 e2e，`deploy.ps1` 就会把 `tools/e2e/.browsers`（约 280 MB）、`test-results` 连同 `web/node_modules` 打包传到 NAS，再被 `COPY . .` 放进镜像。现行的发布做法（单独的发布 worktree，只传跟踪的文件）碰不到。R7 做部署件时在 `.dockerignore` 和 `deploy.ps1` 里加上。
+- **句子里的链接悬停时没有变化**（A35 NIT-2）：平时就有下划线了，WCAG 不要求悬停时变，没改。
+- **A35 顺带看到、R6 以前就有的两样**：开发 API 被 SIGTERM 停下时留下 `/tmp/nc-dev-api-*`（推测 uvicorn 平稳停下以后又抛了一次信号，`with` 的清理没跑；WSL 重启就没了）；手机 390 宽时提问框那句折成三行，「。」单独一行（链接至少 44 像素高；版式要用户定）。都没改。
 - **只测了 Chromium 的无头版**（用户定的），Firefox、Safari 没测。Safari 点按钮不给它焦点那一类，还是靠 jsdom 的测试和第 40 节的做法。
 - **开发 API 的状态不在测试之间重置**：投稿那条用另一个账号、最后删号还原；登录那几条只用合成账号登录、登出。整套一个 worker 顺序跑，本机约 52 秒。
 - 第 40 节「已知」里其余几条照旧（旧 seed、前端隐私的合成数据、最后一轮下面的空白、隐私说明里两句、离线演示外壳的跳过链接、守关看不到的两样、390 宽时占位文字折行、按了评价按钮以后焦点掉到 body）。
 
 ### 发布状态
 
-分支 `feat/web-e2e`，从 main `1f5b5d8`（#40 合并以后）开，一个提交。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
+分支 `feat/web-e2e`，从 main `1f5b5d8`（#40 合并以后）开，两个提交：第一个是上面这些，第二个是第 35 轮审查的修补。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。

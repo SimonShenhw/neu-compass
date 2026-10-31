@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { answered, ask, landed, optIn, signIn } from './support';
+import { answered, ask, landed, optIn, signIn, test } from './support';
 
 // axe on whole pages in a real browser, colour contrast included, which jsdom cannot compute (R6_PLAN section 1 item
 // 7). Every rule axe runs by default, in both window sizes.
@@ -67,5 +67,8 @@ test('axe finds nothing in a conversation of two saved answers with their votes'
   await answered(page, 1);
   await ask(page, 'CS 6140 呢？');
   await answered(page, 2);
+  // Both answers' votes, which come once each receipt is checked, after the answer (review B35), and their courses.
+  await expect(page.getByRole('group', { name: '回答反馈' })).toHaveCount(2);
+  await expect(page.getByRole('group', { name: '相关课程 1' })).toHaveCount(2);
   expect(await violations(page)).toEqual([]);
 });

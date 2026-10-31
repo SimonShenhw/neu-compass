@@ -46,7 +46,8 @@ jobs:
   # 假 Google），回答反馈照生产开着。
   e2e:
     name: End-to-end tests
-    # Ubuntu 24.04, whose libraries Playwright 1.64 lists for its browser; ubuntu-latest is now a newer one.
+    # Pinned, not ubuntu-latest (26.04 since 10-28): the fonts and libraries the layout tests run with change only by
+    # an edit here. Playwright 1.64 supports both.
     runs-on: ubuntu-24.04
     env:
       # The dev API imports config.settings, which requires it; never sent anywhere (see the test job).

@@ -255,7 +255,21 @@ def test_days_the_setting_cannot_have_are_refused(days, monkeypatch, capsys):
     monkeypatch.setattr(uvicorn, "run", started)
     with pytest.raises(SystemExit) as refused:
         dev_api.main(["--port", "8123", "--query-log-retention-days", days])
-    assert refused.value.code == 2 and "--query-log-retention-days" in capsys.readouterr().err
+    assert refused.value.code == 2
+    assert "--query-log-retention-days must be from 0 to 3650." in capsys.readouterr().err
+
+
+def test_build_dev_app_and_configure_without_the_two_are_off_with_no_days(settings_back, tmp_path):
+    """As the tests call them, without the two: off and 0, whatever the process had, as main() without the flags
+    (review B35). 中文：测试里直接调用、不给这两个参数时也是关、0，不管进程里原来是什么，和 main() 不带参数一样。"""
+    settings.answer_feedback_enabled = True
+    settings.query_log_retention_days = 30
+    dev_api.configure(settings, tmp_path / "configured.sqlite3")
+    assert settings.answer_feedback_enabled is False and settings.query_log_retention_days == 0
+    settings.answer_feedback_enabled = True
+    settings.query_log_retention_days = 30
+    dev_api.build_dev_app(tmp_path / "built.sqlite3", base="https://dev-api.test")
+    assert settings.answer_feedback_enabled is False and settings.query_log_retention_days == 0
 
 
 def test_a_code_the_sign_in_page_never_gave_is_refused_as_google_would():

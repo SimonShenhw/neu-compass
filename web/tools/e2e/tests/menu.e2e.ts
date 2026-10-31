@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { landed } from './support';
+import { expect } from '@playwright/test';
+import { landed, test } from './support';
 
 // The phone's navigation menu (the sidebar in a dialog): focus goes into it, it carries the footer's two sentences
 // (R6), and Escape gives focus back to the button that opened it.
@@ -12,8 +12,10 @@ test('the menu opens with focus in it and the footer, and Escape gives focus bac
   await open.click();
   const menu = page.getByRole('dialog');
   await expect(menu).toBeVisible();
-  await expect(menu).toContainText('课程数据可能滞后');
-  await expect(menu).toContainText('非商业 / F1');
+  // Seen, not only in the menu's text (review A35).
+  const footer = menu.getByText(/课程数据可能滞后/);
+  await expect(footer).toBeVisible();
+  await expect(footer).toContainText('非商业 / F1');
   expect(
     await menu.evaluate((dialog) => dialog.contains(document.activeElement)),
   ).toBe(true);

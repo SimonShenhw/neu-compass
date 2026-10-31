@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import {
   answer,
   answered,
@@ -9,6 +9,7 @@ import {
   countScrolls,
   landed,
   scrolls,
+  test,
 } from './support';
 
 // R6, the user's choice of 10-29: a question asked comes into view at the top of the window, its answer below it. The
@@ -41,7 +42,9 @@ test('a question asked comes to the top of the window, its answer below it, the 
 });
 
 // From a course page the question opens the search page with NEWEST_QUESTION, read once: the entry is replaced
-// without it, not added to, so one Back is the course page and Forward scrolls nowhere (reviews A34, B34; recheck 1).
+// without it, not added to, so one Back is the course page and Forward does not bring the question into view again
+// (reviews A34, B34; recheck 1). Where Forward leaves the page is the browser's: it puts back where the page was left,
+// which was the question at the top (review A35), so only the page's own scrolls are counted.
 test('a question asked on a course page is at the top of the search page; one Back is the course page, Forward scrolls nowhere', async ({
   page,
 }) => {
@@ -82,4 +85,12 @@ test('coming back to the search page shows the conversation again and scrolls no
   await page.getByRole('link', { name: '回到课程搜索' }).click();
   await expect(answer(page, 1)).toBeVisible();
   expect((await scrolls(page)).slice(before)).not.toContain('question');
+  // Nor by any other means (review A35): two frames on, the page is where the shell put it, at its top.
+  await page.evaluate(
+    () =>
+      new Promise((done) =>
+        requestAnimationFrame(() => requestAnimationFrame(done)),
+      ),
+  );
+  expect(await page.evaluate(() => scrollY)).toBe(0);
 });

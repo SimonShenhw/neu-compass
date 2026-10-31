@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test';
-import { API, WEB, answered, ask, landed } from './support';
+import { expect } from '@playwright/test';
+import { API, WEB, answered, ask, landed, test } from './support';
 
 // What a build is, beyond what Vitest sees of its configuration (R6): no demo page, a skip link that moves focus
-// without a history entry, and no request to anything but the site and its API. On the desktop only
-// (playwright.config.ts).
+// without a history entry, and no request to anything but the site and its API (which every test checks too,
+// tests/support.ts). On the desktop only (playwright.config.ts).
 
 // The nine demo routes of src/demoRoutes.tsx, which no build carries.
 const DEMOS = [
@@ -48,7 +48,8 @@ test('the skip link moves focus to main, and the address and history stay as the
   expect(await page.evaluate(() => history.length)).toBe(entries);
 });
 
-// The fonts are bundled, the icons inline: a page asks nothing of a third party, not even a font host.
+// The fonts are bundled, the icons inline: a page asks nothing of a third party, not even a font host. Every page
+// once, as a guest, asking the site and the API both.
 test('the pages ask nothing of anyone but the site and its API', async ({
   page,
 }) => {

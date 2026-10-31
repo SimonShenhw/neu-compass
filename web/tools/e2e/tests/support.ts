@@ -1,9 +1,31 @@
-import { expect } from '@playwright/test';
+import { expect, test as base } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
 // The preview of the build, and the dev API it was built for (src/api/apiBase.ts: PREVIEW_PORT and LOCAL_API).
 export const WEB = 'http://127.0.0.1:4173';
 export const API = 'http://127.0.0.1:8000';
+
+// Every test: its page asks nothing of anyone but the site and its API (the fonts are bundled, the icons inline), in
+// whatever state the test leaves it, a comparison table, a chosen plan, an account (review A35).
+export const test = base.extend<{ noThirdParty: void }>({
+  noThirdParty: [
+    async ({ page }, use) => {
+      const others = new Set<string>();
+      page.on('request', (request) => {
+        const { protocol, origin } = new URL(request.url());
+        if (
+          (protocol === 'http:' || protocol === 'https:') &&
+          origin !== WEB &&
+          origin !== API
+        )
+          others.add(origin);
+      });
+      await use();
+      expect([...others], 'requests to other origins').toEqual([]);
+    },
+    { auto: true },
+  ],
+});
 
 // The dev API's scripted answer ends so (tests/support/dev_api.py's ANSWER).
 const ANSWER_END = '没有调用模型。）';

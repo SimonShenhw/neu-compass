@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { box } from './support';
+import { box, test } from './support';
 
 // R6, the user's choice of 10-29: below 1200 wide the course page shows the course first, and a screen reader reads it
 // first; from 1200 wide the grid puts the conversation back on the left (SearchPage.module.css), which jsdom cannot

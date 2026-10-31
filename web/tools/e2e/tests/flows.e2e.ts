@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { signIn } from './support';
+import { expect } from '@playwright/test';
+import { signIn, test } from './support';
 
 // The site's main ways through, as the R6 walkthrough went them by hand, on the dev API's synthetic accounts (its fake
 // Google page lists them). On the desktop only (playwright.config.ts): the phone's menu has a test of its own.
@@ -37,9 +37,14 @@ test('a plan and a draft for it stay while a course page is open and after Back'
   ).toBeVisible();
   await page.getByRole('button', { name: '查看 CS 5010' }).first().click();
   await expect(page).toHaveURL(/\/course\/CS-5010$/);
+  // The address changes before the program page goes: Back only once the course page is drawn instead (review A35).
+  await expect(page.getByRole('region', { name: '课程详情' })).toBeVisible();
+  await expect(plan).toHaveCount(0);
   await page.goBack();
   await expect(page).toHaveURL(/\/programs\/cs-ms$/);
   await expect(plan).toHaveAccessibleName(`${PLAN_LABEL} ${STANDARD_PLAN}`);
+  // The draft itself, not the last check's answer shown while it is checked again.
+  await expect(page.getByText('正在核对课程…')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: '移除 CS 5800' }),
   ).toBeVisible();

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import {
   answered,
   ask,
@@ -6,6 +6,7 @@ import {
   field,
   landed,
   sendButton,
+  test,
 } from './support';
 
 // Focus after a question (R3d spec 3, the focus rule of 10-25, R6): a question asked in the ask box leaves focus in its
