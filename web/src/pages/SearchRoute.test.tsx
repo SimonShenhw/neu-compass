@@ -1,4 +1,10 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -13,7 +19,7 @@ import alias from '../fixtures/search/alias-cs-6140.json';
 import receipt from '../fixtures/search/feedback-receipt.json';
 import votes from '../fixtures/search/feedback-responses.json';
 import { SINGLE_FOLLOWUPS } from '../features/search-answer/SearchConversation';
-import { CAPTURE_LABEL } from '../layout/AskBar';
+import { CAPTURE_LABEL, CAPTURE_OFF, CAPTURE_REGION } from '../layout/AskBar';
 import { PLAN_PLACEHOLDER } from '../models/programFormat';
 import { apiError, asked, held, json } from '../test/fakeApi';
 import { SEEDED_READY, seededQueryClient } from '../test/withApi';
@@ -78,6 +84,12 @@ const ask = async (question: string) => {
   );
 };
 const answered = () => screen.findByRole('group', { name: '接着问' });
+// The same question sent with the ask box's button.
+const askWithButton = async (question: string) => {
+  const user = userEvent.setup();
+  await user.type(screen.getByRole('textbox', { name: '课程问题' }), question);
+  await user.click(screen.getByRole('button', { name: '发送问题' }));
+};
 
 it('the landing asks the program list, the featured programs it has, Co-op and the privacy words, once each', async () => {
   const api = world();
@@ -971,23 +983,86 @@ it('after a follow-up pressed with the keyboard, focus is on the conversation', 
 });
 
 // Focus in the ask box stays there, for the first question, which takes the landing away, as for those after it: only
-// focus left on nothing goes to the conversation (the focus rule of 10-25).
-it('a question asked in the ask box, the first as those after it, leaves focus in the box', async () => {
+// focus left on nothing goes to the conversation (the focus rule of 10-25). Sent with the button too, which the empty
+// box disables (recheck 1 of round 34).
+it.each([
+  ['Enter', ask],
+  ['the send button', askWithButton],
+])(
+  'a question asked in the ask box with %s, the first as those after it, leaves focus in the box',
+  async (_, send) => {
+    world();
+    page('/');
+    await landed();
+    const box = screen.getByRole('textbox', { name: '课程问题' });
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    await send('CS 6140 讲什么？');
+    await answered();
+    expect(box).toHaveFocus();
+    await send('CS 5800 讲什么？');
+    await waitFor(() =>
+      expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(
+        2,
+      ),
+    );
+    await answered();
+    expect(box).toHaveFocus();
+    expect(focus.mock.contexts).not.toContain(
+      screen.getByRole('group', { name: '对话' }),
+    );
+  },
+);
+
+// Safari's click leaves focus where it was, and a screen reader may press a button without focus on it: the buttons
+// still go with what they were in, so the conversation takes focus from them all the same (recheck 1 of round 34).
+it('a sample question or a follow-up pressed without focus on it still gives focus to the conversation', async () => {
   world();
   page('/');
   await landed();
-  const box = screen.getByRole('textbox', { name: '课程问题' });
-  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
-  await ask('CS 6140 讲什么？');
-  await answered();
-  expect(box).toHaveFocus();
-  await ask('CS 5800 讲什么？');
+  const main = screen.getByRole('main');
+  main.focus();
+  fireEvent.click(screen.getByRole('button', { name: 'CS 5800' }));
+  const followUps = await answered();
+  const conversation = screen.getByRole('group', { name: '对话' });
+  expect(conversation).toHaveFocus();
+  main.focus();
+  fireEvent.click(within(followUps).getAllByRole('button')[0]!);
   await waitFor(() =>
     expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2),
   );
+  expect(conversation).toHaveFocus();
+  // What the button said goes with its question: one asked in the ask box after it leaves focus in the box.
   await answered();
-  expect(box).toHaveFocus();
-  expect(focus.mock.contexts).not.toContain(
-    screen.getByRole('group', { name: '对话' }),
+  await ask('CS 5800 讲什么？');
+  await waitFor(() =>
+    expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(3),
   );
+  expect(screen.getByRole('textbox', { name: '课程问题' })).toHaveFocus();
 });
+
+// Out of the form, the opt-in and its notice, or the line that nothing is saved, are a landmark of their own, so
+// nothing on the search page is outside one (recheck 1 of round 34). axe's region rule is given the body itself:
+// given the html element, which is not in the body, vitest-axe copies the page into the body and leaves the copy
+// behind for the next test.
+it.each([
+  ['on', true],
+  ['off', false],
+])(
+  'with answer feedback %s, nothing on the search page is outside a landmark',
+  async (_, feedback) => {
+    world();
+    page(
+      '/',
+      seededQueryClient({
+        config: { answer_feedback_enabled: feedback, login_available: true },
+      }),
+    );
+    await landed();
+    expect(
+      await screen.findByRole('region', { name: CAPTURE_REGION }),
+    ).toHaveTextContent(feedback ? CAPTURE_LABEL : CAPTURE_OFF);
+    expect(
+      (await axe(document.body, { runOnly: ['region'] })).violations,
+    ).toEqual([]);
+  },
+);

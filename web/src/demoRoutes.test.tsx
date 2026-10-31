@@ -33,24 +33,28 @@ it.each([
   },
 );
 
+// What the pages ask gets a 404, and each still draws a part of its own, named; the not-found page draws in main too,
+// so main alone could not tell them apart (recheck 1 of round 34).
 it.each([
-  '/',
-  '/course/CS-6140',
-  '/compare',
-  '/programs',
-  '/programs/cs-ms',
-  '/coop',
-  '/privacy',
-])('without them the real page %s is still there', async (path) => {
-  // What the pages ask gets a 404: only which page draws matters here.
-  fakeApi(() => json(null, 404));
-  render(
-    <WithApi>
-      <MemoryRouter initialEntries={[path]}>
-        <App />
-      </MemoryRouter>
-    </WithApi>,
-  );
-  expect(await screen.findByRole('main')).toBeInTheDocument();
-  expect(screen.queryByText('404 · 找不到这个页面')).toBeNull();
-});
+  ['/', 'region', '搜索落地内容'],
+  ['/course/CS-6140', 'group', 'CS 6140'],
+  ['/compare', 'region', '课程对比内容'],
+  ['/programs', 'region', '培养方案列表'],
+  ['/programs/cs-ms', 'region', '项目课程表'],
+  ['/coop', 'region', 'Co-op 经历列表'],
+  ['/privacy', 'region', '隐私说明加载失败'],
+] as const)(
+  'without them the real page %s is still there',
+  async (path, role, name) => {
+    fakeApi(() => json(null, 404));
+    render(
+      <WithApi>
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>
+      </WithApi>,
+    );
+    expect(await screen.findByRole(role, { name })).toBeInTheDocument();
+    expect(screen.queryByText('404 · 找不到这个页面')).toBeNull();
+  },
+);

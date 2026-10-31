@@ -1,7 +1,7 @@
 /* Held at the window's bottom edge while the page scrolls behind it, as Streamlit's chat input is (R6, the user's
-   choice of 10-29), in a window at least 500 px high: in a lower one (a phone turned sideways, a page zoomed to 200 or
-   400 %) it left the page a strip (review A34). From the same height base.css keeps what is focused or scrolled into
-   view on the page out from under it, by the height AskBar sets (--ask-bar-height). */
+   choice of 10-29), in a window at least 500 px high: in a lower one (a phone turned sideways, a 768 px screen zoomed
+   to 200 %, a 1080 px one to 400 %) it left the page a strip (review A34). From the same height base.css keeps what is
+   focused or scrolled into view on the page out from under it, by the height AskBar sets (--ask-bar-height). */
 .askBar {
   display: grid;
   gap: var(--space-2);
@@ -72,7 +72,7 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
 }
-/* Under the box, in the page. */
+/* Under the box, in the page: a landmark of its own (AskBar's CAPTURE_REGION). */
 .capture {
   display: grid;
   gap: var(--space-1);

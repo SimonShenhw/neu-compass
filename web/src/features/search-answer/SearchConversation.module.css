@@ -16,10 +16,17 @@
 }
 /* Room for the newest question to come to the top of the window, its answer below it, as the search page brings it
    into view (R6): the last turn is at least the window's height less the ask box. Without it a question asked at the
-   end of a short page stopped above the box, and its answer came in under the box (review A34). */
+   end of a short page stopped above the box, and its answer came in under the box (review A34). The large viewport's
+   height, which stays put as a phone's address bar comes and goes, and from the second turn on the border and padding
+   above the question too, which left the box a few pixels above the window's edge (recheck 1 of round 34). */
 .turn:last-child {
-  min-height: calc(100dvh - var(--ask-bar-height, 0px));
+  min-height: calc(100lvh - var(--ask-bar-height, 0px));
   align-content: start;
+}
+.turn + .turn:last-child {
+  min-height: calc(
+    100lvh - var(--ask-bar-height, 0px) + var(--border) + var(--space-6)
+  );
 }
 .question {
   padding: var(--space-4);

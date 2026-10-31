@@ -198,8 +198,9 @@ function CoursePanel({
         />
       );
   }
-  // No landmark of its own: the detail inside is the region 「课程详情」 (R3b). A group named for the course, so the
-  // place focus goes after 重新加载 says what it is (review A34).
+  // No landmark of its own: the detail inside is the region 「课程详情」 (R3b). A group named as the address names the
+  // course (its code, or a short name such as ML that names several), so the place focus goes after 重新加载 says what
+  // it is (review A34).
   return (
     <div
       ref={panel}

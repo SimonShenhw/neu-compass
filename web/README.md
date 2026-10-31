@@ -233,8 +233,10 @@ npm.cmd run check
 npm.cmd run format:check
 node scripts/search-mutations.mjs
 npm.cmd run test:mutations
-npm.cmd run preview -- --port 4173 --strictPort
+npm.cmd run dev
 ```
+
+R6 起演示页只在开发服务器上（`/search-demo`），预览和任何构建里都没有。
 
 前一个变异脚本是 R3c 的 36 个具名变异，后一个保留现有 152 个回归变异；均在临时快照运行并核对工作源文件未变。完整网络瀑布、屏幕阅读器语音、真实 `/chat` / `/feedback`、方案选择、停止、分享及生产集成另行验收。本轮只有本地提交，不推送、不建 PR、不部署。
 
@@ -269,7 +271,7 @@ npm.cmd run preview -- --port 4173 --strictPort
 - **纯文本与排版：** 沿用浅色 tokens 和 CourseCode，项目标签用现有 oneLine；卡片／Co-op 值仅去 CR，LF 保留为换行，其余文本不解析 HTML 或 Markdown。本区没有链接。桌面最多四列项目、三列课程、两列示例，手机一列；长课号、课名与公司可折行。列数照说明书第 8 节的上限固定为 4／3／2（Streamlit 按项目数分列），不满一排时右边留空。加载时只有一行「正在加载推荐内容…」，发现区带 `aria-busy`，没有转动的图标或骨架，先到的块先画。
 - **固定数据：** 31 份导出、30 份 expected 原字节冻结，独立 SHA-256 测试；expected 只供测试，生产场景来源映射单独手写并与 27 个参考场景核对，不从标准答案生成页面。27 个 DOM 场景及 11 / 11 / 16 个向量之外另测坏形状、时序、焦点、取消和冷启动无请求。
 
-使用已有 Node 24 环境：`npm.cmd run check`、`npm.cmd run format:check`、`node scripts/landing-mutations.mjs`。本轮新增变异工具在临时副本验证行为与生成类型漂移，副本包含 R2b 生成器、独立依赖链接和 Prettier 配置；超时、导入失败或无具名断言不能冒充 kill。预览为 `npm.cmd run preview -- --port 4173 --strictPort`。
+使用已有 Node 24 环境：`npm.cmd run check`、`npm.cmd run format:check`、`node scripts/landing-mutations.mjs`。本轮新增变异工具在临时副本验证行为与生成类型漂移，副本包含 R2b 生成器、独立依赖链接和 Prettier 配置；超时、导入失败或无具名断言不能冒充 kill。演示页 `/search-landing-demo` 在开发服务器上看（`npm.cmd run dev`）：R6 起预览和任何构建里都没有演示页。
 
 R1 原型首页、真实请求／缓存、允许保存勾选、路由跳转、R4a 培养方案页均留给后续约定批次。浏览器控制没有完整网络瀑布接口，不能把无请求组件／空 QueryClient 测试替代为完整网络面板验收；详细证据与限制见独立记录。本轮仅本地提交，无 push、PR 或部署。
 
@@ -398,16 +400,16 @@ R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLO
 从 main `4629e5f`（#39 合并以后）开 `feat/web-alignment`，依据评审目录 `frontend_react/R6_PLAN.md`。这是 R6 的第一个 PR；Playwright 的端到端测试是第二个。10-29 用户定了：拿掉侧栏「高级筛选」的空入口，页脚补回 Streamlit 的两句；走查以后又定了三处布局（提问框固定在窗口底部、窄一些时课程页先显示课程、提问以后滚到新问题）。10-30 第 34 轮审查以后的修补在同一个 PR 的第二个提交里，下面写的是修完的样子。
 
 - **演示页只在开发服务器和测试里**：九个 `*-demo` 路由放在 `src/demoRoutes.tsx`。`vite.config.ts` 在任何构建（`build`、`build:dev-api`）里用 `resolve.alias` 把 `./demoRoutes` 换成 `src/demoRoutes.none.tsx`（两个都是 `null`），这些地址就是 404；插件 `neu-compass:no-demo-modules` 再查一遍，演示页（文件名带 `Demo`，只给落地演示用的对话也改名成了 `LandingDemoConversation.tsx`）、`features/demo/` 下的演示外壳、演示的数据、`fixtures/`、`test/`、`*TestUtils` 在哪个块里进了构建都报错，拿不到项目根也报错。项目根不分大小写，后面的路径分。`__DEMO_ROUTES__`（开发服务器和测试里是 true，构建里是 false）管演示页的标题、隐私演示的锁和不显示访客标记的那两个演示。首屏 JavaScript 从 209,919 字节降到约 186,000，构建只剩一个 JS 文件。
-- **错误边界**（`src/components/ErrorBoundary.tsx`）：页面画的时候出错，侧栏和顶栏还在，页面那块只说一句「这一页出了问题，没能显示出来。」，给「重新加载」，不显示异常原文；换一个地址就再试一次。外壳自己出错时，`main.tsx` 最外层那一层说「页面出了问题，没能显示出来。」。页面出错时提问框跟着收起（不然问题照样发出去，回答却看不到），焦点原来在跟着没了的东西上就交给 main；同一个地址上重画，还是那句话。
+- **错误边界**（`src/components/ErrorBoundary.tsx`）：页面画的时候出错，侧栏和顶栏还在，页面那块只说一句「这一页出了问题，没能显示出来。」，给「重新加载」，不显示异常原文；换一个地址就再试一次。外壳自己出错时，`main.tsx` 最外层那一层说「页面出了问题，没能显示出来。」。页面出错时提问框跟着收起（不然问题照样发出去，回答却看不到），焦点原来在跟着没了的东西上就交给 main，在留下来的东西上（侧栏的链接、「刷新页面内容」）就不动；同一个地址上重画，还是那句话。
 - **跳过链接**不再是页内链接：按下以后把焦点交给 main（`src/layout/mainContent.ts`），地址和历史记录都不变，方案链接的核对、`?program=` 的 ref 和课程页带的课程 ID 不会再丢（第 39 节「已知」）。按着 Ctrl、⌘、Shift 或 Alt 点的交给浏览器。
-- **「重新加载」「重试」以后的焦点**交给留下来的那一块，不滚动：对比页给对比表，Co-op 给经历列表，隐私页给 main，课程页给课程那一栏（以课号命名的 group）。原来按下的按钮一换成加载中，焦点就掉到 body。
+- **「重新加载」「重试」以后的焦点**交给留下来的那一块，不滚动：对比页给对比表，Co-op 给经历列表，隐私页给 main，课程页给课程那一栏（照地址里写的课号或 ML 这样的简称命名的 group）。原来按下的按钮一换成加载中，焦点就掉到 body。
 - **先修面板旧平铺行的「查看」**带上课号（`查看 CS 5800`），和规则树的按钮一样。
 - **`index.html`**：描述改成正式的一句，加了网页图标 `public/favicon.svg`。
-- **提问框固定在窗口底部**（搜索页和课程页）：窗口至少 500 像素高时，粘在底部的是查询日志那句和输入框；「允许保存」勾选框和它的说明在它下面，跟着页面走（生产开着回答反馈，原来整块粘着，手机上占掉将近半个窗口）。更矮的窗口（手机横着、页面放大）不粘。它把自己的高度写进 html 的 `--ask-bar-height`，`base.css` 在同样的窗口高度下给 main 里的元素做 `scroll-margin-bottom`：用 Tab 走到的、滚进视野的东西不会落在它下面，提问框自己的控件获得焦点时页面也不跳（原来用 html 的 `scroll-padding-bottom`，会跳）。
+- **提问框固定在窗口底部**（搜索页和课程页）：窗口至少 500 像素高时，粘在底部的是查询日志那句和输入框；「允许保存」勾选框和它的说明在它下面，跟着页面走（生产开着回答反馈，原来整块粘着，手机上占掉一半上下）；这一块是自己的地标（名为「保存回答」的 region），读屏按地标跳也找得到。更矮的窗口（手机横着；768 高的屏幕放大到 200%，1080 高的放大到 400%）不粘。它把自己的高度写进 html 的 `--ask-bar-height`，`base.css` 在同样的窗口高度下给 main 里的元素做 `scroll-margin-bottom`（再加上焦点框和 4 像素）：用 Tab 走到的、滚进视野的东西连焦点框都不会落在它下面，提问框自己的控件获得焦点时页面也不跳（原来用 html 的 `scroll-padding-bottom`，会跳）。
 - **课程页先显示课程**：1200 宽以下一栏，课程在上、对话在下；DOM 里也是课程在前，1200 宽以上用 grid 把对话放回左边。
-- **提问以后滚到新问题**：在搜索页提问、追问，最后一个问题滚到窗口顶上，回答接着在它下面出来；对话的最后一轮至少一个窗口高（减去提问框），问题才滚得到顶，最后一条回答短的时候下面空着。在课程页提问，去首页时带着 `NEWEST_QUESTION`，到了也滚，读过就从这条历史里清掉，以后后退、前进回到它不再滚。回到这一页、或者带着别的 state（比如课程 ID）打开页面时不滚。按了示例问题或「接着问」，按下的按钮跟着没了，焦点交给对话；在提问框里问的，焦点留在框里，第一个问题也一样（原来第一个问题会把焦点挪到对话）。外壳换页时的回页顶改在 layout effect 里，排在页面自己的滚动前面。
+- **提问以后滚到新问题**：在搜索页提问、追问，最后一个问题滚到窗口顶上，回答接着在它下面出来；对话的最后一轮至少一个窗口高（`100lvh` 减去提问框，第二轮起再加上问题上面的边框和内边距），问题才滚得到顶，最后一条回答短的时候下面空着。在课程页提问，去首页时带着 `NEWEST_QUESTION`，到了也滚，读过就从这条历史里清掉，以后后退、前进回到它不再滚。回到这一页、或者带着别的 state（比如课程 ID）打开页面时不滚。按了示例问题或「接着问」，按下的按钮跟着没了，焦点交给对话，不论按钮是怎么按的（Safari 的鼠标点击、读屏不移焦点地按，焦点都不在按钮上）；在提问框里问的，回车或者按「发送问题」，焦点都留在输入框里，第一个问题也一样（原来第一个问题会把焦点挪到对话）。外壳换页时的回页顶改在 layout effect 里，排在页面自己的滚动前面。
 - **「允许保存」旁边那句说明**（`GET /privacy` 的 `capture_notice`，两个前端共用）照 API 实际存的写：回答，连同提问时带的筛选、项目和方案、最近一次列出的课程（两个前端每次提问都带上最近一条列出课程的回答里的那些课）；去掉了两个前端都没有的「清空对话」。
-- **变异脚本的副本**多带 `public/favicon.svg`（`contracts.test.ts` 读它）；M17、M23 的锚点带上前后的一截，在新代码里又只出现一次。
-- **测试**：`demoRoutes.test.tsx` 把 `./demoRoutes` 换成 none，看九个地址都是 404、七个真页面都在；`apiBase.test.ts` 测构建的 alias、插件（含第二个以后的块）和 `__DEMO_ROUTES__`；`routePresentation.test.ts` 把 `__DEMO_ROUTES__` 设成 false 重新 import，看构建里的标题；`ErrorBoundary.test.tsx`、`pageFailed.test.tsx`（出错时提问框和焦点）、`main.test.tsx`、`skipLink.test.tsx`（BrowserRouter 下的地址和历史、修饰键）；四个页面的重试焦点；`SearchRoute.test.tsx`、`CourseRoute.test.tsx` 测滚到新问题、后退不再滚、课程在前、`--ask-bar-height` 的几种重新量；`AskBar.test.tsx` 测勾选框和说明在粘底那块下面。粘底、`scroll-margin-bottom`、最后一轮的高度和 1200 宽以上的两栏 jsdom 量不到，是在浏览器里量的，第二个 PR 的 Playwright 对着构建测（要开着回答反馈，加上放大和矮窗口）。
+- **变异脚本的副本**多带 `public/favicon.svg`（`contracts.test.ts` 读它）；M17 的锚点带上后面的一截，在新代码里又只出现一次；M23 和 main 上一样（落地页自己那个焦点 effect 去掉了）。
+- **测试**：`demoRoutes.test.tsx` 把 `./demoRoutes` 换成 none，看九个地址都是 404、七个真页面各自画出自己的那一块；`apiBase.test.ts` 测构建的 alias、插件（含第二个以后的块）和 `__DEMO_ROUTES__`；`routePresentation.test.ts` 把 `__DEMO_ROUTES__` 设成 false 重新 import，看构建里的标题；`ErrorBoundary.test.tsx`、`pageFailed.test.tsx`（出错时提问框和焦点，焦点在留下来的东西上时不动）、`main.test.tsx`、`skipLink.test.tsx`（BrowserRouter 下的地址和历史、修饰键）；四个页面的重试焦点；`SearchRoute.test.tsx`、`CourseRoute.test.tsx` 测滚到新问题、后退不再滚（后退一次就回到课程页）、课程在前、`--ask-bar-height` 的几种重新量、提问以后的焦点（回车、发送按钮、焦点不在按钮上时按的示例问题和追问）、整页没有地标以外的东西（axe 的 region 规则，开着和关着回答反馈）；`AskBar.test.tsx` 测勾选框和说明在粘底那块下面、在「保存回答」这个地标里，按发送按钮以后焦点在输入框。粘底、`scroll-margin-bottom`、最后一轮的高度和 1200 宽以上的两栏 jsdom 量不到，是在浏览器里量的，第二个 PR 的 Playwright 对着构建测（要开着回答反馈，加上放大和矮窗口）。
 
 修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 40 节。

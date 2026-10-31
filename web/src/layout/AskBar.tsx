@@ -22,6 +22,9 @@ export const PLACEHOLDER =
 // The custom property base.css reads for the page's scroll-margin-bottom, and the conversation's last turn for its
 // height.
 export const ASK_BAR_HEIGHT = '--ask-bar-height';
+// Out of the form, the opt-in and its notice, or the line that nothing is saved, are a landmark of their own by this
+// name, found beside 提问 (recheck 1 of round 34). Not 回答反馈: each answer's votes are a region by that name (R3c).
+export const CAPTURE_REGION = '保存回答';
 
 export function AskBar({ onSend }: { onSend: (question: string) => void }) {
   const search = useSearch();
@@ -61,17 +64,23 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
   const tooLong = length > MAX_QUESTION_CHARS;
   // One question at a time: the next waits until this answer has ended (R3c's conversation takes one).
   const canSend = length > 0 && !tooLong && !search.busy;
+  const field = useRef<HTMLTextAreaElement>(null);
   function send() {
     if (!canSend) return;
     onSend(text.trim());
     setText('');
+    // Sent with the button, which the empty box disables: a browser takes focus from it to the body, after the search
+    // page has looked where focus is. It stays in the ask box, in the question's field, as after Enter (recheck 1 of
+    // round 34).
+    if (document.activeElement !== field.current)
+      field.current?.focus({ preventScroll: true });
   }
   // The opt-in and its notice, or the sentence that no answer is kept: under the box, in the page, not held at the
-  // bottom with it. Held there, with answer feedback on, they made the box half a phone's window, and all of a zoomed
-  // one (review A34). Still under the query log's sentence, which the notice names as above.
+  // bottom with it. Held there, with answer feedback on, they made the box about half a phone's window, and all of a
+  // zoomed one (review A34). Still under the query log's sentence, which the notice names as above.
   const capture =
     search.feedback === true && notices?.capture ? (
-      <div className={styles.capture}>
+      <>
         <label className={styles.optin}>
           <input
             type="checkbox"
@@ -81,9 +90,9 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
           {CAPTURE_LABEL}
         </label>
         <p className={styles.note}>{notices.capture}</p>
-      </div>
+      </>
     ) : search.feedback === false ? (
-      <p className={`${styles.capture} ${styles.note}`}>{CAPTURE_OFF}</p>
+      <p className={styles.note}>{CAPTURE_OFF}</p>
     ) : null;
   return (
     <>
@@ -108,6 +117,7 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
             课程问题
           </label>
           <textarea
+            ref={field}
             id={`${id}-query`}
             rows={1}
             value={text}
@@ -143,7 +153,11 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
           </p>
         )}
       </form>
-      {capture}
+      {capture && (
+        <section className={styles.capture} aria-label={CAPTURE_REGION}>
+          {capture}
+        </section>
+      )}
     </>
   );
 }

@@ -15,6 +15,7 @@ import {
   AskBar,
   CAPTURE_LABEL,
   CAPTURE_OFF,
+  CAPTURE_REGION,
   PLACEHOLDER,
   QUERY_LOG_FALLBACK,
 } from './AskBar';
@@ -122,7 +123,8 @@ it('asks nothing before it is known who is looking (R2b: back from Google, only 
 });
 
 // What is held at the bottom of the window is the form: the query log's sentence and the question. The opt-in and its
-// notice are under it, in the page; held with it, they made it half a phone's window (review A34).
+// notice are under it, in the page; held with it, they made it about half a phone's window (review A34). Out of the
+// form, they are a landmark of their own, so a screen reader going by landmarks finds them beside 提问 (recheck 1).
 function underTheBox(element: HTMLElement) {
   const form = screen.getByRole('form', { name: '提问' });
   expect(form).toContainElement(screen.getByText(NOTICE, { exact: false }));
@@ -130,6 +132,9 @@ function underTheBox(element: HTMLElement) {
   expect(
     form.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+  expect(screen.getByRole('region', { name: CAPTURE_REGION })).toContainElement(
+    element,
+  );
 }
 
 it('with answer feedback on: the opt-in and the API’s notice', async () => {
@@ -190,6 +195,33 @@ it('Enter sends trimmed input and clears the field', async () => {
   expect(input).toHaveValue('');
   expect(button).toBeDisabled();
 });
+
+// The button is disabled once the box is empty, and a browser takes focus from it to the body, after the search page
+// has looked where focus is; focus goes back to the question's field, as after Enter (recheck 1 of round 34).
+it.each([
+  [
+    'clicked',
+    (user: ReturnType<typeof userEvent.setup>, button: HTMLElement) =>
+      user.click(button),
+  ],
+  [
+    'pressed with the keyboard',
+    async (user: ReturnType<typeof userEvent.setup>, button: HTMLElement) => {
+      button.focus();
+      await user.keyboard('{Enter}');
+    },
+  ],
+])(
+  'a question sent with the button %s leaves focus in the question’s field',
+  async (_, press) => {
+    const { user, send, input, button } = setup();
+    await user.type(input, 'CS 5800');
+    await press(user, button);
+    expect(send).toHaveBeenCalledExactlyOnceWith('CS 5800');
+    expect(button).toBeDisabled();
+    expect(input).toHaveFocus();
+  },
+);
 
 it('Shift+Enter inserts a newline without sending', async () => {
   const { user, send, input } = setup();

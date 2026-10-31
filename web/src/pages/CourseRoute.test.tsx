@@ -534,6 +534,29 @@ it('Back to the search page a course-page question opened does not bring the new
   expect(into).not.toHaveBeenCalled();
 });
 
+// The mark is read once by replacing the entry it came with: an entry added instead held Back on the search page, as
+// each Back to the marked one added another (recheck 1 of round 34).
+it('after a question asked on a course page, one Back goes to that course page, and Forward scrolls nowhere', async () => {
+  world();
+  page('/course/CS-6140');
+  await heading('Machine Learning');
+  await userEvent.type(
+    screen.getByRole('textbox', { name: '课程问题' }),
+    'CS 6140 讲什么？{Enter}',
+  );
+  await waitFor(() => expect(where()).toBe('/'));
+  await screen.findByRole('group', { name: '接着问' });
+  expect(stateOf()).toBeNull();
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  await waitFor(() => expect(where()).toBe('/course/CS-6140'));
+  await heading('Machine Learning');
+  await userEvent.click(screen.getByRole('button', { name: 'forward' }));
+  await waitFor(() => expect(where()).toBe('/'));
+  await screen.findByRole('region', { name: '第 1 轮问答' });
+  expect(into).not.toHaveBeenCalled();
+});
+
 // On a laptop's width the course showed under the whole conversation, or under the landing (R6, the user's choice of
 // 10-29): it is first in the page now, and only two columns put the conversation back on the left.
 it('a course page has the course before the conversation in the page', async () => {

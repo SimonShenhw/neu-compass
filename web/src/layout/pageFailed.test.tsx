@@ -1,14 +1,16 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { PAGE_FAILED } from '../components/ErrorBoundary';
 import type * as SearchRouteModule from '../pages/SearchRoute';
 import { fakeApi, json, livePage } from '../test/fakeApi';
 
 // The search page fails while it draws as long as `failing` says so; the comparison page fails once its button is
-// pressed. What the shell around them does (review A34).
+// pressed, or once `breakIt` is called from outside it, as data coming back after a refresh would make it fail. What
+// the shell around them does (review A34).
 let failing = false;
+let breakIt: (() => void) | undefined;
 vi.mock('../pages/SearchRoute', async (importOriginal) => {
   const original = await importOriginal<typeof SearchRouteModule>();
   return {
@@ -21,6 +23,12 @@ vi.mock('../pages/SearchRoute', async (importOriginal) => {
 });
 function Breaks() {
   const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    breakIt = () => setBroken(true);
+    return () => {
+      breakIt = undefined;
+    };
+  }, []);
   if (broken) throw new Error('boom');
   return (
     <button type="button" onClick={() => setBroken(true)}>
@@ -69,3 +77,34 @@ it('when a page fails on a button pressed in it, focus goes to main, without scr
     { preventScroll: true },
   ]);
 });
+
+// Focus on what stays, as on the sidebar's 刷新页面内容 whose data made the page fail, stays there: only focus that went
+// with the page goes to main (the focus rule of 10-25; recheck 1 of round 34).
+it.each([
+  [
+    'a link in the sidebar',
+    () =>
+      within(
+        screen.getAllByRole('navigation', { name: '主导航' })[0]!,
+      ).getByRole('link', { name: /培养方案/ }),
+  ],
+  [
+    '刷新页面内容',
+    () => screen.getAllByRole('button', { name: '刷新页面内容' })[0]!,
+  ],
+])(
+  'when a page fails while focus is on %s, which stays, focus stays there',
+  async (_, target) => {
+    livePage('/compare');
+    await screen.findByRole('button', { name: 'break it' });
+    const element = target();
+    element.focus();
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    act(() => breakIt!());
+    expect(await screen.findByRole('alert')).toHaveTextContent(PAGE_FAILED);
+    // The shell's effect for the failed page has run once nothing more is pending.
+    await act(async () => {});
+    expect(element).toHaveFocus();
+    expect(focus.mock.contexts).not.toContain(screen.getByRole('main'));
+  },
+);
