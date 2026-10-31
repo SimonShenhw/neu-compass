@@ -330,7 +330,8 @@ cases.push(
     'clearing comparison focuses its remaining keyboard action',
   ],
   // R3e: the search page on the live API puts focus on the conversation when a sample question's button goes with the
-  // landing (since review A34 by the one rule for focus left on nothing, a follow-up's too).
+  // landing (since R6 by the one rule after a question: a sample question's or a follow-up's button, or focus left on
+  // nothing).
   [
     'M23',
     'example answer focus',

@@ -165,6 +165,8 @@ it('says nothing of saving while /config has not answered', async () => {
   expect(await screen.findByText(NOTICE, { exact: false })).toBeVisible();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   expect(screen.queryByText(CAPTURE_OFF)).not.toBeInTheDocument();
+  // Nor an empty landmark for it (recheck 2 of round 34).
+  expect(screen.queryByRole('region', { name: CAPTURE_REGION })).toBeNull();
 });
 
 it('offers no opt-in the API gave no notice for', async () => {
@@ -175,6 +177,7 @@ it('offers no opt-in the API gave no notice for', async () => {
   await waitFor(() =>
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument(),
   );
+  expect(screen.queryByRole('region', { name: CAPTURE_REGION })).toBeNull();
 });
 
 it('disables sending empty or whitespace text', async () => {

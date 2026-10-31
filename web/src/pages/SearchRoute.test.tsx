@@ -982,9 +982,9 @@ it('after a follow-up pressed with the keyboard, focus is on the conversation', 
   ]);
 });
 
-// Focus in the ask box stays there, for the first question, which takes the landing away, as for those after it: only
-// focus left on nothing goes to the conversation (the focus rule of 10-25). Sent with the button too, which the empty
-// box disables (recheck 1 of round 34).
+// Focus in the ask box stays there, for the first question, which takes the landing away, as for those after it: the
+// conversation takes it only from a sample question's or a follow-up's button, which goes, and when it was left on
+// nothing (the focus rule of 10-25). Sent with the button too, which the empty box disables (recheck 1 of round 34).
 it.each([
   ['Enter', ask],
   ['the send button', askWithButton],
@@ -1041,9 +1041,10 @@ it('a sample question or a follow-up pressed without focus on it still gives foc
 });
 
 // Out of the form, the opt-in and its notice, or the line that nothing is saved, are a landmark of their own, so
-// nothing on the search page is outside one (recheck 1 of round 34). axe's region rule is given the body itself:
-// given the html element, which is not in the body, vitest-axe copies the page into the body and leaves the copy
-// behind for the next test.
+// nothing on the search page is outside one (recheck 1 of round 34). axe's region rule is given the body itself. Given
+// a container, as RTL's, the rule does not apply (its selector is `body *`, and there is no body under the container),
+// so the test would pass whatever is outside a landmark (recheck 2). Given the html element, which is not in the body,
+// vitest-axe copies the page into the body and leaves the copy behind for the next test.
 it.each([
   ['on', true],
   ['off', false],

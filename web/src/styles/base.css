@@ -11,13 +11,18 @@
    height while it is on the page, and is held from the same window height; R6). A margin on what the page shows, not
    a padding on the window: the box's own controls are in view where they are, and with the padding the page jumped
    down whenever one of them took focus (review A34). With the focus ring outside the element, and a little more for
-   the height measured in whole pixels, the ring is clear of the box too (recheck 1 of round 34). */
+   the height measured in whole pixels, the ring is clear of the box too (recheck 1 of round 34). With no box on the
+   page the height is not set, so neither is the clearance, and the margin is its fallback, 0. A unitless 0 in the
+   calc itself made the whole declaration invalid, which came to 0 only by chance (recheck 2). */
 @media (min-height: 500px) {
-  #main-content * {
-    scroll-margin-bottom: calc(
-      var(--ask-bar-height, var(--space-0)) + var(--focus-width) +
-        var(--focus-offset) + var(--space-1)
+  #main-content {
+    --ask-bar-clearance: calc(
+      var(--ask-bar-height) + var(--focus-width) + var(--focus-offset) +
+        var(--space-1)
     );
+  }
+  #main-content * {
+    scroll-margin-bottom: var(--ask-bar-clearance, var(--space-0));
   }
 }
 body {

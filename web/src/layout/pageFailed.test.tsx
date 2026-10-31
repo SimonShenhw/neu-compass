@@ -100,10 +100,9 @@ it.each([
     const element = target();
     element.focus();
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    // The act runs the catch, and after it the shell's effect for the failed page: nothing more to wait for.
     act(() => breakIt!());
     expect(await screen.findByRole('alert')).toHaveTextContent(PAGE_FAILED);
-    // The shell's effect for the failed page has run once nothing more is pending.
-    await act(async () => {});
     expect(element).toHaveFocus();
     expect(focus.mock.contexts).not.toContain(screen.getByRole('main'));
   },
