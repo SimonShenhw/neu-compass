@@ -23,7 +23,8 @@ if (
   'neu-compass-web'
 )
   throw Error('Run from web/');
-// Everything the tests read besides src/; the baseline runs R2b's tests too, which read the last three.
+// Everything the tests read besides src/; the baseline runs R2b's tests too, which read the page, the API document and
+// the generator's pins, and R6's, which read the page's icon.
 const config = [
   'package.json',
   'package-lock.json',
@@ -31,6 +32,7 @@ const config = [
   'vite.config.ts',
   'eslint.config.js',
   'index.html',
+  'public/favicon.svg',
   'openapi.json',
   'tools/openapi-types/package.json',
 ];

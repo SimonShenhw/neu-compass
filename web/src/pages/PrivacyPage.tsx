@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PrivacyPageProps } from '../api/privacy';
 import { AccountDeletion } from '../components/AccountDeletion';
 import { Button } from '../components/Button';
+import { focusMainContent } from '../layout/mainContent';
 import { deletionNotice, privacyContent } from '../models/privacy';
 import styles from './PrivacyPage.module.css';
 
@@ -24,7 +25,16 @@ export function PrivacyPage({
     return (
       <section className={styles.failure} aria-label="隐私说明加载失败">
         <p>隐私说明暂时加载不了，请稍后重试。</p>
-        <Button onClick={() => onRetry()}>重试</Button>
+        <Button
+          onClick={() => {
+            // The whole page loads again, so nothing of it stays: focus goes to the main content, without scrolling
+            // (R6).
+            focusMainContent({ preventScroll: true });
+            onRetry();
+          }}
+        >
+          重试
+        </Button>
       </section>
     );
   return (

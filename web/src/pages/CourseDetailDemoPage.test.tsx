@@ -101,7 +101,13 @@ it('detail demo open callback announces through an injected relation without cha
     },
   });
   page('/course-detail-demo?case=ds-5220-conflicts');
-  await userEvent.setup().click(screen.getByRole('button', { name: '查看' }));
+  await userEvent
+    .setup()
+    .click(
+      screen
+        .getAllByRole('button', { name: '查看 CS 5800' })
+        .find((button) => button.dataset.part === 'legacy')!,
+    );
   expect(
     screen.getByRole('status', { name: '课程详情演示结果' }),
   ).toHaveTextContent('演示：这里会打开 CS 5800');

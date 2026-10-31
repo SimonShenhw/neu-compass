@@ -15,7 +15,7 @@ import { WithApi } from '../test/withApi';
 import { createQueryClient } from '../api/queries';
 import type { ChatSource } from '../api/chat';
 import { useLandingDemo } from '../features/search-landing/useLandingDemo';
-import { LandingConversation } from '../features/search-landing/LandingConversation';
+import { LandingDemoConversation } from '../features/search-landing/LandingDemoConversation';
 import {
   landingSources,
   landingOptions,
@@ -244,7 +244,7 @@ it('a refused first turn and a source error never bring landing content back or 
     });
   };
   render(
-    <LandingConversation
+    <LandingDemoConversation
       {...settledLanding(landingSources('guest'))}
       onReset={vi.fn()}
       onOpenProgram={vi.fn()}

@@ -87,6 +87,20 @@ def test_the_notice_has_no_streamlit_layout_words(client):
     assert "左侧" not in notice and "🔒" not in notice and notice.endswith("秘密。")
 
 
+@pytest.mark.parametrize("days", [90, 0])
+def test_the_consent_notice_says_what_is_kept_with_the_answer_and_names_no_control_that_is_not_there(days):
+    # R6: chat's _store_completed_answer keeps the question's filters, program and plan, and context_course_ids (the
+    # courses of the latest answer that listed any, sent with every question, review A34) with the answer; neither
+    # front end has a 清空对话. 中文：和回答一起存的是筛选、项目和方案、最近一次列出的课程；两个前端都没有「清空对话」。
+    from api.privacy_text import capture_notice
+
+    notice = capture_notice(days)
+    assert "连同提问时带的条件（筛选、项目和方案、最近一次列出的课程）" in notice
+    assert "接着问" not in notice
+    assert "清空对话" not in notice and "筛选条件会" not in notice
+    assert notice.endswith("取消勾选或登出都不会删除已经保存的数据。")
+
+
 def test_streamlit_shows_the_same_words():
     from api import privacy_text
     from app import answer_feedback_view, privacy_view

@@ -1,6 +1,10 @@
-import type { ConfigEnv, UserConfig } from 'vite';
+import type { ConfigEnv, Plugin, UserConfig } from 'vite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import config from '../../vite.config';
+import config, {
+  NO_DEMO_ROUTES,
+  demoOrTestModule,
+  noDemoModules,
+} from '../../vite.config';
 import {
   DEV_API_MODE,
   LOCAL_API,
@@ -101,10 +105,12 @@ describe('which API a bundle talks to', () => {
     expect(bundled('build', 'production')).toEqual({
       __API_BASE_URL__: JSON.stringify(PRODUCTION_API),
       __PUBLIC_BASE_URL__: JSON.stringify(PRODUCTION_SITE),
+      __DEMO_ROUTES__: 'false',
     });
     expect(bundled('build', DEV_API_MODE)).toEqual({
       __API_BASE_URL__: JSON.stringify(LOCAL_API),
       __PUBLIC_BASE_URL__: JSON.stringify('http://127.0.0.1:4173'),
+      __DEMO_ROUTES__: 'false',
     });
     expect(() => bundled('build', 'staging')).toThrow(
       /needs VITE_API_BASE_URL/,
@@ -113,10 +119,12 @@ describe('which API a bundle talks to', () => {
     expect(bundled('serve', 'development')).toEqual({
       __API_BASE_URL__: JSON.stringify(other),
       __PUBLIC_BASE_URL__: JSON.stringify('http://127.0.0.1:5173'),
+      __DEMO_ROUTES__: 'true',
     });
     expect(bundled('serve', 'test')).toEqual({
       __API_BASE_URL__: JSON.stringify(LOCAL_API),
       __PUBLIC_BASE_URL__: JSON.stringify('http://127.0.0.1:5173'),
+      __DEMO_ROUTES__: 'true',
     });
   });
 
@@ -179,5 +187,129 @@ describe('the site a shared link names (R3e)', () => {
     expect(devPort('65535')).toBe(65535);
     for (const value of ['80', '1023', '65536', '5300x', '-1', '5e3'])
       expect(() => devPort(value), value).toThrow('VITE_DEV_PORT');
+  });
+});
+
+describe('the demo pages: on the dev server and in the tests, in no build (R6)', () => {
+  const configure = config as (env: ConfigEnv) => UserConfig;
+  const at = (command: ConfigEnv['command'], mode: string) =>
+    configure({ command, mode, isSsrBuild: false, isPreview: false });
+  const names = (settings: UserConfig) =>
+    (settings.plugins ?? []).flat().map((plugin) => (plugin as Plugin).name);
+
+  it('every build swaps App’s demo routes for none, and checks what it carries', () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.beta.example.test');
+    for (const mode of ['production', DEV_API_MODE, 'beta']) {
+      const built = at('build', mode);
+      expect(built.resolve, mode).toEqual({
+        alias: [{ find: /^\.\/demoRoutes$/, replacement: NO_DEMO_ROUTES }],
+      });
+      expect(names(built), mode).toContain('neu-compass:no-demo-modules');
+    }
+    expect(NO_DEMO_ROUTES).toBe('/src/demoRoutes.none.tsx');
+    for (const mode of ['development', 'test']) {
+      const served = at('serve', mode);
+      expect(served.resolve, mode).toEqual({});
+      expect(names(served), mode).not.toContain('neu-compass:no-demo-modules');
+    }
+  });
+
+  type Hook = (
+    this: { error(message: string): never },
+    ...args: unknown[]
+  ) => void;
+  const context = {
+    error(message: string): never {
+      throw new Error(message);
+    },
+  };
+  // A build of the project at root whose chunks hold these modules, through the plugin's own hooks: the first its
+  // entry, the others what it loads later.
+  function chunks(root: string | null, ...modules: string[][]) {
+    const plugin = noDemoModules();
+    if (root !== null) (plugin.configResolved as Hook).call(context, { root });
+    (plugin.generateBundle as Hook).call(
+      context,
+      {},
+      Object.fromEntries([
+        ...modules.map((moduleIds, index) => [
+          index === 0 ? 'assets/index.js' : `assets/chunk-${index}.js`,
+          { type: 'chunk', moduleIds },
+        ]),
+        ['assets/index.css', { type: 'asset' }],
+      ]),
+    );
+  }
+  // One chunk holding these modules.
+  const build = (root: string | null, ...moduleIds: string[]) =>
+    chunks(root, moduleIds);
+
+  it('a build stops when a demo page or shell, a demo’s data, a fixture or a test helper reaches it by any import', () => {
+    // As Vite gives them: the root with / and module IDs with /; and on Windows, IDs with \ and another drive case.
+    const root = 'H:/neu-compass/web';
+    const src = (path: string) => `${root}/src/${path}`;
+    const windows = (path: string) =>
+      `h:\\neu-compass\\web\\src\\${path.replaceAll('/', '\\')}`;
+    const main = src('main.tsx');
+    for (const found of [
+      src('pages/CompareDemoPage.tsx'),
+      windows('pages/SearchLandingDemoPage.tsx'),
+      src('pages/CompareDemoPage.module.css?used'),
+      src('features/demo/OfflineDemoShell.tsx'),
+      // Whatever else the demo shell's folder holds, and the landing demo's conversation (reviews A34, B34).
+      src('features/demo/sample.ts'),
+      src('features/search-landing/LandingDemoConversation.tsx'),
+      src('features/programs/useProgramDemoLoad.ts'),
+      src('demoRoutes.tsx'),
+      src('fixtures/compareDemo.ts'),
+      windows('fixtures/programs/curriculum-cs-ms.json'),
+      src('pages/searchRouteTestUtils.tsx'),
+      src('test/withApi.tsx'),
+    ])
+      expect(() => build(root, main, found), found).toThrow(
+        `A build carries demo or test modules: ${found}`,
+      );
+    // The same project's root, given with a trailing /.
+    expect(() => build(`${root}/`, main, src('demoRoutes.tsx'))).toThrow(
+      `A build carries demo or test modules: ${src('demoRoutes.tsx')}`,
+    );
+    expect(() =>
+      build(
+        `${root}/`,
+        main,
+        src('demoRoutes.none.tsx'),
+        src('pages/CompareRoute.tsx'),
+        windows('models/compareList.ts'),
+        src('features/programs/ProgramCurriculum.tsx'),
+        // Another package's own src/ is not this project's.
+        `${root}/node_modules/some-lib/src/fixtures/data.js`,
+        `${root}/node_modules/x/src/test/a.js`,
+      ),
+    ).not.toThrow();
+    expect(demoOrTestModule('/work/web/src/test/a.ts', '/work/web')).toBe(true);
+    expect(demoOrTestModule('/work/web/src/test/a.ts', '/work/other')).toBe(
+      false,
+    );
+  });
+
+  // A real build has more than one chunk; one that loads a demo page later (a lazy route) carries it in the second
+  // (review B34).
+  it('a demo page in any chunk stops the build, not only in the first', () => {
+    const root = 'H:/neu-compass/web';
+    const demo = `${root}/src/pages/CoopDemoPage.tsx`;
+    expect(() =>
+      chunks(
+        root,
+        [`${root}/src/main.tsx`],
+        [`${root}/src/pages/CompareRoute.tsx`],
+        [demo],
+      ),
+    ).toThrow(`A build carries demo or test modules: ${demo}`);
+  });
+
+  it('a build whose project root never came stops instead of checking nothing', () => {
+    expect(() => build(null, '/work/web/src/main.tsx')).toThrow(
+      'The project root is not known',
+    );
   });
 });

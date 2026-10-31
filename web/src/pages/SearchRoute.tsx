@@ -16,7 +16,8 @@ import { Select } from '../components/Select';
 import { SearchConversation } from '../features/search-answer/SearchConversation';
 import { SearchLanding } from '../features/search-landing/SearchLanding';
 import { useAccount, viewerScope } from '../layout/account';
-import { useSearch } from '../layout/SearchContext';
+import { focusLost } from '../layout/mainContent';
+import { showsNewestQuestion, useSearch } from '../layout/SearchContext';
 import { oneLine } from '../models/courseDetailFormat';
 import { coursePath } from '../models/coursePath';
 import { FEATURED_PROGRAM_IDS, showLanding } from '../models/landing';
@@ -159,15 +160,42 @@ function SearchColumn() {
     ...coopListQuery(scope ?? 'pending'),
     enabled: landing && scope !== null,
   });
-  // From the landing into the conversation, the button pressed is gone with the landing: focus goes to the
-  // conversation, without scrolling (R3d spec 3; the focus rule of 10-25).
+  // A question just asked comes into view, with its answer to be read below it: one asked here (the ask box, a sample
+  // question, a follow-up), and one asked from a course page, which opens the search page with NEWEST_QUESTION. Not
+  // when the page only shows the conversation again (R6, the user's choice of 10-29). The shell's own scroll to the top
+  // runs first. A sample question's button goes with the landing, and a follow-up's with the turn it was under, so the
+  // conversation, which stays, takes focus from them, without scrolling (R3d spec 3, review A34): however the button
+  // was pressed, also where a click leaves focus where it was, as Safari's does, or a screen reader presses it without
+  // focus (recheck 1 of round 34). So does focus left on nothing. Focus elsewhere, as in the ask box, stays there, for
+  // the first question as for those after it (the focus rule of 10-25).
   const region = useRef<HTMLDivElement>(null);
-  const wasLanding = useRef(landing);
+  const location = useLocation();
+  const seen = useRef(search.turns.length);
+  const arrived = useRef(showsNewestQuestion(location.state));
+  const handOver = useRef(false);
+  const askFromButton = (question: string) => {
+    handOver.current = true;
+    search.ask(question);
+  };
   useEffect(() => {
-    if (wasLanding.current && !landing)
-      region.current?.focus({ preventScroll: true });
-    wasLanding.current = landing;
-  }, [landing]);
+    const asked = search.turns.length > seen.current || arrived.current;
+    seen.current = search.turns.length;
+    arrived.current = false;
+    const pressed = handOver.current;
+    handOver.current = false;
+    if (!asked || landing) return;
+    if (pressed || focusLost()) region.current?.focus({ preventScroll: true });
+    const questions = region.current?.querySelectorAll<HTMLElement>(
+      '[data-kind="question"]',
+    );
+    questions?.[questions.length - 1]?.scrollIntoView({ block: 'start' });
+  }, [search.turns.length, landing]);
+  // NEWEST_QUESTION is read once: Back or Forward to this entry later shows the conversation again, as coming back to
+  // the page does, without bringing the newest question into view a second time (reviews A34, B34).
+  useEffect(() => {
+    if (showsNewestQuestion(location.state))
+      void navigate(location, { replace: true, state: null });
+  }, [location, navigate]);
 
   if (landing) {
     const loads = Object.fromEntries(
@@ -194,7 +222,7 @@ function SearchColumn() {
           openCourse(courseId, codeOf(courseId) ?? courseId)
         }
         onOpenCoop={() => void navigate('/coop')}
-        onAsk={search.ask}
+        onAsk={askFromButton}
         onRetry={() => {
           if (programs.isError) void programs.refetch();
           for (const query of curricula)
@@ -227,7 +255,7 @@ function SearchColumn() {
         onViewCourse={(courseId) =>
           openCourse(courseId, codeOf(courseId) ?? courseId)
         }
-        onFollowUp={search.ask}
+        onFollowUp={askFromButton}
         onFeedback={sendFeedback}
       />
     </div>
@@ -252,11 +280,13 @@ export function SearchWorkspace({ detail }: { detail?: ReactNode }) {
       <div
         className={`${styles.columns} ${detail ? styles.detailOpen : styles.single}`}
       >
+        {/* The course first, to the eye and to a screen reader: under 1200 wide it shows above the conversation, and
+            wider the grid puts the conversation back on the left (R6, the user's choice of 10-29). */}
+        {detail}
         <section className={styles.chat} aria-label="课程问答">
           <ProgramChoice />
           <SearchColumn />
         </section>
-        {detail}
       </div>
     </>
   );

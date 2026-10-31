@@ -67,7 +67,11 @@ it('demo resets selections and navigation status on case changes; both navigatio
   expect(
     screen.getByRole('status', { name: '课程导航演示结果' }),
   ).toHaveTextContent('演示：这里会打开 DS 5220');
-  await user.click(screen.getAllByRole('button', { name: '查看' })[0]!);
+  await user.click(
+    screen
+      .getAllByRole('button', { name: /^查看 / })
+      .find((button) => button.dataset.part === 'legacy')!,
+  );
   expect(
     screen.getByRole('status', { name: '课程导航演示结果' }),
   ).toHaveTextContent('演示：这里会打开 CS 5100');

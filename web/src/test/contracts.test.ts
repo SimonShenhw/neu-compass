@@ -76,6 +76,20 @@ it('the page sends other sites its origin only, wherever it is served from (R0 1
   );
 });
 
+it('the page describes itself to students, not as a prototype, and has an icon (R6)', () => {
+  const html = readFileSync(resolve(root, 'index.html'), 'utf8');
+  expect(html).toMatch(
+    /<meta\s+name="description"\s+content="NEU-Compass 选课助手：/,
+  );
+  expect(html).not.toMatch(/原型|prototype|本地设计/i);
+  expect(html).toContain(
+    '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />',
+  );
+  expect(readFileSync(resolve(root, 'public/favicon.svg'), 'utf8')).toMatch(
+    /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 32 32">/,
+  );
+});
+
 it('first-party TypeScript has no any types and only the API client makes requests', () => {
   for (const path of files(resolve(root, 'src')).filter((path) =>
     /\.tsx?$/.test(path),

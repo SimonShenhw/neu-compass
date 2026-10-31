@@ -33,10 +33,17 @@ def capture_notice(days):
     keep = (f'保存的回答和评价 {days} 天后删除，每日备份里最多再留大约两周，已经导出的文件不会自动删除；'
             '7 天只是投票凭证的有效期；' if days else
             '7 天只是投票凭证的有效期，数据、备份和导出不会自动删除；')
+    # What is kept with the answer is what api/routes/chat.py's _store_completed_answer keeps: the filters, the program
+    # and plan, and context_course_ids, as the question carried them. Both front ends send those with every question:
+    # the courses of the latest answer that listed any, whether or not the question follows up on them (review A34).
+    # Neither front end has a 清空对话 (R6).
+    # 中文：和回答一起保存的，就是 _store_completed_answer 存的那些：筛选、项目和方案、context_course_ids，提问带了什么
+    # 就存什么。两个前端每次提问都带上它：最近一条列出课程的回答里的那些课，不管这一问是不是接着问（A34 审查）。两个
+    # 前端都没有「清空对话」（R6）。
     return ('勾不勾选都不影响上面的查询日志。'
-            '勾选后，如果服务可用，本次会话之后正常完成的回答和筛选条件会不公开地保存下来，'
+            '勾选后，如果服务可用，本次会话之后正常完成的回答会不公开地保存下来，连同提问时带的条件（筛选、项目和方案、最近一次列出的课程），'
             '即使你不点击 👍／👎 也会保存；对话历史只多记轮数，不多存完整历史文本。'
-            + keep + '取消勾选、清空对话或登出都不会删除已经保存的数据。')
+            + keep + '取消勾选或登出都不会删除已经保存的数据。')
 
 
 def privacy_sections(settings: Any, *, web: bool = False) -> list[tuple[str, list[str]]]:

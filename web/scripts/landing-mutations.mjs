@@ -28,6 +28,7 @@ const config = [
   'eslint.config.js',
   '.prettierrc',
   'index.html',
+  'public/favicon.svg',
   'openapi.json',
   'tools/openapi-types/package.json',
   'tools/openapi-types/package-lock.json',
@@ -277,7 +278,7 @@ add(
 );
 add(
   'conversation receives focus',
-  'src/features/search-landing/LandingConversation.tsx',
+  'src/features/search-landing/LandingDemoConversation.tsx',
   'if (hasConversation) region.current?.focus({ preventScroll: true });',
   'if (false) region.current?.focus({ preventScroll: true });',
   demo,

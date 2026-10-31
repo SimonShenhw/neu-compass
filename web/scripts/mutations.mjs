@@ -48,7 +48,8 @@ process.on('exit', () => {
     console.error(`Copies kept, a link is still there: ${taskTemp}`);
   else rmSync(taskTemp, { recursive: true, force: true });
 });
-// Everything the tests read besides src/ (R2b: the page, the API document and the generator's pins).
+// Everything the tests read besides src/ (R2b: the page, the API document and the generator's pins; R6: the page's
+// icon).
 const configFiles = [
   'package.json',
   'package-lock.json',
@@ -56,6 +57,7 @@ const configFiles = [
   'vite.config.ts',
   'eslint.config.js',
   'index.html',
+  'public/favicon.svg',
   'openapi.json',
   'tools/openapi-types/package.json',
 ];
@@ -265,12 +267,14 @@ const cases = [
     'src/models/compareList.test.tsx',
     'store preserves ID order',
   ],
+  // R6: the shell focuses its main through focusMainContent (layout/mainContent.ts), on a new page before it scrolls
+  // to the top (a failed page focuses it too, review A34).
   [
     'M17',
     'focus without scroll jump',
     'src/layout/AppShell.tsx',
-    '.focus({ preventScroll: true })',
-    '.focus()',
+    'focusMainContent({ preventScroll: true });\n    window.scrollTo',
+    'focusMainContent();\n    window.scrollTo',
     'src/pages/pages.test.tsx',
     'route focus does not scroll',
   ],
@@ -325,7 +329,9 @@ cases.push(
     'src/pages/pages.test.tsx',
     'clearing comparison focuses its remaining keyboard action',
   ],
-  // R3e: the search page on the live API puts focus on the conversation when the first question leaves the landing.
+  // R3e: the search page on the live API puts focus on the conversation when a sample question's button goes with the
+  // landing (since R6 by the one rule after a question: a sample question's or a follow-up's button, or focus left on
+  // nothing).
   [
     'M23',
     'example answer focus',

@@ -31,6 +31,11 @@ async function programDisclosure() {
     .setup()
     .click(screen.getByText('同一年份培养方案里的相关要求'));
 }
+// The legacy rows' 查看 buttons: named for their courses, as the rule tree's are (R6).
+const legacyButtons = () =>
+  screen
+    .getAllByRole('button', { name: /^查看 / })
+    .filter((button) => button.dataset.part === 'legacy');
 it('multiple years start empty; a single year starts selected but clearing survives rerenders', async () => {
   const input = props();
   const { rerender } = render(<CourseRequisites {...input} />);
@@ -164,7 +169,7 @@ it('legacy labels remain only for genuinely absent structured records, including
   const input = props('cs-6140-requisites-table-missing');
   const { rerender } = render(<CourseRequisites {...input} />);
   expect(screen.getByText('建议先修')).toBeVisible();
-  expect(screen.getAllByRole('button', { name: '查看' })).toHaveLength(2);
+  expect(legacyButtons()).toHaveLength(2);
   const data = listing('cs-6140-requisites-table-missing');
   data.unusable_records = 1;
   rerender(<CourseRequisites {...input} requisites={data} />);
@@ -208,8 +213,12 @@ it('unknown legacy labels stay literal; missing course has no View; each callbac
   expect(screen.getByText('可同修')).toBeVisible();
   expect(container.querySelectorAll('[data-row-id]')).toHaveLength(2);
   const user = userEvent.setup();
-  for (const button of screen.getAllByRole('button', { name: '查看' }))
-    await user.click(button);
+  // Each says which course it opens, not only 「查看」: a row without a code has none.
+  expect(legacyButtons()).toEqual([
+    screen.getByRole('button', { name: '查看 CS 1' }),
+    screen.getByRole('button', { name: '查看 CS 2' }),
+  ]);
+  for (const button of legacyButtons()) await user.click(button);
   expect(input.onOpenCourse).toHaveBeenNthCalledWith(1, 'CS 1');
   expect(input.onOpenCourse).toHaveBeenNthCalledWith(2, 'CS 2');
   rerender(
@@ -218,6 +227,25 @@ it('unknown legacy labels stay literal; missing course has no View; each callbac
   expect(container.querySelectorAll('[data-row-label]')).toHaveLength(0);
   expect(screen.getByText('Name without code')).toBeVisible();
   expect(screen.getByText('CS 1')).toBeVisible();
+});
+it('a legacy row’s 查看 says a code with a line break on one line, and opens the code as it came (R6)', async () => {
+  const input = props();
+  const rows = [
+    {
+      course_id: 'broken',
+      primary_code: 'CS\n5800',
+      primary_name: null,
+      requirement: 'other',
+    },
+  ];
+  render(
+    <CourseRequisites {...input} requisites={undefined} prerequisites={rows} />,
+  );
+  expect(legacyButtons()).toEqual([
+    screen.getByRole('button', { name: '查看 CS 5800' }),
+  ]);
+  await userEvent.setup().click(legacyButtons()[0]!);
+  expect(input.onOpenCourse).toHaveBeenCalledWith('CS\n5800');
 });
 it.each([
   [],
@@ -338,9 +366,14 @@ it('keyboard reaches selects disclosures rule leaves and legacy View', async () 
   await user.tab();
   expect(screen.getByRole('combobox')).toHaveFocus();
   await user.keyboard('{Enter}{ArrowDown}{Enter}');
-  expect(screen.getByRole('button', { name: '查看 CS 5800' })).toBeVisible();
+  // The rule tree's leaf; the legacy row for the same course has the same name, as it opens the same page (R6).
+  const leaf = () =>
+    screen
+      .getAllByRole('button', { name: '查看 CS 5800' })
+      .find((button) => button.dataset.part !== 'legacy')!;
+  expect(leaf()).toBeVisible();
   await user.tab();
-  expect(screen.getByRole('button', { name: '查看 CS 5800' })).toHaveFocus();
+  expect(leaf()).toHaveFocus();
   await user.keyboard('{Enter}');
   expect(input.onOpenCourse).toHaveBeenLastCalledWith('CS 5800');
   let disclosure = false;

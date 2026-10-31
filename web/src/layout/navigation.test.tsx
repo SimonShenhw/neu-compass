@@ -24,6 +24,20 @@ it.each([
   ).toHaveAttribute('aria-current', 'page');
   expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
 });
+it('the footer says what Streamlit’s does, and no filters wait to be built (R6, the user’s choices of 10-29)', () => {
+  render(
+    <MemoryRouter>
+      <Sidebar />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByText(
+      '非官方学生工具 · 课程数据可能滞后，选课请以官方目录为准 · 非商业 / F1 合规',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('高级筛选')).not.toBeInTheDocument();
+  expect(screen.queryByText(/后续接入|R1 只保留/)).not.toBeInTheDocument();
+});
 it('a guest can press login only when the API says login works', async () => {
   const user = userEvent.setup();
   const onLogin = vi.fn();

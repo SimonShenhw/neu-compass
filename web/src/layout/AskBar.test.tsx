@@ -15,6 +15,7 @@ import {
   AskBar,
   CAPTURE_LABEL,
   CAPTURE_OFF,
+  CAPTURE_REGION,
   PLACEHOLDER,
   QUERY_LOG_FALLBACK,
 } from './AskBar';
@@ -121,11 +122,28 @@ it('asks nothing before it is known who is looking (R2b: back from Google, only 
   expect(screen.getByText(QUERY_LOG_FALLBACK, { exact: false })).toBeVisible();
 });
 
+// What is held at the bottom of the window is the form: the query log's sentence and the question. The opt-in and its
+// notice are under it, in the page; held with it, they made it about half a phone's window (review A34). Out of the
+// form, they are a landmark of their own, so a screen reader going by landmarks finds them beside 提问 (recheck 1).
+function underTheBox(element: HTMLElement) {
+  const form = screen.getByRole('form', { name: '提问' });
+  expect(form).toContainElement(screen.getByText(NOTICE, { exact: false }));
+  expect(form).not.toContainElement(element);
+  expect(
+    form.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(screen.getByRole('region', { name: CAPTURE_REGION })).toContainElement(
+    element,
+  );
+}
+
 it('with answer feedback on: the opt-in and the API’s notice', async () => {
   const { user, send, input, button } = setup();
   const box = await screen.findByRole('checkbox', { name: CAPTURE_LABEL });
   expect(box).not.toBeChecked();
   expect(screen.getByText(CAPTURE)).toBeVisible();
+  underTheBox(box);
+  underTheBox(screen.getByText(CAPTURE));
   await user.click(box);
   expect(box).toBeChecked();
   await user.type(input, 'CS 6140');
@@ -139,6 +157,7 @@ it('with answer feedback off: no opt-in, and Streamlit’s line that nothing is 
   expect(await screen.findByText(NOTICE, { exact: false })).toBeVisible();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   expect(screen.getByText(CAPTURE_OFF)).toBeVisible();
+  underTheBox(screen.getByText(CAPTURE_OFF));
 });
 
 it('says nothing of saving while /config has not answered', async () => {
@@ -146,6 +165,8 @@ it('says nothing of saving while /config has not answered', async () => {
   expect(await screen.findByText(NOTICE, { exact: false })).toBeVisible();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   expect(screen.queryByText(CAPTURE_OFF)).not.toBeInTheDocument();
+  // Nor an empty landmark for it (recheck 2 of round 34).
+  expect(screen.queryByRole('region', { name: CAPTURE_REGION })).toBeNull();
 });
 
 it('offers no opt-in the API gave no notice for', async () => {
@@ -156,6 +177,7 @@ it('offers no opt-in the API gave no notice for', async () => {
   await waitFor(() =>
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument(),
   );
+  expect(screen.queryByRole('region', { name: CAPTURE_REGION })).toBeNull();
 });
 
 it('disables sending empty or whitespace text', async () => {
@@ -176,6 +198,33 @@ it('Enter sends trimmed input and clears the field', async () => {
   expect(input).toHaveValue('');
   expect(button).toBeDisabled();
 });
+
+// The button is disabled once the box is empty, and a browser takes focus from it to the body, after the search page
+// has looked where focus is; focus goes back to the question's field, as after Enter (recheck 1 of round 34).
+it.each([
+  [
+    'clicked',
+    (user: ReturnType<typeof userEvent.setup>, button: HTMLElement) =>
+      user.click(button),
+  ],
+  [
+    'pressed with the keyboard',
+    async (user: ReturnType<typeof userEvent.setup>, button: HTMLElement) => {
+      button.focus();
+      await user.keyboard('{Enter}');
+    },
+  ],
+])(
+  'a question sent with the button %s leaves focus in the question’s field',
+  async (_, press) => {
+    const { user, send, input, button } = setup();
+    await user.type(input, 'CS 5800');
+    await press(user, button);
+    expect(send).toHaveBeenCalledExactlyOnceWith('CS 5800');
+    expect(button).toBeDisabled();
+    expect(input).toHaveFocus();
+  },
+);
 
 it('Shift+Enter inserts a newline without sending', async () => {
   const { user, send, input } = setup();

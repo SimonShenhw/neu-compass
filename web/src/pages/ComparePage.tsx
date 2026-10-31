@@ -23,6 +23,8 @@ export function ComparePage({
   }));
   const removeButtons = useRef(new Map<string, HTMLButtonElement>());
   const emptyAction = useRef<HTMLAnchorElement>(null);
+  // 重新加载 goes as the columns it asks for load: focus goes to the table, which stays, without scrolling (R6).
+  const table = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<{ id: string } | 'empty' | null>(null);
   useLayoutEffect(() => {
     const target = pendingFocus.current;
@@ -66,10 +68,18 @@ export function ComparePage({
               清空对比
             </Button>
             {views.some((v) => v.column.status === 'error') && (
-              <Button onClick={() => onReload()}>重新加载</Button>
+              <Button
+                onClick={() => {
+                  table.current?.focus({ preventScroll: true });
+                  onReload();
+                }}
+              >
+                重新加载
+              </Button>
             )}
           </div>
           <div
+            ref={table}
             className={styles.scroll}
             role="region"
             aria-label="课程对比表，可横向滚动"

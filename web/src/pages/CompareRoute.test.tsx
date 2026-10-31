@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import cs5100 from '../fixtures/compare/course-cs-5100.json';
 import cs5800 from '../fixtures/compare/course-cs-5800.json';
@@ -117,6 +117,40 @@ it('a failed column says why on its own, and 重新加载 asks again for the fai
   expect(
     screen.getByText('课程加载失败（c-gone）：没有找到这门课。'),
   ).toBeInTheDocument();
+});
+
+// The button goes as the column it asks for loads (R5d's wiring shows loading), so focus used to fall to the body
+// (section 35's known item); now it goes to the table, which stays, without scrolling (R6).
+it('重新加载 hands focus to the table, which is still there once the column it asked for has come back', async () => {
+  const user = userEvent.setup();
+  const later = held();
+  let lost = true;
+  fakeApi(({ path }) => {
+    if (path !== '/course/c-lost') return catalog({ path });
+    if (lost) throw new TypeError('Failed to fetch');
+    return later.response;
+  });
+  choose('c-cs-5800', 'c-lost');
+  livePage('/compare');
+  await screen.findByText(
+    '课程加载失败（c-lost）：暂时连不上服务，请稍后重新加载。',
+  );
+  lost = false;
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  await user.click(screen.getByRole('button', { name: '重新加载' }));
+  const table = screen.getByRole('region', { name: '课程对比表，可横向滚动' });
+  expect(table).toHaveFocus();
+  expect(
+    screen.queryByRole('button', { name: '重新加载' }),
+  ).not.toBeInTheDocument();
+  expect(focus.mock.calls[focus.mock.contexts.indexOf(table)]).toEqual([
+    { preventScroll: true },
+  ]);
+  later.answer(json({ ...cs7800.body, course_id: 'c-lost' }));
+  expect(
+    await screen.findByRole('link', { name: '查看 CS 7800' }),
+  ).toBeInTheDocument();
+  expect(table).toHaveFocus();
 });
 
 // A column still on its way is not asked again (B27, X16). For a course that answered before, TanStack would cancel

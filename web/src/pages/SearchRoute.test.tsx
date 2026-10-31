@@ -1,4 +1,10 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -13,7 +19,7 @@ import alias from '../fixtures/search/alias-cs-6140.json';
 import receipt from '../fixtures/search/feedback-receipt.json';
 import votes from '../fixtures/search/feedback-responses.json';
 import { SINGLE_FOLLOWUPS } from '../features/search-answer/SearchConversation';
-import { CAPTURE_LABEL } from '../layout/AskBar';
+import { CAPTURE_LABEL, CAPTURE_OFF, CAPTURE_REGION } from '../layout/AskBar';
 import { PLAN_PLACEHOLDER } from '../models/programFormat';
 import { apiError, asked, held, json } from '../test/fakeApi';
 import { SEEDED_READY, seededQueryClient } from '../test/withApi';
@@ -78,6 +84,12 @@ const ask = async (question: string) => {
   );
 };
 const answered = () => screen.findByRole('group', { name: '接着问' });
+// The same question sent with the ask box's button.
+const askWithButton = async (question: string) => {
+  const user = userEvent.setup();
+  await user.type(screen.getByRole('textbox', { name: '课程问题' }), question);
+  await user.click(screen.getByRole('button', { name: '发送问题' }));
+};
 
 it('the landing asks the program list, the featured programs it has, Co-op and the privacy words, once each', async () => {
   const api = world();
@@ -810,3 +822,248 @@ it('has no DOM axe violations with the landing, and with a conversation', async 
   await answered();
   expect((await axe(container, rules)).violations).toEqual([]);
 });
+
+// The ask box is held at the window's bottom edge now, so a question asked comes into view where its answer is read
+// below it (R6, the user's choice of 10-29).
+it('each question asked on the search page comes into view; coming back to the page without asking scrolls nowhere', async () => {
+  world();
+  page('/');
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await ask('CS 6140 讲什么？');
+  await answered();
+  expect(into.mock.contexts.at(-1)).toHaveTextContent('CS 6140 讲什么？');
+  expect(into.mock.calls.at(-1)).toEqual([{ block: 'start' }]);
+  // A follow-up is asked on this page too.
+  const [followUp] = within(
+    screen.getByRole('group', { name: '接着问' }),
+  ).getAllByRole('button');
+  await userEvent.click(followUp!);
+  await waitFor(() =>
+    expect(into.mock.contexts.at(-1)).toHaveTextContent(followUp!.textContent!),
+  );
+  expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2);
+  into.mockClear();
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '查看 CS 6140' })[0]!,
+  );
+  await screen.findByRole('heading', { name: 'Machine Learning' });
+  await userEvent.click(screen.getByRole('link', { name: '回到课程搜索' }));
+  expect(where()).toBe('/');
+  await screen.findByRole('region', { name: '第 2 轮问答' });
+  expect(into).not.toHaveBeenCalled();
+});
+
+// What the page has seen goes down with the conversation: back on the page with one, a logout empties it, and the
+// first question asked after that comes into view as well (R6).
+it('after a logout empties the conversation the page came back to, the next question asked comes into view', async () => {
+  world((call) =>
+    call.path === '/auth/logout'
+      ? new Response(null, { status: 204 })
+      : undefined,
+  );
+  page('/', seededQueryClient({ viewer: member }));
+  await landed();
+  await ask('CS 6140 讲什么？');
+  await answered();
+  // Away and back: the page is drawn anew, with the conversation it had.
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '查看 CS 6140' })[0]!,
+  );
+  await screen.findByRole('heading', { name: 'Machine Learning' });
+  await userEvent.click(screen.getByRole('link', { name: '回到课程搜索' }));
+  await screen.findByRole('region', { name: '第 1 轮问答' });
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '退出登录' })[0]!,
+  );
+  await landed();
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await ask('CS 5800 讲什么？');
+  await answered();
+  expect(into.mock.contexts.at(-1)).toHaveTextContent('CS 5800 讲什么？');
+});
+
+it('while the ask box is on the page, html carries its height (--ask-bar-height), and lets it go with the box', async () => {
+  world();
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(152);
+  page('/');
+  const root = document.documentElement;
+  await waitFor(() =>
+    expect(root.style.getPropertyValue('--ask-bar-height')).toBe('152px'),
+  );
+  await userEvent.click(
+    within(screen.getByRole('navigation', { name: '主导航' })).getByRole(
+      'link',
+      { name: /课程对比/ },
+    ),
+  );
+  expect(screen.queryByRole('form', { name: '提问' })).toBeNull();
+  expect(root.style.getPropertyValue('--ask-bar-height')).toBe('');
+});
+
+// Measured once when it mounts, the box was taken as lower than it became (section 40 item 8); jsdom can see both
+// ways it is measured again (review B34).
+it('the ask box is measured again after it draws again, not only when it mounts', async () => {
+  world();
+  let tall = 152;
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+    () => tall,
+  );
+  page('/');
+  const height = () =>
+    document.documentElement.style.getPropertyValue('--ask-bar-height');
+  await waitFor(() => expect(height()).toBe('152px'));
+  tall = 221;
+  await userEvent.type(screen.getByRole('textbox', { name: '课程问题' }), 'C');
+  await waitFor(() => expect(height()).toBe('221px'));
+});
+
+it('a resize the ResizeObserver reports is measured too', async () => {
+  const observed: Element[] = [];
+  let report: (() => void) | undefined;
+  const stub = window.ResizeObserver;
+  window.ResizeObserver = class {
+    constructor(callback: () => void) {
+      report = callback;
+    }
+    observe(element: Element) {
+      observed.push(element);
+    }
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+  try {
+    world();
+    let tall = 152;
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+      () => tall,
+    );
+    page('/');
+    const height = () =>
+      document.documentElement.style.getPropertyValue('--ask-bar-height');
+    await waitFor(() => expect(height()).toBe('152px'));
+    expect(observed).toContain(screen.getByRole('form', { name: '提问' }));
+    tall = 193;
+    act(() => report?.());
+    expect(height()).toBe('193px');
+  } finally {
+    window.ResizeObserver = stub;
+  }
+});
+
+// Only a course page's question opens the search page; one asked on it adds no entry to the history (review B34).
+it('a question asked on the search page adds no entry to the history', async () => {
+  world();
+  page(['/programs', '/']);
+  await landed();
+  await ask('CS 6140 讲什么？');
+  await answered();
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  expect(where()).toBe('/programs');
+});
+
+// A follow-up's button goes with the turn it was under, so focus fell to the body (review A34): it goes to the
+// conversation, which stays, without scrolling it away from the question brought into view.
+it('after a follow-up pressed with the keyboard, focus is on the conversation', async () => {
+  world();
+  page('/');
+  const user = userEvent.setup();
+  await ask('CS 6140 讲什么？');
+  const [followUp] = within(await answered()).getAllByRole('button');
+  followUp!.focus();
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  await user.keyboard('{Enter}');
+  await waitFor(() =>
+    expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2),
+  );
+  const conversation = screen.getByRole('group', { name: '对话' });
+  expect(conversation).toHaveFocus();
+  expect(focus.mock.calls[focus.mock.contexts.indexOf(conversation)]).toEqual([
+    { preventScroll: true },
+  ]);
+});
+
+// Focus in the ask box stays there, for the first question, which takes the landing away, as for those after it: the
+// conversation takes it only from a sample question's or a follow-up's button, which goes, and when it was left on
+// nothing (the focus rule of 10-25). Sent with the button too, which the empty box disables (recheck 1 of round 34).
+it.each([
+  ['Enter', ask],
+  ['the send button', askWithButton],
+])(
+  'a question asked in the ask box with %s, the first as those after it, leaves focus in the box',
+  async (_, send) => {
+    world();
+    page('/');
+    await landed();
+    const box = screen.getByRole('textbox', { name: '课程问题' });
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    await send('CS 6140 讲什么？');
+    await answered();
+    expect(box).toHaveFocus();
+    await send('CS 5800 讲什么？');
+    await waitFor(() =>
+      expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(
+        2,
+      ),
+    );
+    await answered();
+    expect(box).toHaveFocus();
+    expect(focus.mock.contexts).not.toContain(
+      screen.getByRole('group', { name: '对话' }),
+    );
+  },
+);
+
+// Safari's click leaves focus where it was, and a screen reader may press a button without focus on it: the buttons
+// still go with what they were in, so the conversation takes focus from them all the same (recheck 1 of round 34).
+it('a sample question or a follow-up pressed without focus on it still gives focus to the conversation', async () => {
+  world();
+  page('/');
+  await landed();
+  const main = screen.getByRole('main');
+  main.focus();
+  fireEvent.click(screen.getByRole('button', { name: 'CS 5800' }));
+  const followUps = await answered();
+  const conversation = screen.getByRole('group', { name: '对话' });
+  expect(conversation).toHaveFocus();
+  main.focus();
+  fireEvent.click(within(followUps).getAllByRole('button')[0]!);
+  await waitFor(() =>
+    expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2),
+  );
+  expect(conversation).toHaveFocus();
+  // What the button said goes with its question: one asked in the ask box after it leaves focus in the box.
+  await answered();
+  await ask('CS 5800 讲什么？');
+  await waitFor(() =>
+    expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(3),
+  );
+  expect(screen.getByRole('textbox', { name: '课程问题' })).toHaveFocus();
+});
+
+// Out of the form, the opt-in and its notice, or the line that nothing is saved, are a landmark of their own, so
+// nothing on the search page is outside one (recheck 1 of round 34). axe's region rule is given the body itself. Given
+// a container, as RTL's, the rule does not apply (its selector is `body *`, and there is no body under the container),
+// so the test would pass whatever is outside a landmark (recheck 2). Given the html element, which is not in the body,
+// vitest-axe copies the page into the body and leaves the copy behind for the next test.
+it.each([
+  ['on', true],
+  ['off', false],
+])(
+  'with answer feedback %s, nothing on the search page is outside a landmark',
+  async (_, feedback) => {
+    world();
+    page(
+      '/',
+      seededQueryClient({
+        config: { answer_feedback_enabled: feedback, login_available: true },
+      }),
+    );
+    await landed();
+    expect(
+      await screen.findByRole('region', { name: CAPTURE_REGION }),
+    ).toHaveTextContent(feedback ? CAPTURE_LABEL : CAPTURE_OFF);
+    expect(
+      (await axe(document.body, { runOnly: ['region'] })).violations,
+    ).toEqual([]);
+  },
+);

@@ -95,6 +95,8 @@ function CoopContent({
   onSubmit,
   onLogin,
 }: CoopPageProps) {
+  // 重试 goes as the list loads again: focus goes to the list's section, which stays, without scrolling (R6).
+  const listSection = useRef<HTMLElement>(null);
   return (
     <div className={styles.page}>
       <header className={styles.intro}>
@@ -124,11 +126,19 @@ function CoopContent({
       </section>
       <div className={styles.columns}>
         <section
+          ref={listSection}
+          tabIndex={-1}
           aria-label="Co-op 经历列表"
           aria-busy={list.status === 'loading'}
         >
           <h2 className={styles.listTitle}>经历列表</h2>
-          <CoopList list={list} onRetryList={onRetryList} />
+          <CoopList
+            list={list}
+            onRetryList={() => {
+              listSection.current?.focus({ preventScroll: true });
+              onRetryList();
+            }}
+          />
         </section>
         <aside className={styles.aside} aria-label="分享经验">
           {viewer.kind === 'member' ? (

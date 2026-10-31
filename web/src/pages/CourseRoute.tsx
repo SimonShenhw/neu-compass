@@ -4,6 +4,7 @@
 // share box gives this page's address on the site shared links name. Beside it, the search column (SearchWorkspace).
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
+import { useRef } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { apiErrorMessage, isJsonObject, isTransientError } from '../api/client';
 import { courseQuery } from '../api/course';
@@ -52,10 +53,12 @@ function Detail({
   courseId,
   segment,
   others,
+  keepFocus,
 }: {
   courseId: string;
   segment: string;
   others: readonly ResolvedCourse[];
+  keepFocus: () => void;
 }) {
   const detail = useQuery(courseQuery(courseId));
   const compare = useCompareList();
@@ -73,7 +76,12 @@ function Detail({
             : `无法加载课程详情。${apiErrorMessage(failure)}`}
         </DetailText>
         {isTransientError(failure) && (
-          <Retry onRetry={() => void detail.refetch()} />
+          <Retry
+            onRetry={() => {
+              keepFocus();
+              void detail.refetch();
+            }}
+          />
         )}
       </div>
     );
@@ -140,9 +148,20 @@ function CoursePanel({
     enabled: known === null,
   });
   const label = refLabel(codeFromPath(segment));
+  // 重新加载 goes as the detail or the code's lookup loads again: focus goes to the panel, which stays, without
+  // scrolling (R6).
+  const panel = useRef<HTMLDivElement>(null);
+  const keepFocus = () => panel.current?.focus({ preventScroll: true });
   let content;
   if (known !== null)
-    content = <Detail courseId={known} segment={segment} others={[]} />;
+    content = (
+      <Detail
+        courseId={known}
+        segment={segment}
+        others={[]}
+        keepFocus={keepFocus}
+      />
+    );
   else {
     const matches = shownData(resolve);
     if (matches === undefined) {
@@ -156,7 +175,12 @@ function CoursePanel({
             <DetailText kind="warning">
               {`链接里的课程暂时打不开。${apiErrorMessage(failure)}`}
             </DetailText>
-            <Retry onRetry={() => void resolve.refetch()} />
+            <Retry
+              onRetry={() => {
+                keepFocus();
+                void resolve.refetch();
+              }}
+            />
           </div>
         ) : (
           <DetailText kind="warning">{notFound(label)}</DetailText>
@@ -170,12 +194,21 @@ function CoursePanel({
           courseId={matches[0]!.course_id}
           segment={segment}
           others={matches.slice(1)}
+          keepFocus={keepFocus}
         />
       );
   }
-  // No landmark of its own: the detail inside is the region 「课程详情」 (R3b).
+  // No landmark of its own: the detail inside is the region 「课程详情」 (R3b). A group named as the address names the
+  // course (its code, or a short name such as ML that names several), so the place focus goes after 重新加载 says what
+  // it is (review A34).
   return (
-    <div className={styles.panel}>
+    <div
+      ref={panel}
+      role="group"
+      aria-label={label}
+      tabIndex={-1}
+      className={styles.panel}
+    >
       <Link to="/" className={styles.back}>
         <ArrowLeft aria-hidden="true" />
         回到课程搜索
