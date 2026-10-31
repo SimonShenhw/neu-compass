@@ -7,8 +7,9 @@ import { RequisitesDemoPage } from './pages/RequisitesDemoPage';
 import { CourseDetailDemoPage } from './pages/CourseDetailDemoPage';
 
 // The demo pages R1–R5 built for acceptance, on synthetic data: on the dev server and in the tests only. Every build
-// gets demoRoutes.none.tsx in this module's place (vite.config.ts), so no demo page, nor its data or styles, reaches a
-// bundle students are served (R6).
+// gets demoRoutes.none.tsx in this module's place (vite.config.ts), so no demo page, nor its data, reaches a bundle
+// students are served (R6). What stays is a few unused class names the demos share with the real pages' CSS modules
+// (`.demo`), a few hundred bytes of style (review A34).
 const SearchDemoPage = lazy(() => import('./pages/SearchDemoPage'));
 const ProgramsDemoPage = lazy(() => import('./pages/ProgramsDemoPage'));
 const PlanDraftDemoPage = lazy(() => import('./pages/PlanDraftDemoPage'));

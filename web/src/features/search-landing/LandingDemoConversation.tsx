@@ -8,7 +8,7 @@ import { SearchLanding } from './SearchLanding';
 import type { SearchLandingProps } from './SearchLanding';
 import styles from './SearchLanding.module.css';
 
-export type LandingConversationProps = Omit<
+export type LandingDemoConversationProps = Omit<
   SearchLandingProps,
   'onAsk' | 'onRetry'
 > & {
@@ -16,12 +16,12 @@ export type LandingConversationProps = Omit<
   onReset: () => void;
   onFollowUp: (text: string) => void;
 };
-export function LandingConversation({
+export function LandingDemoConversation({
   sourceFor,
   onReset,
   onFollowUp,
   ...landing
-}: LandingConversationProps) {
+}: LandingDemoConversationProps) {
   const { turns, busy, ask } = useConversation();
   const hasConversation = !showLanding(turns);
   const region = useRef<HTMLElement>(null);

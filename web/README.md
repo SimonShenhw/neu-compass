@@ -94,7 +94,7 @@ npm.cmd run test:mutations
 - **贡献数 / 切换：** 仅展示外部 `viewer`，不从 201 或结果计数加一。演示切换会清除草稿、筛选和展开；已离开页面的异步结果不回灌。R2 必须另外按真实会话 owner key 隔离页面，不能用贡献数区分两个账号。
 - **文案 / 布局选择：** 正文与结果沿用说明书固定中文；额外增加“请检查标出的字段后再提交。”作为本地校验的结果摘要，便于聚焦朗读。1199px 以下改为单栏，手机表单字段单列，保证长标签可换行。Co-op 顶栏隐藏重复游客徽标；侧栏仍是 R1 原型，不代表演示会员已完成全站登录。
 
-演示所有等级包会进入本地 bundle，**只能含合成记录**；不能把演示参数当鉴权。R2 接入后替换外壳和生成类型，服务端负责删字段、身份与缓存；真实账号、接口端到端、屏幕阅读器语音和上线仍需另验。修改经过见 [COOP_WORKLOG.md](COOP_WORKLOG.md)，R1 历史仍在 [WORKLOG.md](WORKLOG.md)。
+演示所有等级包会进入本地 bundle（R6 起演示页只在开发服务器和测试里，不进任何构建），**只能含合成记录**；不能把演示参数当鉴权。R2 接入后替换外壳和生成类型，服务端负责删字段、身份与缓存；真实账号、接口端到端、屏幕阅读器语音和上线仍需另验。修改经过见 [COOP_WORKLOG.md](COOP_WORKLOG.md)，R1 历史仍在 [WORKLOG.md](WORKLOG.md)。
 
 ## 课程对比 R5b（2026-10-22）
 
@@ -265,7 +265,7 @@ npm.cmd run preview -- --port 4173 --strictPort
 - **展示与派生：** `SearchLanding` 无状态，只接数据和回调；`landingView` 一次派生区块、pending、单一重试提示。项目和 Co-op 独立；入门推荐等所有「精选且在列表里」的课程表有结果再画。只挑第 1 学期的第一门 core / foundation；Co-op 仅校验并显示前两条，不读取第三条。
 - **失败处理：** 普通 fixture failure 先构造 ApiError 再复用 `isTransientError`，没有用强制断言冒充实例。只对 408、429、5xx 显示一次重试；明确失败、空数据、坏形状不显示重试，其他已就绪区块照常显示。
 - **演示会话：** 来源调度在 `useLandingDemo`，不进入产品组件；换任一控件／重试／返回都用 key 重建会话并取消旧计时器。重试重播同一份合成失败，不假装联网成功。项目、课程、Co-op 按钮只写 status；四个示例发送 query 而非 label，以 R3c 的真实钩子／展示组件播放四份 chat-sample，正常速度、允许保存 false、反馈关。第一轮一创建即隐藏落地内容并接续焦点，被拒／出错也不会重新显示落地内容。
-- **演示壳隔离：** 新增 `features/demo/OfflineDemoShell` 复用原侧栏、顶栏及布局 CSS，固定游客与不可登录状态，完全不挂载 useSession。这样生产构建的本演示路由不会因外壳读取 `/config` / `/auth/me` 而访问公网；不依赖测试 WithApi 的预填缓存，也不改真实 AppShell 或全局 fetch。member 场景仅模拟 Co-op 返回体，不改变真实账号或共享缓存。
+- **演示壳隔离：** 新增 `features/demo/OfflineDemoShell` 复用原侧栏、顶栏及布局 CSS，固定游客与不可登录状态，完全不挂载 useSession。这样生产构建的本演示路由不会因外壳读取 `/config` / `/auth/me` 而访问公网（R6 起演示路由不进任何构建）；不依赖测试 WithApi 的预填缓存，也不改真实 AppShell 或全局 fetch。member 场景仅模拟 Co-op 返回体，不改变真实账号或共享缓存。
 - **纯文本与排版：** 沿用浅色 tokens 和 CourseCode，项目标签用现有 oneLine；卡片／Co-op 值仅去 CR，LF 保留为换行，其余文本不解析 HTML 或 Markdown。本区没有链接。桌面最多四列项目、三列课程、两列示例，手机一列；长课号、课名与公司可折行。列数照说明书第 8 节的上限固定为 4／3／2（Streamlit 按项目数分列），不满一排时右边留空。加载时只有一行「正在加载推荐内容…」，发现区带 `aria-busy`，没有转动的图标或骨架，先到的块先画。
 - **固定数据：** 31 份导出、30 份 expected 原字节冻结，独立 SHA-256 测试；expected 只供测试，生产场景来源映射单独手写并与 27 个参考场景核对，不从标准答案生成页面。27 个 DOM 场景及 11 / 11 / 16 个向量之外另测坏形状、时序、焦点、取消和冷启动无请求。
 
@@ -335,7 +335,7 @@ R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLO
 - **固定数据：** 32 份接口回答（真实 API 在合成库上导出 25 份，改出来 7 份）和 31 份标准答案原字节放在 `fixtures/draft/` 与 `expected/`，`fixtures/draftFixtures.test.ts` 锁定 63 份的 SHA-256，目录跳过 Prettier。expected 只供测试；演示的场景映射 `fixtures/draftScenarios.ts` 单独写，测试核对它和 29 个标准答案的 props 一样。29 个场景逐项比对实际 DOM（种类、文字、顺序、按钮的 action 和 course_id、`aria-disabled`、输入框的标题和字数上限、树的每一行；提示的级别从定样子的外层框读），另查读到的东西都看得见、不在 `aria-hidden` 里，读到的以外没有别的字（`placeholder`、`title`、`alt` 也没有）；另有 18 个失败向量、7 个树向量。jsdom 不套样式表，换行、折行、警告样子和变灰的那几条声明由测试直接读 CSS 文件核对，另一条测试核对这些规则对应的类都挂在该挂的元素上。
 - **变异：** `node scripts/draft-mutations.mjs`，具名变异在临时副本里跑。Vitest 失败、而且失败的测试里有对应的那条，才算杀掉，不分是断言没过、找不到元素还是抛了异常；类型变异算对应的类型测试在那个字段上编译失败。说明书第 15 节列的那些改坏都在里面；第 31 轮审查以后又加了一批：每处修复反过来改一次，再加上审查自己的变异里没杀掉的那些。一个变异可以在同一个文件里按顺序改几处。进程退出时（跑完，或者中途出错，比如基线没过、锚点对不上）先删副本里的两个 `node_modules` 链接，再删副本。按 Ctrl+C、从外面结束进程或者机器重启时走不到这一步，副本会留在 `%TEMP%` 的 `neu-draft-*` 里；手动删时也先删那两个链接。
 
-在 Windows Node 24 下从 `web/` 执行 `npm.cmd run check`、`npm.cmd run format:check`、`node scripts/draft-mutations.mjs`。本机看演示：`npm.cmd run build:dev-api` 再 `npm.cmd run preview:dev-api`（或 `npm.cmd run dev`），打开上面的入口。真实的请求、草案放在内存里、刷新／登出／换账号清空、换方案重新核对、409 清掉方案选择、「课程页／年度先修」换页都在 R4 接线时做（说明书第 14 节；R4c 照下面四点接上了，见 R4c 一节）。给接线的四点：
+在 Windows Node 24 下从 `web/` 执行 `npm.cmd run check`、`npm.cmd run format:check`、`node scripts/draft-mutations.mjs`。本机看演示：`npm.cmd run dev`，打开上面的入口（R6 起演示页不进任何构建，`preview:dev-api` 里这些地址是 404）。真实的请求、草案放在内存里、刷新／登出／换账号清空、换方案重新核对、409 清掉方案选择、「课程页／年度先修」换页都在 R4 接线时做（说明书第 14 节；R4c 照下面四点接上了，见 R4c 一节）。给接线的四点：
 
 - 核对中按「移除」「清空草案」照样调回调（说明书没拦）。接线以最后一次请求为准，丢掉晚到的旧回答。
 - 换方案时把 `answer`、`failure` 都置 null，或者按方案分别存。不然在新方案的结果回来以前，旧回答对不上新方案的内容版本，会闪一下版本警告；上一份方案的失败和「重新核对」也会挂在新方案下面。
@@ -395,19 +395,19 @@ R1 的修改经过、命令结果、浏览器覆盖和未完成边界在 [WORKLO
 
 ## 上线前的修补 R6（2026-10-29）
 
-从 main `4629e5f`（#39 合并以后）开 `feat/web-alignment`，依据评审目录 `frontend_react/R6_PLAN.md`。这是 R6 的第一个 PR；Playwright 的端到端测试是第二个。10-29 用户定了：拿掉侧栏「高级筛选」的空入口，页脚补回 Streamlit 的两句；走查以后又定了三处布局（提问框固定在窗口底部、窄一些时课程页先显示课程、提问以后滚到新问题）。
+从 main `4629e5f`（#39 合并以后）开 `feat/web-alignment`，依据评审目录 `frontend_react/R6_PLAN.md`。这是 R6 的第一个 PR；Playwright 的端到端测试是第二个。10-29 用户定了：拿掉侧栏「高级筛选」的空入口，页脚补回 Streamlit 的两句；走查以后又定了三处布局（提问框固定在窗口底部、窄一些时课程页先显示课程、提问以后滚到新问题）。10-30 第 34 轮审查以后的修补在同一个 PR 的第二个提交里，下面写的是修完的样子。
 
-- **演示页只在开发服务器和测试里**：九个 `*-demo` 路由放在 `src/demoRoutes.tsx`。`vite.config.ts` 在任何构建（`build`、`build:dev-api`）里用 `resolve.alias` 把 `./demoRoutes` 换成 `src/demoRoutes.none.tsx`（两个都是 `null`），这些地址就是 404；插件 `neu-compass:no-demo-modules` 再查一遍，演示页、演示外壳和数据、`fixtures/`、`test/`、`*TestUtils` 进了构建就报错，拿不到项目根也报错。`__DEMO_ROUTES__`（开发服务器和测试里是 true，构建里是 false）管演示页的标题、隐私演示的锁和不显示访客标记的那两个演示。首屏 JavaScript 从 209,919 字节降到约 186,000，构建只剩一个 JS 文件。
-- **错误边界**（`src/components/ErrorBoundary.tsx`）：页面画的时候出错，侧栏和顶栏还在，页面那块只说一句「这一页出了问题，没能显示出来。」，给「重新加载」，不显示异常原文；换一个地址就再试一次。外壳自己出错时，`main.tsx` 最外层那一层说「页面出了问题，没能显示出来。」。
-- **跳过链接**不再是页内链接：按下以后把焦点交给 main（`src/layout/mainContent.ts`），地址和历史记录都不变，方案链接的核对、`?program=` 的 ref 和课程页带的课程 ID 不会再丢（第 39 节「已知」）。
-- **「重新加载」「重试」以后的焦点**交给留下来的那一块，不滚动：对比页给对比表，Co-op 给经历列表，隐私页给 main，课程页给课程那一栏。原来按下的按钮一换成加载中，焦点就掉到 body。
+- **演示页只在开发服务器和测试里**：九个 `*-demo` 路由放在 `src/demoRoutes.tsx`。`vite.config.ts` 在任何构建（`build`、`build:dev-api`）里用 `resolve.alias` 把 `./demoRoutes` 换成 `src/demoRoutes.none.tsx`（两个都是 `null`），这些地址就是 404；插件 `neu-compass:no-demo-modules` 再查一遍，演示页（文件名带 `Demo`，只给落地演示用的对话也改名成了 `LandingDemoConversation.tsx`）、`features/demo/` 下的演示外壳、演示的数据、`fixtures/`、`test/`、`*TestUtils` 在哪个块里进了构建都报错，拿不到项目根也报错。项目根不分大小写，后面的路径分。`__DEMO_ROUTES__`（开发服务器和测试里是 true，构建里是 false）管演示页的标题、隐私演示的锁和不显示访客标记的那两个演示。首屏 JavaScript 从 209,919 字节降到约 186,000，构建只剩一个 JS 文件。
+- **错误边界**（`src/components/ErrorBoundary.tsx`）：页面画的时候出错，侧栏和顶栏还在，页面那块只说一句「这一页出了问题，没能显示出来。」，给「重新加载」，不显示异常原文；换一个地址就再试一次。外壳自己出错时，`main.tsx` 最外层那一层说「页面出了问题，没能显示出来。」。页面出错时提问框跟着收起（不然问题照样发出去，回答却看不到），焦点原来在跟着没了的东西上就交给 main；同一个地址上重画，还是那句话。
+- **跳过链接**不再是页内链接：按下以后把焦点交给 main（`src/layout/mainContent.ts`），地址和历史记录都不变，方案链接的核对、`?program=` 的 ref 和课程页带的课程 ID 不会再丢（第 39 节「已知」）。按着 Ctrl、⌘、Shift 或 Alt 点的交给浏览器。
+- **「重新加载」「重试」以后的焦点**交给留下来的那一块，不滚动：对比页给对比表，Co-op 给经历列表，隐私页给 main，课程页给课程那一栏（以课号命名的 group）。原来按下的按钮一换成加载中，焦点就掉到 body。
 - **先修面板旧平铺行的「查看」**带上课号（`查看 CS 5800`），和规则树的按钮一样。
 - **`index.html`**：描述改成正式的一句，加了网页图标 `public/favicon.svg`。
-- **提问框固定在窗口底部**（搜索页和课程页）：它把自己的高度写进 html 的 `--ask-bar-height`，`base.css` 用它做 `scroll-padding-bottom`，用 Tab 走到的、滚进视野的东西不会落在它下面。
+- **提问框固定在窗口底部**（搜索页和课程页）：窗口至少 500 像素高时，粘在底部的是查询日志那句和输入框；「允许保存」勾选框和它的说明在它下面，跟着页面走（生产开着回答反馈，原来整块粘着，手机上占掉将近半个窗口）。更矮的窗口（手机横着、页面放大）不粘。它把自己的高度写进 html 的 `--ask-bar-height`，`base.css` 在同样的窗口高度下给 main 里的元素做 `scroll-margin-bottom`：用 Tab 走到的、滚进视野的东西不会落在它下面，提问框自己的控件获得焦点时页面也不跳（原来用 html 的 `scroll-padding-bottom`，会跳）。
 - **课程页先显示课程**：1200 宽以下一栏，课程在上、对话在下；DOM 里也是课程在前，1200 宽以上用 grid 把对话放回左边。
-- **提问以后滚到新问题**：在搜索页提问、追问，最后一个问题滚到眼前，回答接着在它下面出来；在课程页提问，去首页时带着 `NEWEST_QUESTION`，到了也滚。只是回到这一页、或者带着别的 state（比如课程 ID）打开页面时不滚。外壳换页时的回页顶改在 layout effect 里，排在页面自己的滚动前面。
-- **「允许保存」旁边那句说明**（`GET /privacy` 的 `capture_notice`，两个前端共用）照 API 实际存的写：回答，连同提问时带的筛选、项目和方案、接着问的课程；去掉了两个前端都没有的「清空对话」。
-- **变异脚本的副本**多带 `public/favicon.svg`（`contracts.test.ts` 读它）。
-- **测试**：`demoRoutes.test.tsx` 把 `./demoRoutes` 换成 none，看九个地址都是 404；`apiBase.test.ts` 测构建的 alias、插件和 `__DEMO_ROUTES__`；`ErrorBoundary.test.tsx`、`main.test.tsx`、`skipLink.test.tsx`（BrowserRouter 下的地址和历史）；四个页面的重试焦点；`SearchRoute.test.tsx`、`CourseRoute.test.tsx` 测滚到新问题、课程在前和 `--ask-bar-height`。粘底、`scroll-padding-bottom` 和 1200 宽以上的两栏 jsdom 量不到，是在浏览器里量的，第二个 PR 的 Playwright 对着构建测。
+- **提问以后滚到新问题**：在搜索页提问、追问，最后一个问题滚到窗口顶上，回答接着在它下面出来；对话的最后一轮至少一个窗口高（减去提问框），问题才滚得到顶，最后一条回答短的时候下面空着。在课程页提问，去首页时带着 `NEWEST_QUESTION`，到了也滚，读过就从这条历史里清掉，以后后退、前进回到它不再滚。回到这一页、或者带着别的 state（比如课程 ID）打开页面时不滚。按了示例问题或「接着问」，按下的按钮跟着没了，焦点交给对话；在提问框里问的，焦点留在框里，第一个问题也一样（原来第一个问题会把焦点挪到对话）。外壳换页时的回页顶改在 layout effect 里，排在页面自己的滚动前面。
+- **「允许保存」旁边那句说明**（`GET /privacy` 的 `capture_notice`，两个前端共用）照 API 实际存的写：回答，连同提问时带的筛选、项目和方案、最近一次列出的课程（两个前端每次提问都带上最近一条列出课程的回答里的那些课）；去掉了两个前端都没有的「清空对话」。
+- **变异脚本的副本**多带 `public/favicon.svg`（`contracts.test.ts` 读它）；M17、M23 的锚点带上前后的一截，在新代码里又只出现一次。
+- **测试**：`demoRoutes.test.tsx` 把 `./demoRoutes` 换成 none，看九个地址都是 404、七个真页面都在；`apiBase.test.ts` 测构建的 alias、插件（含第二个以后的块）和 `__DEMO_ROUTES__`；`routePresentation.test.ts` 把 `__DEMO_ROUTES__` 设成 false 重新 import，看构建里的标题；`ErrorBoundary.test.tsx`、`pageFailed.test.tsx`（出错时提问框和焦点）、`main.test.tsx`、`skipLink.test.tsx`（BrowserRouter 下的地址和历史、修饰键）；四个页面的重试焦点；`SearchRoute.test.tsx`、`CourseRoute.test.tsx` 测滚到新问题、后退不再滚、课程在前、`--ask-bar-height` 的几种重新量；`AskBar.test.tsx` 测勾选框和说明在粘底那块下面。粘底、`scroll-margin-bottom`、最后一轮的高度和 1200 宽以上的两栏 jsdom 量不到，是在浏览器里量的，第二个 PR 的 Playwright 对着构建测（要开着回答反馈，加上放大和矮窗口）。
 
 修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 40 节。

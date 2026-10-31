@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { App } from './App';
+import { fakeApi, json } from './test/fakeApi';
 import { WithApi } from './test/withApi';
 
 // App as every build has it: demoRoutes.none.tsx in demoRoutes' place (vite.config.ts, R6).
@@ -32,16 +33,24 @@ it.each([
   },
 );
 
-it('the real pages are all there without them', async () => {
+it.each([
+  '/',
+  '/course/CS-6140',
+  '/compare',
+  '/programs',
+  '/programs/cs-ms',
+  '/coop',
+  '/privacy',
+])('without them the real page %s is still there', async (path) => {
+  // What the pages ask gets a 404: only which page draws matters here.
+  fakeApi(() => json(null, 404));
   render(
     <WithApi>
-      <MemoryRouter initialEntries={['/compare']}>
+      <MemoryRouter initialEntries={[path]}>
         <App />
       </MemoryRouter>
     </WithApi>,
   );
-  expect(
-    await screen.findAllByRole('heading', { name: '课程对比' }),
-  ).not.toHaveLength(0);
+  expect(await screen.findByRole('main')).toBeInTheDocument();
   expect(screen.queryByText('404 · 找不到这个页面')).toBeNull();
 });

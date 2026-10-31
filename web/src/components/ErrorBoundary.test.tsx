@@ -78,6 +78,54 @@ it('at the top, where nothing else could be drawn, it says the page could not be
   expect(document.body).not.toHaveTextContent(/boom|token-7f3a/);
 });
 
+// Trying again whenever the shell drew it again, at the same address, drew the failing page over and over until React
+// gave up, and the whole page failed (review B34).
+it('drawn again at the same address, it keeps its sentence and does not draw the page again', () => {
+  let draws = 0;
+  function Page(): never {
+    draws += 1;
+    throw new Error(SECRET);
+  }
+  const failed = vi.fn();
+  const { rerender } = render(
+    <ErrorBoundary where="/compare" onFailed={failed}>
+      <Page />
+    </ErrorBoundary>,
+  );
+  const drawn = draws;
+  rerender(
+    <ErrorBoundary where="/compare" onFailed={failed}>
+      <Page />
+    </ErrorBoundary>,
+  );
+  expect(draws).toBe(drawn);
+  expect(screen.getByRole('alert')).toHaveTextContent(PAGE_FAILED);
+  expect(failed.mock.calls).toEqual([[true]]);
+});
+
+it('tells the shell when a page has failed, and when another address tries again', () => {
+  let failing = true;
+  function Page() {
+    if (failing) throw new Error(SECRET);
+    return <p>page</p>;
+  }
+  const failed = vi.fn();
+  const { rerender } = render(
+    <ErrorBoundary where="/compare" onFailed={failed}>
+      <Page />
+    </ErrorBoundary>,
+  );
+  expect(failed.mock.calls).toEqual([[true]]);
+  failing = false;
+  rerender(
+    <ErrorBoundary where="/programs" onFailed={failed}>
+      <Page />
+    </ErrorBoundary>,
+  );
+  expect(screen.getByText('page')).toBeInTheDocument();
+  expect(failed.mock.calls).toEqual([[true], [false]]);
+});
+
 it('while nothing failed, a new address does not draw the pages under it anew', () => {
   let mounts = 0;
   function Page() {

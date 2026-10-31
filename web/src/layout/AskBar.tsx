@@ -19,7 +19,8 @@ export const CAPTURE_OFF = '回答内容不会保存（回答反馈功能目前�
 export const CAPTURE_LABEL = '允许保存本次会话之后的回答，用于回答反馈';
 export const PLACEHOLDER =
   '问任何课程问题：CS 5800 / 适合入门的 ML 课 / algo …';
-// The custom property base.css reads for html's scroll-padding-bottom.
+// The custom property base.css reads for the page's scroll-margin-bottom, and the conversation's last turn for its
+// height.
 export const ASK_BAR_HEIGHT = '--ask-bar-height';
 
 export function AskBar({ onSend }: { onSend: (question: string) => void }) {
@@ -33,7 +34,7 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
   const [text, setText] = useState('');
   const id = useId();
   // Held at the bottom of the window (AskBar.module.css): while it is on the page, the page keeps what is focused or
-  // scrolled into view clear of it, by its height (base.css's scroll-padding-bottom; R6).
+  // scrolled into view clear of it, by its height (base.css's scroll-margin-bottom; R6).
   const form = useRef<HTMLFormElement>(null);
   const measure = useCallback(() => {
     const element = form.current;
@@ -65,77 +66,84 @@ export function AskBar({ onSend }: { onSend: (question: string) => void }) {
     onSend(text.trim());
     setText('');
   }
-  return (
-    <form
-      ref={form}
-      className={styles.askBar}
-      aria-label="提问"
-      onSubmit={(event) => {
-        event.preventDefault();
-        send();
-      }}
-    >
-      <p className={styles.privacy} id={`${id}-privacy`}>
-        <LockKeyhole aria-hidden="true" />
-        <span>
-          {notices?.queryLog ?? QUERY_LOG_FALLBACK}留多久、怎么删，见{' '}
-          <Link to="/privacy">数据与隐私</Link>。
-        </span>
-      </p>
-      <div className={styles.input}>
-        <label className="visually-hidden" htmlFor={`${id}-query`}>
-          课程问题
+  // The opt-in and its notice, or the sentence that no answer is kept: under the box, in the page, not held at the
+  // bottom with it. Held there, with answer feedback on, they made the box half a phone's window, and all of a zoomed
+  // one (review A34). Still under the query log's sentence, which the notice names as above.
+  const capture =
+    search.feedback === true && notices?.capture ? (
+      <div className={styles.capture}>
+        <label className={styles.optin}>
+          <input
+            type="checkbox"
+            checked={search.allowSave}
+            onChange={(event) => search.setAllowSave(event.target.checked)}
+          />
+          {CAPTURE_LABEL}
         </label>
-        <textarea
-          id={`${id}-query`}
-          rows={1}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          aria-describedby={
-            tooLong ? `${id}-privacy ${id}-limit` : `${id}-privacy`
-          }
-          aria-invalid={tooLong}
-          placeholder={PLACEHOLDER}
-          onKeyDown={(event) => {
-            if (
-              event.key === 'Enter' &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              send();
-            }
-          }}
-        />
-        <IconButton
-          type="submit"
-          aria-label="发送问题"
-          variant="primary"
-          disabled={!canSend}
-        >
-          <ArrowUp aria-hidden="true" />
-        </IconButton>
+        <p className={styles.note}>{notices.capture}</p>
       </div>
-      {tooLong && (
-        <p id={`${id}-limit`} className={styles.limit}>
-          {`问题最多 ${MAX_QUESTION_CHARS} 个字，现在是 ${length} 个字；改短一点再发。`}
+    ) : search.feedback === false ? (
+      <p className={`${styles.capture} ${styles.note}`}>{CAPTURE_OFF}</p>
+    ) : null;
+  return (
+    <>
+      <form
+        ref={form}
+        className={styles.askBar}
+        aria-label="提问"
+        onSubmit={(event) => {
+          event.preventDefault();
+          send();
+        }}
+      >
+        <p className={styles.privacy} id={`${id}-privacy`}>
+          <LockKeyhole aria-hidden="true" />
+          <span>
+            {notices?.queryLog ?? QUERY_LOG_FALLBACK}留多久、怎么删，见{' '}
+            <Link to="/privacy">数据与隐私</Link>。
+          </span>
         </p>
-      )}
-      {search.feedback === true && notices?.capture ? (
-        <div className={styles.capture}>
-          <label className={styles.optin}>
-            <input
-              type="checkbox"
-              checked={search.allowSave}
-              onChange={(event) => search.setAllowSave(event.target.checked)}
-            />
-            {CAPTURE_LABEL}
+        <div className={styles.input}>
+          <label className="visually-hidden" htmlFor={`${id}-query`}>
+            课程问题
           </label>
-          <p className={styles.note}>{notices.capture}</p>
+          <textarea
+            id={`${id}-query`}
+            rows={1}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            aria-describedby={
+              tooLong ? `${id}-privacy ${id}-limit` : `${id}-privacy`
+            }
+            aria-invalid={tooLong}
+            placeholder={PLACEHOLDER}
+            onKeyDown={(event) => {
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                send();
+              }
+            }}
+          />
+          <IconButton
+            type="submit"
+            aria-label="发送问题"
+            variant="primary"
+            disabled={!canSend}
+          >
+            <ArrowUp aria-hidden="true" />
+          </IconButton>
         </div>
-      ) : search.feedback === false ? (
-        <p className={styles.note}>{CAPTURE_OFF}</p>
-      ) : null}
-    </form>
+        {tooLong && (
+          <p id={`${id}-limit`} className={styles.limit}>
+            {`问题最多 ${MAX_QUESTION_CHARS} 个字，现在是 ${length} 个字；改短一点再发。`}
+          </p>
+        )}
+      </form>
+      {capture}
+    </>
   );
 }

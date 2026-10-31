@@ -198,9 +198,16 @@ function CoursePanel({
         />
       );
   }
-  // No landmark of its own: the detail inside is the region 「课程详情」 (R3b).
+  // No landmark of its own: the detail inside is the region 「课程详情」 (R3b). A group named for the course, so the
+  // place focus goes after 重新加载 says what it is (review A34).
   return (
-    <div ref={panel} tabIndex={-1} className={styles.panel}>
+    <div
+      ref={panel}
+      role="group"
+      aria-label={label}
+      tabIndex={-1}
+      className={styles.panel}
+    >
       <Link to="/" className={styles.back}>
         <ArrowLeft aria-hidden="true" />
         回到课程搜索

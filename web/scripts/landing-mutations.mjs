@@ -278,7 +278,7 @@ add(
 );
 add(
   'conversation receives focus',
-  'src/features/search-landing/LandingConversation.tsx',
+  'src/features/search-landing/LandingDemoConversation.tsx',
   'if (hasConversation) region.current?.focus({ preventScroll: true });',
   'if (false) region.current?.focus({ preventScroll: true });',
   demo,

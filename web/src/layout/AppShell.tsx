@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { refreshReads, shownData, useShowingOld } from '../api/queries';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { coursesIndexed, readyQuery } from '../api/ready';
 import { AccountContext, viewerOwner } from './account';
 import { AskBar } from './AskBar';
-import { MAIN_CONTENT, focusMainContent } from './mainContent';
+import { MAIN_CONTENT, focusLost, focusMainContent } from './mainContent';
 import { ProgramsProvider } from './ProgramsContext';
 import { NEWEST_QUESTION, SearchProvider, useSearch } from './SearchContext';
 import { Sidebar } from './Sidebar';
@@ -64,6 +64,13 @@ export function AppShell() {
     focusMainContent({ preventScroll: true });
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [pathname, title]);
+  // A page that failed to draw takes the ask box with it: what was asked there would go out, into the query log too,
+  // with no page to show the answer (review A34). Focus that was on what went (a button of the page, the ask box) goes
+  // to main, without scrolling.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (failed && focusLost()) focusMainContent({ preventScroll: true });
+  }, [failed]);
   const refresh = () => void refreshReads(queryClient);
   const owner =
     account.viewer === undefined ? undefined : viewerOwner(account.viewer);
@@ -76,6 +83,15 @@ export function AppShell() {
         href={`#${MAIN_CONTENT}`}
         className="skip-link"
         onClick={(event) => {
+          // A click with a modifier is the browser's (a new tab or window), as on the router's links (review A34).
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.altKey ||
+            event.ctrlKey ||
+            event.shiftKey
+          )
+            return;
           event.preventDefault();
           focusMainContent();
         }}
@@ -120,11 +136,11 @@ export function AppShell() {
                 >
                   {notice}
                 </p>
-                <ErrorBoundary where={pathname}>
+                <ErrorBoundary where={pathname} onFailed={setFailed}>
                   <Outlet />
                 </ErrorBoundary>
               </main>
-              {isSearch && <SearchAskBar />}
+              {isSearch && !failed && <SearchAskBar />}
             </ProgramsProvider>
           </SearchProvider>
         </AccountContext.Provider>

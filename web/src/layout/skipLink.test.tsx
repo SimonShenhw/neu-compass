@@ -68,6 +68,34 @@ it('the skip link moves focus to the main content and leaves the address and the
   expect(window.history.state).toEqual(state);
 });
 
+// A click with a modifier is the browser's, to open the address in a new tab or window, as on the router's links
+// (review A34).
+it.each(['Control', 'Meta', 'Shift', 'Alt'])(
+  'a click on the skip link with %s held is left to the browser',
+  async (key) => {
+    world();
+    browserPage('/compare');
+    await screen.findAllByRole('heading', { name: '课程对比' });
+    let prevented: boolean | undefined;
+    // After the page's own handler; jsdom then follows no link.
+    const watch = (event: MouseEvent) => {
+      prevented = event.defaultPrevented;
+      event.preventDefault();
+    };
+    window.addEventListener('click', watch);
+    try {
+      const user = userEvent.setup();
+      await user.keyboard(`{${key}>}`);
+      await user.click(screen.getByRole('link', { name: '跳到主要内容' }));
+      await user.keyboard(`{/${key}}`);
+    } finally {
+      window.removeEventListener('click', watch);
+    }
+    expect(prevented).toBe(false);
+    expect(screen.getByRole('main')).not.toHaveFocus();
+  },
+);
+
 it('pressed while a plan link is checked, the shared plan is chosen all the same', async () => {
   const later = held();
   let reads = 0;

@@ -121,11 +121,24 @@ it('asks nothing before it is known who is looking (R2b: back from Google, only 
   expect(screen.getByText(QUERY_LOG_FALLBACK, { exact: false })).toBeVisible();
 });
 
+// What is held at the bottom of the window is the form: the query log's sentence and the question. The opt-in and its
+// notice are under it, in the page; held with it, they made it half a phone's window (review A34).
+function underTheBox(element: HTMLElement) {
+  const form = screen.getByRole('form', { name: '提问' });
+  expect(form).toContainElement(screen.getByText(NOTICE, { exact: false }));
+  expect(form).not.toContainElement(element);
+  expect(
+    form.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+}
+
 it('with answer feedback on: the opt-in and the API’s notice', async () => {
   const { user, send, input, button } = setup();
   const box = await screen.findByRole('checkbox', { name: CAPTURE_LABEL });
   expect(box).not.toBeChecked();
   expect(screen.getByText(CAPTURE)).toBeVisible();
+  underTheBox(box);
+  underTheBox(screen.getByText(CAPTURE));
   await user.click(box);
   expect(box).toBeChecked();
   await user.type(input, 'CS 6140');
@@ -139,6 +152,7 @@ it('with answer feedback off: no opt-in, and Streamlit’s line that nothing is 
   expect(await screen.findByText(NOTICE, { exact: false })).toBeVisible();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   expect(screen.getByText(CAPTURE_OFF)).toBeVisible();
+  underTheBox(screen.getByText(CAPTURE_OFF));
 });
 
 it('says nothing of saving while /config has not answered', async () => {

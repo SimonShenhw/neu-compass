@@ -11,19 +11,29 @@ export const APP_FAILED = '页面出了问题，没能显示出来。';
 export const pageReload = { reload: () => window.location.reload() };
 
 // Catches what the pages under it throw while drawing. In the shell (`where` is the address shown) the sidebar and
-// the top bar stay, and going to another address tries again, without drawing the pages anew while nothing failed.
-// At the top (`where` is null) nothing else could be drawn. The error's own text is never shown.
+// the top bar stay, and going to another address tries again, without drawing the pages anew while nothing failed;
+// `onFailed` tells the shell when a page has failed and when it is tried again. At the top (`where` is null) nothing
+// else could be drawn. The error's own text is never shown.
 export class ErrorBoundary extends Component<
-  { children: ReactNode; where: string | null },
+  {
+    children: ReactNode;
+    where: string | null;
+    onFailed?: (failed: boolean) => void;
+  },
   { failed: boolean }
 > {
   override state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
   }
+  override componentDidCatch() {
+    this.props.onFailed?.(true);
+  }
   override componentDidUpdate(previous: { where: string | null }) {
-    if (this.state.failed && previous.where !== this.props.where)
+    if (this.state.failed && previous.where !== this.props.where) {
       this.setState({ failed: false });
+      this.props.onFailed?.(false);
+    }
   }
   override render() {
     if (!this.state.failed) return this.props.children;

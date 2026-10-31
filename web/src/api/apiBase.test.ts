@@ -223,19 +223,26 @@ describe('the demo pages: on the dev server and in the tests, in no build (R6)',
       throw new Error(message);
     },
   };
-  // A build of the project at root whose one chunk holds these modules, through the plugin's own hooks.
-  function build(root: string | null, ...moduleIds: string[]) {
+  // A build of the project at root whose chunks hold these modules, through the plugin's own hooks: the first its
+  // entry, the others what it loads later.
+  function chunks(root: string | null, ...modules: string[][]) {
     const plugin = noDemoModules();
     if (root !== null) (plugin.configResolved as Hook).call(context, { root });
     (plugin.generateBundle as Hook).call(
       context,
       {},
-      {
-        'assets/index.js': { type: 'chunk', moduleIds },
-        'assets/index.css': { type: 'asset' },
-      },
+      Object.fromEntries([
+        ...modules.map((moduleIds, index) => [
+          index === 0 ? 'assets/index.js' : `assets/chunk-${index}.js`,
+          { type: 'chunk', moduleIds },
+        ]),
+        ['assets/index.css', { type: 'asset' }],
+      ]),
     );
   }
+  // One chunk holding these modules.
+  const build = (root: string | null, ...moduleIds: string[]) =>
+    chunks(root, moduleIds);
 
   it('a build stops when a demo page or shell, a demo’s data, a fixture or a test helper reaches it by any import', () => {
     // As Vite gives them: the root with / and module IDs with /; and on Windows, IDs with \ and another drive case.
@@ -249,6 +256,9 @@ describe('the demo pages: on the dev server and in the tests, in no build (R6)',
       windows('pages/SearchLandingDemoPage.tsx'),
       src('pages/CompareDemoPage.module.css?used'),
       src('features/demo/OfflineDemoShell.tsx'),
+      // Whatever else the demo shell's folder holds, and the landing demo's conversation (reviews A34, B34).
+      src('features/demo/sample.ts'),
+      src('features/search-landing/LandingDemoConversation.tsx'),
       src('features/programs/useProgramDemoLoad.ts'),
       src('demoRoutes.tsx'),
       src('fixtures/compareDemo.ts'),
@@ -280,6 +290,21 @@ describe('the demo pages: on the dev server and in the tests, in no build (R6)',
     expect(demoOrTestModule('/work/web/src/test/a.ts', '/work/other')).toBe(
       false,
     );
+  });
+
+  // A real build has more than one chunk; one that loads a demo page later (a lazy route) carries it in the second
+  // (review B34).
+  it('a demo page in any chunk stops the build, not only in the first', () => {
+    const root = 'H:/neu-compass/web';
+    const demo = `${root}/src/pages/CoopDemoPage.tsx`;
+    expect(() =>
+      chunks(
+        root,
+        [`${root}/src/main.tsx`],
+        [`${root}/src/pages/CompareRoute.tsx`],
+        [demo],
+      ),
+    ).toThrow(`A build carries demo or test modules: ${demo}`);
   });
 
   it('a build whose project root never came stops instead of checking nothing', () => {

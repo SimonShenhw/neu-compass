@@ -267,13 +267,14 @@ const cases = [
     'src/models/compareList.test.tsx',
     'store preserves ID order',
   ],
-  // R6: the shell focuses its main through focusMainContent (layout/mainContent.ts).
+  // R6: the shell focuses its main through focusMainContent (layout/mainContent.ts), on a new page before it scrolls
+  // to the top (a failed page focuses it too, review A34).
   [
     'M17',
     'focus without scroll jump',
     'src/layout/AppShell.tsx',
-    'focusMainContent({ preventScroll: true })',
-    'focusMainContent()',
+    'focusMainContent({ preventScroll: true });\n    window.scrollTo',
+    'focusMainContent();\n    window.scrollTo',
     'src/pages/pages.test.tsx',
     'route focus does not scroll',
   ],
@@ -328,7 +329,8 @@ cases.push(
     'src/pages/pages.test.tsx',
     'clearing comparison focuses its remaining keyboard action',
   ],
-  // R3e: the search page on the live API puts focus on the conversation when the first question leaves the landing.
+  // R3e: the search page on the live API puts focus on the conversation when a sample question's button goes with the
+  // landing (since review A34 by the one rule for focus left on nothing, a follow-up's too).
   [
     'M23',
     'example answer focus',

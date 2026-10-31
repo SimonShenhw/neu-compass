@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LandingConversation } from '../features/search-landing/LandingConversation';
+import { LandingDemoConversation } from '../features/search-landing/LandingDemoConversation';
 import { useLandingDemo } from '../features/search-landing/useLandingDemo';
 import {
   landingOptions,
@@ -22,7 +22,7 @@ function DemoSession({
   const [notice, setNotice] = useState('');
   return (
     <>
-      <LandingConversation
+      <LandingDemoConversation
         {...data}
         onReset={reset}
         onOpenProgram={(id) => setNotice(`演示：这里会打开培养方案 ${id}`)}

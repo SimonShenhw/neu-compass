@@ -1,16 +1,21 @@
 /* Held at the window's bottom edge while the page scrolls behind it, as Streamlit's chat input is (R6, the user's
-   choice of 10-29). html's scroll-padding-bottom (AskBar sets --ask-bar-height) keeps what is focused or scrolled
-   into view out from under it. */
+   choice of 10-29), in a window at least 500 px high: in a lower one (a phone turned sideways, a page zoomed to 200 or
+   400 %) it left the page a strip (review A34). From the same height base.css keeps what is focused or scrolled into
+   view on the page out from under it, by the height AskBar sets (--ask-bar-height). */
 .askBar {
-  position: sticky;
-  bottom: var(--space-0);
-  z-index: var(--z-sticky);
   display: grid;
   gap: var(--space-2);
-  padding-block: var(--space-4) var(--space-5);
+  padding-block: var(--space-4);
   margin-top: var(--space-5);
   border-top: var(--border) solid var(--line);
   background: var(--canvas);
+}
+@media (min-height: 500px) {
+  .askBar {
+    position: sticky;
+    bottom: var(--space-0);
+    z-index: var(--z-sticky);
+  }
 }
 .privacy {
   display: flex;
@@ -67,9 +72,11 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
 }
+/* Under the box, in the page. */
 .capture {
   display: grid;
   gap: var(--space-1);
+  padding-bottom: var(--space-5);
 }
 .note {
   color: var(--ink3);

@@ -870,7 +870,7 @@ it('after a logout empties the conversation the page came back to, the next ques
   expect(into.mock.contexts.at(-1)).toHaveTextContent('CS 5800 讲什么？');
 });
 
-it('while the ask box is on the page, html keeps its height clear at the bottom, and lets it go with the box', async () => {
+it('while the ask box is on the page, html carries its height (--ask-bar-height), and lets it go with the box', async () => {
   world();
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(152);
   page('/');
@@ -886,4 +886,108 @@ it('while the ask box is on the page, html keeps its height clear at the bottom,
   );
   expect(screen.queryByRole('form', { name: '提问' })).toBeNull();
   expect(root.style.getPropertyValue('--ask-bar-height')).toBe('');
+});
+
+// Measured once when it mounts, the box was taken as lower than it became (section 40 item 8); jsdom can see both
+// ways it is measured again (review B34).
+it('the ask box is measured again after it draws again, not only when it mounts', async () => {
+  world();
+  let tall = 152;
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+    () => tall,
+  );
+  page('/');
+  const height = () =>
+    document.documentElement.style.getPropertyValue('--ask-bar-height');
+  await waitFor(() => expect(height()).toBe('152px'));
+  tall = 221;
+  await userEvent.type(screen.getByRole('textbox', { name: '课程问题' }), 'C');
+  await waitFor(() => expect(height()).toBe('221px'));
+});
+
+it('a resize the ResizeObserver reports is measured too', async () => {
+  const observed: Element[] = [];
+  let report: (() => void) | undefined;
+  const stub = window.ResizeObserver;
+  window.ResizeObserver = class {
+    constructor(callback: () => void) {
+      report = callback;
+    }
+    observe(element: Element) {
+      observed.push(element);
+    }
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+  try {
+    world();
+    let tall = 152;
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+      () => tall,
+    );
+    page('/');
+    const height = () =>
+      document.documentElement.style.getPropertyValue('--ask-bar-height');
+    await waitFor(() => expect(height()).toBe('152px'));
+    expect(observed).toContain(screen.getByRole('form', { name: '提问' }));
+    tall = 193;
+    act(() => report?.());
+    expect(height()).toBe('193px');
+  } finally {
+    window.ResizeObserver = stub;
+  }
+});
+
+// Only a course page's question opens the search page; one asked on it adds no entry to the history (review B34).
+it('a question asked on the search page adds no entry to the history', async () => {
+  world();
+  page(['/programs', '/']);
+  await landed();
+  await ask('CS 6140 讲什么？');
+  await answered();
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  expect(where()).toBe('/programs');
+});
+
+// A follow-up's button goes with the turn it was under, so focus fell to the body (review A34): it goes to the
+// conversation, which stays, without scrolling it away from the question brought into view.
+it('after a follow-up pressed with the keyboard, focus is on the conversation', async () => {
+  world();
+  page('/');
+  const user = userEvent.setup();
+  await ask('CS 6140 讲什么？');
+  const [followUp] = within(await answered()).getAllByRole('button');
+  followUp!.focus();
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  await user.keyboard('{Enter}');
+  await waitFor(() =>
+    expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2),
+  );
+  const conversation = screen.getByRole('group', { name: '对话' });
+  expect(conversation).toHaveFocus();
+  expect(focus.mock.calls[focus.mock.contexts.indexOf(conversation)]).toEqual([
+    { preventScroll: true },
+  ]);
+});
+
+// Focus in the ask box stays there, for the first question, which takes the landing away, as for those after it: only
+// focus left on nothing goes to the conversation (the focus rule of 10-25).
+it('a question asked in the ask box, the first as those after it, leaves focus in the box', async () => {
+  world();
+  page('/');
+  await landed();
+  const box = screen.getByRole('textbox', { name: '课程问题' });
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  await ask('CS 6140 讲什么？');
+  await answered();
+  expect(box).toHaveFocus();
+  await ask('CS 5800 讲什么？');
+  await waitFor(() =>
+    expect(screen.getAllByRole('region', { name: /轮问答$/ })).toHaveLength(2),
+  );
+  await answered();
+  expect(box).toHaveFocus();
+  expect(focus.mock.contexts).not.toContain(
+    screen.getByRole('group', { name: '对话' }),
+  );
 });

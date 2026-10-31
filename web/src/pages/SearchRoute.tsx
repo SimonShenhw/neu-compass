@@ -16,6 +16,7 @@ import { Select } from '../components/Select';
 import { SearchConversation } from '../features/search-answer/SearchConversation';
 import { SearchLanding } from '../features/search-landing/SearchLanding';
 import { useAccount, viewerScope } from '../layout/account';
+import { focusLost } from '../layout/mainContent';
 import { showsNewestQuestion, useSearch } from '../layout/SearchContext';
 import { oneLine } from '../models/courseDetailFormat';
 import { coursePath } from '../models/coursePath';
@@ -159,31 +160,33 @@ function SearchColumn() {
     ...coopListQuery(scope ?? 'pending'),
     enabled: landing && scope !== null,
   });
-  // From the landing into the conversation, the button pressed is gone with the landing: focus goes to the
-  // conversation, without scrolling (R3d spec 3; the focus rule of 10-25).
+  // A question just asked comes into view, with its answer to be read below it: one asked here (the ask box, a sample
+  // question, a follow-up), and one asked from a course page, which opens the search page with NEWEST_QUESTION. Not
+  // when the page only shows the conversation again (R6, the user's choice of 10-29). The shell's own scroll to the top
+  // runs first. A sample question's button goes with the landing, and a follow-up's with the turn it was under, so
+  // focus left on nothing goes to the conversation, which stays, without scrolling (R3d spec 3, review A34). Focus
+  // elsewhere, as in the ask box, stays there, for the first question as for those after it (the focus rule of 10-25).
   const region = useRef<HTMLDivElement>(null);
-  const wasLanding = useRef(landing);
-  useEffect(() => {
-    if (wasLanding.current && !landing)
-      region.current?.focus({ preventScroll: true });
-    wasLanding.current = landing;
-  }, [landing]);
-  // A question just asked comes into view, with its answer to be read below it: one asked here (the ask box, a
-  // follow-up), and one asked from a course page, which opens the search page with NEWEST_QUESTION. Not when the page
-  // only shows the conversation again (R6, the user's choice of 10-29). The shell's own scroll to the top runs first.
-  const { state } = useLocation();
+  const location = useLocation();
   const seen = useRef(search.turns.length);
-  const arrived = useRef(showsNewestQuestion(state));
+  const arrived = useRef(showsNewestQuestion(location.state));
   useEffect(() => {
     const asked = search.turns.length > seen.current || arrived.current;
     seen.current = search.turns.length;
     arrived.current = false;
     if (!asked || landing) return;
+    if (focusLost()) region.current?.focus({ preventScroll: true });
     const questions = region.current?.querySelectorAll<HTMLElement>(
       '[data-kind="question"]',
     );
     questions?.[questions.length - 1]?.scrollIntoView({ block: 'start' });
   }, [search.turns.length, landing]);
+  // NEWEST_QUESTION is read once: Back or Forward to this entry later shows the conversation again, as coming back to
+  // the page does, without bringing the newest question into view a second time (reviews A34, B34).
+  useEffect(() => {
+    if (showsNewestQuestion(location.state))
+      void navigate(location, { replace: true, state: null });
+  }, [location, navigate]);
 
   if (landing) {
     const loads = Object.fromEntries(

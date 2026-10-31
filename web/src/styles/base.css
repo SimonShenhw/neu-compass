@@ -7,10 +7,14 @@
 * {
   box-sizing: border-box;
 }
-/* What is focused or scrolled into view stays clear of the ask box held at the bottom (AskBar sets the height while
-   it is on the page; R6). */
-html {
-  scroll-padding-bottom: var(--ask-bar-height, var(--space-0));
+/* What is focused or scrolled into view on the page stays clear of the ask box held at the bottom (AskBar sets the
+   height while it is on the page, and is held from the same window height; R6). A margin on what the page shows, not
+   a padding on the window: the box's own controls are in view where they are, and with the padding the page jumped
+   down whenever one of them took focus (review A34). */
+@media (min-height: 500px) {
+  #main-content * {
+    scroll-margin-bottom: var(--ask-bar-height, var(--space-0));
+  }
 }
 body {
   margin: var(--space-0);

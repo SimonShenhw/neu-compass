@@ -13,10 +13,13 @@ import {
 // App imports demoRoutes (a path from the project root, which Vite resolves there), and stops if a demo page, its
 // data or a test helper reaches it by any other import.
 export const NO_DEMO_ROUTES = '/src/demoRoutes.none.tsx';
-// Under the project's src/: the demo pages, shell and hooks, and the data behind them; the tests' helpers; every
-// fixture. Compared without case and with / for separators, as module IDs come on Windows.
+// Under the project's src/: the demo pages, shell and hooks, and the data behind them, by a name with Demo in it or in
+// features/demo/; the tests' helpers; every fixture. With / for separators, as module IDs come on Windows, and the
+// project root compared without case (Windows gives the drive either way). The rest keeps its case, or
+// demoRoutes.none.tsx would read as a demo; a path written in another case resolves only on Windows, not in CI or
+// the image's build (reviews A34, B34).
 const DEMO_OR_TEST =
-  /^(?:fixtures\/|test\/|demoRoutes\.tsx$|(?:[^/]*\/)*[^/]*(?:Demo|TestUtils)[^/]*$)/;
+  /^(?:fixtures\/|test\/|features\/demo\/|demoRoutes\.tsx$|(?:[^/]*\/)*[^/]*(?:Demo|TestUtils)[^/]*$)/;
 export function demoOrTestModule(id: string, root: string) {
   const source = `${root.replaceAll('\\', '/').replace(/\/+$/, '')}/src/`;
   const path = id.replaceAll('\\', '/');

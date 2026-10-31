@@ -149,28 +149,38 @@ it('a lookup that fails for a moment says so and can be tried again', async () =
 });
 
 // The failure and its button give way to the loading line, so focus used to fall to the body (section 38's known
-// item); now it goes to the course's panel, which stays, without scrolling (R6).
+// item); now it goes to the course's panel, which stays, without scrolling (R6), and is named for the course (review
+// A34). Opened from an answer, a landing pick or the comparison, the page has the course's ID and asks no lookup
+// (review B34).
 it.each([
-  ['the code’s lookup', '/resolve/course', LOOKUP_FAILED],
-  ['the detail', '/course/c-cs-6140', /^无法加载课程详情。/],
+  ['the code’s lookup', '/resolve/course', LOOKUP_FAILED, null],
+  ['the detail', '/course/c-cs-6140', /^无法加载课程详情。/, null],
+  [
+    'the detail of a course opened with its ID',
+    '/course/c-cs-6140',
+    /^无法加载课程详情。/,
+    { courseId: 'c-cs-6140' },
+  ],
 ])(
   '重新加载 after %s failed for a moment hands focus to the course’s panel, still there once the course is shown',
-  async (_name, path, failed) => {
+  async (_name, path, failed, state) => {
     const user = userEvent.setup();
     let down = true;
-    world((call) =>
+    const api = world((call) =>
       call.path === path && down
         ? apiError(503, 'service_unavailable', 'down')
         : undefined,
     );
-    page('/course/CS-6140');
+    page({ pathname: '/course/CS-6140', state });
     expect(await screen.findByText(failed)).toBeInTheDocument();
+    expect(api.count('GET', '/resolve/course')).toBe(state === null ? 1 : 0);
     down = false;
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
     await user.click(screen.getByRole('button', { name: '重新加载' }));
     const panel = screen.getByRole('link', {
       name: '回到课程搜索',
     }).parentElement!;
+    expect(panel).toBe(screen.getByRole('group', { name: 'CS 6140' }));
     expect(panel).toHaveFocus();
     expect(focus.mock.calls[focus.mock.contexts.indexOf(panel)]).toEqual([
       { preventScroll: true },
@@ -490,14 +500,38 @@ it('a question asked on a course page opens the search page with that question i
     'CS 6140 讲什么？{Enter}',
   );
   await waitFor(() => expect(where()).toBe('/'));
-  expect(stateOf()).toEqual({ show: 'newest-question' });
   await waitFor(() => expect(order.at(-1)).toBe('into CS 6140 讲什么？'));
+  // Read once: the entry keeps no state that would bring the question into view again (reviews A34, B34).
+  expect(stateOf()).toBeNull();
   expect(order.lastIndexOf('top')).toBeGreaterThan(-1);
   expect(order.lastIndexOf('top')).toBeLessThan(
     order.lastIndexOf('into CS 6140 讲什么？'),
   );
   expect(into.mock.calls.at(-1)).toEqual([{ block: 'start' }]);
   expect(screen.getByRole('main')).toHaveFocus();
+});
+
+// Back or Forward to that entry used to bring the newest question into view again, as the state stayed in it
+// (reviews A34, B34); it shows the conversation again, as coming back to the page does.
+it('Back to the search page a course-page question opened does not bring the newest question into view again', async () => {
+  world();
+  page('/course/CS-6140');
+  await heading('Machine Learning');
+  await userEvent.type(
+    screen.getByRole('textbox', { name: '课程问题' }),
+    'CS 6140 讲什么？{Enter}',
+  );
+  await waitFor(() => expect(where()).toBe('/'));
+  await screen.findByRole('group', { name: '接着问' });
+  await userEvent.click(
+    screen.getAllByRole('button', { name: '查看 CS 6140' })[0]!,
+  );
+  await heading('Machine Learning');
+  const into = vi.spyOn(Element.prototype, 'scrollIntoView');
+  await userEvent.click(screen.getByRole('button', { name: 'back' }));
+  await waitFor(() => expect(where()).toBe('/'));
+  await screen.findByRole('region', { name: '第 1 轮问答' });
+  expect(into).not.toHaveBeenCalled();
 });
 
 // On a laptop's width the course showed under the whole conversation, or under the landing (R6, the user's choice of
