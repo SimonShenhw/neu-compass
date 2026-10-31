@@ -60,10 +60,12 @@ export function ProgramList({
                   </span>
                 </div>
                 <Line kind="note">{`旧课程表标签未核验 · 可用版本化规则 ${p.plan_count} 份`}</Line>
+                {/* Named by what it says, then the program: the name starts with the words on the button (WCAG 2.5.3,
+                    axe's label-content-name-mismatch), and no two buttons share it. */}
                 <Button
                   data-kind="button"
                   data-program-id={p.program_id}
-                  aria-label={`查看 ${oneLine(p.prefix)} 的课程表`}
+                  aria-label={`查看课程表（${oneLine(p.prefix)}）`}
                   onClick={() => onOpenProgram(p.program_id)}
                 >
                   查看课程表

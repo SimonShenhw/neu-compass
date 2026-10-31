@@ -14,6 +14,10 @@ function files(directory: string): string[] {
         'coverage',
         '.vite',
         'artifacts',
+        // What tools/e2e installs and what a run of it leaves (.gitignore).
+        '.browsers',
+        'test-results',
+        'playwright-report',
       ].includes(entry.name)
     )
       return [];
@@ -22,12 +26,18 @@ function files(directory: string): string[] {
   });
 }
 
-it('direct dependencies are exact, stable pins; TanStack Query is the only data library and no e2e library is installed', () => {
+type Package = {
+  engines?: Record<string, string>;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+};
+const readPackage = (file: string) =>
+  JSON.parse(readFileSync(resolve(root, file), 'utf8')) as Package;
+
+it('direct dependencies are exact, stable pins; TanStack Query is the only data library and the site installs no e2e library', () => {
   for (const file of ['package.json', 'tools/openapi-types/package.json']) {
-    const pkg = JSON.parse(readFileSync(resolve(root, file), 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
+    const pkg = readPackage(file);
     for (const [name, version] of Object.entries({
       ...pkg.dependencies,
       ...pkg.devDependencies,
@@ -38,6 +48,66 @@ it('direct dependencies are exact, stable pins; TanStack Query is the only data 
       );
       if (name.includes('tanstack')) expect(name).toBe('@tanstack/react-query');
     }
+  }
+});
+
+// R6's end-to-end tests are a package of their own: Playwright and axe's runner for it are in none of the site's
+// dependencies, and nothing of the site imports them. The browser is Chromium's headless shell only, the download
+// agreed for R6, into tools/e2e/.browsers (playwright.mjs).
+it('Playwright is in tools/e2e only, exactly pinned, with the TypeScript and Node of the site, and src never imports it', () => {
+  const site = readPackage('package.json');
+  const e2e = readPackage('tools/e2e/package.json');
+  expect(e2e.dependencies).toBeUndefined();
+  expect(Object.keys(e2e.devDependencies ?? {}).sort()).toEqual([
+    '@axe-core/playwright',
+    '@playwright/test',
+    '@types/node',
+    'typescript',
+  ]);
+  for (const [name, version] of Object.entries(e2e.devDependencies ?? {}))
+    expect(version, `tools/e2e: ${name}`).toMatch(/^\d+\.\d+\.\d+$/);
+  for (const name of ['typescript', '@types/node'])
+    expect(e2e.devDependencies?.[name], name).toBe(
+      site.devDependencies?.[name],
+    );
+  expect(e2e.engines).toEqual(site.engines);
+  expect(e2e.scripts?.browser).toBe(
+    'node playwright.mjs install --only-shell chromium',
+  );
+  // Its tests are *.e2e.ts: a *.test.* or *.spec.* file would be Vitest's.
+  expect(
+    files(resolve(root, 'tools/e2e'))
+      .map((path) => relative(root, path).split(sep).join('/'))
+      .filter((name) => /\.(test|spec)\./.test(name)),
+  ).toEqual([]);
+  for (const path of files(resolve(root, 'src')).filter((path) =>
+    /\.tsx?$/.test(path),
+  )) {
+    const source = ts.createSourceFile(
+      path,
+      readFileSync(path, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    function visit(node: ts.Node) {
+      const specifier =
+        (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+        node.moduleSpecifier &&
+        ts.isStringLiteralLike(node.moduleSpecifier)
+          ? node.moduleSpecifier.text
+          : ts.isCallExpression(node) &&
+              node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+              node.arguments[0] &&
+              ts.isStringLiteralLike(node.arguments[0])
+            ? node.arguments[0].text
+            : null;
+      if (specifier !== null)
+        expect(specifier, relative(root, path)).not.toMatch(
+          /tools\/e2e|playwright/,
+        );
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
   }
 });
 

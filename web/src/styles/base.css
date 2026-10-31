@@ -60,6 +60,13 @@ a {
 a:hover {
   text-decoration: underline;
 }
+/* A link in a sentence is underlined: its colour alone does not set it apart from the words around it (WCAG 1.4.1,
+   axe's link-in-text-block in R6's end-to-end tests). The links that stand alone (the navigation, the brand, a source,
+   an action) are in no paragraph or list item, and stay as they are. */
+p a,
+li a {
+  text-decoration: underline;
+}
 h1,
 h2,
 h3,

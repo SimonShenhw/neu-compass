@@ -55,9 +55,10 @@ it.each(scenarios)(
         }),
       );
       await waitFor(() =>
-        expect(
-          screen.getByRole('region', { name: '回答反馈' }),
-        ).toHaveAttribute('aria-busy', 'false'),
+        expect(screen.getByRole('group', { name: '回答反馈' })).toHaveAttribute(
+          'aria-busy',
+          'false',
+        ),
       );
     }
     const defaults = defaultDisclosures(container);

@@ -87,7 +87,7 @@ it('the list opens a program at an address of its own, titled as the program lis
   const api = world();
   page('/programs');
   await userEvent.click(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   );
   expect(where()).toBe('/programs/cs-ms');
   expect(await opened()).toBeInTheDocument();
@@ -109,7 +109,7 @@ it('a list that cannot be read loads again, and focus goes to the list, without 
     await screen.findByRole('button', { name: '重新加载' }),
   );
   expect(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   ).toBeInTheDocument();
   const list = screen.getByRole('region', { name: '培养方案列表' });
   expect(list).toHaveFocus();
@@ -201,7 +201,7 @@ it('the plan chosen in a program stays through a visit to the list and back', as
   await userEvent.click(screen.getByRole('button', { name: '所有培养方案' }));
   expect(where()).toBe('/programs');
   await userEvent.click(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   );
   expect(await opened()).toHaveTextContent(STANDARD_PLAN);
 });
@@ -343,7 +343,7 @@ it('a /?program= ref that names no program opens the list and says so', async ()
   page('/?program=nope');
   await waitFor(() => expect(where()).toBe('/programs'));
   expect(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   ).toBeInTheDocument();
   // The sentence comes with a second turn of the address, once the list has been read.
   await waitFor(() =>

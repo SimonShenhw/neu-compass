@@ -6,3 +6,7 @@ coverage/
 *.tsbuildinfo
 *.log
 artifacts/
+# R6's end-to-end tests (tools/e2e): the browser they install, and what a run leaves.
+tools/e2e/.browsers/
+tools/e2e/test-results/
+tools/e2e/playwright-report/

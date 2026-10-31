@@ -5,7 +5,18 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'dist-dev-api/**', 'node_modules/**', 'coverage/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'dist-dev-api/**',
+      'node_modules/**',
+      'coverage/**',
+      // What tools/e2e installs and what a run of it leaves (.gitignore).
+      'tools/e2e/.browsers/**',
+      'tools/e2e/test-results/**',
+      'tools/e2e/playwright-report/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

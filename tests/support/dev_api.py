@@ -27,7 +27,11 @@ loses its query too (it carries the state). Both this and the dev server are on 
 site for the browser, so the SameSite=Lax session cookie goes along.
 
 Usage (WSL, from the repository root): python -m tests.support.dev_api [--port 8000] [--web-port 5173]
+[--answer-feedback] [--query-log-retention-days N]
 --web-port is the dev server's port when 5173 cannot be used (web/'s VITE_DEV_PORT; Windows can reserve 5173).
+--answer-feedback turns answer feedback on and --query-log-retention-days sets the query log's days, as production's
+compose does (on, 90); without them both are the code's defaults (off, 0). The web front end's end-to-end tests run
+with both (R6).
 
 中文：给新前端开发和验收用的本机 API，不连 Google、不加载模型、不用真实数据（R2b）。只在本机用，不部署，生产代码不
 import 它，API 里也没有任何测试模式；这里只是把测试套件自己的替身拼在一起：临时文件里的合成数据库，里面有
@@ -41,7 +45,8 @@ state 不对的链接和一个「取消」；模型换成 tests/conftest.py 的�
 断开、停得比前端等的还久。每个设置都从代码里的默认值开始，不管 .env 或环境变量怎么写；每次启动换一个会话密钥，所以重启
 就都登出了。访问日志和生产一样过滤，假登录页那条也去掉查询串（里面有 state）。它和开发服务器都在 127.0.0.1，同一个主机名，
 浏览器才把它们算作同一个站点，SameSite=Lax 的会话 cookie 才会跟着请求走。--web-port 是 5173 用不了时开发服务器的
-端口（web/ 的 VITE_DEV_PORT；Windows 可能把 5173 保留掉）。
+端口（web/ 的 VITE_DEV_PORT；Windows 可能把 5173 保留掉）。--answer-feedback 打开回答反馈，--query-log-retention-days
+设查询日志留几天，和生产的 compose 一样（开、90）；不给就都是代码的默认值（关、0）。新前端的端到端测试两个都给（R6）。
 """
 
 from __future__ import annotations
@@ -153,14 +158,17 @@ def pinned(settings) -> list[str]:
     return [name for name, field in type(settings).model_fields.items() if not field.is_required()]
 
 
-def configure(settings, db_path: Path, *, web_port: int = DEV_PORT) -> None:
+def configure(settings, db_path: Path, *, web_port: int = DEV_PORT, answer_feedback: bool = False,
+              retention_days: int = 0) -> None:
     """Point the process's settings at the synthetic world. Every setting first goes back to the code's default,
     whatever .env or the environment says (a request limit or a data path there would change what this API does),
     then the few this API needs are set. Only the Gemini key has no default and stays as it is; nothing here calls
-    Gemini. `web_port` is the dev server's (--web-port).
+    Gemini. `web_port` is the dev server's (--web-port); `answer_feedback` and `retention_days` are
+    --answer-feedback and --query-log-retention-days.
     中文：把这个进程的设置指向合成的那一套。每个设置先恢复成代码里的默认值，不管 .env 或环境变量怎么写（那里的限流或
     数据路径会改变这个 API 的行为），再设它需要的几项。只有 Gemini key 没有默认值，保持原样；这里不会调用 Gemini。
-    `web_port` 是开发服务器的端口（--web-port）。"""
+    `web_port` 是开发服务器的端口（--web-port）；`answer_feedback`、`retention_days` 是 --answer-feedback 和
+    --query-log-retention-days。"""
     fields = type(settings).model_fields
     for name in pinned(settings):
         setattr(settings, name, fields[name].get_default(call_default_factory=True))
@@ -171,7 +179,8 @@ def configure(settings, db_path: Path, *, web_port: int = DEV_PORT) -> None:
     settings.google_oauth_client_id = "dev-client-id"
     settings.google_oauth_client_secret = "dev-client-secret"
     settings.google_oauth_redirect_uri = f"{origins[0]}/"
-    settings.answer_feedback_enabled = False
+    settings.answer_feedback_enabled = answer_feedback
+    settings.query_log_retention_days = retention_days
 
 
 def seed_coop(conn) -> None:
@@ -328,17 +337,18 @@ class CutChat:
         await self.app(scope, replay, stop_early if how else send)
 
 
-def build_dev_app(db_path: Path, *, base: str, web_port: int = DEV_PORT) -> FastAPI:
+def build_dev_app(db_path: Path, *, base: str, web_port: int = DEV_PORT, answer_feedback: bool = False,
+                  retention_days: int = 0) -> FastAPI:
     """The real app (create_app) over the synthetic world; `base` is where this API answers, for the sign-in page, and
-    `web_port` the dev server's port.
+    `web_port` the dev server's port; `answer_feedback` and `retention_days` as configure() takes them.
     中文：真正的应用（create_app），跑在合成的那一套上；`base` 是这个 API 的地址，给登录页用；`web_port` 是开发服务器
-    的端口。"""
+    的端口；`answer_feedback`、`retention_days` 和 configure() 的一样。"""
     from config import settings  # noqa: PLC0415
 
     # Before anything imports the routes: api/routes/common.py copies rerank_pool_size when it is first imported, and
     # in this API's own process that happens just below (B26). 中文：要在任何东西 import 路由之前：api/routes/common.py
     # 第一次被 import 时就把 rerank_pool_size 拷走了，在这个 API 自己的进程里那就发生在下面几行（B26）。
-    configure(settings, db_path, web_port=web_port)
+    configure(settings, db_path, web_port=web_port, answer_feedback=answer_feedback, retention_days=retention_days)
 
     import api.google_oauth  # noqa: PLC0415
     from api.dependencies import (  # noqa: PLC0415
@@ -400,18 +410,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--web-port", type=int, default=DEV_PORT,
                         help="the dev server's port, as web/'s VITE_DEV_PORT (default 5173)")
+    parser.add_argument("--answer-feedback", action="store_true",
+                        help="answer feedback on, as production has it (default off)")
+    parser.add_argument("--query-log-retention-days", type=int, default=0, metavar="N",
+                        help="the query log's days, as QUERY_LOG_RETENTION_DAYS (production 90; default 0, off)")
     args = parser.parse_args(argv)
     # The range web/'s devPort takes; never the preview's port or this API's own. 中文：和 web/ 的 devPort 同一个范围；
     # 不能是 preview 的端口，也不能是这个 API 自己的。
     if not 1024 <= args.web_port <= 65535 or args.web_port in (PREVIEW_PORT, args.port):
         parser.error(f"--web-port must be a port from 1024 to 65535, other than {PREVIEW_PORT} and --port.")
+    # The range the setting takes (config/settings.py), checked here as assigning it is not. 中文：设置本身的范围
+    # （config/settings.py）；直接赋值不会检查，所以在这里查。
+    if not 0 <= args.query_log_retention_days <= 3650:
+        parser.error("--query-log-retention-days must be from 0 to 3650.")
     import uvicorn  # noqa: PLC0415
 
     with tempfile.TemporaryDirectory(prefix="nc-dev-api-") as directory:
         base = f"http://{HOST}:{args.port}"
-        app = build_dev_app(Path(directory) / "dev.sqlite3", base=base, web_port=args.web_port)
+        app = build_dev_app(Path(directory) / "dev.sqlite3", base=base, web_port=args.web_port,
+                            answer_feedback=args.answer_feedback, retention_days=args.query_log_retention_days)
         print(f"Dev API on {base} for {', '.join(front_ends(args.web_port))}. Synthetic data; fake Google at "
-              f"{base}{SIGN_IN_PATH}.")
+              f"{base}{SIGN_IN_PATH}. Answer feedback {'on' if args.answer_feedback else 'off'}, query log "
+              f"{args.query_log_retention_days} days.")
         uvicorn.run(app, host=HOST, port=args.port, log_level="info")
     return 0
 

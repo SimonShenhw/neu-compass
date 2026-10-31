@@ -129,7 +129,7 @@ it('all buttons call only their intended callback with the literal ID', () => {
       onRetry={retry}
     />,
   );
-  fireEvent.click(screen.getByRole('button', { name: '查看 P 的课程表' }));
+  fireEvent.click(screen.getByRole('button', { name: '查看课程表（P）' }));
   expect(open).toHaveBeenCalledExactlyOnceWith('literal-id');
   rerender(
     <ProgramList
@@ -257,7 +257,7 @@ it('a program card shows its prefix and full name on one line each', () => {
   expect(card.querySelector('[data-prefix]')!.textContent).toBe('CS X');
   expect(card.querySelector('[data-name]')!.textContent).toBe('Name Two');
   expect(
-    screen.getByRole('button', { name: '查看 CS X 的课程表' }),
+    screen.getByRole('button', { name: '查看课程表（CS X）' }),
   ).toBeInTheDocument();
 });
 it('empty curriculum notes and empty course notes show nothing', () => {

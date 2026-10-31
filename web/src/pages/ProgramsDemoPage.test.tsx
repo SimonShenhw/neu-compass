@@ -141,7 +141,7 @@ it('scenario and speed changes reset the whole session and stale read results ca
 it('interactive list opens a project, policies follow selection, refresh clears and back restores the list', async () => {
   page('?speed=instant');
   await userEvent.click(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   );
   await screen.findByRole('combobox', { name: /选择目录版本与路径/ });
   expect(
@@ -184,10 +184,10 @@ it('interactive list opens a project, policies follow selection, refresh clears 
   expect(document.querySelector('pre')).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: '所有培养方案' }));
   expect(
-    await screen.findAllByRole('button', { name: /的课程表/ }),
+    await screen.findAllByRole('button', { name: /^查看课程表（/ }),
   ).toHaveLength(4);
   await userEvent.click(
-    screen.getByRole('button', { name: '查看 DS 的课程表' }),
+    screen.getByRole('button', { name: '查看课程表（DS）' }),
   );
   await screen.findByRole('combobox', { name: /选择目录版本与路径/ });
   await choose(/普通 MS/);
@@ -269,7 +269,7 @@ it('choosing the same plan again after the placeholder reads its policies again'
 }, 20000);
 it('the first render takes no focus; opening a program and going back move it to the view now shown', async () => {
   page('?speed=instant');
-  const cs = await screen.findByRole('button', { name: '查看 CS 的课程表' });
+  const cs = await screen.findByRole('button', { name: '查看课程表（CS）' });
   expect(document.body).toHaveFocus();
   await userEvent.click(cs);
   expect(screen.getByRole('region', { name: '项目课程表' })).toHaveFocus();
@@ -330,7 +330,7 @@ it('a failed list takes no focus on its first render, and after retry focus stay
 it('after opening a program from the list, choosing a plan, viewing a course and refreshing keep focus where it was', async () => {
   page('?speed=instant');
   await userEvent.click(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   );
   expect(screen.getByRole('region', { name: '项目课程表' })).toHaveFocus();
   await choose(/2026-2027 · 普通 MS/);
@@ -351,7 +351,7 @@ it('after opening a program from the list, choosing a plan, viewing a course and
 it('the list and the curriculum take focus from the demo but are not Tab stops of their own', async () => {
   page('?speed=instant');
   await userEvent.click(
-    await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+    await screen.findByRole('button', { name: '查看课程表（CS）' }),
   );
   await userEvent.tab();
   expect(screen.getByRole('button', { name: '所有培养方案' })).toHaveFocus();
@@ -361,14 +361,14 @@ it('the list and the curriculum take focus from the demo but are not Tab stops o
   expect(screen.getByRole('region', { name: '培养方案列表' })).toHaveFocus();
   await userEvent.tab();
   expect(
-    screen.getByRole('button', { name: '查看 CS 的课程表' }),
+    screen.getByRole('button', { name: '查看课程表（CS）' }),
   ).toHaveFocus();
   await userEvent.tab({ shift: true });
   expect(screen.getByLabelText('速度')).toHaveFocus();
 });
 it('moving focus to the view now shown does not scroll the page', async () => {
   page('?speed=instant');
-  const cs = await screen.findByRole('button', { name: '查看 CS 的课程表' });
+  const cs = await screen.findByRole('button', { name: '查看课程表（CS）' });
   const focus = vi.spyOn(HTMLElement.prototype, 'focus');
   await userEvent.click(cs);
   expect(focus.mock.contexts.at(-1)).toBe(
@@ -425,7 +425,7 @@ it.each(['/programs-demo', '/PROGRAMS-DEMO/'])(
       </StrictMode>,
     );
     expect(
-      await screen.findByRole('button', { name: '查看 CS 的课程表' }),
+      await screen.findByRole('button', { name: '查看课程表（CS）' }),
     ).toBeInTheDocument();
     expect(client.getQueryCache().getAll()).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();

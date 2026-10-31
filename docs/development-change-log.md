@@ -5518,17 +5518,82 @@ R4c（#39）10-28 合并以后，React 前端的每一页都接上了真实接�
 
 - **「旧 seed」没统一**（方案第 1 节第 6 条的前半）：方案以为还有三处，实际在 52 个文件里，多数是照 Streamlit 生成、钉了哈希的标准答案（课程详情、对比、先修、培养方案）。改这几个字等于改一批标准答案、重钉哈希，「和 Streamlit 一字不差」也就没了。等 Streamlit 退役以后连同标准答案一起改。对比页「在培养方案里的位置」那一行现在还是「旧 seed 关系，未核验」。
 - **前端隐私的合成数据还是旧的那句**：R5c 从 API 导出、钉了哈希的隐私说明（`src/fixtures/privacy/`）里，「允许保存」的说明还是改以前的（有「清空对话」）。它只是接口的形状，页面照原样显示 API 给的字，没改。
-- **只在浏览器里量过的**：提问框从 500 像素高起粘底、main 里元素的 `scroll-margin-bottom`（连同焦点框那几像素）、最后一轮的最小高度（`100lvh`，第二轮起多的那 25 像素）、1200 宽以上对话放回左边，jsdom 都没有布局，测不到。这些都在浏览器里量过，第二个 PR 的 Playwright 对着构建测；它要开着回答反馈（开发 API 现在写死关着），加上放大和矮窗口的尺寸，再测点进输入框不跳（审查 A34）。提问框的 ResizeObserver 和 `routePresentation` 的 `__DEMO_ROUTES__` 原来也归在这里，第 34 轮补了 jsdom 的测试；`TopBar` 的锁和外壳的 `SAYS_WHO` 按 `routePresentation` 给的标题和地址找，构建里它们的演示那几项什么也对不上。
+- **只在浏览器里量过的**：提问框从 500 像素高起粘底、main 里元素的 `scroll-margin-bottom`（连同焦点框那几像素）、最后一轮的最小高度（`100lvh`，第二轮起多的那 25 像素）、1200 宽以上对话放回左边，jsdom 都没有布局，测不到。这些都在浏览器里量过，第二个 PR 的 Playwright 对着构建测；它要开着回答反馈（开发 API 现在写死关着），加上放大和矮窗口的尺寸，再测点进输入框不跳（审查 A34）；第 41 节做了。提问框的 ResizeObserver 和 `routePresentation` 的 `__DEMO_ROUTES__` 原来也归在这里，第 34 轮补了 jsdom 的测试；`TopBar` 的锁和外壳的 `SAYS_WHO` 按 `routePresentation` 给的标题和地址找，构建里它们的演示那几项什么也对不上。
 - **最后一轮下面的空白**：最后一条回答短的时候，下面空到提问框为止（第 10 条的代价，聊天应用常见的做法）。
 - **整页隐私说明里还没对上的两句**（不是这次引入的，R7 以前用户要通读整页，可以一起看；审查 A34）：「记了什么」那一条只说保存回答和 👍／👎，没提跟回答一起存的那些条件；「对话历史只多记轮数」里的数是 `len(req.history)`，数的是历史里的消息条数（一问一答算两条），不是轮数。
 - **离线演示外壳的跳过链接**还是页内链接（`features/demo/OfflineDemoShell.tsx`），它只在开发服务器和测试里，学生碰不到（审查 B34）。
 - **守关看不到的两样**：插件只看各块的 `moduleIds`，CSS 里 `url()` 引的资源和 `public/` 里的文件不在其中。现在 `public/` 只有网页图标，CSS 只引字体（审查 A34）。
-- **整页 axe 的 `link-in-text-block`**（serious，WCAG 1.4.1；复核第 1 轮 C1，R6 以前就有）：游客提示里的「规则」、提问框那句里的「数据与隐私」只靠颜色和正文分开，`base.css` 给链接去掉了下划线。第二个 PR 用 Playwright 对整页跑开着对比度的 axe，到时一起处理。
+- **整页 axe 的 `link-in-text-block`**（serious，WCAG 1.4.1；复核第 1 轮 C1，R6 以前就有）：游客提示里的「规则」、提问框那句里的「数据与隐私」只靠颜色和正文分开，`base.css` 给链接去掉了下划线。第二个 PR 用 Playwright 对整页跑开着对比度的 axe，到时一起处理。第 41 节给句子里的链接加了下划线。
 - **390 宽时输入框的占位文字折成两行**，第二行被一行高的输入框截掉（复核第 1 轮 C1，R6 以前就有）。
 - **按了评价按钮以后焦点掉到 body**（复核第 2 轮 R2C1，R6 以前就有）：`AnswerFeedback.tsx` 里按下的「有帮助」「没帮助」跟着变成禁用，焦点离开它，掉到 body。和这次修好的「发送问题」是同一类，改它就是改评价的产品逻辑，这一轮不动。
-- **两条以上带评价的回答时，整页 axe 报 `landmark-unique`**（moderate，属于 best-practice；复核第 2 轮 R2C1，R6 以前就有）：每条回答的「回答反馈」region 同名，结果卡片的「相关课程 1」也重名。第二个 PR 用 Playwright 对整页跑 axe 时会报出来，到时一起处理。
-- **方案第 1 节第 7 条还差的**：开着对比度的 axe 留给第二个 PR（要真浏览器）；聊天流的几种故障这次没再走（R3e 走过，这一批没改聊天）。
+- **两条以上带评价的回答时，整页 axe 报 `landmark-unique`**（moderate，属于 best-practice；复核第 2 轮 R2C1，R6 以前就有）：每条回答的「回答反馈」region 同名，结果卡片的「相关课程 1」也重名。第二个 PR 用 Playwright 对整页跑 axe 时会报出来，到时一起处理。第 41 节把这两样改成了 group。
+- **方案第 1 节第 7 条还差的**：开着对比度的 axe 留给第二个 PR（要真浏览器；第 41 节做了）；聊天流的几种故障这次没再走（R3e 走过，这一批没改聊天）。
 
 ### 发布状态
 
 分支 `feat/web-alignment`，从 main `4629e5f`（#39 合并以后）开，四个提交：`2399954` 是修补本身，`1bfe861` 是第 34 轮审查以后的修补，`f4b71bf` 是复核第 1 轮以后的修补，第四个是复核第 2 轮以后的修补。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
+
+## 41 — 端到端测试（R6 的第二个 PR，2026-10-31）
+
+### 范围与原因
+
+第 40 节的修补里有几样只有真浏览器量得到：提问框粘底、main 里元素的 `scroll-margin-bottom`、最后一轮的最小高度、1200 宽以上的两栏；还有真浏览器里的焦点，和开着对比度的整页 axe（`R6_PLAN.md` 第 1 节第 7 条）。10-29 用户定了加 Playwright、单独一个包、只用 Chromium，做成第二个 PR；10-31 下载以前又定了只装无头版（Chrome for Testing 156 的 `chrome-headless-shell`，连 FFmpeg、Winldd 约 120 MB），不装完整的 Chromium。方案 `r6/PR2_PLAYWRIGHT_PLAN.md`（评审目录）。从 main `1f5b5d8`（#40 合并以后）开 `feat/web-e2e`。整页 axe 找出三样 R6 以前就有的问题，两样第 40 节已记在「已知」，这一批一起改了。
+
+线上不变：新前端还没部署。后端只给开发 API 加了两个开关，生产代码不 import 它。
+
+### 已实现
+
+1. **开发 API 的两个开关**（`tests/support/dev_api.py`）：`--answer-feedback` 打开回答反馈，`--query-log-retention-days N` 设查询日志留几天，照生产的 compose（开着、90 天）。原来写死关着，页面上看不到生产那样带着勾选框和说明的提问框，第 34 轮审查 A34 的 HIGH 就是这样漏过走查的。默认照旧关着、0 天，原来的用法和测试都不变；天数只收设置本身认的 0–3650（`Field(ge=0, le=3650)`），别的数启动时就报错。`configure()`、`build_dev_app()` 各多两个参数；启动时那行字说开没开、留几天。
+2. **`web/tools/e2e/`，单独的包**：`@playwright/test` 1.64.1、`@axe-core/playwright` 4.14.0，TypeScript 6.0.3、`@types/node` 24.19.2 和 web 一样，自带 lockfile；web 的依赖里没有 Playwright。
+   - `playwright.mjs` 包一层 Playwright 的命令行：没设 `PLAYWRIGHT_BROWSERS_PATH` 时设成 `tools/e2e/.browsers`，浏览器装在项目里，装的和用的是同一个地方，不进用户目录。`npm run browser` 是 `install --only-shell chromium`，只装无头版。
+   - `playwright.config.ts`：测试文件叫 `*.e2e.ts`（`.test.`、`.spec.` 会被 Vitest 收走）；一个 worker、按顺序跑，因为只有一个开发 API，投稿、删号会改后面的测试看到的东西；不重试；两个项目，桌面 1440×900、手机 390×844，登录、方案、对比、Co-op 这些流程和构建的检查只在桌面，手机菜单只在手机；挂了留 trace 和截图，CI 里另出一份 HTML 报告。`webServer` 起开发 API（`uv run --frozen --no-sync python -m tests.support.dev_api --answer-feedback --query-log-retention-days 90`，等 `/ready`）和预览（`npm run preview:dev-api`）；本机已经开着就直接用（Windows 上开发 API 在 WSL 里跑）。
+   - `globalSetup.ts`：开测以前核对开发 API 开着回答反馈、`/privacy` 给了说明，4173 上的构建连的是 `http://127.0.0.1:8000`、里面没有正式 API 的地址。少一个开关时提问框只是矮一点，测试照样过，过得没道理；连正式 API 的构建，每条测试的问题都会发到正式站。
+   - 八个测试文件，两个项目各算一次共 66 条，其中 10 条按项目跳过（只在一种窗口跑的那几条）。每个文件测什么见 README「端到端测试 R6」。阈值：桌面提问框粘住的那块不超过窗口的 15%（第 40 节量的是 1440×900 上 118 像素，13%），手机不超过 30%（390×844 上 189），放大的两种不超过 30%。
+3. **整页 axe 找出来的三样**（都是 R6 以前就有的）：
+   - `link-in-text-block`（serious，WCAG 1.4.1；复核第 1 轮 C1 记过）：句子里的链接只靠颜色和正文分开，`base.css` 给链接去掉了下划线。加了 `p a, li a { text-decoration: underline; }`：游客提示里的「规则」、提问框那句里的「数据与隐私」、课程详情和对比表里官方目录的链接、回答里的链接（段落和列表里的）。单独放着的链接不在段落和列表项里，不变：侧栏导航、站名、方案和政策的来源、对比页的「查看」、「回到课程搜索」、404 的「返回首页」。axe 报的是首页、课程页上的三处；回答里的链接开发 API 的回答里没有，规则是同一条。
+   - `landmark-unique`（moderate，best-practice；复核第 2 轮 R2C1 记过）：两轮以上带评价的对话里，每条回答的「回答反馈」region 同名，结果卡片的「相关课程 1」也重名。`AnswerFeedback.tsx`、`SearchParts.tsx` 的 `section` 换成 `role="group"` 的 `div`，名字不变：地标是每一轮自己（「第 n 轮问答」），读屏按地标跳到的是轮次，进去以后照样听得到评价和第几门课。没改成「第 n 轮回答反馈」这样的名字：每轮多出几个地标，地标列表更长。
+   - `label-content-name-mismatch`（serious，WCAG 2.5.3）：培养方案列表的按钮看得见的是「查看课程表」，名字是「查看 CS 的课程表」，看得见的字不在名字里，语音控制说「查看课程表」点不到它。名字改成「查看课程表（CS）」：以看得见的字开头，四个按钮仍然各是各的。
+4. **测试跟着名字走**：`SearchConversation.golden.test.tsx` 按 group 找「回答反馈」；`Programs.test.tsx`、`ProgramsDemoPage.test.tsx`、`ProgramsRoute.test.tsx` 按新名字找按钮（14 处，另有一个正则）。`AskBar.tsx` 的注释跟着改：「保存回答」不叫「回答反馈」，那是每条回答的评价，现在是 group。
+5. **CI**：`.github/workflows/ci.yml` 加 e2e job（End-to-end tests），跑在 ubuntu-24.04 上：Playwright 1.64 列了这一版要的系统库，`ubuntu-latest` 10-28 起是 26.04，不在它的列表里。装 uv、Python 3.12、`uv sync --frozen --extra dev`，Node 24、`npm ci`、`npm ci --prefix tools/e2e`；缓存 `web/tools/e2e/.browsers`（键是 e2e 的 lockfile）；`npm run browser --prefix tools/e2e -- --with-deps` 装无头版和它要的系统库；查 e2e 的类型；`build:dev-api`；`npm test --prefix tools/e2e`；挂了上传报告和 trace（留 7 天）。`GEMINI_API_KEY` 和测试 job 一样是占位的。
+6. **守关**：`contracts.test.ts` 遍历 web/ 时跳过 `.browsers`、`test-results`、`playwright-report`（不然要读浏览器的二进制）；新的一条查 `tools/e2e/package.json` 只有那四个依赖、都是精确版本，TypeScript、`@types/node`、`engines` 和 web 一样，`browser` 只装无头版，`tools/e2e` 里没有 `.test.`、`.spec.` 文件，`src/` 不 import `tools/e2e` 和 Playwright（静态、动态的都查）。第一条的名字改成「站点的包里没有 e2e 的库」。`eslint.config.js`、`.prettierignore` 也跳过这三个文件夹（Prettier 本来就读 `.gitignore`，写出来好查）。
+7. **文档**：README 新的「端到端测试 R6」一节，开头、「检查」、「无障碍与验收边界」和 R6 一节末句各改一处；第 40 节「已知」里这一批处理了的四条后面注明了。
+
+### 修改文件
+
+- 后端：`tests/support/dev_api.py`；后端测试：`tests/test_dev_api.py`。
+- CI：`.github/workflows/ci.yml`。
+- 前端新建：`web/tools/e2e/` 的 `package.json`、`package-lock.json`、`playwright.mjs`、`playwright.config.ts`、`globalSetup.ts`、`tsconfig.json`，`tests/support.ts` 和八个 `*.e2e.ts`（`askBox`、`newestQuestion`、`focus`、`coursePage`、`build`、`flows`、`menu`、`axe`）。
+- 前端改：`web/.gitignore`、`.prettierignore`、`eslint.config.js`；`src/styles/base.css`；`features/search-answer/AnswerFeedback.tsx`、`SearchParts.tsx`；`features/programs/ProgramList.tsx`；`layout/AskBar.tsx`（注释）。
+- 前端测试改：`src/test/contracts.test.ts`、`features/search-answer/SearchConversation.golden.test.tsx`、`features/programs/Programs.test.tsx`、`pages/ProgramsDemoPage.test.tsx`、`pages/ProgramsRoute.test.tsx`。
+- 文档：`web/README.md`；本节，第 40 节「已知」四处。
+
+数据库结构、检索、提示词和生产的 API 都没改。
+
+### 验证记录
+
+- **第一次跑**（用例刚写完，产品没改；那时 64 条）：43 过、12 挂、9 跳过，另有一处类型错误（`evaluate` 的参数要标成 `HTMLElement`）。挂的是上面第 3 条的三样，和用例自己的四处：
+  - 游客的隐私页没有删号的勾选框，那条等错了东西：改成等「数据与隐私内容」，另加一条登录以后、带删号那块的。
+  - 页面打开时焦点就在 main（外壳的 layout effect），第一下 Tab 往 main 里走，到不了跳过链接：改成把焦点放在链接上再按 Enter。
+  - 方案选择框的文字连着它的标签（标签在按钮里）：改成核对名字，「标签 方案」。
+  - 手机上第二轮的问题和回答比窗口减去提问框高：问题 58、回答 620（开着的相关课程 444、追问按钮 96），提问框上沿在 655，回答下沿在它下面 38 像素。改成回答在提问框上沿以上开始，桌面上整条在提问框上面。
+- **改完以后**：e2e 全套 66 条，56 过、10 条按项目跳过，本机约 52 秒。最后补了 `coursePage.e2e.ts` 手机那条：原来只看课程在第一屏，现在也核对对话那栏在页面里、不显示（手机上课程页只显示课程，照 R1 的版式）。
+- **e2e 变异**（评审目录 `r6/pr2/e2e_mutants.mjs`）：14 个，都杀掉了。每个在 web/ 的副本里改，`vite build --mode dev-api` 重新构建，换到 4173 上预览，再跑对口的用例；先跑不改的副本，11 条对口用例都过；跑完 worktree 一个文件都没变。布局 9 个：不粘底、两处 500 像素改成 300（提问框粘底和 `base.css` 留的边距）、勾选框放回表单、`scroll-margin-bottom` 不算提问框、最后一轮不留高度、第二轮起不加边框和内边距、两栏从 1500 宽起、手机的课程页显示对话；这次的产品改动 4 个：不加下划线、评价和课程卡片改回 region、按钮名改回去；跳过链接改回页内链接 1 个。`scroll-margin-bottom` 那个只有手机那遍杀得掉：桌面上回答短，控件本来就在提问框上面。
+- **开发 API 的变异**（`r6/pr2/dev_api_mutants.sh`）：7 个，都杀掉了：开关不生效、天数不生效、范围放宽一天（上下各一个）、`main` 不传开关和天数、`build_dev_app` 不传开关。
+- **前端检查**：类型、零警告 lint、两种构建、格式、`gen:api:check`、e2e 的类型都过；Vitest **92 个文件 2782 条**全过（多的一条是新的合约测试）；首屏 JavaScript gzip **186,441 字节**（`build:dev-api` 的 186,443）。按码位扫了 33 个改动文件：只有改动记录和 README 里原来就有的两个表情符号。
+- **后端**：`test_dev_api.py` 48 条过；全量 **5319 条**全过（9 分 31 秒），跑前跑后比了 33 个改动文件的哈希，没变。
+
+### 审查
+
+还没开（开以前先问用户）。
+
+### 已知、未处理
+
+- **页面打开时焦点在 main**，键盘用户从页面开头按 Tab 到不了跳过链接，要 Shift+Tab 往回走。外壳一直是这样（打开、换页都把焦点交给 main），这一批没改；跳过链接是给已经走到侧栏的人用的。
+- **CI 的 e2e job 还没在 GitHub 上跑过**：Linux 上中文用 `--with-deps` 装的系统字体，和 Windows 的不一样，阈值是在 Windows 上量的，CI 里可能差一点。挂了先看原因。
+- **只测了 Chromium 的无头版**（用户定的），Firefox、Safari 没测。Safari 点按钮不给它焦点那一类，还是靠 jsdom 的测试和第 40 节的做法。
+- **开发 API 的状态不在测试之间重置**：投稿那条用另一个账号、最后删号还原；登录那几条只用合成账号登录、登出。整套一个 worker 顺序跑，本机约 52 秒。
+- 第 40 节「已知」里其余几条照旧（旧 seed、前端隐私的合成数据、最后一轮下面的空白、隐私说明里两句、离线演示外壳的跳过链接、守关看不到的两样、390 宽时占位文字折行、按了评价按钮以后焦点掉到 body）。
+
+### 发布状态
+
+分支 `feat/web-e2e`，从 main `1f5b5d8`（#40 合并以后）开，一个提交。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
