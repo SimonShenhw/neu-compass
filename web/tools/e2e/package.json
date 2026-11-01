@@ -1,0 +1,21 @@
+{
+  "name": "neu-compass-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "End-to-end tests of a build of web/ in Chromium (R6). Its own package, so web/ itself installs no browser and no e2e library.",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "browser": "node playwright.mjs install --only-shell chromium",
+    "test": "node playwright.mjs test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "typescript": "6.0.3"
+  }
+}

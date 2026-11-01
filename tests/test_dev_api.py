@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 import api.dependencies
 import api.google_oauth
+from api.privacy_text import capture_notice
 from api.session_cookie import COOKIE_NAME
 from config import settings
 from tests.support import dev_api
@@ -204,6 +205,71 @@ def test_a_web_port_the_dev_server_cannot_have_is_refused(port, monkeypatch, cap
     with pytest.raises(SystemExit) as refused:
         dev_api.main(["--port", "8123", "--web-port", port])
     assert refused.value.code == 2 and "--web-port" in capsys.readouterr().err
+
+
+def test_answer_feedback_and_the_query_log_can_be_as_production_has_them(settings_back, tmp_path):
+    """--answer-feedback and --query-log-retention-days (R6): the opt-in, its notice and the votes, as production's
+    compose has them, for the web front end's end-to-end tests. 中文：和生产的 compose 一样打开回答反馈、设查询日志的
+    天数，给新前端的端到端测试用（R6）。"""
+    app = dev_api.build_dev_app(tmp_path / "dev.sqlite3", base="https://dev-api.test", answer_feedback=True,
+                                retention_days=90)
+    with TestClient(app, base_url="https://testserver") as client:
+        assert client.get("/config").json() == {"answer_feedback_enabled": True, "login_available": True}
+        assert client.get("/privacy").json()["capture_notice"] == capture_notice(90)
+
+
+@pytest.mark.parametrize("days", ["0", "90", "3650"])
+def test_answer_feedback_and_the_days_are_passed_on(days, settings_back, monkeypatch, capsys):
+    import uvicorn  # noqa: PLC0415
+
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: None)
+    assert dev_api.main(["--port", "8123", "--answer-feedback", "--query-log-retention-days", days]) == 0
+    assert settings.answer_feedback_enabled is True and settings.query_log_retention_days == int(days)
+    assert f"Answer feedback on, query log {days} days." in capsys.readouterr().out
+
+
+def test_without_them_answer_feedback_is_off_and_the_log_keeps_no_days(settings_back, monkeypatch, capsys):
+    # Whatever the process had before, as for every other setting. 中文：不管进程里原来是什么，和别的设置一样。
+    import uvicorn  # noqa: PLC0415
+
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: None)
+    settings.answer_feedback_enabled = True
+    settings.query_log_retention_days = 30
+    assert dev_api.main(["--port", "8123"]) == 0
+    assert settings.answer_feedback_enabled is False and settings.query_log_retention_days == 0
+    assert "Answer feedback off, query log 0 days." in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("days", ["-1", "3651"])
+def test_days_the_setting_cannot_have_are_refused(days, monkeypatch, capsys):
+    """The setting's own range (config/settings.py), which assigning it does not check. 中文：设置本身的范围；直接
+    赋值不会检查。"""
+    import uvicorn  # noqa: PLC0415
+
+    bounds = {type(rule).__name__: rule for rule in type(settings).model_fields["query_log_retention_days"].metadata}
+    assert (bounds["Ge"].ge, bounds["Le"].le) == (0, 3650)
+
+    def started(app, **options):
+        raise AssertionError(f"--query-log-retention-days {days} was let through")
+
+    monkeypatch.setattr(uvicorn, "run", started)
+    with pytest.raises(SystemExit) as refused:
+        dev_api.main(["--port", "8123", "--query-log-retention-days", days])
+    assert refused.value.code == 2
+    assert "--query-log-retention-days must be from 0 to 3650." in capsys.readouterr().err
+
+
+def test_build_dev_app_and_configure_without_the_two_are_off_with_no_days(settings_back, tmp_path):
+    """As the tests call them, without the two: off and 0, whatever the process had, as main() without the flags
+    (review B35). 中文：测试里直接调用、不给这两个参数时也是关、0，不管进程里原来是什么，和 main() 不带参数一样。"""
+    settings.answer_feedback_enabled = True
+    settings.query_log_retention_days = 30
+    dev_api.configure(settings, tmp_path / "configured.sqlite3")
+    assert settings.answer_feedback_enabled is False and settings.query_log_retention_days == 0
+    settings.answer_feedback_enabled = True
+    settings.query_log_retention_days = 30
+    dev_api.build_dev_app(tmp_path / "built.sqlite3", base="https://dev-api.test")
+    assert settings.answer_feedback_enabled is False and settings.query_log_retention_days == 0
 
 
 def test_a_code_the_sign_in_page_never_gave_is_refused_as_google_would():

@@ -102,8 +102,11 @@ function FeedbackButtons({
       if (mounted.current) setPending(false);
     }
   }
+  // A group, not a region: each answer has its votes, and a landmark of the same name in every turn could not be told
+  // apart (axe's landmark-unique). The turn is the landmark.
   return (
-    <section
+    <div
+      role="group"
       className={styles.feedback}
       aria-label="回答反馈"
       aria-busy={pending}
@@ -134,6 +137,6 @@ function FeedbackButtons({
       {rating !== null && (
         <SearchText>已记录评价，可点击另一项修改。</SearchText>
       )}
-    </section>
+    </div>
   );
 }

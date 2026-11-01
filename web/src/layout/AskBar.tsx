@@ -23,7 +23,8 @@ export const PLACEHOLDER =
 // height.
 export const ASK_BAR_HEIGHT = '--ask-bar-height';
 // Out of the form, the opt-in and its notice, or the line that nothing is saved, are a landmark of their own by this
-// name, found beside 提问 (recheck 1 of round 34). Not 回答反馈: each answer's votes are a region by that name (R3c).
+// name, found beside 提问 (recheck 1 of round 34). Not 回答反馈: each answer's votes are a group by that name (R3c; a
+// region until R6's end-to-end tests).
 export const CAPTURE_REGION = '保存回答';
 
 export function AskBar({ onSend }: { onSend: (question: string) => void }) {

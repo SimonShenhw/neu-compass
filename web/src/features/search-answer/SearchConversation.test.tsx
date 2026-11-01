@@ -509,3 +509,27 @@ it.each([
       .violations,
   ).toEqual([]);
 });
+// Two answers, each with its course and its votes (R6): the cards and the votes are groups in their turn, named alike
+// in every turn, never landmarks by the same names twice (axe's landmark-unique, which one turn cannot show; review
+// B35).
+it('search axe has no violations in two answers with their courses and votes, each a group of its turn', async () => {
+  const { container } = render(
+    <SearchConversation
+      {...props()}
+      turns={[1, 2].map((id) => fixtureTurn('feedback-receipt', id).turn)}
+      feedbackEnabled
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getAllByRole('group', { name: '回答反馈' })).toHaveLength(2),
+  );
+  expect(screen.getAllByRole('group', { name: '相关课程 1' })).toHaveLength(2);
+  expect(
+    screen.queryAllByRole('region', { name: /^(回答反馈|相关课程 \d+)$/ }),
+  ).toEqual([]);
+  await expandSearch(container);
+  expect(
+    (await axe(container, { rules: { 'color-contrast': { enabled: false } } }))
+      .violations,
+  ).toEqual([]);
+});

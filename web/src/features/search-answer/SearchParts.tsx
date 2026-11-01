@@ -113,8 +113,10 @@ export function RelatedCourses({
       <span data-kind="badge" className={styles.badge}>
         {matched.get(meta.matched_via) ?? '没有结果'}
       </span>
+      {/* Groups, as the votes are (AnswerFeedback.tsx): 相关课程 1 is in every answer that found a course. */}
       {meta.results.map((r, index) => (
-        <section
+        <div
+          role="group"
           className={styles.resultCard}
           key={index}
           aria-label={`相关课程 ${index + 1}`}
@@ -148,7 +150,7 @@ export function RelatedCourses({
           >
             查看
           </Button>
-        </section>
+        </div>
       ))}
     </SearchDisclosure>
   );

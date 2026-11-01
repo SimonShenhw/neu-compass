@@ -4,30 +4,64 @@ import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 const root = process.cwd();
+// What is installed, by its name wherever it is; what is built, or installed and left by tools/e2e's runs, where it
+// is made (.gitignore). A directory of src by one of those names is read like any other (review B35).
+const INSTALLED = ['node_modules'];
+const MADE = [
+  'dist',
+  'dist-dev-api',
+  'coverage',
+  '.vite',
+  'artifacts',
+  'tools/e2e/.browsers',
+  'tools/e2e/test-results',
+  'tools/e2e/playwright-report',
+];
 function files(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name);
     if (
-      [
-        'node_modules',
-        'dist',
-        'dist-dev-api',
-        'coverage',
-        '.vite',
-        'artifacts',
-      ].includes(entry.name)
+      INSTALLED.includes(entry.name) ||
+      MADE.includes(relative(root, path).split(sep).join('/'))
     )
       return [];
-    const path = resolve(directory, entry.name);
     return entry.isDirectory() ? files(path) : [path];
   });
 }
+// The files TypeScript reads as code, JavaScript among them.
+const CODE = /\.[cm]?[jt]sx?$/;
 
-it('direct dependencies are exact, stable pins; TanStack Query is the only data library and no e2e library is installed', () => {
+type Package = {
+  engines?: Record<string, string>;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+};
+const readPackage = (file: string) =>
+  JSON.parse(readFileSync(resolve(root, file), 'utf8')) as Package;
+const PACKAGES = [
+  'package.json',
+  'tools/openapi-types/package.json',
+  'tools/e2e/package.json',
+];
+
+// npm installs optional dependencies by default and peer ones since npm 7, and overrides change what it installs:
+// no package has them, so dependencies and devDependencies are all there is to check (review B35).
+it('no package has optional, peer or bundled dependencies, or overrides', () => {
+  for (const file of PACKAGES)
+    expect(
+      Object.keys(readPackage(file)).filter((field) =>
+        /^(optional|peer|bundle|bundled)Dependencies(Meta)?$|^overrides$/.test(
+          field,
+        ),
+      ),
+      file,
+    ).toEqual([]);
+});
+
+it('direct dependencies are exact, stable pins; TanStack Query is the only data library and the site installs no e2e library', () => {
   for (const file of ['package.json', 'tools/openapi-types/package.json']) {
-    const pkg = JSON.parse(readFileSync(resolve(root, file), 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
+    const pkg = readPackage(file);
     for (const [name, version] of Object.entries({
       ...pkg.dependencies,
       ...pkg.devDependencies,
@@ -38,6 +72,66 @@ it('direct dependencies are exact, stable pins; TanStack Query is the only data 
       );
       if (name.includes('tanstack')) expect(name).toBe('@tanstack/react-query');
     }
+  }
+});
+
+// R6's end-to-end tests are a package of their own: Playwright and axe's runner for it are in none of the site's
+// dependencies, and nothing of the site imports them. The browser is Chromium's headless shell only, the download
+// agreed for R6, into tools/e2e/.browsers (playwright.mjs).
+it('Playwright is in tools/e2e only, exactly pinned, with the TypeScript and Node of the site, and src never imports it', () => {
+  const site = readPackage('package.json');
+  const e2e = readPackage('tools/e2e/package.json');
+  expect(e2e.dependencies).toBeUndefined();
+  expect(Object.keys(e2e.devDependencies ?? {}).sort()).toEqual([
+    '@axe-core/playwright',
+    '@playwright/test',
+    '@types/node',
+    'typescript',
+  ]);
+  for (const [name, version] of Object.entries(e2e.devDependencies ?? {}))
+    expect(version, `tools/e2e: ${name}`).toMatch(/^\d+\.\d+\.\d+$/);
+  for (const name of ['typescript', '@types/node'])
+    expect(e2e.devDependencies?.[name], name).toBe(
+      site.devDependencies?.[name],
+    );
+  expect(e2e.engines).toEqual(site.engines);
+  expect(e2e.scripts?.browser).toBe(
+    'node playwright.mjs install --only-shell chromium',
+  );
+  // Its tests are *.e2e.ts: a *.test.* or *.spec.* file would be Vitest's.
+  expect(
+    files(resolve(root, 'tools/e2e'))
+      .map((path) => relative(root, path).split(sep).join('/'))
+      .filter((name) => /\.(test|spec)\./.test(name)),
+  ).toEqual([]);
+  for (const path of files(resolve(root, 'src')).filter((path) =>
+    CODE.test(path),
+  )) {
+    const source = ts.createSourceFile(
+      path,
+      readFileSync(path, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    function visit(node: ts.Node) {
+      const specifier =
+        (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+        node.moduleSpecifier &&
+        ts.isStringLiteralLike(node.moduleSpecifier)
+          ? node.moduleSpecifier.text
+          : ts.isCallExpression(node) &&
+              node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+              node.arguments[0] &&
+              ts.isStringLiteralLike(node.arguments[0])
+            ? node.arguments[0].text
+            : null;
+      if (specifier !== null)
+        expect(specifier, relative(root, path)).not.toMatch(
+          /tools\/e2e|playwright/,
+        );
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
   }
 });
 
@@ -92,7 +186,7 @@ it('the page describes itself to students, not as a prototype, and has an icon (
 
 it('first-party TypeScript has no any types and only the API client makes requests', () => {
   for (const path of files(resolve(root, 'src')).filter((path) =>
-    /\.tsx?$/.test(path),
+    CODE.test(path),
   )) {
     const name = relative(root, path).split(sep).join('/');
     const source = ts.createSourceFile(
@@ -136,6 +230,16 @@ it('all authored files use LF and CSS colors and font sizes come from tokens', (
       expect(withoutComments).not.toMatch(/https?:/);
     }
   }
+});
+
+// A link in a sentence is underlined, not set apart by its colour alone (WCAG 1.4.1, R6). jsdom loads no global style:
+// otherwise only the end-to-end tests' axe sees the rule, on the pages that have such a link (review B35).
+it('links in a paragraph or a list item are underlined', () => {
+  const css = readFileSync(
+    resolve(root, 'src/styles/base.css'),
+    'utf8',
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+  expect(css).toContain('\np a,\nli a {\n  text-decoration: underline;\n}\n');
 });
 
 it('normal text token pairs meet a 4.5:1 contrast threshold', () => {

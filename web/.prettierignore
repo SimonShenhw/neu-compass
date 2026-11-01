@@ -4,6 +4,10 @@ dist-dev-api/
 package-lock.json
 coverage/
 artifacts/
+# What tools/e2e installs and what a run of it leaves.
+tools/e2e/.browsers/
+tools/e2e/test-results/
+tools/e2e/playwright-report/
 # Written by scripts/export_openapi.py, whose --check (CI) owns its bytes.
 openapi.json
 # Reviewer API exports: preserve original bytes; verified by SHA-256 tests.

@@ -40,6 +40,72 @@ jobs:
       - name: Check types, lint, tests and build
         run: npm run check
 
+  # R6: Playwright in Chromium's headless shell, against a build for the dev API (tests/support/dev_api.py, synthetic
+  # data and a fake Google only), with answer feedback on as production has it. Playwright starts both servers
+  # (web/tools/e2e/playwright.config.ts). 中文：用 Chromium 无头版跑端到端测试，对着开发 API 的构建（只有合成数据和
+  # 假 Google），回答反馈照生产开着。
+  e2e:
+    name: End-to-end tests
+    # Pinned, not ubuntu-latest (26.04 since 10-28): the fonts and libraries the layout tests run with do not change
+    # with a new major version, though the image and the apt packages --with-deps installs are still updated within
+    # this one. Playwright 1.64 supports both.
+    runs-on: ubuntu-24.04
+    env:
+      # The dev API imports config.settings, which requires it; never sent anywhere (see the test job).
+      GEMINI_API_KEY: ci-placeholder-not-a-secret
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the API's dependencies
+        working-directory: .
+        run: uv sync --frozen --extra dev
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            web/tools/e2e/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright
+        run: npm ci --prefix tools/e2e
+      - name: Cache the browser
+        uses: actions/cache@v4
+        with:
+          path: web/tools/e2e/.browsers
+          key: playwright-shell-${{ runner.os }}-${{ hashFiles('web/tools/e2e/package-lock.json') }}
+      - name: Install the headless shell and the system libraries it needs
+        run: npm run browser --prefix tools/e2e -- --with-deps
+      - name: Check the end-to-end tests' types
+        run: npm run typecheck --prefix tools/e2e
+      - name: Build the site for the dev API
+        run: npm run build:dev-api
+      - name: Run the end-to-end tests
+        run: npm test --prefix tools/e2e
+      - name: Keep the report and traces of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            web/tools/e2e/playwright-report/
+            web/tools/e2e/test-results/
+          retention-days: 7
+
   test:
     name: Test & Integrity Checks
     runs-on: ubuntu-latest
