@@ -22,7 +22,10 @@
 #       originRequest:
 #         connectTimeout: 30s
 #         noTLSVerify: false
+#     - hostname: beta.neu-compass.me      # R7's beta: the web front end
+#       service: http://web:8080
 #     - service: http_status:404
+# At R7's switch, compass's entry routes to http://web:8080 too, and its old one is the way back.
 
 # Bounded container logs: the api emits one JSON line per request and
 # cloudflared is chatty — the default json-file driver grows UNBOUNDED
@@ -94,6 +97,11 @@ services:
       ANSWER_FEEDBACK_ENABLED: "true"
       # P4: GET /privacy (R2a) shows the address as the Streamlit page does. Keep equal to the ui value.
       PRIVACY_CONTACT_EMAIL: shen.haow@northeastern.edu
+      # R7: the web front end's origins (a JSON list), which CORS answers, which may send writes with the session
+      # cookie, and whose root Google may send a browser back to (Google Cloud Console must list it too). The beta
+      # only, until the switch adds https://compass.neu-compass.me. Set here, not in .env: compose's environment
+      # wins over env_file, so this is what runs.
+      WEB_ORIGINS: '["https://beta.neu-compass.me"]'
       # P5: one process-wide budget for POST /search and /chat (not per user, not a cost quota). Not measured on
       # the NAS: 4 at once ≈ two chat streams + two searches; burst 20; 0.5/s ≈ 30 a minute site-wide.
       REQUEST_GUARD_ENABLED: "true"
@@ -149,10 +157,11 @@ services:
     ports:
       - "8501:8501"
     healthcheck:
-      # Streamlit's built-in liveness endpoint. Lets cloudflared wait for
-      # the UI to actually bind 8501 (cold streamlit import takes seconds)
-      # instead of routing public traffic into 502s right after a deploy,
-      # and surfaces a crash-looping UI as unhealthy in `docker ps`.
+      # Streamlit's built-in liveness endpoint: surfaces a crash-looping UI
+      # as unhealthy in `docker ps`, and deploy.ps1 probes it. cloudflared
+      # no longer waits for it (R7): compass answers 502 for the few seconds
+      # a cold streamlit import takes after a deploy, instead of the whole
+      # tunnel waiting on the UI.
       test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
       interval: 30s
       timeout: 5s
@@ -161,6 +170,39 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  web:
+    # R7: the React front end (web/Dockerfile): a build of web/, served by nginx with no access log and the build's
+    # security headers. Built here on the NAS, as the api is. Beside ui during the beta; nothing depends on it, so a
+    # broken web keeps nothing else from starting.
+    # 中文：新前端。在 NAS 上构建；beta 期间和 ui 并存；没有服务等它，它坏了不影响别的服务起来。
+    build:
+      context: ./web
+      args:
+        # The API a page calls, and the site its shared links name: the beta's own until the switch (R7 plan,
+        # decision 2), then https://compass.neu-compass.me, rebuilt.
+        VITE_API_BASE_URL: https://api.neu-compass.me
+        VITE_PUBLIC_BASE_URL: https://beta.neu-compass.me
+    image: neu-compass-web:latest
+    container_name: neu-compass-web
+    restart: always
+    logging: *bounded-logging
+    # nginx as user 101 (the image's), writing nothing but /tmp (its pid and temp files).
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "8510:8080"                # on the NAS LAN/Tailscale, for deploy.ps1's probe, as 8000 and 8501 are
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   backup:
     # Daily SQLite snapshot sidecar (scripts/backup_daemon.py). A compose
@@ -200,8 +242,8 @@ services:
     command: tunnel --no-autoupdate run ce52553f-7fc3-48dc-923d-3dd9ea772f06
     volumes:
       - ./cloudflared:/etc/cloudflared:ro
+    # The api only (R7, decision 5): a front end that is not healthy, ui or web, no longer keeps the tunnel down, and
+    # with it the API and the other front end. Its hostname answers 502 until it is.
     depends_on:
       api:
-        condition: service_healthy
-      ui:
         condition: service_healthy

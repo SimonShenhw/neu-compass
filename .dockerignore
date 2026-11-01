@@ -58,6 +58,10 @@ backups/
 # Docs aren't needed at runtime (image stays smaller)
 docs/
 
+# The web front end has its own image (web/Dockerfile, built from web/). Never here: the api and ui run none of it,
+# and what a checkout installs or builds there (node_modules, dist, the e2e browser) is hundreds of MB (R7).
+web/
+
 # Logs
 *.log
 logs/

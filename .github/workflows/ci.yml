@@ -106,6 +106,42 @@ jobs:
             web/tools/e2e/test-results/
           retention-days: 7
 
+  # R7: the web front end's image as compose builds and runs it on the NAS (web/Dockerfile, docker-compose.yml's web
+  # service: its build arguments, read-only root, health check), checked from outside: every kind of response and its
+  # headers (web/deploy/check-site.ts), nginx as user 101, and no request in the log. Nothing reaches the NAS.
+  # 中文：照 NAS 上 compose 的做法构建、运行新前端的镜像，从外面核对每类响应和它的头、nginx 以 101 用户运行、
+  # 日志里没有请求。不碰 NAS。
+  web-image:
+    name: Web image
+    # Pinned, as the e2e job is.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and start the web service as compose has it
+        # Compose reads the api's env_file even to start only web: an empty one, which web never reads.
+        run: |
+          touch .env
+          docker compose up --build --detach --wait --wait-timeout 180 web
+      - name: Check what it serves
+        run: node web/deploy/check-site.ts http://127.0.0.1:8510 https://api.neu-compass.me
+      - name: Check it runs nginx as user 101 and logged no request
+        run: |
+          test "$(docker compose exec -T web id -u)" = 101
+          docker compose logs --no-log-prefix web > web.log
+          cat web.log
+          if grep -E 'GET |HEAD |HTTP/1\.|/course/|/assets/|/healthz' web.log; then
+            echo "::error::the web container logged a request"
+            exit 1
+          fi
+      - name: Show its log
+        if: failure()
+        run: docker compose logs web
+
   test:
     name: Test & Integrity Checks
     runs-on: ubuntu-latest

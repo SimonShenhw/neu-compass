@@ -7,7 +7,14 @@ export const API = 'http://127.0.0.1:8000';
 
 // Every test: its page asks nothing of anyone but the site and its API (the fonts are bundled, the icons inline), in
 // whatever state the test leaves it, a comparison table, a chosen plan, an account (review A35).
-export const test = base.extend<{ noThirdParty: void }>({
+// And nothing it does, a dialog, a select, a stream, a sign-in, is refused by the CSP the preview sends: the build's own
+// (deploy/securityHeaders.ts), the policy nginx sends in production (R7). The browser reports each refusal as a
+// securitypolicyviolation event, in whichever document of the test it happens; a test that makes one on purpose takes
+// cspViolations and empties it.
+export const test = base.extend<{
+  noThirdParty: void;
+  cspViolations: string[];
+}>({
   noThirdParty: [
     async ({ page }, use) => {
       const others = new Set<string>();
@@ -22,6 +29,42 @@ export const test = base.extend<{ noThirdParty: void }>({
       });
       await use();
       expect([...others], 'requests to other origins').toEqual([]);
+    },
+    { auto: true },
+  ],
+  cspViolations: [
+    async ({ page }, use) => {
+      const violations: string[] = [];
+      await page.exposeBinding(
+        'reportCspViolation',
+        (_source, report: string) => {
+          violations.push(report);
+        },
+      );
+      await page.addInitScript(() => {
+        document.addEventListener('securitypolicyviolation', (event) => {
+          const where = event.sourceFile
+            ? ` at ${event.sourceFile}:${event.lineNumber}`
+            : '';
+          (
+            window as unknown as { reportCspViolation(report: string): void }
+          ).reportCspViolation(
+            `${event.effectiveDirective} refused ${event.blockedURI}${where}`,
+          );
+        });
+      });
+      await use(violations);
+      // A report is an event queued after the refusal: let the page run once more before counting.
+      if (!page.isClosed())
+        await page
+          .evaluate(
+            () =>
+              new Promise((resolve) =>
+                requestAnimationFrame(() => setTimeout(resolve)),
+              ),
+          )
+          .catch(() => undefined);
+      expect(violations, 'CSP violations').toEqual([]);
     },
     { auto: true },
   ],

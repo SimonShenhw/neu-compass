@@ -5644,3 +5644,87 @@ R4c（#39）10-28 合并以后，React 前端的每一页都接上了真实接�
 ### 发布状态
 
 分支 `feat/web-e2e`，从 main `1f5b5d8`（#40 合并以后）开，三个提交：第一个是上面这些，第二个是第 35 轮审查的修补，第三个是复核第 1 轮的修补。没有使用真实模型、账号、NAS 或生产库；页面都对着本机的开发 API 和合成数据。上线要另外授权。
+
+## 42 — 新前端的部署件（R7 的 PR，2026-11-01）
+
+### 范围与原因
+
+R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，过了再切换，Streamlit 留一周当回退（总方案 `PLAN.md` 第 3 节；评审目录 `frontend_react/R7_PLAN.md`）。这一批只做部署要用的东西：前端的镜像、nginx 的配置和安全头、compose 的服务、部署脚本的打包和探测、CI 对镜像的核对。11-01 用户定了方案第 2 节的前四件，都照建议：beta 用 `beta.neu-compass.me`；beta 期间分享链接指向 beta，切换时重新构建改指 compass，beta 再留两周；镜像在 NAS 上构建；`cloudflared` 只等 `api`。验收谁做、Streamlit 什么时候删，不影响这个 PR，beta 部署前再定。从 `feat/web-e2e` 的 `0039b53`（#41，还没合并；合并用的是合并提交，#41 进了 main 以后这个 PR 只显示自己的提交）开 `feat/web-deploy`。
+
+线上不变：什么都没部署。部署、改 NAS 上的隧道配置、改 Cloudflare 和 Google Cloud Console，都要用户另外点头。
+
+### 已实现
+
+1. **前端的镜像**（`web/Dockerfile`，构建上下文 `web/`）：
+   - 第一段 `node:24.22.2-bookworm-slim`：先只拷 `package.json`、lockfile，`npm ci --no-audit --no-fund`；再拷其余的，`npm run build`（类型检查、构建、首屏体积检查，和 CI 一样），`deploy/render-headers.ts` 把构建写下的安全头渲染成 nginx 的 `add_header`，最后删掉 `dist/.vite/`（manifest 和安全头的文件，不该被访问到）。
+   - 第二段 `nginxinc/nginx-unprivileged:1.30.6-alpine`：只放 `deploy/nginx.conf`、渲染出来的头和 `dist/`（到 `/srv/www`），没有 `RUN`。nginx 以用户 101 运行、监听 8080。
+   - 两个基础镜像都钉 digest（和 `cloudflared` 一样），旁边的标签只给人看版本。构建参数 `VITE_API_BASE_URL`、`VITE_PUBLIC_BASE_URL` 必须给（`test -n`），放在 `npm ci` 后面，换值不重装依赖。
+   - `web/.dockerignore`：`node_modules`、构建和测试留下的、`tools/`（e2e 和类型生成器，构建用不着）、本机的 `.env*`（会改 Vite 构建出来的东西）。
+2. **nginx 的配置**（`web/deploy/nginx.conf`）：
+   - 页面路径：`try_files $uri /index.html`，`Cache-Control: no-cache`（浏览器照样用 ETag 重新验证，新构建马上看得到）。不用 `$uri/`：那样 `/assets` 这种目录会 301。
+   - `/assets/`：带哈希的文件 `public, max-age=31536000, immutable`；没有的文件 `=404`，不回 `index.html`，404 不带缓存头（`add_header` 不加 `always`）：部署前开着的页面要旧分块时干脆地失败，404 也不会被缓存一年。
+   - `/healthz`：`ok`，`no-store`，给 compose 的健康检查和部署脚本。
+   - 不记访问日志（页面路径里有学生看过的课号）；错误日志只记 error、`log_not_found off`（找不到文件不算错误，路径进不了日志）；`server_tokens off`；`charset utf-8`；不压缩（Cloudflare 给浏览器压缩，它和 nginx 之间是 NAS 自己的网络）。
+   - 每个 location 都 include 一次安全头：location 里有自己的 `add_header`，就不继承 server 那层的。
+3. **安全头**（`web/deploy/securityHeaders.ts`，一个函数，给 API 的来源）：
+   - CSP：`default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' <API>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。样式要内联：Radix 打开弹窗和选择框时，`react-remove-scroll-bar` 往页面里插一个 `<style>`，没有 nonce 可给。`connect-src` 带本站：Vite 的 modulepreload 补丁在不支持的浏览器里用 fetch 取分块。构建里没有 `data:` 的图片和字体（查过 `dist/assets`）。
+   - `Referrer-Policy: strict-origin-when-cross-origin`（R0 14.15：`index.html` 已经有，服务器上再设一次）、`X-Content-Type-Options: nosniff`。
+   - 只收来源：带路径、斜杠、查询的，或者想往策略里塞别的东西的，直接报错。
+4. **一份策略，两个服务器都发**（`web/vite.config.ts` 的插件 `neu-compass:security-headers`）：
+   - 构建时按这次连的 API 把头写进 `.vite/security-headers.json`；镜像从这个文件渲染（上面第 1 条），所以 nginx 发的策略和页面连的 API 是同一次构建定的。
+   - `vite preview` 照同一个文件给每个响应加头；构建没写这个文件就不启动。e2e 用的是预览，所以 e2e 跑在和生产同一份策略下，只有 API 不同（`http://127.0.0.1:8000`）。
+   - `deploy/render-headers.ts`：头名只许字母数字和连字符；值只许一行可打印的 ASCII，不许 `"`、`\` 和 `$`（nginx 会当变量读）；每行 `add_header 名 "值" always;`。Node 24 直接跑 TypeScript，镜像的构建阶段就这样用。
+5. **e2e 在 CSP 下跑**（`web/tools/e2e/`）：
+   - `tests/support.ts` 的自动 fixture 多一样：页面上被 CSP 拒掉的任何东西都让这条测试失败。用浏览器的 `securitypolicyviolation` 事件，经 `exposeBinding` 报回来，换了页面、去了假 Google 再回来都收得到；收尾前让页面再跑一帧，等排在后面的报告。故意制造一次的测试拿 `cspViolations` 自己清掉。
+   - `build.e2e.ts` 两条新的：预览在首页和深链上发的头就是 `securityHeaders()` 给的；页面里加一段内联脚本，它不执行，报告收到一条 `script-src-elem`（证明 fixture 不是空转）。
+6. **compose**（`docker-compose.yml`）：
+   - 新的 `web` 服务：从 `./web` 构建，参数是正式 API 和 beta 的站点；`restart: always`、日志有上限；只读根目录、`/tmp` 在内存里（nginx 的 pid 和临时文件）、去掉全部 capability、`no-new-privileges`；健康检查 `curl /healthz`（镜像里有 curl）；主机端口 8510 给部署脚本探测，和 8000、8501 一样只在 NAS 的局域网和 Tailscale 上。没有服务等它。
+   - `api` 加 `WEB_ORIGINS: '["https://beta.neu-compass.me"]'`：CORS、带 cookie 的写请求、Google 送回的地址都认它。写在 compose 里而不是 `.env`：compose 的 `environment` 压过 `env_file`，仓库里看到的就是跑着的。切换时加上 compass。
+   - `cloudflared` 只等 `api`（决定 5）：一个前端不健康，隧道、API 和另一个前端照常，坏的那个子域名回 502。`ui` 健康检查的注释跟着改。
+   - 文件头的隧道配置示例加了 beta 那一条（`http://web:8080`），写明切换时 compass 那条也指过去、原来那条就是回退。
+   - 根目录的 `.dockerignore` 加 `web/`：API 和 Streamlit 的镜像用不着它（查过运行时的代码，只有 `scripts/export_openapi.py` 写 `web/openapi.json`，那是开发和 CI 用的）。
+7. **部署脚本**（`scripts/deploy.ps1`）：
+   - 打包排除任何一层的 `node_modules`，和 `web/` 下的 `dist`、`dist-dev-api`、`coverage`、`.vite`、`artifacts`、e2e 的 `.browsers`、`test-results`、`playwright-report`（第 41 节「已知」的 B35 LOW-9）。`web/` 的源码照样传：镜像在 NAS 上从它构建。
+   - 探测加两步：`8510/healthz` 回 `ok`；深链 `/course/CS-5800` 回 200、是这个应用的 `index.html`（有 `<div id="root"></div>`），CSP 里 `connect-src` 是正式 API、有 `frame-ancestors 'none'`，还有 `nosniff` 和 referrer 策略。新加一个 `Get-HeaderValues`：PS5 的响应头是字符串、PS7 是字符串数组，按名字不分大小写取。出错提示的日志命令加上 `web`，最后列的公开地址加上 beta。
+8. **CI**（`.github/workflows/ci.yml`）新的 web-image job，跑在钉住的 ubuntu-24.04 上：`touch .env`（compose 起 `web` 也要读 `api` 的 `env_file`，空的，web 不读），`docker compose up --build --detach --wait --wait-timeout 180 web`，即 compose 里的构建参数、只读根目录、健康检查都照 NAS 那样；`node web/deploy/check-site.ts http://127.0.0.1:8510 https://api.neu-compass.me`；容器里 `id -u` 是 101；`docker compose logs` 里没有一条请求。不碰 NAS。
+9. **`web/deploy/check-site.ts`**：从外面核对一个跑着的站，CI 用它，部署以后也可以对 beta 用（只请求静态文件，不碰 API）。健康检查、首页、六个不是文件的路径（`/index.html`、两个深链、`/assets`、`.vite/` 下两个）都回同一个 `index.html` 且 `no-cache`；图标；首页引的那个分块缓存一年、类型对；缺的分块是 404、不是 `index.html`、没有缓存头；首页的 ETag 换来 304。每个响应的安全头都和 `securityHeaders(API)` 一字不差，`Server` 只有 `nginx`。不跟重定向。
+10. **测试**：
+    - Vitest：`deploy/securityHeaders.test.ts`（策略原样；只收来源；生产和 dev-api 两种构建各写对的文件；预览照文件发头、没有文件不启动；每种构建和预览都有这个插件）；`deploy/render-headers.test.ts`（原样渲染；七种值、四种名字、几种不是对象的都拒；用 node 跑这个文件，输出相同，不给文件就报用法）；`deploy/check-site.test.ts`（一个照 `nginx.conf` 回答的替身，通过；再一次错一样，十五种都抓到，报的是对的那句；请求顺序和只问本站也核对。fetch 打桩，和别的测试一样不上网）。`tsconfig.json` 把 `deploy` 加进来。
+    - 后端：`tests/test_web_deploy.py`（新的，只读文件）：分享链接的站点是 `WEB_ORIGINS` 里的唯一一个（beta），API 是正式的；`cloudflared` 只等 `api`、没有服务等 `web`；`web` 从 `./web` 构建、只读、`/tmp` 在内存里、去掉 capability、`no-new-privileges`、健康检查查 `/healthz`；部署脚本探测的端口和 API、CI 核对的端口和 API 都和 compose 一致；`web/.gitignore` 里每个目录，`web/.dockerignore` 和部署脚本的打包都排除了，根目录的 `.dockerignore` 有 `web/`；两个基础镜像钉了 digest、是 node 24 和 nginx-unprivileged。`tests/test_deploy_script.py`：成功的两种要有两个新探测；失败的加九种 web 的（连不上、健康检查不对、深链 404、不是这个应用、没有 CSP、CSP 是别的 API、没有 `frame-ancestors`、没有 `nosniff`、没有 referrer 策略），PS5 那条也跑这九种。
+11. **文档**：README 新的「部署 R7」一节；「接口层与登录 R2b」里 Referrer 和「上线前（R7）」两条改了（`WEB_ORIGINS` 设好了，Google 的回调地址还要用户加）。
+
+### 修改文件
+
+- 新建：`web/Dockerfile`、`web/.dockerignore`；`web/deploy/` 的 `nginx.conf`、`securityHeaders.ts`、`render-headers.ts`、`check-site.ts` 和三个测试；`tests/test_web_deploy.py`。
+- 改：`docker-compose.yml`、`.dockerignore`、`scripts/deploy.ps1`、`.github/workflows/ci.yml`；`web/vite.config.ts`、`web/tsconfig.json`；`web/tools/e2e/tests/support.ts`、`build.e2e.ts`；`tests/test_deploy_script.py`。
+- 文档：`web/README.md`；本节。
+
+产品代码（`web/src/`、API、数据库、检索、提示词）都没改。
+
+### 验证记录
+
+本机的 Docker Desktop 起不来，镜像本身第一次在 CI 的 web-image job 里构建（下面「已知」第 1 条）。nginx 那一半在 WSL 里用同一个镜像的文件跑：按 digest 从 Docker Hub 取 `nginx-unprivileged:1.30.6-alpine`，每一层核过 sha256，解包后在非特权的 user namespace 里 chroot，只读根目录、`/tmp` 在内存里，跑镜像自己的 entrypoint 和这里的 `nginx.conf`、渲染出来的头。
+
+- **前端检查**：格式、`gen:api:check`、类型（连 `deploy/`）、零警告 lint、e2e 的类型都过；Vitest **95 个文件 2808 条**全过（多的三个文件是 `deploy/` 的测试）；两种构建都过，首屏 JavaScript gzip **186,441 字节**（`build:dev-api` 的 186,443），和第 41 节一样。
+- **e2e**：对 `vite preview` 58 过、10 条按项目跳过（55.4 秒）；对 WSL 里的真 nginx（4173 上的 dev-api 构建和它的头）也是 58 过、10 跳过（53.2 秒），nginx 的日志里一条请求都没有。
+- **`check-site.ts` 对真 nginx**：生产构建（8510，正式 API 的策略）和 dev-api 构建（4173，`http://127.0.0.1:8000` 的策略）都过。
+- **nginx 的变异**（评审目录 `r7/nginx_mutants.mjs`，每个改一处配置或头，起真 nginx，用 `check-site.ts` 核对）：21 个，杀掉 19 个：三种 location 各少一次头、不加 `always`、页面回退经过 `$uri/`、缺的分块回 `index.html` 或缓存一年、页面缓存一小时、`server_tokens on`、开访问日志、去掉 `charset`、root 指错、健康检查可缓存、别的 API 的策略、没有 referrer 策略、没有 `/assets/` 或 `/healthz` 的 location、镜像里留着 `.vite/`、没有 `frame-ancestors`。活下来的两个是等价的（「已知」第 2 条）。
+- **Vitest 的变异**（`r7/vitest_mutants.mjs`，在 web/ 的副本里）：21 个。第一遍杀掉 19 个，活下来的是「缺的分块只看内容」和「`index.html` 什么类型都行」：`check-site.test.ts` 的替身补了这两种错法（共十五种），第二遍 21 个都杀掉。
+- **Python 的变异**（`r7/py_mutants.py`，在仓库的副本里）：30 个都杀掉。`test_web_deploy.py` 对口的 20 个：分享链接指 compass、`WEB_ORIGINS` 没有 beta、`cloudflared` 又等 `ui` 或也等 `web`、`web` 不只读、`/tmp` 不在内存里、健康检查查 `/`、compose／部署脚本／CI 的端口或 API 各改一处、API 的镜像收 `web/`、web 的镜像收 `node_modules` 或 `tools/`、打包带上 e2e 的浏览器或 `node_modules`、node 只钉标签、换成以 root 跑的 nginx、不去掉 capability、构建给别的 API。`test_deploy_script.py` 对口的 10 个：没有 web 的健康探测、健康检查的内容不看、深链的状态不看、不看应用的根节点、不查 CSP、CSP 里什么 API 都行、不查 `frame-ancestors`、不查 `nosniff`、不查 referrer 策略、两个头有一个就行。跑完 worktree 的文件没变。
+- **CSP 的 e2e 变异**（`r7/e2e_csp_mutants.mjs`，每个换一份头，真 nginx 发，跑 e2e 全套，第一条失败就停）：先跑不改的，58 过、10 跳过；6 个都杀掉：样式不许内联、`connect-src` 没有 API、不许图片、不许字体、整份策略去掉、去掉 referrer 策略。图片、字体两个是 fixture 报的拒绝杀掉的，`connect-src` 那个是页面等不到 API 的内容。样式那个先挂在头的那条测试上，所以去掉那条再跑一次（`--grep-invert`）：fixture 报 Radix 的 `<style>` 被拒，照样杀掉。
+- **后端**：`test_deploy_script.py`、`test_web_deploy.py`、`test_opt06_review_round17_routes.py` 116 条过，ruff 干净；全量 **5335 条**全过（9 分 54 秒），跑前跑后比了 21 个改动文件的哈希，没变。
+- **码位**：这个 PR 新加的 1169 行（21 个文件）里没有格式字符、私用区、控制字符和表情符号。改动记录和 README 以外的非 ASCII：CI、compose、Dockerfile、`nginx.conf`、`test_web_deploy.py` 的中文注释（仓库原来的写法），三个测试标题里的 `’`，`deploy.ps1` 一处注释里的长破折号（这个文件本来就带 BOM、有中文注释，Windows PowerShell 5.1 那条测试照常过）。没有 CR。
+
+### 已知、未处理
+
+- **镜像没在本机构建过**：nginx 那一半在 WSL 里跑过（上面），和容器的差别是 namespace 里的 uid 0、单进程（`master_process off`）、日志写成文件。node 那一段（`npm ci`、构建、渲染头）、uid 101、compose 的只读根目录、capability、健康检查，第一次在 CI 里跑。挂了先看原因。
+- **两个等价的 nginx 变异**：`log_not_found on` 和错误日志记到 info。`try_files` 找不到文件不记日志，这份配置里也没有低于 error 的日志，这两行现在是多一道保险，测不出来。
+- **样式要 `'unsafe-inline'`**：Radix 插的 `<style>` 内容随滚动条宽度和弹层的编号变，给不了哈希，静态文件也没有 nonce 可给。脚本仍只许本站，能注入的只有样式。
+- **Cloudflare 往页面里插脚本的功能会被 CSP 挡住**（Rocket Loader、邮件地址混淆、Web Analytics 的自动注入之类），e2e 测不到 Cloudflare：上线前要确认 beta、compass 都没开（R7 方案第 3 节，用户做）。
+- **`check-site.ts` 只看静态文件**：CORS、cookie、Google 登录回来的地址要在 beta 上照验收清单走。
+- **切换时要跟着改的**：compose 里 `web` 的 `VITE_PUBLIC_BASE_URL`（改成 compass）和 `api` 的 `WEB_ORIGINS`（加上 compass）；`test_web_deploy.py` 第一条（现在要求分享站点就是 beta、是唯一的来源）；NAS 上隧道配置的 compass 那条；README「部署 R7」。
+- **NAS 上第一次构建要拉 node 和 nginx 的镜像、装 npm 的包**（用户定了在 NAS 上构建），那次部署比平常慢。
+
+### 发布状态
+
+分支 `feat/web-deploy`，从 `feat/web-e2e` 的 `0039b53` 开，一个提交。没有使用真实模型、账号、NAS 或生产库；本机只对着开发 API 和合成数据，镜像和 nginx 都只在本机和 CI 里起。上线分两步（用户定的）：第一步只发 API 和 Streamlit（main 里 10-25 以后合进来的那些），用不着这个 PR；这个 PR 的 compose 会把 web 一起起来，部署脚本也会探它，所以第一步从不含这个 PR 的提交发。第二步才起 web、开 beta。每一步的发布计划部署前给用户看，部署要另外授权。

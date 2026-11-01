@@ -91,6 +91,29 @@ function Invoke-WebRequest {
         $headers = if ($global:reviewScenario -eq 'coop_no_header') { @{} } else { @{'x-coop-moderation' = $moderation} }
         return [pscustomobject]@{StatusCode=$httpStatus; Content=$body; Headers=$headers}
     }
+    if ($Uri -like '*:8510/healthz') {
+        if ($global:reviewScenario -eq 'web_down') { throw 'Simulated connection refused' }
+        $body = if ($global:reviewScenario -eq 'web_unhealthy') { '<html>502</html>' } else { "ok`n" }
+        return [pscustomobject]@{StatusCode=200; Content=$body}
+    }
+    if ($Uri -like '*:8510/course/CS-5800') {
+        # R7: nginx's answer to a deep link (web/deploy/nginx.conf); header names as nginx sends them.
+        $api = if ($global:reviewScenario -eq 'web_policy_other_api') { 'https://api.example.test' } else { 'https://api.neu-compass.me' }
+        $framing = if ($global:reviewScenario -eq 'web_policy_framable') { '' } else { "; frame-ancestors 'none'" }
+        $headers = @{
+            'Content-Security-Policy' = "default-src 'none'; script-src 'self'; connect-src 'self' $api; base-uri 'none'$framing"
+            'Referrer-Policy' = 'strict-origin-when-cross-origin'
+            'X-Content-Type-Options' = 'nosniff'
+        }
+        switch ($global:reviewScenario) {
+            'web_no_policy' { $headers.Remove('Content-Security-Policy') }
+            'web_no_nosniff' { $headers.Remove('X-Content-Type-Options') }
+            'web_no_referrer_policy' { $headers.Remove('Referrer-Policy') }
+        }
+        $httpStatus = if ($global:reviewScenario -eq 'web_deep_link_404') { 404 } else { 200 }
+        $body = if ($global:reviewScenario -eq 'web_not_the_app') { '<html>Welcome to nginx!</html>' } else { '<body><div id="root"></div></body>' }
+        return [pscustomobject]@{StatusCode=$httpStatus; Content=$body; Headers=$headers}
+    }
     throw "Unexpected HTTP operation in offline test: $Uri"
 }
 try {
@@ -101,6 +124,12 @@ try {
 }
 exit $LASTEXITCODE
 """
+
+
+WEB_FAILURES = (
+    "web_down", "web_unhealthy", "web_deep_link_404", "web_not_the_app", "web_no_policy",
+    "web_policy_other_api", "web_policy_framable", "web_no_nosniff", "web_no_referrer_policy",
+)
 
 
 def _run_deploy(scenario: str) -> subprocess.CompletedProcess[str]:
@@ -133,6 +162,8 @@ def test_deploy_requires_all_readonly_acceptance_probes(scenario: str) -> None:
     assert "REVIEW_PROBE: http://review-only.invalid:8501/_stcore/health" in result.stdout
     assert "REVIEW_PROBE: http://review-only.invalid:8000/resolve/course?ref=CS-5800" in result.stdout
     assert "REVIEW_PROBE: http://review-only.invalid:8000/coop" in result.stdout
+    assert "REVIEW_PROBE: http://review-only.invalid:8510/healthz" in result.stdout
+    assert "REVIEW_PROBE: http://review-only.invalid:8510/course/CS-5800" in result.stdout
     if scenario == "transient":
         assert result.stdout.count("REVIEW_PROBE: http://review-only.invalid:8000/ready") >= 2
 
@@ -145,6 +176,8 @@ def test_deploy_requires_all_readonly_acceptance_probes(scenario: str) -> None:
         "coop_unavailable", "coop_invalid_json", "coop_wrong_shape",
         # Public list degrades to seeds before v1.3; the header must still fail the deploy.
         "coop_unmigrated", "coop_no_header",
+        # R7: the web front end down or unhealthy, a deep link not the app, or a page without its headers.
+        *WEB_FAILURES,
     ],
 )
 def test_deploy_fails_closed(scenario: str) -> None:
@@ -168,5 +201,6 @@ def test_deploy_acceptance_with_windows_powershell_5(monkeypatch: pytest.MonkeyP
         "compose_failure", "warming", "empty_index", "empty_bm25", "invalid_json",
         "api_unavailable", "network_failure", "ui_unhealthy", "resolver_missing", "resolver_empty",
         "coop_unavailable", "coop_invalid_json", "coop_wrong_shape", "coop_unmigrated", "coop_no_header",
+        *WEB_FAILURES,
     ):
         test_deploy_fails_closed(scenario)
