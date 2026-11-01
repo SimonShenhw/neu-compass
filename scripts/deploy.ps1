@@ -66,6 +66,19 @@ function Get-HeaderValues($Response, [string]$Name) {
     @($Response.Headers.Keys | Where-Object { $_ -ieq $Name } | ForEach-Object { $Response.Headers[$_] } | ForEach-Object { $_ })
 }
 
+# A Content-Security-Policy's directives by name, each with its sources: read so, a policy whose directives come in
+# another order, or with another source beside the API, is still read right (review B36).
+function Get-PolicyDirectives([string]$Policy) {
+    $directives = @{}
+    foreach ($part in $Policy -split ';') {
+        $tokens = @($part.Trim() -split '\s+' | Where-Object { $_ })
+        if ($tokens.Count -gt 0) {
+            $directives[$tokens[0].ToLowerInvariant()] = @($tokens | Select-Object -Skip 1)
+        }
+    }
+    return $directives
+}
+
 Write-Host ''
 Write-Host '=== NEU-Compass deploy ===' -ForegroundColor Cyan
 Write-Host "  target  : $NasTarget"
@@ -150,22 +163,11 @@ $tarExcludes = @(
     '--exclude=.mypy_cache',
     '--exclude=.ruff_cache',
     '--exclude=.coverage',
-    '--exclude=tests',
-    '--exclude=eval',
-    '--exclude=docs',
-    '--exclude=backups',
-    '--exclude=data/raw',
-    '--exclude=data/processed',
-    '--exclude=data/ground_truth',
-    '--exclude=data/coop_seed/curated.json',
     '--exclude=*.db',
     '--exclude=*.db-*',
     '--exclude=*.faiss',
     '--exclude=faiss_index',
-    '--exclude=runtime-data',
-    '--exclude=cloudflared',
     '--exclude=.env',
-    '--exclude=scripts/.stack_pids',
     '--exclude=*.log',
     '--exclude=*.ipynb',
     '--exclude=.ipynb_checkpoints',
@@ -177,7 +179,23 @@ $tarExcludes = @(
     '--exclude=web/artifacts',
     '--exclude=web/tools/e2e/.browsers',
     '--exclude=web/tools/e2e/test-results',
-    '--exclude=web/tools/e2e/playwright-report'
+    '--exclude=web/tools/e2e/playwright-report',
+    # What lives at the root only, as .dockerignore names it: anchored (tar's
+    # names start with ./), so that no folder of web/'s sources, from which the
+    # NAS builds the web image, is left out for sharing a name (review B36).
+    '--anchored',
+    '--exclude=./tests',
+    '--exclude=./eval',
+    '--exclude=./docs',
+    '--exclude=./backups',
+    '--exclude=./data/raw',
+    '--exclude=./data/processed',
+    '--exclude=./data/ground_truth',
+    '--exclude=./data/coop_seed/curated.json',
+    '--exclude=./runtime-data',
+    '--exclude=./cloudflared',
+    '--exclude=./scripts/.stack_pids',
+    '--no-anchored'
 ) -join ' '
 
 # === 3) Code: tar -czf - | ssh "tar -xzf - -C dest" ===
@@ -328,7 +346,8 @@ if ($DryRun) {
                 throw 'web did not answer a deep link with the app'
             }
             $policy = @(Get-HeaderValues $page 'Content-Security-Policy' | Where-Object {
-                $_.Contains("connect-src 'self' $WebApi;") -and $_.Contains("frame-ancestors 'none'")
+                $directives = Get-PolicyDirectives $_
+                ($directives['connect-src'] -contains $WebApi) -and ($directives['frame-ancestors'] -contains "'none'")
             })
             if ($policy.Count -eq 0) {
                 throw "web page has no Content-Security-Policy for $WebApi"

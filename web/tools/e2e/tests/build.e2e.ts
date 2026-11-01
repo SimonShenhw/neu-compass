@@ -40,6 +40,45 @@ test('an inline script is refused, and the refusal is reported', async ({
   cspViolations.length = 0;
 });
 
+// The fixture watches every page of the test's context, one the test opens later too, whose window outlives its first,
+// blank document (review A36; tests/support.ts).
+test('a refusal in a page the test opens later is reported too', async ({
+  page,
+  cspViolations,
+}) => {
+  await page.goto('/');
+  await landed(page);
+  const [opened] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.evaluate(() => void window.open('/', '_blank')),
+  ]);
+  await landed(opened);
+  await opened.evaluate(() => {
+    const script = document.createElement('script');
+    script.textContent = 'document.body.dataset.inlineRan = "yes";';
+    document.body.append(script);
+  });
+  await expect.poll(() => cspViolations.length).toBe(1);
+  expect(cspViolations[0]).toMatch(/^script-src-elem refused inline/);
+  cspViolations.length = 0;
+});
+
+// And one nobody takes back fails the test that made it: the fixture's own check, which no other test ever trips, kept
+// under test (review A36). Marked as failing: it passes only if that check fails it. The page makes it a moment after
+// the test's last step, which still counts.
+test('a refusal left in place fails its test', async ({ page }) => {
+  test.fail();
+  await page.goto('/');
+  await landed(page);
+  await page.evaluate(() => {
+    setTimeout(() => {
+      const script = document.createElement('script');
+      script.textContent = 'document.body.dataset.inlineRan = "yes";';
+      document.body.append(script);
+    });
+  });
+});
+
 // The nine demo routes of src/demoRoutes.tsx, which no build carries.
 const DEMOS = [
   '/compare-demo',

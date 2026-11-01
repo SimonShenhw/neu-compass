@@ -5,20 +5,21 @@ import type { Locator, Page } from '@playwright/test';
 export const WEB = 'http://127.0.0.1:4173';
 export const API = 'http://127.0.0.1:8000';
 
-// Every test: its page asks nothing of anyone but the site and its API (the fonts are bundled, the icons inline), in
-// whatever state the test leaves it, a comparison table, a chosen plan, an account (review A35).
+// Every test: no page of its browser context asks anything of anyone but the site and its API (the fonts are bundled,
+// the icons inline), in whatever state the test leaves it, a comparison table, a chosen plan, an account (review A35).
 // And nothing it does, a dialog, a select, a stream, a sign-in, is refused by the CSP the preview sends: the build's own
 // (deploy/securityHeaders.ts), the policy nginx sends in production (R7). The browser reports each refusal as a
-// securitypolicyviolation event, in whichever document of the test it happens; a test that makes one on purpose takes
-// cspViolations and empties it.
+// securitypolicyviolation event, in any document of any page of the context, a page the test opens later included
+// (review A36). The reports are counted once every page has run one more frame after the test's last step; a refusal
+// later than that goes unseen. A test that makes one on purpose takes cspViolations and empties it.
 export const test = base.extend<{
   noThirdParty: void;
   cspViolations: string[];
 }>({
   noThirdParty: [
-    async ({ page }, use) => {
+    async ({ context }, use) => {
       const others = new Set<string>();
-      page.on('request', (request) => {
+      context.on('request', (request) => {
         const { protocol, origin } = new URL(request.url());
         if (
           (protocol === 'http:' || protocol === 'https:') &&
@@ -33,29 +34,36 @@ export const test = base.extend<{
     { auto: true },
   ],
   cspViolations: [
-    async ({ page }, use) => {
+    async ({ context }, use) => {
       const violations: string[] = [];
-      await page.exposeBinding(
+      await context.exposeBinding(
         'reportCspViolation',
         (_source, report: string) => {
           violations.push(report);
         },
       );
-      await page.addInitScript(() => {
-        document.addEventListener('securitypolicyviolation', (event) => {
+      await context.addInitScript(() => {
+        // On the window, once. A page opened with window.open keeps the window of its first, blank document across
+        // its first navigation, while that document and anything listening on it is replaced, and this script does
+        // not run again (Chromium): the window's listener still hears the new document's refusals, which bubble up.
+        const watched = window as unknown as {
+          reportCspViolation(report: string): void;
+          cspWatched?: true;
+        };
+        if (watched.cspWatched) return;
+        watched.cspWatched = true;
+        window.addEventListener('securitypolicyviolation', (event) => {
           const where = event.sourceFile
             ? ` at ${event.sourceFile}:${event.lineNumber}`
             : '';
-          (
-            window as unknown as { reportCspViolation(report: string): void }
-          ).reportCspViolation(
+          watched.reportCspViolation(
             `${event.effectiveDirective} refused ${event.blockedURI}${where}`,
           );
         });
       });
       await use(violations);
-      // A report is an event queued after the refusal: let the page run once more before counting.
-      if (!page.isClosed())
+      // A report is an event queued after the refusal: let each page run once more before counting.
+      for (const page of context.pages())
         await page
           .evaluate(
             () =>

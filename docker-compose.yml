@@ -173,9 +173,11 @@ services:
 
   web:
     # R7: the React front end (web/Dockerfile): a build of web/, served by nginx with no access log and the build's
-    # security headers. Built here on the NAS, as the api is. Beside ui during the beta; nothing depends on it, so a
-    # broken web keeps nothing else from starting.
-    # 中文：新前端。在 NAS 上构建；beta 期间和 ui 并存；没有服务等它，它坏了不影响别的服务起来。
+    # security headers. Built here on the NAS, as the api is. Beside ui during the beta. Nothing waits for it, so a web
+    # that starts but is not healthy keeps nothing else down. Its build is another matter: `up --build` builds every
+    # image before it starts any, so a web build that fails stops the whole deploy, the api's included.
+    # 中文：新前端。在 NAS 上构建；beta 期间和 ui 并存。没有服务等它：它起来了但不健康，不影响别的服务。构建不一样：
+    # `up --build` 先构建所有镜像再起容器，web 构建失败整次部署都停，API 也上不去。
     build:
       context: ./web
       args:

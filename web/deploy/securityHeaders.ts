@@ -1,5 +1,5 @@
 // R7: the headers every response of the site carries, wherever it is served from: nginx in the web image (each
-// location of deploy/nginx.conf includes them, as deploy/render-headers.mjs writes them) and vite preview, which the
+// location of deploy/nginx.conf includes them, as deploy/render-headers.ts writes them) and vite preview, which the
 // end-to-end tests use. A build writes them for the API it calls to .vite/security-headers.json (vite.config.ts), and
 // both send that file's headers, so the policy a page runs under is the one its build was made with.
 export function securityHeaders(apiBase: string): Record<string, string> {
@@ -10,7 +10,9 @@ export function securityHeaders(apiBase: string): Record<string, string> {
     'Content-Security-Policy': [
       "default-src 'none'",
       "script-src 'self'",
-      // While a dialog or a select is open, Radix adds a <style> of its own (react-remove-scroll-bar), with no nonce.
+      // Radix adds <style> elements of its own, with no nonce to give them: while a dialog or a select is open,
+      // react-remove-scroll-bar's, whose text changes with the scrollbar's width (so no hash can match it), and the
+      // select's viewport's.
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self'",
       "font-src 'self'",

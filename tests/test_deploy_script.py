@@ -100,8 +100,15 @@ function Invoke-WebRequest {
         # R7: nginx's answer to a deep link (web/deploy/nginx.conf); header names as nginx sends them.
         $api = if ($global:reviewScenario -eq 'web_policy_other_api') { 'https://api.example.test' } else { 'https://api.neu-compass.me' }
         $framing = if ($global:reviewScenario -eq 'web_policy_framable') { '' } else { "; frame-ancestors 'none'" }
+        $policy = switch ($global:reviewScenario) {
+            # The same policy in another order, connect-src last with a second source: still the API's (B36).
+            'web_policy_reordered' { "default-src 'none'; frame-ancestors 'none'; connect-src 'self' https://api.neu-compass.me https://other.example.test" }
+            # The API named, but not where the page may connect to it.
+            'web_policy_api_elsewhere' { "default-src 'none'; img-src https://api.neu-compass.me; connect-src 'self'; frame-ancestors 'none'" }
+            default { "default-src 'none'; script-src 'self'; connect-src 'self' $api; base-uri 'none'$framing" }
+        }
         $headers = @{
-            'Content-Security-Policy' = "default-src 'none'; script-src 'self'; connect-src 'self' $api; base-uri 'none'$framing"
+            'Content-Security-Policy' = $policy
             'Referrer-Policy' = 'strict-origin-when-cross-origin'
             'X-Content-Type-Options' = 'nosniff'
         }
@@ -128,8 +135,12 @@ exit $LASTEXITCODE
 
 WEB_FAILURES = (
     "web_down", "web_unhealthy", "web_deep_link_404", "web_not_the_app", "web_no_policy",
-    "web_policy_other_api", "web_policy_framable", "web_no_nosniff", "web_no_referrer_policy",
+    "web_policy_other_api", "web_policy_api_elsewhere", "web_policy_framable", "web_no_nosniff",
+    "web_no_referrer_policy",
 )
+# Deploys that must pass: the success path, a probe that succeeds on its second try, and the web's policy in another
+# order (R7, B36).
+SUCCESSES = ("success", "transient", "web_policy_reordered")
 
 
 def _run_deploy(scenario: str) -> subprocess.CompletedProcess[str]:
@@ -153,7 +164,7 @@ def _run_deploy(scenario: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-@pytest.mark.parametrize("scenario", ["success", "transient"])
+@pytest.mark.parametrize("scenario", SUCCESSES)
 def test_deploy_requires_all_readonly_acceptance_probes(scenario: str) -> None:
     result = _run_deploy(scenario)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -195,7 +206,7 @@ def test_deploy_fails_closed(scenario: str) -> None:
 def test_deploy_acceptance_with_windows_powershell_5(monkeypatch: pytest.MonkeyPatch) -> None:
     """Legacy PowerShell must execute UTF-8 comments/code, not silently skip compose."""
     monkeypatch.setitem(globals(), "POWERSHELL", shutil.which("powershell.exe"))
-    for scenario in ("success", "transient"):
+    for scenario in SUCCESSES:
         test_deploy_requires_all_readonly_acceptance_probes(scenario)
     for scenario in (
         "compose_failure", "warming", "empty_index", "empty_bm25", "invalid_json",

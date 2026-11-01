@@ -80,6 +80,24 @@ describe('the build writes them, and the preview sends them (vite.config.ts)', (
           source: `${JSON.stringify(securityHeaders(api), null, 2)}\n`,
         },
       ]);
+    // A build for an API that VITE_API_BASE_URL names, as the image's is: that API's policy, not a default's (B36).
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.beta.example.test');
+    expect(
+      emitted(
+        configure({
+          command: 'build',
+          mode: 'production',
+          isSsrBuild: false,
+          isPreview: false,
+        }),
+      ),
+    ).toEqual([
+      {
+        type: 'asset',
+        fileName: '.vite/security-headers.json',
+        source: `${JSON.stringify(securityHeaders('https://api.beta.example.test'), null, 2)}\n`,
+      },
+    ]);
     expect(SECURITY_HEADERS_FILE).toBe('.vite/security-headers.json');
   });
 
