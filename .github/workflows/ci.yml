@@ -46,8 +46,9 @@ jobs:
   # 假 Google），回答反馈照生产开着。
   e2e:
     name: End-to-end tests
-    # Pinned, not ubuntu-latest (26.04 since 10-28): the fonts and libraries the layout tests run with change only by
-    # an edit here. Playwright 1.64 supports both.
+    # Pinned, not ubuntu-latest (26.04 since 10-28): the fonts and libraries the layout tests run with do not change
+    # with a new major version, though the image and the apt packages --with-deps installs are still updated within
+    # this one. Playwright 1.64 supports both.
     runs-on: ubuntu-24.04
     env:
       # The dev API imports config.settings, which requires it; never sent anywhere (see the test job).

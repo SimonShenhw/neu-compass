@@ -132,12 +132,13 @@ test('clicking into the question field moves the page nowhere', async ({
 
 // Tab through an answer with its votes: what takes focus in main is clear of the box, its focus ring too (WCAG
 // 2.4.11; the margin counts the ring since recheck 1 of round 34). In a window the answer does not fit above the box,
-// so that Tab scrolls the page: on the desktop the zoomed laptop's, as 1440×900 holds all of it (review B35).
+// so that Tab scrolls the page: on the desktop the 1080 p screen at 200 % above, as 1440×900 holds all of the answer
+// (review B35) and 1093×614 scrolls for one control only (recheck 1 of round 35).
 test('Tab through an answer: every control in the conversation, focus ring and all, stays above the box', async ({
   page,
 }, { project }) => {
   if (project.name === 'desktop')
-    await page.setViewportSize({ width: 1093, height: 614 });
+    await page.setViewportSize({ width: 960, height: 540 });
   await page.goto('/');
   await landed(page);
   await optIn(page).check();

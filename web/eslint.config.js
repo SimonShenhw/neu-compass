@@ -39,4 +39,25 @@ export default tseslint.config(
     files: ['*.js', 'scripts/*.mjs', 'tools/*/*.mjs'],
     languageOptions: { globals: globals.node },
   },
+  {
+    // The e2e tests take test from tests/support.ts, whose automatic fixture checks that each page asks nothing of a
+    // third party; @playwright/test's own (its default export too) would leave a file without it (recheck 1 of round 35).
+    files: ['tools/e2e/tests/**/*.ts'],
+    ignores: ['tools/e2e/tests/support.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              importNames: ['test', 'default'],
+              message:
+                'Take test from ./support: its fixture checks what each page requests.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
