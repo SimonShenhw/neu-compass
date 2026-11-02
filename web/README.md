@@ -152,14 +152,15 @@ npm.cmd run test:mutations
 
 ## R3a 先修要求组件与演示
 
-`/requisites-demo?case=cs-6140-two-years`（不加入导航）只用合成 API 导出。演示数据选择器提供 16 个 case；缺省或未知 case 回到 `cs-6140-two-years`，换 case 清空年份、方案和导航提示。点击规则课号或旧边「查看」只在 status 区显示「演示：这里会打开 …」，不跳转、不取数。
+`/requisites-demo?case=cs-6140-two-years`（不加入导航）只用合成 API 导出。演示数据选择器提供 17 个 case；缺省或未知 case 回到 `cs-6140-two-years`，换 case 清空年份、方案和导航提示。点击规则课号或旧边「查看」只在 status 区显示「演示：这里会打开 …」，不跳转、不取数。
 
 - 目录：`features/requisites/CourseRequisites.tsx` 为公开组件；树、证据、方案上下文分文件以保持职责明确。参数完全由调用方提供；加载、失败和重试 UI 属于未来 R3 取数外壳，本组件不模拟这些状态。
 - 调用方用 `key={course.course_id}` 区分课程。多年份默认空，单年份仅首次挂载默认显示；主动清空、数据移除后的选择均不会自动恢复。换年份重新挂载方案区，返回原年份也要重选。没有把选择写入 URL 或 storage。
 - `api/requisites.ts` 为手写消费类型；`models/requisites.ts` 接收 unknown，只按说明书检查形状和链接，忽略额外字段；不复刻 Python 的原文重解析与候选池语义证明。未使用的方案节点字段不额外收紧，以免越过前端契约。
 - `models/requisiteRules.ts` 导出 `ruleLines`、`programRuleLines`，逐字对齐 Python。课程树只在同组内合并完全相同的叶子；原文不改。方案用可折行、保留缩进的纯文本，不做个人资格或学期规划。
-- `fixtures/requisites/` 的 16 份导出与 `expected/` 的 16 份标准答案逐字节冻结，独立 SHA-256 测试防改动；expected 只供测试，不打包进生产。34 个场景逐项比对 DOM，不从标准答案生成页面。
+- `fixtures/requisites/` 的 17 份导出与 `expected/` 的 17 份标准答案逐字节冻结（R3a 的 16 份，加上 2026-11-02 旧边改标目录来源时的 `cs-6140-legacy-catalog-listing`），独立 SHA-256 测试防改动；expected 只供测试，不打包进生产。35 个场景逐项比对 DOM，不从标准答案生成页面。
 - 旧边保留用于未选年份、未解析和非树内课程的导航。R3a 明确覆盖了 R1「删掉下面那排按钮」的决定；原型课程页及旧 `RequisiteTree` 本轮不改。数据无效／存储冲突时旧边不能冒充必修性判断。
+- 没有结构化记录时，旧边每行不再标「必须先修／建议先修／可同修」（2026-11-02 起；这些分级从没和目录核对过，见 `docs/course-requisites.md`）。现在只按本课记录的目录快照标「目录列出」或「目录未列出」，规则在 `models/requisites.ts` 的 `legacyCatalogListing`，课号比较不分大小写和空格。说明里另加一句解释这两个词。没有可用快照或这一行没有课号时不标，说明也不加那句。课号由调用方传入（`catalogPrereqCodes`）：课程页取详情里的 `answer_evidence.catalog`，演示页取导出里的同一项。
 - 所有接口文字均按纯文本显示；两个来源链接须精确通过官方 URL 限制，且新标签页带 `noopener noreferrer`。学分字符串原样，时间只替换末尾 Z；树最深 10 层、方案最深 8 层，各最多 120 节点。
 - 复用 R1 Select、CourseCode、Button 和浅色 tokens；details 默认折叠。测试中 jsdom 不实现原生 summary 的 Enter 默认行为，因此键盘展开另外由真实浏览器验收，不用 jsdom 的绿色结果代替。
 

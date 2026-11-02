@@ -1,0 +1,112 @@
+{
+  "case": "cs-6140-legacy-catalog-listing",
+  "notes": "The clause table does not exist on this server, and the course has a catalog snapshot listing CS 5800 and CS 7800: each legacy row says whether the catalog lists it (CS 5800 listed, CS 5100 not listed; the edge without a course row has no code and no label).",
+  "request": {
+    "method": "GET",
+    "path": "/course/c-cs-6140"
+  },
+  "status": 200,
+  "body": {
+    "course_id": "c-cs-6140",
+    "primary_code": "CS 6140",
+    "primary_name": "Machine Learning",
+    "schema_version": "1.1",
+    "professor": [],
+    "term": null,
+    "credits": null,
+    "prereqs": [
+      "CS 5800",
+      "CS 7800"
+    ],
+    "delivery_mode": null,
+    "instructor_contact": null,
+    "textbooks": [],
+    "meeting_schedule": null,
+    "ai_policy": null,
+    "workload_hours_per_week": null,
+    "difficulty_score": null,
+    "grading_components": [],
+    "topics_covered": [],
+    "skill_tags": [],
+    "career_relevance": [],
+    "controversial_signals": [],
+    "evidence_snippets": [],
+    "extraction_confidence": null,
+    "source_review_ids": [],
+    "created_at": "2026-11-02T21:37:21.698469Z",
+    "updated_at": "2026-11-02T21:37:21.698471Z",
+    "program_context": [],
+    "prerequisites": [
+      {
+        "course_id": "c-cs-5010-missing",
+        "primary_code": null,
+        "primary_name": null,
+        "requirement": "required"
+      },
+      {
+        "course_id": "c-cs-5100",
+        "primary_code": "CS 5100",
+        "primary_name": "Foundations of Artificial Intelligence",
+        "requirement": "recommended"
+      },
+      {
+        "course_id": "c-cs-5800",
+        "primary_code": "CS 5800",
+        "primary_name": "Algorithms",
+        "requirement": "required"
+      }
+    ],
+    "answer_evidence": {
+      "catalog": {
+        "course_code": "CS 6140",
+        "course_name": "Machine Learning",
+        "description": "Covers supervised learning, model selection and evaluation. (Synthetic text for interface tests.)",
+        "credits": 4,
+        "prereq_codes": [
+          "CS 5800",
+          "CS 7800"
+        ],
+        "catalog_url": "https://catalog.northeastern.edu/course-descriptions/cs/",
+        "snapshot_id": "catalog:2635c4182b5ea674bc28ec5bf6a1b8e375cc2c36f9b1a97968ced7b76bff65b0",
+        "imported_at": "2026-09-29T03:00:00Z",
+        "retrieved_at": "2026-09-28T14:05:00Z"
+      },
+      "field_evidence": [],
+      "source_review_ids": [],
+      "missing_fields": [
+        "credits",
+        "term",
+        "delivery_mode",
+        "professor",
+        "topics_covered",
+        "skill_tags",
+        "workload_hours_per_week",
+        "difficulty_score",
+        "grading_components",
+        "career_relevance"
+      ],
+      "warnings": [
+        "prerequisite_logic_unavailable"
+      ],
+      "requisites": {
+        "storage": "schema_missing",
+        "editions": [],
+        "editions_omitted": 0,
+        "unusable_records": 0
+      }
+    },
+    "course_requisites": {
+      "schema_available": false,
+      "has_any_stored_records": false,
+      "documents": [],
+      "unusable_records": 0,
+      "warnings": [
+        "course_block_only_not_full_policy_or_eligibility",
+        "campus_and_personal_pathway_not_declared",
+        "legacy_prerequisite_edges_not_verified_logic",
+        "structured_requisite_schema_unavailable"
+      ],
+      "program_contexts": []
+    }
+  }
+}

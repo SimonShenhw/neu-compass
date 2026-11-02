@@ -45,6 +45,11 @@ it.each(requisitesFixtures)(
     ).not.toBeInTheDocument();
   },
 );
+it('the demo labels legacy rows from its export’s catalog snapshot', () => {
+  page('/requisites-demo?case=cs-6140-legacy-catalog-listing');
+  expect(screen.getByText('目录列出')).toBeVisible();
+  expect(screen.getByText('目录未列出')).toBeVisible();
+});
 it.each(['/REQUISITES-DEMO/?case=unknown', '/requisites-demo'])(
   'demo defaults and unknown inputs fall back safely: %s',
   (path) => {

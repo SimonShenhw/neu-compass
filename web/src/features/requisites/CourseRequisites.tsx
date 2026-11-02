@@ -3,6 +3,7 @@ import type { RequisiteDocument, RequisiteSection } from '../../api/requisites';
 import { Button } from '../../components/Button';
 import { oneLine } from '../../models/courseDetailFormat';
 import {
+  legacyCatalogListing,
   legacyLabelsAllowed,
   legacyPrerequisites,
   parseRequisites,
@@ -17,16 +18,20 @@ export interface CourseRequisitesProps {
   course: { course_id: string; primary_code: string; primary_name: string };
   requisites: unknown;
   prerequisites: unknown;
+  // The course's recorded catalog prerequisite codes, null without a usable snapshot: they label the legacy rows.
+  catalogPrereqCodes: readonly string[] | null;
   onOpenCourse: (code: string) => void;
 }
 export const YEAR_LABEL = '先修规则的 Catalog 年份（不会默认选最新）';
 export const YEAR_EMPTY = '请选择适用的年份';
 export const INVALID =
   '结构化规则格式/来源/原文一致性校验未通过，未显示；不回退为旧资格图。';
+const LISTING = { listed: '目录列出', unlisted: '目录未列出' } as const;
 export function CourseRequisites({
   course,
   requisites,
   prerequisites,
+  catalogPrereqCodes,
   onOpenCourse,
 }: CourseRequisitesProps) {
   const parsed = parseRequisites(requisites);
@@ -47,6 +52,9 @@ export function CourseRequisites({
   if (year !== null && !selected) setYear(null);
   const rows = legacyPrerequisites(prerequisites);
   const labels = legacyLabelsAllowed(parsed);
+  const listings = rows.map((row) =>
+    labels ? legacyCatalogListing(row.primary_code, catalogPrereqCodes) : null,
+  );
   let rules;
   if (parsed.kind === 'absent')
     rules = (
@@ -140,7 +148,10 @@ export function CourseRequisites({
           </Line>
           <Line kind="note">
             {labels
-              ? '旧边不表达 AND/OR、最低成绩或共修；不能用它判断哪些课全部必修或能否注册。'
+              ? '旧边不表达 AND/OR、最低成绩或共修；不能用它判断哪些课全部必修或能否注册。' +
+                (listings.some((listing) => listing !== null)
+                  ? '「目录列出」：本课记录的目录先修段提到了这门课，关系仍未核验；「目录未列出」：目录先修段没有提到。'
+                  : '')
               : '只用来跳转；不表示「都要」还是「任选」、最低成绩或是否必修，以上面的先修规则为准。'}
           </Line>
           {rows.map((row, index) => {
@@ -151,13 +162,8 @@ export function CourseRequisites({
               : [row.primary_code, row.primary_name]
                   .filter(Boolean)
                   .join(' · ') || row.course_id;
-            const label = labels
-              ? (new Map([
-                  ['required', '必须先修'],
-                  ['recommended', '建议先修'],
-                  ['concurrent', '可同修'],
-                ]).get(row.requirement) ?? row.requirement)
-              : null;
+            const listing = listings[index] ?? null;
+            const label = listing === null ? null : LISTING[listing];
             return (
               <div className={styles.legacy} key={index}>
                 <div data-kind="legacy_row" data-part="legacy" data-depth="0">

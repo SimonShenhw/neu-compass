@@ -297,3 +297,16 @@ export function legacyLabelsAllowed(parsed: ParsedRequisites) {
       !parsed.listing.warnings.includes('structured_requisite_schema_unusable'))
   );
 }
+// A legacy row says only whether the course's recorded catalog entry lists the prerequisite's code: the old edges'
+// required/recommended tiers were never checked (a catalog OR was backfilled as two required edges). Null without a
+// code or without a usable catalog snapshot. Codes compare without spaces or case.
+export function legacyCatalogListing(
+  code: string | null,
+  catalogCodes: readonly string[] | null,
+): 'listed' | 'unlisted' | null {
+  const bare = (value: string) => value.replace(/\s+/g, '').toUpperCase();
+  if (code === null || bare(code) === '' || catalogCodes === null) return null;
+  return catalogCodes.some((listed) => bare(listed) === bare(code))
+    ? 'listed'
+    : 'unlisted';
+}

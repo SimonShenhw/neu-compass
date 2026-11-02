@@ -7,6 +7,7 @@ import {
   requisitesFixtures,
 } from '../fixtures/requisitesDemo';
 import type { RequisitesFixture } from '../fixtures/requisitesDemo';
+import { catalogPrereqCodes, evidence } from '../models/courseDetail';
 import styles from '../features/requisites/Requisites.module.css';
 
 function DemoSession({ fixture }: { fixture: RequisitesFixture }) {
@@ -23,6 +24,9 @@ function DemoSession({ fixture }: { fixture: RequisitesFixture }) {
         course={fixture.body}
         requisites={fixture.body.course_requisites}
         prerequisites={fixture.body.prerequisites}
+        catalogPrereqCodes={catalogPrereqCodes(
+          evidence(fixture.body.answer_evidence),
+        )}
         onOpenCourse={(code) => setNotice(`演示：这里会打开 ${code}`)}
       />
       <p role="status" aria-label="课程导航演示结果">

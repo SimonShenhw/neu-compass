@@ -349,6 +349,39 @@ it('R3a callbacks are passed through and course keys reset its annual selection 
   await chooseYear();
   expect(screen.getByRole('button', { name: '查看 DS 5220' })).toBeVisible();
 });
+it('legacy rows are labelled from the course’s own catalog snapshot, and only from a usable one', () => {
+  const legacy = requisitesFixture('cs-6140-requisites-table-missing').body;
+  const data = {
+    ...detailData(),
+    course_requisites: structuredClone(legacy.course_requisites),
+    prerequisites: legacy.prerequisites,
+  };
+  setDetail(data, 'answer_evidence.catalog.prereq_codes', [
+    'CS 5800',
+    'CS 7800',
+  ]);
+  const { container, rerender } = render(
+    <CourseDetail {...input()} course={data} />,
+  );
+  const shown = () =>
+    [...container.querySelectorAll('[data-kind="legacy_row"]')].map(
+      (row) => row.querySelector('[data-row-label]')?.textContent ?? null,
+    );
+  expect(shown()).toEqual([null, '目录未列出', '目录列出']);
+  // A snapshot of another department's page is unusable; so is none at all.
+  const foreign = structuredClone(data);
+  setDetail(
+    foreign,
+    'answer_evidence.catalog.catalog_url',
+    'https://catalog.northeastern.edu/course-descriptions/ds/',
+  );
+  rerender(<CourseDetail {...input()} course={foreign} />);
+  expect(shown()).toEqual([null, null, null]);
+  const none = structuredClone(data);
+  setDetail(none, 'answer_evidence.catalog', null);
+  rerender(<CourseDetail {...input()} course={none} />);
+  expect(shown()).toEqual([null, null, null]);
+});
 it('AI disclosure and all provenance start folded and remain keyboard reachable', async () => {
   const { container } = render(<CourseDetail {...input()} />);
   const details = [...container.querySelectorAll('details')];

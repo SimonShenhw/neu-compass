@@ -47,14 +47,14 @@
           "part": "legacy",
           "depth": 0,
           "kind": "markdown",
-          "value": "`c-cs-5010-missing`  \n*必须先修*",
+          "value": "`c-cs-5010-missing`",
           "column": 0
         },
         {
           "part": "legacy",
           "depth": 0,
           "kind": "markdown",
-          "value": "**CS 5100** — Foundations of Artificial Intelligence  \n*建议先修*",
+          "value": "**CS 5100** — Foundations of Artificial Intelligence",
           "column": 0
         },
         {
@@ -69,7 +69,7 @@
           "part": "legacy",
           "depth": 0,
           "kind": "markdown",
-          "value": "**CS 5800** — Algorithms  \n*必须先修*",
+          "value": "**CS 5800** — Algorithms",
           "column": 0
         },
         {
@@ -119,7 +119,7 @@
           "code": null,
           "name": null,
           "id": "c-cs-5010-missing",
-          "label": "必须先修"
+          "label": null
         },
         {
           "part": "legacy",
@@ -128,7 +128,7 @@
           "code": "CS 5100",
           "name": "Foundations of Artificial Intelligence",
           "id": null,
-          "label": "建议先修"
+          "label": null
         },
         {
           "part": "legacy",
@@ -144,7 +144,7 @@
           "code": "CS 5800",
           "name": "Algorithms",
           "id": null,
-          "label": "必须先修"
+          "label": null
         },
         {
           "part": "legacy",
