@@ -32,6 +32,7 @@ CI_JOB = CI["jobs"]["web-image"]
 DOCKERFILE = (ROOT / "web" / "Dockerfile").read_text(encoding="utf-8")
 NGINX = (ROOT / "web" / "deploy" / "nginx.conf").read_text(encoding="utf-8")
 BETA = "https://beta.neu-compass.me"
+COMPASS = "https://compass.neu-compass.me"
 API = "https://api.neu-compass.me"
 # CI's last check of the image, whole: nginx runs as 101, and its log holds no request, not even the malformed one
 # check-site sends (the line an error log lowered to info would keep).
@@ -78,10 +79,11 @@ def test_the_site_shared_links_name_is_one_the_api_takes() -> None:
     assert web_args()["VITE_API_BASE_URL"] == API
 
 
-def test_during_the_beta_links_name_the_beta_and_only_it_is_taken() -> None:
-    """Decision 2 of the R7 plan, until the switch: the one assertion the switch changes (compass, and both origins)."""
-    assert web_args()["VITE_PUBLIC_BASE_URL"] == BETA
-    assert json.loads(mapping(SERVICES["api"]["environment"])["WEB_ORIGINS"]) == [BETA]
+def test_since_the_switch_links_name_compass_and_the_beta_is_still_taken() -> None:
+    """Decision 2 of the R7 plan, from the switch: links name compass, and the API takes compass and, for the two weeks
+    the beta stays, the beta. Taking the beta down changes this one assertion."""
+    assert web_args()["VITE_PUBLIC_BASE_URL"] == COMPASS
+    assert json.loads(mapping(SERVICES["api"]["environment"])["WEB_ORIGINS"]) == [COMPASS, BETA]
 
 
 def test_the_tunnel_waits_for_the_api_only() -> None:

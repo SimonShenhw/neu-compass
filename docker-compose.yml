@@ -18,14 +18,14 @@
 #     - hostname: api.neu-compass.me
 #       service: http://api:8000
 #     - hostname: compass.neu-compass.me
-#       service: http://ui:8501
+#       service: http://web:8080           # since R7's switch
 #       originRequest:
 #         connectTimeout: 30s
 #         noTLSVerify: false
-#     - hostname: beta.neu-compass.me      # R7's beta: the web front end
+#     - hostname: beta.neu-compass.me      # R7's beta: the same front end, for two weeks after the switch
 #       service: http://web:8080
 #     - service: http_status:404
-# At R7's switch, compass's entry routes to http://web:8080 too, and its old one is the way back.
+# compass's way back, for the week Streamlit stays after the switch, is its old service, http://ui:8501.
 
 # Bounded container logs: the api emits one JSON line per request and
 # cloudflared is chatty — the default json-file driver grows UNBOUNDED
@@ -98,10 +98,10 @@ services:
       # P4: GET /privacy (R2a) shows the address as the Streamlit page does. Keep equal to the ui value.
       PRIVACY_CONTACT_EMAIL: shen.haow@northeastern.edu
       # R7: the web front end's origins (a JSON list), which CORS answers, which may send writes with the session
-      # cookie, and whose root Google may send a browser back to (Google Cloud Console must list it too). The beta
-      # only, until the switch adds https://compass.neu-compass.me. Set here, not in .env: compose's environment
+      # cookie, and whose root Google may send a browser back to (Google Cloud Console must list it too). compass
+      # since the switch, and the beta for the two weeks it stays. Set here, not in .env: compose's environment
       # wins over env_file, so this is what runs.
-      WEB_ORIGINS: '["https://beta.neu-compass.me"]'
+      WEB_ORIGINS: '["https://compass.neu-compass.me", "https://beta.neu-compass.me"]'
       # P5: one process-wide budget for POST /search and /chat (not per user, not a cost quota). Not measured on
       # the NAS: 4 at once ≈ two chat streams + two searches; burst 20; 0.5/s ≈ 30 a minute site-wide.
       REQUEST_GUARD_ENABLED: "true"
@@ -173,18 +173,19 @@ services:
 
   web:
     # R7: the React front end (web/Dockerfile): a build of web/, served by nginx with no access log and the build's
-    # security headers. Built here on the NAS, as the api is. Beside ui during the beta. Nothing waits for it, so a web
-    # that starts but is not healthy keeps nothing else down. Its build is another matter: `up --build` builds every
-    # image before it starts any, so a web build that fails stops the whole deploy, the api's included.
-    # 中文：新前端。在 NAS 上构建；beta 期间和 ui 并存。没有服务等它：它起来了但不健康，不影响别的服务。构建不一样：
-    # `up --build` 先构建所有镜像再起容器，web 构建失败整次部署都停，API 也上不去。
+    # security headers. Built here on the NAS, as the api is. compass and the beta both route to it since the switch;
+    # ui stays beside it for a week, as the way back. Nothing waits for it, so a web that starts but is not healthy
+    # keeps nothing else down. Its build is another matter: `up --build` builds every image before it starts any, so a
+    # web build that fails stops the whole deploy, the api's included.
+    # 中文：新前端。在 NAS 上构建；切换以后 compass 和 beta 都指向它，ui 再留一周当回退。没有服务等它：它起来了但不健康，
+    # 不影响别的服务。构建不一样：`up --build` 先构建所有镜像再起容器，web 构建失败整次部署都停，API 也上不去。
     build:
       context: ./web
       args:
-        # The API a page calls, and the site its shared links name: the beta's own until the switch (R7 plan,
-        # decision 2), then https://compass.neu-compass.me, rebuilt.
+        # The API a page calls, and the site its shared links name: compass since the switch (R7 plan, decision 2;
+        # the beta's own before it). The beta serves this build too, so a link copied there names compass.
         VITE_API_BASE_URL: https://api.neu-compass.me
-        VITE_PUBLIC_BASE_URL: https://beta.neu-compass.me
+        VITE_PUBLIC_BASE_URL: https://compass.neu-compass.me
     image: neu-compass-web:latest
     container_name: neu-compass-web
     restart: always
