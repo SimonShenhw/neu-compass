@@ -5789,3 +5789,52 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
 ### 发布状态
 
 分支 `feat/web-deploy`，从 `feat/web-e2e` 的 `0039b53` 开，三个提交：第一个是上面这些，第二个是第 36 轮审查的修补，第三个是复核第 1 轮的修补。没有使用真实模型、账号、NAS 或生产库；本机只对着开发 API 和合成数据，镜像和 nginx 都只在本机和 CI 里起。上线分两步（用户定的）：第一步只发 API 和 Streamlit（main 里 10-25 以后合进来的那些），用不着这个 PR；这个 PR 的 compose 会把 web 一起起来，部署脚本也会探它，所以第一步从不含这个 PR 的提交发。第二步才起 web、开 beta。每一步的发布计划部署前给用户看，部署要另外授权。
+
+## 43 — 切换到 compass（R7 的第二个 PR，2026-11-02）
+
+### 范围与原因
+
+R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前端，分享链接指向 beta（方案第 2 节决定 2），compass 还是 Streamlit。beta 验收过了就切换：compass 也指向新前端，分享链接改指 compass；Streamlit 再留一周当回退（决定 6），beta 再留两周（决定 2）。这个 PR 只改切换要的配置，就是第 42 节「已知」里「切换时要跟着改的」那几处；NAS 上的隧道配置不在仓库里，部署时改。从 main 的 `ef61ab4`（#42 的合并）开 `feat/web-switch-compass`。
+
+线上不变：合并不部署。部署（web 重新构建、api 换设置）和改隧道配置要用户另外点头、定时间，步骤在评审目录 `frontend_react/r7/STEP2_BETA_PLAN.md` 第 3 节。
+
+### 已实现
+
+1. **compose**（`docker-compose.yml`）：
+   - `web` 的构建参数 `VITE_PUBLIC_BASE_URL` 改成 `https://compass.neu-compass.me`。分享链接的站点在构建时定，所以部署时要重新构建；beta 发的也是这份构建，切换以后在 beta 上复制的链接也指向 compass。
+   - `api` 的 `WEB_ORIGINS` 改成 `["https://compass.neu-compass.me", "https://beta.neu-compass.me"]`：compass 上的新前端要跨站调 API、带 cookie 写、从 Google 登录回来；beta 那两周照样能用。Google 的回调地址 compass 那条本来就有（Streamlit 用的也是它）。
+   - 文件头的隧道配置示例：compass 指 `http://web:8080`，写明 `http://ui:8501` 是 Streamlit 留着的那一周里的回退；beta 写明再留两周。`web` 服务和构建参数的注释跟着改。
+2. **CI**（`.github/workflows/ci.yml`）：web-image job 里 check-site 的第三个参数（分享链接的站点）改成 compass，和 compose 一致，bundle 里要有它。
+3. **测试**（`tests/test_web_deploy.py`）：beta 期那条换成切换以后的：分享站点就是 compass，`WEB_ORIGINS` 正好是 compass 和 beta（顺序也钉住）。去掉 beta 时只改这一条。分享站点在 `WEB_ORIGINS` 里、CI 的参数和 compose 一致，这两条不用改，照样核对。
+4. **部署脚本**（`scripts/deploy.ps1`）：最后列的公开地址，compass 写明隧道改过去以后是新前端、之前是 Streamlit，beta 写明再留两周。只改了这两行打印的字。
+5. **文档**：README「部署 R7」加切换那一条，compose 和 check-site 的例子改成切换以后的；「上线（R7）」那条写明 Google 的两个回调地址都有了。
+
+### 修改文件
+
+- 改：`docker-compose.yml`、`.github/workflows/ci.yml`、`tests/test_web_deploy.py`、`scripts/deploy.ps1`。
+- 文档：`web/README.md`；本节。
+
+产品代码（`web/src/`、API、数据库、检索、提示词）和镜像（两个 Dockerfile、nginx 的配置、安全头）都没改。
+
+### 验证记录
+
+- **设置**：用 compose 里的 `WEB_ORIGINS` 原样构造 API 的设置（连来源格式的检查），读出 compass、beta 两个来源。
+- **后端**：`test_web_deploy.py`、`test_deploy_script.py`（部署脚本的探测，含 Windows PowerShell 5.1 那条）和三个读 `WEB_ORIGINS` 的测试文件（`test_csrf_cors.py`、`test_public_routes.py`、`test_request_admission.py`）249 条过；改过的 Python 文件 ruff 干净；全量 **5346 条**全过（11 分 47 秒）。全量跑着的时候我往本节加了字：跑前跑后比改动文件的哈希，差别只在本节所在的这个文件（没有测试读它），其余的没变。
+- **前端**没改，本机没跑；CI 的 web-image job 按新参数真构建镜像，check-site 核对 bundle 里有 compass 和正式 API。
+- **码位**：这个提交新加的 78 行（6 个文件）里没有格式字符、私用区、控制字符和表情符号；非 ASCII 只在 compose 的两行中文注释（仓库原来的写法）、README 和本节。没有 CR，`diff --check` 干净。
+
+### 审查
+
+没开：只改配置、对口的测试和文档，CI 的 web-image job 真构建镜像并核对分享站点。
+
+### 已知、未处理
+
+- **部署和改隧道之间的几分钟**：部署以后 beta 上复制的分享链接已经指向 compass，改隧道以前 compass 还是 Streamlit，不认识 `/course/…` 这种路径（`/?course=` 这类旧链接两边都认）。上线时这两步连着做。
+- **只回退切换**（隧道里 compass 改回 `http://ui:8501`，几秒）：`WEB_ORIGINS` 里多一个 compass 没关系；切换期间从新前端复制的分享链接指向 compass，打开的却是 Streamlit。要连分享站点一起回去，就整个回到第二步（compose 和镜像一起换）。
+- **Streamlit 的登录带不过来**：切换以后在新前端上要重新登录一次（新前端的 cookie 在 API 上）。
+- **去掉 beta**（两周以后）：一个小 PR（`WEB_ORIGINS` 去掉 beta、隧道示例去掉 beta、`test_web_deploy.py` 那一条）和一次部署；用户删 beta 的 DNS 和 Google 的回调地址。
+- **删 Streamlit**（一周以后）另开一批：`ui` 服务、`app/`，连同 `eval/route_eval.py`、`scripts/answer_render_check.py` 从 `app/` 的导入（第 33 节「已知」）。
+
+### 发布状态
+
+分支 `feat/web-switch-compass`，从 main 的 `ef61ab4` 开，一个提交。没有使用真实模型、账号、NAS 或生产库。上线要用户点头、定时间：部署（web 重新构建、api 换设置）和改隧道配置里 compass 那条连着做；用户自己在 beta 上验收过了才上。
