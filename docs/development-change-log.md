@@ -5686,12 +5686,12 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
    - 根目录的 `.dockerignore` 加 `web/`：API 和 Streamlit 的镜像用不着它（查过运行时的代码，只有 `scripts/export_openapi.py` 写 `web/openapi.json`，那是开发和 CI 用的）。
 7. **部署脚本**（`scripts/deploy.ps1`）：
    - 打包排除任何一层的 `node_modules`，和 `web/` 下的 `dist`、`dist-dev-api`、`coverage`、`.vite`、`artifacts`、e2e 的 `.browsers`、`test-results`、`playwright-report`（第 41 节「已知」的 B35 LOW-9）。`web/` 的源码照样传：镜像在 NAS 上从它构建。原来那些只在根目录的（`tests`、`eval`、`docs`、`backups`、`data/raw` 之类、`runtime-data`、`cloudflared`、`scripts/.stack_pids`）改成锚定在根目录（`--anchored --exclude=./tests` …），不然 `web/` 里以后叫这些名字的文件夹会传不到 NAS、CI 却照样构建得过；现在只多传了 `web/tools/e2e/tests` 的 9 个文件，web 的镜像不收 `tools/`，API 那边一个文件都没变。
-   - 探测加两步：`8510/healthz` 回 `ok`；深链 `/course/CS-5800` 回 200、是这个应用的 `index.html`（有 `<div id="root"></div>`），CSP 按指令读（新的 `Get-PolicyDirectives`）：`connect-src` 里有正式 API、`frame-ancestors` 是 `'none'`，指令换了先后、多一个来源都认得；还有 `nosniff` 和 referrer 策略。新加一个 `Get-HeaderValues`：PS5 的响应头是字符串、PS7 是字符串数组，按名字不分大小写取。出错提示的日志命令加上 `web`，最后列的公开地址加上 beta。
+   - 探测加两步：`8510/healthz` 回 `ok`；深链 `/course/CS-5800` 回 200、是这个应用的 `index.html`（有 `<div id="root"></div>`），CSP 按指令读（新的 `Get-PolicyDirectives`）：`connect-src` 里有正式 API、`frame-ancestors` 只有 `'none'` 一项，指令换了先后、多一个来源都认得，同一条指令写两次只认第一次（浏览器也只认第一次）；还有 `nosniff` 和 referrer 策略。新加一个 `Get-HeaderValues`：PS5 的响应头是字符串、PS7 是字符串数组，按名字不分大小写取。出错提示的日志命令加上 `web`，最后列的公开地址加上 beta。
 8. **CI**（`.github/workflows/ci.yml`）新的 web-image job，跑在钉住的 ubuntu-24.04 上：`touch .env`（compose 起 `web` 也要读 `api` 的 `env_file`，空的，web 不读），`docker compose up --build --detach --wait --wait-timeout 180 web`，即 compose 里的构建参数、只读根目录、健康检查都照 NAS 那样；`node web/deploy/check-site.ts http://127.0.0.1:8510 https://api.neu-compass.me https://beta.neu-compass.me`（API 和分享链接的站点，和 compose 的构建参数一样）；容器里 `id -u` 是 101；`docker compose logs` 里没有一条请求（check-site 那个格式不对的请求，日志要是记到 info 就会留下一行）。不碰 NAS。
 9. **`web/deploy/check-site.ts`**：从外面核对镜像本身，CI 用它，部署以后也可以对 NAS 上的 8510 用（只请求静态文件，不碰 API）；经过 Cloudflare 的 beta 不行，`Server` 会是 `cloudflare`，还可能多出缓存头。三个参数：站点、API、分享链接的站点。健康检查（`ok`、`text/plain; charset=utf-8`、`no-store`）；首页和另外六个路径（`/index.html` 本身、两个深链、`/assets`、`.vite/` 下两个）都回同一个 `index.html` 且 `no-cache`；图标；首页引的脚本和样式表缓存一年、类型对（`nosniff` 下浏览器只认对的类型），脚本里有这个 API 和分享链接的站点（留给默认值的构建是 compass，不是 beta）；缺的分块是 404、不是 `index.html`、没有缓存头；首页的 ETag 换来 304；带 1.1 MB 请求体的 POST 是 405，不是 413；解不开的转义 `/course/%zz` 是 nginx 自己回的 400。每个响应的安全头都和 `securityHeaders(API)` 一字不差，`Server` 只有 `nginx`。不跟重定向。
 10. **测试**：
-    - Vitest：`deploy/securityHeaders.test.ts`（策略原样；只收来源；生产和 dev-api 两种构建各写对的文件，`VITE_API_BASE_URL` 指定别的 API 时写那个 API 的；预览照文件发头、没有文件不启动；每种构建和预览都有这个插件）；`deploy/render-headers.test.ts`（原样渲染；七种值、四种名字、几种不是对象的都拒；用 node 跑这个文件，输出相同，不给文件就报用法）；`deploy/check-site.test.ts`（一个照 `nginx.conf` 回答的替身，通过；再一次错一样，39 种，check-site 的每一项检查都有一种只靠它抓得到的，报的是对的那句；请求顺序和只问本站也核对。fetch 打桩，和别的测试一样不上网）。`tsconfig.json` 把 `deploy` 加进来。
-    - 后端：`tests/test_web_deploy.py`（新的，只读文件，compose 和 CI 按 YAML 读，注释和换一种写法都骗不过）：分享链接的站点在 `WEB_ORIGINS` 里，API 是正式的；beta 期间分享站点就是 beta、`WEB_ORIGINS` 只有它（切换时只改这一条）；`cloudflared` 只等 `api`、没有服务等 `web`（`depends_on` 的两种写法都认）；`web` 从 `./web` 构建、只读、`/tmp` 在内存里、去掉 capability、`no-new-privileges`、没有 `user`／`privileged`／`cap_add`／`env_file`／`volumes`、健康检查查 `/healthz`、镜像名和别的服务不重；Dockerfile 收 compose 给的两个构建参数，检查参数的那段用 sh 跑六种不该过的值；部署脚本探测的端口和 API、CI 核对的端口、API 和分享站点都和 compose 一致，CI 那几步没有 `if`、没有 `continue-on-error`，日志检查和 `id -u` 都在；`nginx.conf` server 这层那几行（不记访问日志、error、`log_not_found off`、`client_max_body_size 0`、`server_tokens off`、安全头）；`web/.gitignore` 里每个目录，`web/.dockerignore` 和部署脚本的打包都排除了，`web/.dockerignore` 有 `.env*`，根目录的 `.dockerignore` 有 `web/`；打包里只在根目录的那些锚定、排除都在打包对象之前；两个基础镜像钉了 digest、是 node 24 和 nginx-unprivileged，构建阶段核对 Node 24。`tests/test_deploy_script.py`：成功的三种要有两个新探测（第三种是 CSP 换了先后、多一个来源）；失败的加十种 web 的（连不上、健康检查不对、深链 404、不是这个应用、没有 CSP、CSP 是别的 API、API 写在别的指令里、没有 `frame-ancestors`、没有 `nosniff`、没有 referrer 策略），PS5 那条也跑这些。
+    - Vitest：`deploy/securityHeaders.test.ts`（策略原样；只收来源；生产和 dev-api 两种构建各写对的文件，`VITE_API_BASE_URL` 指定别的 API 时写那个 API 的；预览照文件发头、没有文件不启动；每种构建和预览都有这个插件）；`deploy/render-headers.test.ts`（原样渲染；七种值、四种名字、几种不是对象的都拒；用 node 跑这个文件，输出相同，不给文件就报用法）；`deploy/check-site.test.ts`（一个照 `nginx.conf` 回答的替身，通过，换一个 API 的构建也通过；再一次错一样，44 种，check-site 的每一项检查、两样都问的检查的每一半，都有一种只靠它抓得到的，报的是对的那句；请求顺序和只问本站也核对。fetch 打桩，和别的测试一样不上网）。`tsconfig.json` 把 `deploy` 加进来。
+    - 后端：`tests/test_web_deploy.py`（新的，只读文件，compose 和 CI 按 YAML 读，真正做核对的那几行整行钉住，注释、`|| true`、换一个匹配式都过不去）：分享链接的站点在 `WEB_ORIGINS` 里，API 是正式的；beta 期间分享站点就是 beta、`WEB_ORIGINS` 只有它（切换时只改这一条）；`cloudflared` 只等 `api`、没有服务等 `web`（`depends_on` 的两种写法都认）；`web` 从 `./web` 构建、只读、`/tmp` 在内存里、去掉 capability、`security_opt` 只有 `no-new-privileges`、设置只有那十一项（列有什么，不列没什么：`user`、`privileged`、`network_mode`、`pid`、`volumes` 之类都进不来）、健康检查查 `/healthz`、镜像名和别的服务不重；Dockerfile 收 compose 给的两个构建参数，检查参数的那段用 sh 跑六种不该过的值；部署脚本探测的端口和 API、CI 核对的端口、API 和分享站点都和 compose 一致，web-image 这个 job 和它那几步都没有 `if`、`continue-on-error`、`shell`，构建、check-site、核对用户和日志三步按原文整段钉住；`nginx.conf` server 这层那几行（不记访问日志、error、`log_not_found off`、`client_max_body_size 0`、`server_tokens off`、安全头），`access_log`、`error_log` 各只一处（location 里不许另开日志）；`web/.gitignore` 里每个目录，`web/.dockerignore` 和部署脚本的打包都排除了，`web/.dockerignore` 有 `.env*`，根目录的 `.dockerignore` 有 `web/`；打包选项去掉 PowerShell 的注释再读，只在根目录的那些锚定、排除都在打包对象之前；两个基础镜像钉了 digest、是 node 24 和 nginx-unprivileged，构建阶段核对 Node 24 的那行整行比。`tests/test_deploy_script.py`：成功的四种要有两个新探测（第三种是 CSP 换了先后、多一个来源，第四种是 `connect-src` 后面又写了一次不带 API 的）；失败的加十三种 web 的（连不上、健康检查不对、深链 404、不是这个应用、没有 CSP、CSP 是别的 API、API 写在别的指令里、没有 `frame-ancestors`、没有 `nosniff`、没有 referrer 策略、`connect-src` 写两次而 API 只在第二次、`frame-ancestors` 写两次而第一次放开、`'none'` 旁边还有来源），PS5 那条也跑这些。
 11. **文档**：README 新的「部署 R7」一节；「接口层与登录 R2b」里 Referrer 和「上线前（R7）」两条改了（`WEB_ORIGINS` 设好了，Google 的回调地址还要用户加）。
 
 ### 修改文件
@@ -5706,7 +5706,7 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
 
 本机的 Docker Desktop 起不来，镜像本身第一次在 CI 的 web-image job 里构建（下面「已知」第 1 条）。nginx 那一半在 WSL 里用同一个镜像的文件跑：按 digest 从 Docker Hub 取 `nginx-unprivileged:1.30.6-alpine`，每一层核过 sha256，解包后在非特权的 user namespace 里 chroot，只读根目录、`/tmp` 在内存里，跑镜像自己的 entrypoint 和这里的 `nginx.conf`、渲染出来的头。
 
-- **前端检查**：格式、`gen:api:check`、类型（连 `deploy/`）、零警告 lint、e2e 的类型都过；Vitest **95 个文件 2808 条**全过（多的三个文件是 `deploy/` 的测试）；两种构建都过，首屏 JavaScript gzip **186,441 字节**（`build:dev-api` 的 186,443），和第 41 节一样。
+- **前端检查**：格式、`gen:api:check`、类型（连 `deploy/`）、零警告 lint、e2e 的类型都过；Vitest **95 个文件 2808 条**全过（多的三个文件是 `deploy/` 的测试；那时 `check-site.test.ts` 还没补下面 Vitest 变异那两种错法，第一个提交是 2810 条，复核 R1 NIT-5）；两种构建都过，首屏 JavaScript gzip **186,441 字节**（`build:dev-api` 的 186,443），和第 41 节一样。
 - **e2e**：对 `vite preview` 58 过、10 条按项目跳过（55.4 秒）；对 WSL 里的真 nginx（4173 上的 dev-api 构建和它的头）也是 58 过、10 跳过（53.2 秒），nginx 的日志里一条请求都没有。
 - **`check-site.ts` 对真 nginx**：生产构建（8510，正式 API 的策略）和 dev-api 构建（4173，`http://127.0.0.1:8000` 的策略）都过。
 - **nginx 的变异**（评审目录 `r7/nginx_mutants.mjs`，每个改一处配置或头，起真 nginx，用 `check-site.ts` 核对）：21 个，杀掉 19 个：三种 location 各少一次头、不加 `always`、页面回退经过 `$uri/`、缺的分块回 `index.html` 或缓存一年、页面缓存一小时、`server_tokens on`、开访问日志、去掉 `charset`、root 指错、健康检查可缓存、别的 API 的策略、没有 referrer 策略、没有 `/assets/` 或 `/healthz` 的 location、镜像里留着 `.vite/`、没有 `frame-ancestors`。活下来的两个当时记成等价的；错误日志记到 info 那个其实不是（第 36 轮 B36 L1），见下面第 36 轮那段。
@@ -5716,7 +5716,7 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
 - **后端**：`test_deploy_script.py`、`test_web_deploy.py`、`test_opt06_review_round17_routes.py` 116 条过，ruff 干净；全量 **5335 条**全过（9 分 54 秒），跑前跑后比了 21 个改动文件的哈希，没变。
 - **码位**：第一个提交新加的 1197 行（21 个文件）里没有格式字符、私用区、控制字符和表情符号（原来写的 1169 是本节还没写完时扫的，B36 N1 按 1197 行重扫过）。改动记录和 README 以外的非 ASCII：CI、compose、Dockerfile、`nginx.conf`、`test_web_deploy.py` 的中文注释（仓库原来的写法），三个测试标题里的 `’`，`deploy.ps1` 一处注释里的长破折号（这个文件本来就带 BOM、有中文注释，Windows PowerShell 5.1 那条测试照常过）。没有 CR。
 - **第 36 轮修完以后**（第二个提交）：
-  - 前端：格式、`gen:api:check`、类型、零警告 lint、e2e 的类型都过；Vitest **95 个文件 2834 条**全过（多的 26 条在 `check-site.test.ts` 和 `securityHeaders.test.ts`）；两种构建的首屏 186,441／186,443 字节，没变。
+  - 前端：格式、`gen:api:check`、类型、零警告 lint、e2e 的类型都过；Vitest **95 个文件 2834 条**全过（比第一个提交的 2810 条多 24 条，都在 `check-site.test.ts`；`securityHeaders.test.ts` 那处是在原来的用例里加的断言）；两种构建的首屏 186,441／186,443 字节，没变。
   - e2e：对 `vite preview` 60 过、10 跳过（57.8 秒；多的两条是 `build.e2e.ts` 新加的）；对 WSL 里的真 nginx（4173 上的 dev-api 构建和它的头）也是 60 过、10 跳过（CSP 变异不改的那一遍）。
   - 用 `render-headers.ts` 重新渲染两种构建的头，和 nginx 跑时用的那两份逐字节一样。
   - `check-site.ts` 三个参数对真 nginx：生产构建（正式 API；分享站点 compass，留给默认值的构建就是它）和 dev-api 构建（`http://127.0.0.1:8000`、`http://127.0.0.1:4173`）都过；拿生产构建要 beta 的链接，报「bundle 里没有」失败。两边 nginx 的日志里没有一条请求，也没有 warn 及以上的。生产构建这次在 8300 上起：机器重启以后 Windows 把 8436–8535 划成了保留端口，WSL 转发不出 8510。
@@ -5727,6 +5727,12 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
   - Python 的变异：52 个都杀掉，跑完 worktree 的文件没变。`test_web_deploy.py` 对口的 39 个：原来的 20 个；B36 L4 那一批 12 个（`backup` 用短写法等 `web`、去掉 `security_opt` 只留一句提到它的注释、端口注释掉、CI 的 check-site 只 echo 或允许失败、`web` 用 api 的镜像名、以 root 跑、`privileged`、去掉 CI 的日志检查或 `id -u`、`web/.dockerignore` 不排除 `.env*`、排除写在打包对象后面）；这次改的几处 7 个（根目录的文件夹不锚定、Dockerfile 不收分享站点的参数、检查参数改回 `test -n` 或放过 http、不核对 Node 24、nginx 开访问日志、用默认的请求体上限）。`test_deploy_script.py` 对口的 13 个：原来的 10 个，加上策略又按原文找、指令不拆开、API 在策略里哪儿都行。
   - 后端：这个 PR 的三个测试文件 123 条过，ruff 干净；全量 **5342 条**全过（9 分 51 秒），跑前跑后比了 21 个改动文件的哈希，没变。
   - 码位：两个提交一共新加的 1627 行（21 个文件）里没有格式字符、私用区、控制字符和表情符号。非 ASCII 还是上面那几处（CI、compose、Dockerfile、`nginx.conf`、`test_web_deploy.py` 的中文注释，`deploy.ps1` 那处长破折号），加上三个测试文件标题里的 `’`（`render-headers.test.ts` 里有一处是故意给的非 ASCII 输入）。没有 CR。
+- **复核第 1 轮修完以后**（第三个提交）：
+  - 前端：格式、零警告 lint、类型都过；Vitest **95 个文件 2840 条**全过（多的 6 条都在 `check-site.test.ts`：5 种错法和换一个 API 的那条）。只改了测试，构建和 e2e 没重跑（机器重启以后 Windows 把 8000 也划进了保留端口，WSL 里的开发 API 从 Windows 这边连不上；这个提交也没有 e2e 看得到的改动）。
+  - 后端：这个 PR 的三个测试文件 **127 条**过（多的 4 条是部署脚本的新场景），ruff 干净。只改了两个测试文件和部署脚本，后端全量没重跑。
+  - Python 的变异：69 个都杀掉（D07 的锚点换成新的探测写法以后单独补跑了一次），跑完 worktree 的文件没变。原来的 52 个照样杀掉；新的 17 个里，R1 的 14 个（job 本身关掉或允许失败，核对那一步加 `|| true`、注释掉 grep、换一个匹配不到的式子，注释掉 `--anchored` 或 `node_modules` 那条，注释掉 Node 那行或加 `|| true`，`web` 用主机的网络或 pid、不要 seccomp，location 里另开错误日志或访问日志），我补的 3 个（核对那一步换成不带 `-e` 的 shell，指令写两次时又认后一次，`'none'` 旁边有来源也过）。
+  - Vitest 的变异：63 个都杀掉：原来的 54 个，和 R1 的 9 个（W33–W41：页面路径、健康检查、图标只看状态或只看内容，策略按固定的 API 算，样式表的类型、缓存和安全头只对脚本查）。
+  - 码位：三个提交一共新加的 1715 行（21 个文件）里没有格式字符、私用区、控制字符和表情符号，非 ASCII 还是上面那几处，没有 CR。
 
 ### 审查
 
@@ -5751,7 +5757,18 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
 - **B36 N3**：`test_web_deploy.py` 第一条钉的是 beta 期的状态：拆成「分享站点在 `WEB_ORIGINS` 里」和单独一条 beta 期的，切换时只改后一条。
 - **B36 N4**：没人查 node 的 digest 是不是 24：构建阶段先跑 `node --version`，不是 v24 就停。
 - **B36 N5**：部署脚本原来那些只在根目录的排除没锚定，`web/` 下叫 `tests`、`docs` 之类的文件夹会传不到 NAS：改成 `--anchored --exclude=./tests` 这样（「已实现」第 7 条）。
-- **B36 N6**：`securityHeaders.test.ts` 只测了默认的 API：加了生产构建指定别的 API 的那条（Vitest 变异 V22）。
+- **B36 N6**：`securityHeaders.test.ts` 只测了默认的 API：生产构建那条用例里加了指定别的 API 的情形（Vitest 变异 V22）。
+
+**复核第 1 轮**（11-01 用户同意开，一路只读 R1）：CRITICAL 0／HIGH 0／MEDIUM 0／LOW 1／NIT 5。第 36 轮的每一条都修到了，报告里的出错情形现在都挂在该挂的那句上，修补也没有带进新问题。R1 在钉住的镜像里起了四个 nginx，用原始套接字发了二十种请求（每种答复的安全头都只有一份；1.1 MB、50 MB、分块和慢慢滴的请求体都读了扔掉，一直滴的照样在 30 秒左右断开，和默认上限时一样，什么都不记）；在 dash 下跑了 Dockerfile 的两道检查，在 PS 5.1 里原样跑了 `Get-PolicyDirectives`，用提交的 `support.ts` 在一个静态页上跑了弹窗和 `test.fail()`；写了 14 个 Python 变异、9 个 Vitest 变异。修了的（第三个提交）：
+
+- **LOW-1**：`test_web_deploy.py` 对 CI 只钉到每一步：给整个 web-image job 加 `if: false` 或 `continue-on-error: true`，或在核对用户和日志那一步里加 `|| true`、把 grep 那段注释掉、换一个什么都匹配不到的式子，测试照样过（R1 的 5 个变异都活下来）。现在 job 本身和它那几步都不许有 `if`、`continue-on-error`、`shell`，构建、check-site、核对用户和日志三步按原文整段钉住；测试的说明和本节第 10 条收窄到实际钉住的。
+- **NIT-1**：两样都问的检查（页面路径、健康检查、图标的状态和内容）只有一半有对口的错法，样式表自己的缓存和安全头、按参数里的 API 算策略也没有。补了 5 种错法（深链在 404 下回 `index.html`、`/healthz` 回 503 的 `ok`、图标回 404 却是图标、样式表不长期缓存、样式表没有安全头）和一条换一个 API 的构建，R1 的 9 个变异都杀掉了（Vitest 变异 W33–W41）。
+- **NIT-2**：`test_web_deploy.py` 还有几处按文字读：打包选项连 PowerShell 的注释一起读，注释掉 `node_modules` 那条照样过；Node 那行只看片段，注释掉或加 `|| true` 照样过；`web` 不许有的设置只列了五项，`seccomp:unconfined`、`pid: host`、`network_mode: host` 都过得去。现在打包选项去掉注释再读，Node 那行整行比，`web` 的设置列成全集，`security_opt` 只许那一项。注释掉 `--anchored` 本来是等价的（`./` 已经把名字钉在根目录），现在也会挂。
+- **NIT-3**：在 location 里另开一个 info 级别的错误日志，静态测试和 CI 都看不见（CI 那个格式不对的请求在 server 这层就回了），location 里的事件却会把请求行记下来（R1 用中途断开的请求复现过）。现在 `access_log`、`error_log` 在 `nginx.conf` 里各只许一处。
+- **NIT-4**：`Get-PolicyDirectives` 遇到写了两次的指令留后一次，浏览器认的是前一次；`frame-ancestors 'none'` 旁边多一个来源（浏览器就不认 `'none'` 了）也能过。改成只认第一次、`frame-ancestors` 只能是 `'none'` 一项；部署脚本的测试加了三种要挂的和一种要过的（见「已实现」第 10 条）。这只是多一道保险：策略来自 `securityHeaders()`，单元测试钉住了原文，check-site 整段比对。
+- **NIT-5**：本节两个 Vitest 的数：第一个提交是 2810 条（2808 是补最后两种错法之前数的），第二个提交多的 24 条都在 `check-site.test.ts`。改了（上面）。
+
+不开第 2 轮：剩下的都是测试和一处只多一道保险的探测，R1 的 23 个变异连同我补的 3 个都杀掉了（上面）。
 
 ### 已知、未处理
 
@@ -5764,10 +5781,11 @@ R7 要把新前端放上线：先开 beta 子域名、用真实数据验收，�
 - **NAS 上第一次构建要拉 node 和 nginx 的镜像、装 npm 的包**（用户定了在 NAS 上构建），那次部署比平常慢。
 - **web 的构建失败会让整次部署停下**（A36 LOW-4、B36 L6）：compose 的 `up --build` 先构建所有镜像再换容器，部署脚本对整套跑它。npm 的源或 Docker Hub 连不上、类型检查或首屏体积不过、基础镜像的 digest 被撤，API 和 Streamlit 的修补也就发不出去（停在部署脚本第 5 步，旧容器照跑，不会半新半旧）。没改；要改就让部署脚本先单独构建 web，失败时只更新别的服务。
 - **晚于一帧的 CSP 拒绝 e2e 看不到**（A36 NIT-2）：fixture 收尾前每个页面只多跑一帧，最后一步之后过几百毫秒才发生的拒绝，算不到这条测试上。现在 Radix 的 `<style>` 都在挂载时插，碰不到。fixture 的变异里，收尾前不等这一帧测不出来（Playwright 自己的收尾排在这个 fixture 前面，晚一个任务的报告照样赶上），只挂一次的标记是多一道保险（同一个 window 上初始化脚本不会再跑）。
+- **`test.fail()` 那条对照，只在它自己的正文都通过时才证明收尾那句检查管用**（复核 R1）：任何一处失败都满足 `test.fail()`。第 36 轮那两遍 e2e 里，它的正文都过了。
 - **没有 CSP 上报**：线上被拒的东西只出现在用户自己的控制台里（A36）。
 - **HSTS 交给 Cloudflare**；`Cross-Origin-Opener-Policy` 没设（A36 说可以加，和整页跳去 Google 登录不冲突，不是必须）。
 - **根目录的 Dockerfile 还有 `# syntax=docker/dockerfile:1.7`**（API 和 Streamlit 的镜像，A36 NIT-5 顺带看到）：这个 PR 不碰。
 
 ### 发布状态
 
-分支 `feat/web-deploy`，从 `feat/web-e2e` 的 `0039b53` 开，两个提交：第一个是上面这些，第二个是第 36 轮审查的修补。没有使用真实模型、账号、NAS 或生产库；本机只对着开发 API 和合成数据，镜像和 nginx 都只在本机和 CI 里起。上线分两步（用户定的）：第一步只发 API 和 Streamlit（main 里 10-25 以后合进来的那些），用不着这个 PR；这个 PR 的 compose 会把 web 一起起来，部署脚本也会探它，所以第一步从不含这个 PR 的提交发。第二步才起 web、开 beta。每一步的发布计划部署前给用户看，部署要另外授权。
+分支 `feat/web-deploy`，从 `feat/web-e2e` 的 `0039b53` 开，三个提交：第一个是上面这些，第二个是第 36 轮审查的修补，第三个是复核第 1 轮的修补。没有使用真实模型、账号、NAS 或生产库；本机只对着开发 API 和合成数据，镜像和 nginx 都只在本机和 CI 里起。上线分两步（用户定的）：第一步只发 API 和 Streamlit（main 里 10-25 以后合进来的那些），用不着这个 PR；这个 PR 的 compose 会把 web 一起起来，部署脚本也会探它，所以第一步从不含这个 PR 的提交发。第二步才起 web、开 beta。每一步的发布计划部署前给用户看，部署要另外授权。

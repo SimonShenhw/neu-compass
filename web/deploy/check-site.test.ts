@@ -19,10 +19,12 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 // A stand-in for the web image as deploy/nginx.conf has it serve the build, with one thing wrong at a time: the
 // checker must pass the first and fail every other, each on the line that names what is wrong, so that every check it
-// makes has a fault of its own here (review B36). Behind a stubbed fetch, as every test here keeps off the network.
+// makes, and each half of one that asks two things, has a fault of its own here (review B36, recheck R1). Behind a
+// stubbed fetch, as every test here keeps off the network.
 const FAULTS = {
   // The health check.
   'the health check says OK': '/healthz: 200 "OK"',
+  'the health check is a 503 that says ok': '/healthz: 503 "ok\\n"',
   'the health check as bytes':
     '/healthz: Content-Type is "application/octet-stream"',
   'the health check is cached': '/healthz: Cache-Control is "max-age=60"',
@@ -42,6 +44,8 @@ const FAULTS = {
     '/ with If-None-Match: X-Content-Type-Options is null',
   // The other paths that are index.html.
   'a deep link is a 404': "/course/CS-6140: 404, not the app's index.html",
+  'a deep link is index.html under a 404':
+    "/course/CS-6140: 404, not the app's index.html",
   '/assets redirected to /assets/ (try_files $uri/)':
     "/assets: 301, not the app's index.html",
   'the build’s .vite/ is served':
@@ -52,6 +56,7 @@ const FAULTS = {
     '/course/CS-6140: Content-Security-Policy is null',
   // The icon.
   'the icon is index.html': '/favicon.svg: 200, not the icon',
+  'the icon is a 404 with the icon': '/favicon.svg: 404, not the icon',
   'the icon as text': '/favicon.svg: Content-Type is "text/plain"',
   'the icon cached for a year': `/favicon.svg: Cache-Control is "${IMMUTABLE}"`,
   'the icon without the security headers':
@@ -62,6 +67,8 @@ const FAULTS = {
   'assets are not cached': `${SCRIPT}: Cache-Control is "no-cache"`,
   'the entry script without the security headers': `${SCRIPT}: Content-Security-Policy is null`,
   'a stylesheet as text': `${STYLESHEET}: Content-Type is "text/plain"`,
+  'the stylesheet is not cached for good': `${STYLESHEET}: Cache-Control is "no-cache"`,
+  'the stylesheet without the security headers': `${STYLESHEET}: Content-Security-Policy is null`,
   'a bundle built for another API': `${SCRIPT}: no ${API} in the bundle`,
   'a bundle whose links name compass': `${SCRIPT}: no ${SHARE} in the bundle`,
   // A chunk that is not there.
@@ -80,9 +87,9 @@ const FAULTS = {
 } as const;
 type Fault = keyof typeof FAULTS | 'none';
 
-function standIn(fault: Fault) {
+function standIn(fault: Fault, api: string) {
   const policy = securityHeaders(
-    fault === 'a policy for another API' ? 'https://api.example.test' : API,
+    fault === 'a policy for another API' ? 'https://api.example.test' : api,
   );
   return (
     path: string,
@@ -101,7 +108,9 @@ function standIn(fault: Fault) {
       (fault === 'the icon without the security headers' &&
         path === '/favicon.svg') ||
       (fault === 'the entry script without the security headers' &&
-        path === SCRIPT);
+        path === SCRIPT) ||
+      (fault === 'the stylesheet without the security headers' &&
+        path === STYLESHEET);
     function send(
       status: number,
       body: string | null,
@@ -166,35 +175,43 @@ function standIn(fault: Fault) {
     if (path === '/' && fault === 'index.html behind a redirect')
       return send(301, null, { Location: `${SITE}/index.html` });
     if (path === '/healthz')
-      return send(200, fault === 'the health check says OK' ? 'OK' : 'ok\n', {
-        'Content-Type':
-          fault === 'the health check as bytes'
-            ? 'application/octet-stream'
-            : 'text/plain; charset=utf-8',
-        'Cache-Control':
-          fault === 'the health check is cached' ? 'max-age=60' : 'no-store',
-      });
+      return send(
+        fault === 'the health check is a 503 that says ok' ? 503 : 200,
+        fault === 'the health check says OK' ? 'OK' : 'ok\n',
+        {
+          'Content-Type':
+            fault === 'the health check as bytes'
+              ? 'application/octet-stream'
+              : 'text/plain; charset=utf-8',
+          'Cache-Control':
+            fault === 'the health check is cached' ? 'max-age=60' : 'no-store',
+        },
+      );
     if (path === '/favicon.svg')
       return fault === 'the icon is index.html'
         ? index()
-        : send(200, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', {
-            'Content-Type':
-              fault === 'the icon as text' ? 'text/plain' : 'image/svg+xml',
-            'Cache-Control':
-              fault === 'the icon cached for a year' ? IMMUTABLE : 'no-cache',
-          });
+        : send(
+            fault === 'the icon is a 404 with the icon' ? 404 : 200,
+            '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+            {
+              'Content-Type':
+                fault === 'the icon as text' ? 'text/plain' : 'image/svg+xml',
+              'Cache-Control':
+                fault === 'the icon cached for a year' ? IMMUTABLE : 'no-cache',
+            },
+          );
     if (path === SCRIPT) {
       if (fault === 'the entry script is a 404')
         return send(404, '<html><body>404 Not Found</body></html>', {});
-      const api =
+      const bundleApi =
         fault === 'a bundle built for another API'
           ? 'https://api.example.test'
-          : API;
+          : api;
       const share =
         fault === 'a bundle whose links name compass'
           ? 'https://compass.neu-compass.me'
           : SHARE;
-      return send(200, `const api = "${api}", site = "${share}";`, {
+      return send(200, `const api = "${bundleApi}", site = "${share}";`, {
         'Content-Type':
           fault === 'a JavaScript file as text'
             ? 'text/plain'
@@ -207,7 +224,10 @@ function standIn(fault: Fault) {
       return send(200, 'body{margin:0}', {
         'Content-Type':
           fault === 'a stylesheet as text' ? 'text/plain' : 'text/css',
-        'Cache-Control': IMMUTABLE,
+        'Cache-Control':
+          fault === 'the stylesheet is not cached for good'
+            ? 'no-cache'
+            : IMMUTABLE,
       });
     if (path.startsWith('/assets/')) {
       if (fault === 'a missing chunk is index.html') return index();
@@ -236,12 +256,20 @@ function standIn(fault: Fault) {
       return send(200, '{}', { 'Content-Type': 'application/json' });
     if (path === '/course/CS-6140' && fault === 'a deep link is a 404')
       return send(404, 'not here', {});
+    if (
+      path === '/course/CS-6140' &&
+      fault === 'a deep link is index.html under a 404'
+    )
+      return send(404, html, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      });
     return index();
   };
 }
 
-async function check(fault: Fault) {
-  const site = standIn(fault);
+async function check(fault: Fault, api = API) {
+  const site = standIn(fault, api);
   const requested: string[] = [];
   vi.stubGlobal('fetch', async (url: URL | string, init?: RequestInit) => {
     const target = new URL(String(url));
@@ -259,7 +287,7 @@ async function check(fault: Fault) {
       body instanceof Uint8Array ? body.byteLength : 0,
     );
   });
-  const failures = await checkSite(SITE, API, SHARE);
+  const failures = await checkSite(SITE, api, SHARE);
   return { failures, requested };
 }
 
@@ -284,6 +312,11 @@ describe('deploy/check-site.ts, the check of what the web image serves (R7)', ()
       'POST /course/CS-6140',
       MALFORMED,
     ]);
+  });
+
+  it('passes a site built for another API, against the policy for that API', async () => {
+    const { failures } = await check('none', 'https://api.beta.example.test');
+    expect(failures).toEqual([]);
   });
 
   for (const [fault, failure] of Object.entries(FAULTS))

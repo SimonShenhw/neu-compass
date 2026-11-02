@@ -105,6 +105,13 @@ function Invoke-WebRequest {
             'web_policy_reordered' { "default-src 'none'; frame-ancestors 'none'; connect-src 'self' https://api.neu-compass.me https://other.example.test" }
             # The API named, but not where the page may connect to it.
             'web_policy_api_elsewhere' { "default-src 'none'; img-src https://api.neu-compass.me; connect-src 'self'; frame-ancestors 'none'" }
+            # A directive given twice counts the first time, as browsers enforce it (recheck R1): the API only in the
+            # second connect-src; framing allowed by the first frame-ancestors; then 'none' beside a source, which
+            # browsers ignore; and, to pass, the API in the first connect-src with a second one after it.
+            'web_policy_connect_twice' { "default-src 'none'; connect-src 'self'; frame-ancestors 'none'; connect-src 'self' https://api.neu-compass.me" }
+            'web_policy_framing_twice' { "default-src 'none'; connect-src 'self' https://api.neu-compass.me; frame-ancestors *; frame-ancestors 'none'" }
+            'web_policy_framing_mixed' { "default-src 'none'; connect-src 'self' https://api.neu-compass.me; frame-ancestors 'none' https://other.example.test" }
+            'web_policy_repeated_later' { "default-src 'none'; connect-src 'self' https://api.neu-compass.me; frame-ancestors 'none'; connect-src 'self'" }
             default { "default-src 'none'; script-src 'self'; connect-src 'self' $api; base-uri 'none'$framing" }
         }
         $headers = @{
@@ -136,11 +143,11 @@ exit $LASTEXITCODE
 WEB_FAILURES = (
     "web_down", "web_unhealthy", "web_deep_link_404", "web_not_the_app", "web_no_policy",
     "web_policy_other_api", "web_policy_api_elsewhere", "web_policy_framable", "web_no_nosniff",
-    "web_no_referrer_policy",
+    "web_no_referrer_policy", "web_policy_connect_twice", "web_policy_framing_twice", "web_policy_framing_mixed",
 )
 # Deploys that must pass: the success path, a probe that succeeds on its second try, and the web's policy in another
-# order (R7, B36).
-SUCCESSES = ("success", "transient", "web_policy_reordered")
+# order (R7, B36) or with a directive repeated after the one that counts (R1).
+SUCCESSES = ("success", "transient", "web_policy_reordered", "web_policy_repeated_later")
 
 
 def _run_deploy(scenario: str) -> subprocess.CompletedProcess[str]:

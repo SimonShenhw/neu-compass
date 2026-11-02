@@ -1,11 +1,13 @@
 """R7: the web front end's deployment as the repository has it. docker-compose.yml's web service, the API's
 WEB_ORIGINS, the tunnel's dependency, both images' build contexts, the web image's Dockerfile and nginx.conf,
-deploy.ps1's probes and archive, and CI's check of the image agree with each other. Compose and CI are read as YAML,
-so that neither a comment nor another way of writing the same thing decides (review B36). Reads files only, but runs
-the Dockerfile's guard of its build arguments under sh.
+deploy.ps1's probes and archive, and CI's check of the image agree with each other. Compose and CI are read as YAML
+(review B36); the lines that do the checking (CI's steps, the Dockerfile's Node check, deploy.ps1's tar options without
+its comments) are pinned whole, so that a comment, a `|| true` or another pattern does not pass for them (recheck R1).
+Reads files only, but runs the Dockerfile's guard of its build arguments under sh.
 中文：仓库里的新前端部署：compose 的 web 服务、API 的 WEB_ORIGINS、隧道的依赖、两个镜像的构建上下文、网页镜像的
-Dockerfile 和 nginx.conf、deploy.ps1 的探测和打包、CI 对镜像的核对彼此一致。compose 和 CI 按 YAML 读，注释和换一种
-写法都骗不过（B36）。只读文件，Dockerfile 检查构建参数的那段用 sh 跑一遍。"""
+Dockerfile 和 nginx.conf、deploy.ps1 的探测和打包、CI 对镜像的核对彼此一致。compose 和 CI 按 YAML 读（B36）；真正做
+核对的那几行（CI 的几步、Dockerfile 核对 Node 的那行、deploy.ps1 去掉注释以后的 tar 选项）整行钉住，注释、`|| true`、
+换一个匹配式都过不去（复核 R1）。只读文件，Dockerfile 检查构建参数的那段用 sh 跑一遍。"""
 
 from __future__ import annotations
 
@@ -25,11 +27,22 @@ COMPOSE = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8
 SERVICES: dict[str, dict[str, Any]] = COMPOSE["services"]
 WEB = SERVICES["web"]
 DEPLOY = (ROOT / "scripts" / "deploy.ps1").read_text(encoding="utf-8")
-CI_JOB = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))["jobs"]["web-image"]
+CI = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+CI_JOB = CI["jobs"]["web-image"]
 DOCKERFILE = (ROOT / "web" / "Dockerfile").read_text(encoding="utf-8")
 NGINX = (ROOT / "web" / "deploy" / "nginx.conf").read_text(encoding="utf-8")
 BETA = "https://beta.neu-compass.me"
 API = "https://api.neu-compass.me"
+# CI's last check of the image, whole: nginx runs as 101, and its log holds no request, not even the malformed one
+# check-site sends (the line an error log lowered to info would keep).
+CI_USER_AND_LOG = r'''test "$(docker compose exec -T web id -u)" = 101
+docker compose logs --no-log-prefix web > web.log
+cat web.log
+if grep -E 'GET |HEAD |HTTP/1\.|/course/|/assets/|/healthz' web.log; then
+  echo "::error::the web container logged a request"
+  exit 1
+fi'''
+NODE_CHECK = r'''RUN node --version | grep -q '^v24\.' || { echo "Not Node 24: $(node --version)" >&2; exit 1; }'''
 
 
 def mapping(value: Any) -> dict[str, str]:
@@ -46,6 +59,15 @@ def waits_for(service: dict[str, Any]) -> set[str]:
 
 def web_args() -> dict[str, str]:
     return mapping(WEB["build"].get("args"))
+
+
+def tar_options() -> list[str]:
+    """deploy.ps1's tar options as PowerShell runs them: the $tarExcludes listing without its comments (R1)."""
+    listing = re.search(r"^\$tarExcludes = @\((.*?)^\) -join ' '$", DEPLOY, re.M | re.S)
+    assert listing
+    code = re.sub(r"<#.*?#>", "", listing.group(1), flags=re.S)
+    code = re.sub(r"#.*$", "", code, flags=re.M)
+    return re.findall(r"'(--[^']+)'", code)
 
 
 def test_the_site_shared_links_name_is_one_the_api_takes() -> None:
@@ -73,9 +95,11 @@ def test_the_web_service_is_built_from_web_and_hardened() -> None:
     assert WEB["read_only"] is True
     assert WEB["tmpfs"] == ["/tmp"]
     assert WEB["cap_drop"] == ["ALL"]
-    assert "no-new-privileges:true" in WEB["security_opt"]
-    # Nothing that undoes it or reaches it: the image's user 101, no privilege or capability back, no secrets.
-    assert not {"user", "privileged", "cap_add", "env_file", "volumes"} & set(WEB)
+    assert WEB["security_opt"] == ["no-new-privileges:true"]
+    # Nothing that undoes it or reaches it, listed by what is there rather than what is not (R1): the image's user 101,
+    # no privilege, capability, host namespace or seccomp profile back, no secrets, no volumes.
+    assert set(WEB) == {"build", "image", "container_name", "restart", "logging", "read_only", "tmpfs", "cap_drop",
+                        "security_opt", "ports", "healthcheck"}
     assert WEB["restart"] == "always" and WEB["logging"] == SERVICES["api"]["logging"]
     assert WEB["healthcheck"]["test"] == ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz"]
     # An image of its own: api, ui and backup run neu-compass:latest, which a build of web must never replace.
@@ -113,22 +137,27 @@ def test_deploy_and_ci_check_the_web_service_where_compose_publishes_it() -> Non
     assert port and api
     assert WEB["ports"] == [f"{port.group(1)}:8080"]
     assert api.group(1) == web_args()["VITE_API_BASE_URL"]
-    # The job's checks: steps that always run and whose failure fails the job.
+    # The job always runs and its failure fails the workflow, every step in the default shell (bash -e); its checks are
+    # steps that always run, each pinned whole, so that a `|| true`, a line commented out or another pattern does not
+    # pass for one (recheck R1).
+    assert not {"if", "continue-on-error", "defaults"} & set(CI_JOB) and "defaults" not in CI
+    assert not [step for step in CI_JOB["steps"] if "shell" in step]
     runs = [step["run"].strip() for step in CI_JOB["steps"]
             if "run" in step and "if" not in step and not step.get("continue-on-error")]
-    assert any(run.endswith("docker compose up --build --detach --wait --wait-timeout 180 web") for run in runs)
+    assert "touch .env\ndocker compose up --build --detach --wait --wait-timeout 180 web" in runs
     check_site = f"node web/deploy/check-site.ts http://127.0.0.1:{port.group(1)} {api.group(1)}"
     assert f"{check_site} {web_args()['VITE_PUBLIC_BASE_URL']}" in runs
-    assert any(run.startswith('test "$(docker compose exec -T web id -u)" = 101') for run in runs)
-    assert any("docker compose logs --no-log-prefix web > web.log" in run and "grep -E" in run and "exit 1" in run
-               for run in runs)
+    assert CI_USER_AND_LOG in runs
 
 
 def test_nginx_logs_no_request_and_reads_no_body() -> None:
-    """The server's own lines in nginx.conf (CI's log check and the nginx mutants see their effect)."""
+    """The server's own lines in nginx.conf (CI's log check and the nginx mutants see their effect), and no location
+    with a log of its own: CI's malformed request is answered at the server's level, so it would never show a
+    location's (recheck R1)."""
     for line in ("server_tokens off;", "access_log off;", "error_log /dev/stderr error;", "log_not_found off;",
                  "client_max_body_size 0;", "include /etc/nginx/security-headers.conf;"):
         assert re.search(rf"^    {re.escape(line)}$", NGINX, re.M), line
+    assert sorted(re.findall(r"^\s*(access_log|error_log)\b", NGINX, re.M)) == ["access_log", "error_log"]
 
 
 def test_no_image_takes_what_a_checkout_of_web_installs_or_builds() -> None:
@@ -139,7 +168,7 @@ def test_no_image_takes_what_a_checkout_of_web_installs_or_builds() -> None:
     web_ignore = (ROOT / "web" / ".dockerignore").read_text(encoding="utf-8").splitlines()
     # A local .env would change what Vite builds.
     assert ".env*" in web_ignore
-    excludes = set(re.findall(r"'--exclude=([^']+)'", DEPLOY))
+    excludes = {option.removeprefix("--exclude=") for option in tar_options()}
     made = [
         line.rstrip("/")
         for line in (ROOT / "web" / ".gitignore").read_text(encoding="utf-8").splitlines()
@@ -156,9 +185,7 @@ def test_deploy_archive_leaves_out_what_lives_at_the_root_only_there() -> None:
     """deploy.ps1's archive: the root's own folders anchored (tar's names start with ./), so that no folder of web/'s
     sources is left out for sharing a name (B36); the rest, node_modules and web/'s build output, at any depth; and
     every exclude before the member, or tar ignores it."""
-    listing = re.search(r"^\$tarExcludes = @\((.*?)^\) -join ' '$", DEPLOY, re.M | re.S)
-    assert listing
-    items = re.findall(r"'(--[^']+)'", listing.group(1))
+    items = tar_options()
     anchored = items[items.index("--anchored") + 1: items.index("--no-anchored")]
     assert items[-1] == "--no-anchored" and items.count("--anchored") == 1
     assert {f"--exclude=./{name}" for name in ("tests", "eval", "docs", "backups", "runtime-data", "cloudflared")} <= set(
@@ -177,8 +204,9 @@ def test_the_web_image_bases_are_pinned_by_digest() -> None:
     for base in bases:
         assert re.fullmatch(r"[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}", base), base
     assert bases[0].startswith("node:24.") and bases[1].startswith("nginxinc/nginx-unprivileged:")
-    # The digest, not the tag, decides which node it is: the build stage checks (B36).
-    assert "RUN node --version | grep -q '^v24\\.'" in DOCKERFILE
+    # The digest, not the tag, decides which node it is: the build stage checks and stops on any other (B36), the line
+    # whole (R1).
+    assert NODE_CHECK in DOCKERFILE.splitlines()
     # The site's engines: Node 24 builds it, as CI does.
     engines = json.loads((ROOT / "web" / "package.json").read_text(encoding="utf-8"))["engines"]["node"]
     assert engines == ">=24 <25"

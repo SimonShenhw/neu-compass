@@ -67,12 +67,13 @@ function Get-HeaderValues($Response, [string]$Name) {
 }
 
 # A Content-Security-Policy's directives by name, each with its sources: read so, a policy whose directives come in
-# another order, or with another source beside the API, is still read right (review B36).
+# another order, or with another source beside the API, is still read right (review B36). A directive given twice
+# counts the first time, as browsers enforce it (recheck R1).
 function Get-PolicyDirectives([string]$Policy) {
     $directives = @{}
     foreach ($part in $Policy -split ';') {
         $tokens = @($part.Trim() -split '\s+' | Where-Object { $_ })
-        if ($tokens.Count -gt 0) {
+        if ($tokens.Count -gt 0 -and -not $directives.ContainsKey($tokens[0].ToLowerInvariant())) {
             $directives[$tokens[0].ToLowerInvariant()] = @($tokens | Select-Object -Skip 1)
         }
     }
@@ -347,7 +348,8 @@ if ($DryRun) {
             }
             $policy = @(Get-HeaderValues $page 'Content-Security-Policy' | Where-Object {
                 $directives = Get-PolicyDirectives $_
-                ($directives['connect-src'] -contains $WebApi) -and ($directives['frame-ancestors'] -contains "'none'")
+                # 'none' beside another source is ignored by browsers: framing must be 'none' alone.
+                ($directives['connect-src'] -contains $WebApi) -and ((@($directives['frame-ancestors']) -join ' ') -eq "'none'")
             })
             if ($policy.Count -eq 0) {
                 throw "web page has no Content-Security-Policy for $WebApi"
