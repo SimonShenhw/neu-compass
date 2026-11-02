@@ -6,7 +6,9 @@
 #   3. scp .env             → ${NasUser}@${NasHost}:${NasPath}/.env
 #   4. (opt-in) tar-pipe runtime data via WSL → ${NasPath}/runtime-data/
 #   5. ssh nas "docker compose up -d [--build]"
-#   6. Verify API readiness, UI health, and read-only deep-link resolution
+#   6. Verify API readiness, UI health, read-only deep-link resolution, Co-op,
+#      and the web front end (R7): its health, and a deep link answered with
+#      the app and its security headers
 #
 # Why tar-pipe instead of rsync?
 #   The UGREEN DXP NAS wraps /usr/bin/rsync with an ACL that only allows
@@ -55,6 +57,28 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot   = 'H:\neu-compass'
 $WslProject    = '/mnt/h/neu-compass'
 $NasTarget     = "${NasUser}@${NasHost}"
+# The web front end's port on the NAS (docker-compose.yml: web, 8510:8080) and the API its build calls (R7).
+$WebPort       = 8510
+$WebApi        = 'https://api.neu-compass.me'
+
+# Every value of a response header, by its name in any case: PS5 maps a header to a string, PS7 to a string array.
+function Get-HeaderValues($Response, [string]$Name) {
+    @($Response.Headers.Keys | Where-Object { $_ -ieq $Name } | ForEach-Object { $Response.Headers[$_] } | ForEach-Object { $_ })
+}
+
+# A Content-Security-Policy's directives by name, each with its sources: read so, a policy whose directives come in
+# another order, or with another source beside the API, is still read right (review B36). A directive given twice
+# counts the first time, as browsers enforce it (recheck R1).
+function Get-PolicyDirectives([string]$Policy) {
+    $directives = @{}
+    foreach ($part in $Policy -split ';') {
+        $tokens = @($part.Trim() -split '\s+' | Where-Object { $_ })
+        if ($tokens.Count -gt 0 -and -not $directives.ContainsKey($tokens[0].ToLowerInvariant())) {
+            $directives[$tokens[0].ToLowerInvariant()] = @($tokens | Select-Object -Skip 1)
+        }
+    }
+    return $directives
+}
 
 Write-Host ''
 Write-Host '=== NEU-Compass deploy ===' -ForegroundColor Cyan
@@ -127,7 +151,10 @@ if (-not $Force -and -not $DryRun) {
     }
 }
 
-# Exclusion list for code tar — mirrors .dockerignore
+# Exclusion list for code tar — mirrors .dockerignore, but for web/: the web
+# image builds on the NAS from web/'s sources, so only what a checkout installs
+# or builds there stays out (R7; web/.dockerignore keeps the same out of that
+# image). node_modules at any depth; e2e's browser alone is ~120MB.
 $tarExcludes = @(
     '--exclude=.git',
     '--exclude=.venv',
@@ -137,25 +164,39 @@ $tarExcludes = @(
     '--exclude=.mypy_cache',
     '--exclude=.ruff_cache',
     '--exclude=.coverage',
-    '--exclude=tests',
-    '--exclude=eval',
-    '--exclude=docs',
-    '--exclude=backups',
-    '--exclude=data/raw',
-    '--exclude=data/processed',
-    '--exclude=data/ground_truth',
-    '--exclude=data/coop_seed/curated.json',
     '--exclude=*.db',
     '--exclude=*.db-*',
     '--exclude=*.faiss',
     '--exclude=faiss_index',
-    '--exclude=runtime-data',
-    '--exclude=cloudflared',
     '--exclude=.env',
-    '--exclude=scripts/.stack_pids',
     '--exclude=*.log',
     '--exclude=*.ipynb',
-    '--exclude=.ipynb_checkpoints'
+    '--exclude=.ipynb_checkpoints',
+    '--exclude=node_modules',
+    '--exclude=web/dist',
+    '--exclude=web/dist-dev-api',
+    '--exclude=web/coverage',
+    '--exclude=web/.vite',
+    '--exclude=web/artifacts',
+    '--exclude=web/tools/e2e/.browsers',
+    '--exclude=web/tools/e2e/test-results',
+    '--exclude=web/tools/e2e/playwright-report',
+    # What lives at the root only, as .dockerignore names it: anchored (tar's
+    # names start with ./), so that no folder of web/'s sources, from which the
+    # NAS builds the web image, is left out for sharing a name (review B36).
+    '--anchored',
+    '--exclude=./tests',
+    '--exclude=./eval',
+    '--exclude=./docs',
+    '--exclude=./backups',
+    '--exclude=./data/raw',
+    '--exclude=./data/processed',
+    '--exclude=./data/ground_truth',
+    '--exclude=./data/coop_seed/curated.json',
+    '--exclude=./runtime-data',
+    '--exclude=./cloudflared',
+    '--exclude=./scripts/.stack_pids',
+    '--no-anchored'
 ) -join ' '
 
 # === 3) Code: tar -czf - | ssh "tar -xzf - -C dest" ===
@@ -244,7 +285,7 @@ if ($DryRun) {
     # Read-only probes: do not call /search or /chat (query_log / Gemini).
     # 中文：只读验收，不污染真实查询日志，也不消耗 Gemini 配额。
     Write-Host ''
-    Write-Host "  Probing API + UI + deep links + Co-op (${ReadyTimeoutSeconds}s timeout) " -NoNewline
+    Write-Host "  Probing API + UI + deep links + Co-op + web (${ReadyTimeoutSeconds}s timeout) " -NoNewline
     $deadline = (Get-Date).AddSeconds($ReadyTimeoutSeconds)
     $ok = $false
     $pendingCheck = 'API readiness'
@@ -291,6 +332,33 @@ if ($DryRun) {
                 throw 'Co-op moderation schema missing on the server; apply the v1.3 migration (public list is seeds-only until then)'
             }
 
+            # R7: the web front end. Its health check, then a deep link: the
+            # app's index.html (web/deploy/nginx.conf), with the build's
+            # security headers, its policy naming the API the build calls.
+            $pendingCheck = 'web health'
+            $webHealth = Invoke-WebRequest "http://${NasHost}:${WebPort}/healthz" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            if ($webHealth.StatusCode -ne 200 -or $webHealth.Content.Trim() -ne 'ok') {
+                throw 'web health endpoint did not return 200/ok'
+            }
+
+            $pendingCheck = 'web deep link'
+            $page = Invoke-WebRequest "http://${NasHost}:${WebPort}/course/CS-5800" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            if ($page.StatusCode -ne 200 -or -not $page.Content.Contains('<div id="root"></div>')) {
+                throw 'web did not answer a deep link with the app'
+            }
+            $policy = @(Get-HeaderValues $page 'Content-Security-Policy' | Where-Object {
+                $directives = Get-PolicyDirectives $_
+                # 'none' beside another source is ignored by browsers: framing must be 'none' alone.
+                ($directives['connect-src'] -contains $WebApi) -and ((@($directives['frame-ancestors']) -join ' ') -eq "'none'")
+            })
+            if ($policy.Count -eq 0) {
+                throw "web page has no Content-Security-Policy for $WebApi"
+            }
+            if ((Get-HeaderValues $page 'X-Content-Type-Options') -notcontains 'nosniff' -or
+                (Get-HeaderValues $page 'Referrer-Policy') -notcontains 'strict-origin-when-cross-origin') {
+                throw 'web page lacks nosniff or its referrer policy'
+            }
+
             $ok = $true
             break
         } catch {
@@ -301,10 +369,10 @@ if ($DryRun) {
     }
     Write-Host ''
     if ($ok) {
-        Write-Host '  OK API ready + UI healthy + deep-link resolution + Co-op available' -ForegroundColor Green
+        Write-Host '  OK API ready + UI healthy + deep-link resolution + Co-op available + web serving' -ForegroundColor Green
     } else {
         Write-Host "  X deploy checks failed: $pendingCheck ($lastProbeError)" -ForegroundColor Red
-        Write-Host "    ssh $NasTarget 'cd $NasPath && docker compose logs --tail=100 api ui'" -ForegroundColor DarkGray
+        Write-Host "    ssh $NasTarget 'cd $NasPath && docker compose logs --tail=100 api ui web'" -ForegroundColor DarkGray
         exit 1
     }
 }
@@ -315,6 +383,7 @@ Write-Host ''
 Write-Host '  Public:'
 Write-Host '    https://api.neu-compass.me/health'
 Write-Host '    https://compass.neu-compass.me'
+Write-Host '    https://beta.neu-compass.me (R7 beta: the web front end, once the tunnel routes it)'
 Write-Host ''
 Write-Host "  Logs:  ssh $NasTarget 'cd $NasPath && docker compose logs -f api'"
 Write-Host ''

@@ -1,9 +1,83 @@
 import { expect } from '@playwright/test';
+import { securityHeaders } from '../../../deploy/securityHeaders';
 import { API, WEB, answered, ask, landed, test } from './support';
 
 // What a build is, beyond what Vitest sees of its configuration (R6): no demo page, a skip link that moves focus
 // without a history entry, and no request to anything but the site and its API (which every test checks too,
-// tests/support.ts). On the desktop only (playwright.config.ts).
+// tests/support.ts); the security headers of its build, under which every test runs (R7). On the desktop only
+// (playwright.config.ts).
+
+// R7: the preview sends what the build wrote (vite.config.ts), the headers nginx sends in production for its API, so
+// every test's page runs under the production policy, the API aside.
+test('the preview sends its build’s security headers on a page and on a deep link', async ({
+  page,
+}) => {
+  for (const path of ['/', '/course/CS-6140']) {
+    const headers = (await page.goto(path))?.headers() ?? {};
+    for (const [name, value] of Object.entries(securityHeaders(API)))
+      expect(headers[name.toLowerCase()], `${path}: ${name}`).toBe(value);
+  }
+});
+
+// The policy is enforced, not only sent, and a refusal reaches every test's check (tests/support.ts): a script the page
+// adds inline does not run, and its report arrives.
+test('an inline script is refused, and the refusal is reported', async ({
+  page,
+  cspViolations,
+}) => {
+  await page.goto('/');
+  await landed(page);
+  const ran = await page.evaluate(() => {
+    const script = document.createElement('script');
+    script.textContent = 'document.body.dataset.inlineRan = "yes";';
+    document.body.append(script);
+    return document.body.dataset.inlineRan === 'yes';
+  });
+  expect(ran).toBe(false);
+  await expect.poll(() => cspViolations.length).toBe(1);
+  expect(cspViolations[0]).toMatch(/^script-src-elem refused inline/);
+  // Made on purpose: not a failure of this test.
+  cspViolations.length = 0;
+});
+
+// The fixture watches every page of the test's context, one the test opens later too, whose window outlives its first,
+// blank document (review A36; tests/support.ts).
+test('a refusal in a page the test opens later is reported too', async ({
+  page,
+  cspViolations,
+}) => {
+  await page.goto('/');
+  await landed(page);
+  const [opened] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.evaluate(() => void window.open('/', '_blank')),
+  ]);
+  await landed(opened);
+  await opened.evaluate(() => {
+    const script = document.createElement('script');
+    script.textContent = 'document.body.dataset.inlineRan = "yes";';
+    document.body.append(script);
+  });
+  await expect.poll(() => cspViolations.length).toBe(1);
+  expect(cspViolations[0]).toMatch(/^script-src-elem refused inline/);
+  cspViolations.length = 0;
+});
+
+// And one nobody takes back fails the test that made it: the fixture's own check, which no other test ever trips, kept
+// under test (review A36). Marked as failing: it passes only if that check fails it. The page makes it a moment after
+// the test's last step, which still counts.
+test('a refusal left in place fails its test', async ({ page }) => {
+  test.fail();
+  await page.goto('/');
+  await landed(page);
+  await page.evaluate(() => {
+    setTimeout(() => {
+      const script = document.createElement('script');
+      script.textContent = 'document.body.dataset.inlineRan = "yes";';
+      document.body.append(script);
+    });
+  });
+});
 
 // The nine demo routes of src/demoRoutes.tsx, which no build carries.
 const DEMOS = [

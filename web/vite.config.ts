@@ -1,7 +1,10 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { securityHeaders } from './deploy/securityHeaders.ts';
 import {
   PREVIEW_PORT,
   chooseApiBase,
@@ -52,6 +55,43 @@ export function noDemoModules(): Plugin {
   };
 }
 
+// R7: a build writes the headers nginx sends with every response (deploy/securityHeaders.ts) for the API its bundle
+// calls. The web image renders them for nginx from this file (web/Dockerfile), and vite preview sends them from it, so
+// the end-to-end tests run under the policy of the build they test.
+export const SECURITY_HEADERS_FILE = '.vite/security-headers.json';
+export function securityHeadersFile(apiBase: string): Plugin {
+  return {
+    name: 'neu-compass:security-headers',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: SECURITY_HEADERS_FILE,
+        source: `${JSON.stringify(securityHeaders(apiBase), null, 2)}\n`,
+      });
+    },
+    configurePreviewServer(server) {
+      const file = resolve(
+        server.config.root,
+        server.config.build.outDir,
+        SECURITY_HEADERS_FILE,
+      );
+      if (!existsSync(file))
+        throw new Error(
+          `${file} is missing: a preview sends the headers its build wrote, so build first.`,
+        );
+      const headers = JSON.parse(readFileSync(file, 'utf8')) as Record<
+        string,
+        string
+      >;
+      server.middlewares.use((_request, response, next) => {
+        for (const [name, value] of Object.entries(headers))
+          response.setHeader(name, value);
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ command, mode }) => {
   // R2b: the API address is fixed here, at build time (src/api/apiBase.ts says which one for which build); R3e: so is
   // the site a shared link names, and the dev server's port.
@@ -70,7 +110,11 @@ export default defineConfig(({ command, mode }) => {
   );
   const demos = command === 'serve';
   return {
-    plugins: demos ? [react()] : [react(), noDemoModules()],
+    plugins: [
+      react(),
+      ...(demos ? [] : [noDemoModules()]),
+      securityHeadersFile(apiBase),
+    ],
     define: {
       __API_BASE_URL__: JSON.stringify(apiBase),
       __PUBLIC_BASE_URL__: JSON.stringify(publicBase),

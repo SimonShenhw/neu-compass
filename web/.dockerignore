@@ -1,0 +1,14 @@
+# R7: the web image's build context is web/ (web/Dockerfile). What npm ci installs, what a build or a test run leaves
+# (.gitignore) and the tools/ packages stay out: the image installs and builds its own. Local env files too, which
+# would change what Vite builds.
+node_modules/
+dist/
+dist-dev-api/
+coverage/
+.vite/
+artifacts/
+tools/
+*.log
+.env*
+Dockerfile
+.dockerignore

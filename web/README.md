@@ -196,12 +196,12 @@ npm.cmd run test:mutations
 - **请求只有一个出口：** `src/api/client.ts`。每个请求都带 cookie、不用 HTTP 缓存、不跟重定向；写请求带 `X-NEU-Compass: 1`，有请求体才带 JSON 的 Content-Type。四档超时照 Streamlit（5／8／15／30 秒，读完回答也算在内），什么都不自动重试。失败变成 `ApiError`（状态码、`error_type`、`Retry-After`、422 被拒的字段名、登录被拒的 `reason`），不带后端的英文原文；页面上的中文照 Streamlit。
 - **取数：** TanStack Query，不重试；切回窗口、网络恢复都不重取。断网时请求照样发出、照样失败，不会排队等网络回来再自己发（写请求尤其不能这样）。暂时的失败（超时、429、5xx）继续显示上次的内容，明确的答复（401、404、422…）不留。`/config` 5 分钟内算新鲜；`/auth/me` 的 401 就是游客。
 - **登录：** 点按钮时生成 32 字节的随机 state，和回来的页面一起放进 sessionStorage（本站只在这里存东西，用一次就删），整页去 Google（只认 Google 的登录页；页面连本机开发 API 时也认它的假登录页）。回到站点根路径时先把 code 和 state 从地址栏和历史里去掉，这时还不问 `/config`、`/auth/me`；再核对 state，对了才用 cookie 模式提交回调，然后重读一次 `/auth/me`：读到游客就说「登录状态没有保存下来…」，读失败就保留回调给的身份，最后回到原来的页面。state 对不上的返回链接（包括带 `error=` 的）什么都不发、也不显示链接里的字。外校邮箱和没验证的邮箱分开说，别的失败一句话。登录、登出时清掉按身份取的数据，登出时再清课程对比。
-- **Referrer：** `index.html` 设 `strict-origin-when-cross-origin`，发给别的站点的只有本站的来源（R0 14.15；R7 在服务器上再设一次）。
+- **Referrer：** `index.html` 设 `strict-origin-when-cross-origin`，发给别的站点的只有本站的来源（R0 14.15；R7 起 nginx 在每个响应上也发这个头，见「部署 R7」）。
 - **焦点：** 账号框里按下的按钮忙完以后（登出换成登录按钮、失败恢复原按钮），焦点回到账号框现在的按钮上（桌面侧栏和手机菜单里都一样，和结果同一次渲染完成），用户自己移开了就不动。从 Google 页按「后退」、浏览器原样恢复本页时，登录按钮恢复可用。
 - **聊天流：** `src/api/chatStream.ts` 的 `streamChat(request, { signal })` 边收边读 `/chat` 的 NDJSON，给 R3 的搜索和聊天页用；它是 `client.ts` 以外唯一调 fetch 的文件。先 `meta`，再若干 `token`，最后 `done`（可能带反馈凭证，由页面照 Streamlit 的做法核对）；或者中途一个 `error`，它的 `detail` 是 API 给学生看的固定中文，照样显示。等回答开始、等下一块各最多 30 秒；断线、超时、没有 `done` 就结束、有一行不是这四种事件、或者一行（不算行尾）长过 100 万个字符（API 最长的一行也就几十 KB），都在已经收到的内容后面补一句 Streamlit 的话（「连接中断。…」或「回答流未完整结束；…」）。流开始前的失败和别的请求一样是 `ApiError`。不自动重发（每问一次都算模型次数、写查询日志）；能取消。
 - **开发 API 的聊天：** `/chat` 按脚本回答，不调用模型，HyDE 补救也关着。问题里带 `dev:model-error`（模型中途出错）、`dev:no-answer`（没有回答）、`dev:daily-limit`（今天的次数用完）、`dev:no-done`（流没有 `done` 就结束）、`dev:cut`（连接中途断开）、`dev:stall`（停 35 秒，比前端等的久），就换成对应的情况。
 - **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config`、游客身份和顶栏的 `/ready`（R3e），外壳不再发请求（`fetch` 在测试里仍被禁止，要用就 stub；R5d 的接线测试用 `src/test/fakeApi.tsx` 回答页面自己的请求）。
-- **上线前（R7）：** Google OAuth 客户端要把新前端的地址（来源加 `/`）加进 Authorized redirect URI，API 的 `WEB_ORIGINS` 也要设成它，不然 Google 或 API 会拒绝。
+- **上线前（R7）：** API 的 `WEB_ORIGINS` 在 compose 里设好了（见「部署 R7」）；Google OAuth 客户端的 Authorized redirect URI 还要加上新前端的地址（来源加 `/`，beta 是 `https://beta.neu-compass.me/`），不然 Google 会拒绝，这一步在 Google Cloud Console 里由用户做。
 
 ## R3c 搜索回答区与演示（2026-10-24）
 
@@ -455,3 +455,18 @@ npm.cmd test --prefix tools/e2e
 **CI**：`.github/workflows/ci.yml` 加了 e2e job，跑在钉住的 ubuntu-24.04 上（`ubuntu-latest` 10-28 起是 26.04；钉住以后，布局测试用的字体和系统库不会因为换了大版本就跟着变，但同一个大版本里，GitHub 的镜像和 `--with-deps` 装的 apt 包照样会更新；Playwright 1.64 两版都支持）：装 API 的依赖和 web、`tools/e2e` 的依赖，缓存 `.browsers/`，用 `--with-deps` 装无头版和它要的系统库，查 e2e 的类型，`build:dev-api`，跑测试；挂了就上传报告和 trace（留 7 天）。
 
 修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 41 节。
+
+## 部署 R7（2026-11-01）
+
+从 `feat/web-e2e` 的 `0039b53`（#41）开 `feat/web-deploy`，依据评审目录 `frontend_react/R7_PLAN.md`。11-01 用户定了：beta 用 `beta.neu-compass.me`，beta 期间分享链接指向 beta，镜像在 NAS 上构建，`cloudflared` 只等 `api`。这一批只做部署件，不部署；部署、改隧道和 Google 的设置都要用户另外点头。
+
+- **镜像**（`web/Dockerfile`，构建上下文是 `web/`）：第一段在 `node:24.22.2-bookworm-slim` 里照 CI 的做法 `npm ci`、`npm run build`，把构建写下的安全头渲染成 nginx 的配置，再删掉 `dist/.vite/`；第二段 `nginxinc/nginx-unprivileged:1.30.6-alpine` 只放 `dist/`、`deploy/nginx.conf` 和渲染出来的头，nginx 以用户 101 运行、监听 8080。两个基础镜像都钉 digest，旁边的标签只是写给人看的版本；构建阶段先核对确实是 Node 24（认的是 digest，不是标签）；不写 `# syntax=`，用构建器自带的前端。构建参数 `VITE_API_BASE_URL`、`VITE_PUBLIC_BASE_URL` 必须给（compose 给），而且都要以 `https://` 开头：只有空格的值，`src/api/apiBase.ts` 会当成没给、退回正式 API 和 compass，所以 Dockerfile 先挡下。`web/.dockerignore` 挡住 `node_modules`、构建和测试留下的东西、`tools/` 和本机的 `.env*`。
+- **nginx**（`deploy/nginx.conf`）：页面路径都回 `index.html`，`no-cache`（浏览器每次用 ETag 重新验证，新构建马上看得到）；`/assets/` 下带哈希的文件缓存一年、`immutable`，没有的文件是普通的 404：不回 `index.html`、不缓存，部署前开着的页面要旧分块时干脆地失败。`/healthz` 给健康检查和部署脚本。不记访问日志（页面路径里有学生看过的课号）；错误日志只记 error，找不到文件不算；请求体不管多大都读了扔掉（`client_max_body_size 0`：默认的 1 MiB 上限会回 413，并把那行请求连路径记进错误日志）；`server_tokens off`；不压缩（Cloudflare 给浏览器压缩，它和 nginx 之间是 NAS 自己的网络）。
+- **安全头**（`deploy/securityHeaders.ts`）：CSP 是 `default-src 'none'`，脚本只许本站；样式许本站和内联（Radix 打开弹窗、选择框时自己插 `<style>`：滚动条那个随滚动条宽度变，给不了哈希，静态文件也给不了 nonce）；图片、字体只许本站；`connect-src` 是本站和 API（本站给 Vite 的 modulepreload 补丁用）；`base-uri`、`form-action`、`frame-ancestors` 都是 `'none'`。另有 `Referrer-Policy: strict-origin-when-cross-origin` 和 `X-Content-Type-Options: nosniff`。构建按本次连的 API 把它们写进 `.vite/security-headers.json`（`vite.config.ts` 的插件）；镜像从这个文件渲染出 `add_header … always`（`deploy/render-headers.ts`），server 这层 include 一次（nginx 在进 location 以前就回的答复，比如格式不对的请求），每个 location 再 include 一次（location 里有自己的 `add_header` 就不继承 server 的）；`vite preview` 也照这个文件发头，没有这个文件就不启动。所以 e2e 跑在和生产同一份策略下，只有 API 不同。
+- **e2e**：每条测试多一个自动 fixture，页面上任何被 CSP 拒掉的东西都算失败（浏览器的 `securitypolicyviolation`，挂在整个浏览器上下文每个页面的 window 上：换了页面、测试后来打开的新页面都收得到；最后一步之后一帧以内的也算，再晚的收不到）。`build.e2e.ts` 加四条：预览发的头就是 `securityHeaders()` 给的；页面里加的内联脚本不执行、报告收得到；测试后来打开的页面里的也收得到；留下一次拒绝的测试会失败（标成预期失败，证明 fixture 收尾那句检查本身管用）。
+- **compose**（根目录 `docker-compose.yml`）：新的 `web` 服务，构建参数是正式 API 和 beta 的站点（切换时改成 compass、重新构建）；只读根目录、`/tmp` 在内存里、去掉全部 capability、`no-new-privileges`；健康检查 `curl /healthz`；主机端口 8510 给 `deploy.ps1` 探测。没有服务等它：它起来了但不健康，不影响别的服务；构建不一样，`up --build` 先构建所有镜像，web 构建失败整次部署都停，API 也上不去。`api` 加 `WEB_ORIGINS='["https://beta.neu-compass.me"]'`（切换时加上 compass）。`cloudflared` 只等 `api`：一个前端不健康，隧道、API 和另一个前端照常。根目录的 `.dockerignore` 加 `web/`：API 和 Streamlit 的镜像用不着它。
+- **部署脚本**（`scripts/deploy.ps1`）：打包排除任何一层的 `node_modules`，和 web/ 下的构建产物、e2e 的浏览器和报告（第 41 节「已知」里 B35 LOW-9 那条）；只在根目录的（`tests`、`docs`、`eval`、`backups` 之类）锚定在根目录，`web/` 里同名的文件夹照样传。探测加两步：`8510/healthz`，和深链 `/course/CS-5800`：回的是这个应用的 `index.html`，CSP 按指令读（`connect-src` 里有正式 API、`frame-ancestors` 只有 `'none'` 一项，换了指令的先后也认得，同一条指令写两次只认第一次，和浏览器一样），还有 `nosniff` 和 referrer 策略。
+- **CI**：新的 web-image job，照 compose 构建并起 `web`（`docker compose up --build --wait web`），用 `deploy/check-site.ts` 从外面核对每一类响应（页面、深链、图标、脚本和样式表、缺的分块、304、带大请求体的 POST、nginx 自己回的 400、健康检查）的头、类型、缓存和回退，构建连的 API 和分享链接的站点；再核对 nginx 以 101 运行、日志里没有一条请求。不碰 NAS。
+- **核对一个跑着的站**：`node deploy/check-site.ts <站点> <API 来源> <分享链接的站点>`，例如 `node deploy/check-site.ts http://127.0.0.1:8510 https://api.neu-compass.me https://beta.neu-compass.me`（Node 24 直接跑 TypeScript）。只对镜像本身（CI、NAS 上的 8510）：经过 Cloudflare 的 beta 跑不过，Cloudflare 会把 `Server` 换成它自己的，还可能加缓存头。
+
+修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 42 节。
