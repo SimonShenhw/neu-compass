@@ -91,7 +91,7 @@ def test_prompt_45_adds_a_separate_bounded_url_free_data_block_without_breaking_
     for secret in (plan.source_url, plan.source_excerpt, plan.source_html_sha256, plan.checked_by, content_hash(plan)):
         assert not secret or secret not in projected
     prompt = build_prompt("question", [], history=[{"role": "user", "content": "old"}], plan=plan)
-    assert PROMPT_VERSION == "4.5"
+    assert PROMPT_VERSION == "4.6"
     assert prompt.index("# Selected program plan (JSON DATA)") < prompt.index("# Conversation history (quoted DATA)")
     assert prompt.split("# Conversation history (quoted DATA)\n")[1].split("\n\n# New message", 1)[0] == '"Student: old"'
     assert "# Retrieval notices (DATA)\n[]\n\n# Retrieved course evidence" in prompt
@@ -154,7 +154,7 @@ def test_selection_does_not_change_hits_and_meta_and_feedback_keep_separate_proj
     chosen = chat_meta(api_client.post("/chat", json={"query": "CS 5800", "program_id": plan.program_id,
         "plan": selection_data(plan), "allow_feedback_capture": True}))
     assert [(item["course_id"], item["score"]) for item in chosen["results"]] == [(item["course_id"], item["score"]) for item in base["results"]]
-    assert chosen["plan_context"]["plan_id"] == plan.plan_id and chosen["prompt_version"] == "4.5"
+    assert chosen["plan_context"]["plan_id"] == plan.plan_id and chosen["prompt_version"] == "4.6"
     assert chosen["plan_context"]["placements"][chosen["results"][0]["course_id"]][0]["relation"] == "required"
     assert plan.source_url not in prompts[-1]
     request_context = json.loads(empty_db.execute("SELECT request_context FROM chat_answers").fetchone()[0])

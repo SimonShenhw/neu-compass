@@ -5838,3 +5838,71 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
 ### 发布状态
 
 分支 `feat/web-switch-compass`，从 main 的 `ef61ab4` 开，一个提交。没有使用真实模型、账号、NAS 或生产库。上线要用户点头、定时间：部署（web 重新构建、api 换设置）和改隧道配置里 compass 那条连着做；用户自己在 beta 上验收过了才上。
+
+## 44 — 先修 AND/OR 不明时的说法（CONTENT-01：提示词 4.6、检查器 2.7，2026-11-02）
+
+### 范围与原因
+
+R7 第一步上线后的线上验收（评审目录 `release_20261101/STEP1_BROWSER_ACCEPTANCE_2026-11-01.md` 第 3 节）记了 CONTENT-01：问 CS 6140 学什么、适合什么基础的学生，回答先说「该课程的先决条件是 CS 5800 或 CS 7800」，结尾又说「先决条件的具体逻辑（例如是全部需要还是任选其一）未在记录中明确说明」；同一页的卡片也提示 AND/OR 不清楚。这次发布没改提示词，问题早就有，不是它带进来的。
+
+诊断（评审目录 `content01/DIAGNOSIS.md`，离线复现脚本和输出在同一目录；没调模型）：
+
+- 线上 CS 6140 没有年度先修文档，提示词只有两份裸列表 `recorded_metadata.prereqs` 和目录快照的 `prereq_codes`（都是 `["CS 5800", "CS 7800"]`），外加警告码 `prerequisite_logic_unavailable`；课号旁边、目录描述里都没有「或」。目录原文确实是「或」（仓库夹具里 2025-2026 版的 CS 页），抓取时也解析出了 `any_of`，但这个结构只进单独导入的年度文档，不进快照和课程记录。「或」是模型自己补的：可能是两项连起来顺手用的连词，也可能是它本来就记得官方规则，不调模型分不清，修法一样。
+- 旧规则（4.0 起有，4.4 加了「没有 catalog_requisites 条目时」）只禁止把列表说成全都要或任一即可，没给该怎么说，也没点名警告码；「最后提一下数据缺口」的格式要求又把说明推到了结尾，于是先断言、后免责。
+- `eval/answer_checks.py` 的 `prereq_logic` 只看全文有没有一句「关系不明」的说明，而且认不出这条回答自己的说法，会误报缺说明；前面的断言没有任何检查。
+- 卡片的两处提示都对：回答下的「先修课之间是都要还是任选不清楚」就是 `prerequisite_logic_unavailable`；详情里的「旧边不表达 AND/OR」是先修接口固定带的 `legacy_prerequisite_edges_not_verified_logic`。
+
+用户选了诊断推荐的修法：提示词升到 4.6，把「关系不明」写进课号旁边的字段名，并写明该怎么说（修法 B）；检查器补上这项检查（修法 F）。课程详情里旧边的「必须／建议先修」标签（修法 C）由另一个会话另做；给更多课导入年度文档（修法 D）要动线上库，另行决定。从 main 的 `f24a72d`（#43 的合并）开 `fix/content01-prereq-relation`。
+
+### 已实现
+
+1. **提示词 4.6**（`llm/prompts/chat_v4.py`）：
+   - 没有年度规则时，两份平铺列表留在原位，改名为 `prereq_codes_and_or_unknown`（`FLAT_PREREQS_KEY`）；有年度规则时照旧不给（4.4）。改名和去掉都在 `_flat_prereqs()` 一处，键的顺序不变。`answer_evidence` 本身（meta、课程详情、卡片）不变，只改提示词的投影。
+   - 规则第一句不变（没有 catalog_requisites 条目时，先修代码不表示 AND/OR），后面接：这些课号只以这个字段给出（警告 `prerequisite_logic_unavailable`），记录只列了课、没说怎么组合，回答也不能说；不用或／和／either／both 连接，不说全都要、任一即可或该修哪门，也不凭自己知道的目录规则补；平铺列出（中文用「、」，英文用逗号），在同一句说明记录没写是都要还是任选其一。中英文示例各占一行，课号用 X、Y 占位，免得被抄进别的课的回答。
+2. **检查器 2.7**（`eval/answer_checks.py`）：
+   - 「关系不明」说明的识别补了否定词和动词之间隔着几个字的说法（`UNSTATED_ZH`：「未在记录中明确说明」「并未写明」），以及「没说」「没写」。
+   - 新信号 `prereq_relation_asserted`（列出句子、课号和类型）。上下文的 `flat_prereqs` 记着每门课以平铺列表拿到的先修代码；同一门课的两个课号用「或」类词连起来，而那个分句里没有「没写明／不清楚／是否／does not say／whether」这类词（`UNSTATED`）；或用「和」类词连起来，句子在讲修课（`PREREQ_CUE`），整句又没有「关系不明」的说明；或分句里有「任选／都要／either／both」这类关系词、没有 `UNSTATED`，并且点到了其中一门课，或者自己没有课号、而前一个分句点到了两门且也没有 `UNSTATED`。连接词前面可以有短括号（「（最低 C-）」）和逗号，课号两边可以有加粗、代码格式的 Markdown 标记（模型常把课号加粗）；「CS 5800 或 7800」这种短编号沿用前一个课号的院系。课号的识别和 `_course_codes` 共用新的 `_code_spans()`（多给位置）。这是给人看的信号，不是硬失败；`summarize` 计数。
+   - 上下文没有 `flat_prereqs`（2.7 以前保存的）时这一项是 `None`，表示没查。
+3. **真实回答评测的工具**（`scripts/eval_answers_live.py`；没有运行，没有调模型）：`context_from_records` 从课程块的新字段读 `flat_prereqs`（两份列表按顺序合并去重，没有列表的课不进）；保存的上下文能往返，`_context_ok` 核对它的形状；`summary.md` 多一列 prerequisite relation stated，旧上下文显示 not checked。默认问题集没改。
+4. **测试**：
+   - 新 `tests/test_content01_prereq_relation.py`：用仓库的目录夹具构造 CS 6140。没有年度规则时，课号只在新字段下，课程块里没有任何「或」；验收那条回答（截图里能看到的部分）在说「或」的那一句被标出，结尾的说明算数；4.6 要的说法通过；有年度规则时「或」是记录自己的，不标。
+   - `test_answer_checks.py`：19 个该标的（中英文的「或」「和」、关系词、短编号、斜杠和全角斜杠、括号、加粗和代码格式、三门课、小写课号），14 个不该标的（4.6 的说法、同一句里有说明、问句、两门课各自的列表、年度规则的课、只点到一门课之后的下一分句），旧上下文和计数，说明的识别。
+   - `test_eval_answers_live.py`：上下文带上平铺列表（课程记录和快照各有一个课号）；一条说「或」的回答进了报告和 `summary.md`，删掉 `flat_prereqs` 当旧报告重评得到 not checked；坏的形状不收。
+   - `test_chat_v4_prompt.py`：版本、快照的键名，新的一条（两份列表的新名字和原位置、API 证据不变、规则里那几句、示例各在一行）。`test_chat_structured_requisites.py`：平铺列表那条改成新名字，以及版本；文件顶部 Streamlit 卡片的导入和那几条卡片测试没动。`test_answer_grounding.py`、`test_chat_plan_evidence.py`：版本。
+   - `test_chat_plan_absent.py`（没选方案时 meta 和课程块与 `d7c5530` 逐字节相同的冻结哈希）：允许 4.6，哈希前还原 4.6 的改名，其余照旧逐字节比；另断言还原确实用上了。49 个课程块里有 26 个带平铺列表：不还原只有 23 个对得上，还原以后 49 个全对上，所以这次课程块的变化只有改名。
+5. **文档**：`docs/answer-grounding.md`（当前版本、4.6 一条、评测里的新信号）、`docs/course-requisites.md`（聊天回答那节一句）；本节。
+
+### 修改文件
+
+- 改：`llm/prompts/chat_v4.py`、`eval/answer_checks.py`、`scripts/eval_answers_live.py`。
+- 测试：新 `tests/test_content01_prereq_relation.py`；改 `tests/test_answer_checks.py`、`tests/test_eval_answers_live.py`、`tests/test_chat_v4_prompt.py`、`tests/test_chat_structured_requisites.py`、`tests/test_chat_plan_absent.py`、`tests/test_answer_grounding.py`、`tests/test_chat_plan_evidence.py`。
+- 文档：`docs/answer-grounding.md`、`docs/course-requisites.md`；本节。
+
+没改：API 路由、`rag/answer_evidence.py`（证据和警告）、数据库、检索、两套前端、部署文件。
+
+### 验证记录
+
+- **离线复现**（诊断时，评审目录 `content01/repro_prompt.py`，断网自检、不加载配置）：按 4.5 构造 CS 6140 的提示词，课号旁边和整个数据部分都没有「or／或」；现有检查器对验收那条回答报缺说明，不看断言。修完以后同样的内容由 `tests/test_content01_prereq_relation.py` 固定。
+- **相关测试**：改过和新加的 18 个测试文件 761 条全过；改过的 11 个 Python 文件 ruff（F、E9、B）干净；没有 CR。
+- **全量**：**5387 条**全过（10 分 0 秒），改动的 14 个文件跑前跑后哈希相同。
+- **变异**：43 个全杀。每个在 `/tmp` 下单独一份副本里跑对应的测试，未变异的副本先过（215 条）。提示词 12 个：投影 7（不改名、没有年度规则也去掉、有年度规则也留着、快照那份不动、课程记录那份不动、改名后挪到最后、版本留在 4.5），规则 5（写回旧字段名、去掉「同一句」、允许凭自己知道的、中文示例拆成两行、允许连接）。检查器 23 个：说明的词 2，「或」连接 3，「和」连接 3，关系词 5，连接写法 4（括号、斜杠、全角斜杠、加粗标记），只认本课课号、课号写法、旧上下文、分句、计数、短编号各 1。评测工具 8 个：不带列表、只读课程记录、只读快照、重复、空列表也进、往返不转回、形状不查、not checked 写成 0。
+- **码位**：新加的 552 行（14 个文件）里没有格式字符、私用区、控制字符和表情符号；非 ASCII 只是注释、文档和测试里的中文。
+- 没有用真实模型，没有联网。
+
+### 审查
+
+还没开：按用户的要求，提交以后先问用户要不要开、开几个（简报草稿在评审目录 `content01/review_R1/`）。
+
+### 已知、未处理
+
+- **真实模型会不会照做没验证**：离线只能证明提示词里有什么。复核要用户同意（`scripts/eval_answers_live.py`，Q4 的英文 CS 6140 先修问题加上验收那句中文，约 2 次 Gemini 调用）；没跑之前，4.6 是否真的消除了先断言后免责，不知道。
+- **检查是正则**：会漏（「两门都要」前一分句没有课号、说明写在同一分句的括号里、"Either one works: X, Y"），也会误报（"X and Y are both algorithms courses"），结果要有人读。
+- **只有一个课号时**，规则要求的「没有说明是都要还是任选其一」读起来别扭；规则没有单独写这种情况（平铺列表本来就不带成绩和别的条件）。
+- **提示词里还有 Streamlit 时代的界面名字**：「方案版本（可选）」「你的项目（可选）」（切换以后新前端叫「方案」「项目」）、前面带书本表情符号的「所选方案与课程位置」、培养方案页「没有网址」（新前端是 `/programs`）。这一批没改，改不改由用户定。
+- **线上多少门课走这条路径**没查（不碰线上数据）：有平铺先修代码、又没有可用年度文档的课都是。
+- **另做的两件**：课程详情旧边的「必须／建议先修」标签（另一个会话在做）；给更多课导入年度文档，要动线上库，另行决定。
+- **和 R8（删 Streamlit）同时在做**：两边都改了 `tests/test_chat_structured_requisites.py` 和 `docs/answer-grounding.md`，后合的那个合一下；本节的编号也由后合的那个改。
+
+### 发布状态
+
+分支 `fix/content01-prereq-relation`，从 main 的 `f24a72d` 开，一个提交。没有使用真实模型、账号、NAS 或生产库。线上仍是 4.5：合并不部署，上线（只换 api 镜像）要用户点头、定时间。

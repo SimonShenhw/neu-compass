@@ -253,8 +253,14 @@ def context_from_records(block: str, evidence: list[dict], *, lang: str, notices
     """Shared fixed-evidence/actual-route context projection; no API/model work.
     中文：固定证据与实际路由共用上下文投影，不请求 API 或模型。"""
     from eval.answer_checks import AnswerContext  # noqa: PLC0415
+    from llm.prompts.chat_v4 import FLAT_PREREQS_KEY  # noqa: PLC0415
 
     records = course_records(block)
+    # The codes each course got as a flat list, under the name that says their AND/OR is not recorded (4.6).
+    # 中文：每门课以平铺列表拿到的先修代码，就是提示词里写明 AND/OR 没有记录的那个名字下的（4.6）。
+    flat = [(record["primary_code"], tuple(dict.fromkeys(
+        [*record["recorded_metadata"].get(FLAT_PREREQS_KEY, []),
+         *(record["answer_evidence"]["catalog"] or {}).get(FLAT_PREREQS_KEY, [])]))) for record in records]
     catalogs = [item.get("catalog") for item in evidence]
     urls = {catalog["catalog_url"] for catalog in catalogs if catalog is not None}
     urls.update(edition["catalog_url"] for item in evidence for edition in (item.get("requisites") or {}).get("editions", []))
@@ -270,6 +276,7 @@ def context_from_records(block: str, evidence: list[dict], *, lang: str, notices
         unstated_values=tuple(sorted({value for _, _, value in unstated})),
         course_codes=tuple(record["primary_code"] for record in records), unstated=unstated,
         conflicts=conflict_values(records), prompt_keys=frozenset(_keys(records, set())),
+        flat_prereqs=tuple((code, codes) for code, codes in flat if codes),
     )
 
 
@@ -344,6 +351,8 @@ def context_from_json(data: dict):
                             tuple(values[name]) if name == "course_codes" else
                             tuple(tuple(item) if name == "unstated" else (item[0], item[1], tuple(item[2]))
                                   for item in values[name]))
+    if values.get("flat_prereqs") is not None:
+        values["flat_prereqs"] = tuple((code, tuple(codes)) for code, codes in values["flat_prereqs"])
     return AnswerContext(**values)
 
 
@@ -380,17 +389,21 @@ def write_report(out: Path, report: dict) -> None:
     lines = [f"# Answer check · prompt {report['prompt_version']} · {report['status']}", "",
              f"chat_v4.py {report['chat_v4_sha256'][:12]} · {planned} planned · {report['model_calls']} model calls · "
              f"{report['errors']} errors · {report['summary']['answers']} answers checked", "",
-             "| answer | hard failures | caveats missing | as reviewer-reported | unattributed | saved-copy sentences |",
-             "|---|---|---|---|---|---|"]
+             "| answer | hard failures | caveats missing | as reviewer-reported | unattributed | saved-copy sentences | "
+             "prerequisite relation stated |",
+             "|---|---|---|---|---|---|---|"]
     for record in report["records"]:
         if "checks" not in record:
-            lines.append(f"| {record['qid']} run {record['run']} | error | | | | |")
+            lines.append(f"| {record['qid']} run {record['run']} | error | | | | | |")
             continue
         checks = record["checks"]
         failed = ", ".join(name for name in HARD_FAILURES if checks[name]) or "none"
+        # None: the saved context does not record the flat lists (an answer checked before 2.7). 中文：保存的上下文没记录平铺列表。
+        relations = checks.get("prereq_relation_asserted")
         lines.append(f"| {record['qid']} run {record['run']} | {failed} | {', '.join(checks['caveats_missing']) or '—'} | "
                      f"{len(checks['estimates_as_reported'])} | "
-                     f"{sum(item['kind'] == 'unattributed' for item in checks['estimates'])} | {checks['saved_copy_mentions']} |")
+                     f"{sum(item['kind'] == 'unattributed' for item in checks['estimates'])} | {checks['saved_copy_mentions']} | "
+                     f"{'not checked' if relations is None else len(relations)} |")
     lines += ["", "```json", json.dumps(report["summary"], ensure_ascii=False, indent=2), "```", ""]
     (out / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -427,6 +440,9 @@ def _context_ok(context: object) -> bool:
                                 else ("credits", "workload_hours_per_week", "difficulty_score"))
                 and (numeric(item[2]) if name == "unstated" else isinstance(item[2], list) and all(map(numeric, item[2])))
                 for item in context[name]) for name in ("unstated", "conflicts"))
+            and (context.get("flat_prereqs") is None or isinstance(context["flat_prereqs"], list) and all(
+                isinstance(item, list) and len(item) == 2 and isinstance(item[0], str) and isinstance(item[1], list)
+                and all(isinstance(code, str) for code in item[1]) for item in context["flat_prereqs"]))
             and all(_is(context[flag], bool) for flag in CONTEXT_FLAGS if flag in context))
 
 
