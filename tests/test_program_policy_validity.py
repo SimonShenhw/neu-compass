@@ -4,9 +4,7 @@ import json
 
 import pytest
 
-from app.program_policy_view import render_program_policy_evidence
-from schemas.program_policy import ProgramPolicyBundle, paragraph_hash, policy_lists, policy_paragraphs
-from tests.test_program_plan_view import FakeSurface
+from schemas.program_policy import ProgramPolicyBundle, policy_lists, policy_paragraphs
 from tests.test_program_policy_evidence import ROOT, html
 
 
@@ -114,18 +112,3 @@ def test_certificate_exception_list_is_whole_and_not_claimed_as_personal_eligibi
     assert fragment.heading == 'Course Double Counting'
     assert all(word in fragment.summary for word in ['General Mechanical', '指定证书'])
     assert '不' in fragment.limitation and 'DS' in fragment.limitation
-
-
-def test_renderer_keeps_deadline_unknown_and_extension_approval_distinct(tmp_path):
-    from tests.test_program_policy_view import setup_reader
-    plan, _, reader = setup_reader(tmp_path)
-    data = reader.read(plan).model_dump(mode='json')
-    fragment = data['policies'][0]['fragments'][0]
-    fragment.update(summary='Credit valid for a limited period unless extension is approved.',
-        limitation='Personal dates, deadline and approval unknown. No automatic eligibility.',
-        source_paragraph='Synthetic time limit and conditional extension.',
-        paragraph_sha256=paragraph_hash('Synthetic time limit and conditional extension.'))
-    st = FakeSurface()
-    render_program_policy_evidence(st, plan, data)
-    assert f"限制／未知：{fragment['limitation']}" in st.texts
-    assert not any('eligibility' in item for item in st.markdowns)

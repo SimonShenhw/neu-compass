@@ -75,7 +75,7 @@ logs/
 backups/
 *.bak
 
-# Streamlit
+# Streamlit (deleted in R8; still ignored so an old local secrets file is never committed)
 .streamlit/secrets.toml
 
 # v3.1 stack launcher: transient PID file written by scripts/start_stack.ps1

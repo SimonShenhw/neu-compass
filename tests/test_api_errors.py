@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
 from api.exceptions import ChatConflict, register_exception_handlers
-from app.auth import OAuthError
+from api.google_oauth import OAuthError
 from db.repository import CourseNotFound
 from llm.gemini_client import GeminiError
 

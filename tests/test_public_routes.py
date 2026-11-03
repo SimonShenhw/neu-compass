@@ -51,7 +51,7 @@ def test_privacy_is_built_from_the_apis_own_settings(client, monkeypatch, days, 
     body = client.get("/privacy").json()
     assert body == {
         "intro": INTRO,
-        "sections": [{"heading": h, "sentences": s} for h, s in privacy_sections(settings, web=True)],
+        "sections": [{"heading": h, "sentences": s} for h, s in privacy_sections(settings)],
         "delete_what": DELETE_WHAT,
         "query_log_notice": QUERY_LOG_NOTICE_BASE,
         "capture_notice": capture_notice(days) if feedback else None,
@@ -61,28 +61,20 @@ def test_privacy_is_built_from_the_apis_own_settings(client, monkeypatch, days, 
     assert ((contact or "@@") in text) is bool(contact)
 
 
-def test_only_the_web_page_says_course_pages_stay_in_the_browser_history(client):
-    # R3e, R4c: each course page and each program page of the web front end has its own address; the Streamlit page
-    # never puts either in its address, so its sections stay as they were.
-    # 中文：新前端每门课、每个培养方案一个网址；Streamlit 页的网址里都没有，它的文字不变。
-    from api.privacy_text import privacy_sections
-
+def test_the_page_says_course_pages_stay_in_the_browser_history(client):
+    # R3e, R4c: each course page and each program page of the web front end has its own address. The sentence is the
+    # last of 「记了什么」 and the only one about the browser (review B32).
+    # 中文：新前端每门课、每个培养方案一个网址；这一句是「记了什么」的最后一句，也是唯一讲浏览器的一句。
     sections = {section["heading"]: section["sentences"] for section in client.get("/privacy").json()["sections"]}
     assert any("/course/CS-6140" in sentence and "/programs/cs-ms" in sentence and "浏览器历史" in sentence
                for sentence in sections["记了什么"])
     # A shared plan link carries the plan's scope and content version too (review A33, recheck B33).
     # 中文：分享一份方案的链接还带着它的范围和内容版本。
     assert sections["记了什么"][-1].endswith("分享一份方案时还带着它的校区、目录年度、路径、concentration 和内容版本。")
-    assert not any("浏览器历史" in sentence for _, sentences in privacy_sections(settings) for sentence in sentences)
-    # It is the last sentence of 「记了什么」, and the rest is Streamlit's word for word (review B32).
-    # 中文：它是「记了什么」的最后一句，别的和 Streamlit 一字不差。
-    streamlit = {heading: list(sentences) for heading, sentences in privacy_sections(settings)}
-    assert sections["记了什么"][:-1] == streamlit["记了什么"] and "浏览器历史" in sections["记了什么"][-1]
-    assert {h: s for h, s in sections.items() if h != "记了什么"} == {
-        h: s for h, s in streamlit.items() if h != "记了什么"}
+    assert [s for sentences in sections.values() for s in sentences if "浏览器历史" in s] == [sections["记了什么"][-1]]
 
 
-def test_the_notice_has_no_streamlit_layout_words(client):
+def test_the_notice_has_no_layout_words(client):
     notice = client.get("/privacy").json()["query_log_notice"]
     assert "左侧" not in notice and "🔒" not in notice and notice.endswith("秘密。")
 
@@ -90,8 +82,8 @@ def test_the_notice_has_no_streamlit_layout_words(client):
 @pytest.mark.parametrize("days", [90, 0])
 def test_the_consent_notice_says_what_is_kept_with_the_answer_and_names_no_control_that_is_not_there(days):
     # R6: chat's _store_completed_answer keeps the question's filters, program and plan, and context_course_ids (the
-    # courses of the latest answer that listed any, sent with every question, review A34) with the answer; neither
-    # front end has a 清空对话. 中文：和回答一起存的是筛选、项目和方案、最近一次列出的课程；两个前端都没有「清空对话」。
+    # courses of the latest answer that listed any, sent with every question, review A34) with the answer; the web
+    # front end has no 清空对话. 中文：和回答一起存的是筛选、项目和方案、最近一次列出的课程；新前端没有「清空对话」。
     from api.privacy_text import capture_notice
 
     notice = capture_notice(days)
@@ -99,17 +91,6 @@ def test_the_consent_notice_says_what_is_kept_with_the_answer_and_names_no_contr
     assert "接着问" not in notice
     assert "清空对话" not in notice and "筛选条件会" not in notice
     assert notice.endswith("取消勾选或登出都不会删除已经保存的数据。")
-
-
-def test_streamlit_shows_the_same_words():
-    from api import privacy_text
-    from app import answer_feedback_view, privacy_view
-
-    assert privacy_view.privacy_sections is privacy_text.privacy_sections
-    assert privacy_view.DELETE_WHAT is privacy_text.DELETE_WHAT and privacy_view.BACKUP_COPIES == 14
-    assert answer_feedback_view.capture_notice is privacy_text.capture_notice
-    assert answer_feedback_view.QUERY_LOG_NOTICE == (privacy_text.QUERY_LOG_NOTICE_BASE
-                                                    + "留多久、怎么删，见左侧「🔒 数据与隐私」。")
 
 
 @pytest.mark.parametrize("missing", [{}, *WITHOUT_LOGIN], ids=missing_names)
@@ -239,33 +220,6 @@ def test_the_login_state_stays_out_of_the_access_log(path, logged):
                                ("synthetic", "GET", path, "1.1", 200), None)
     assert _COURSE_READ_ACCESS_FILTER.filter(record)
     assert record.args == ("synthetic", "GET", logged, "1.1", 200) and STATE not in record.getMessage()
-
-
-def test_the_moved_modules_are_the_same_objects():
-    import api.google_oauth
-    import api.session_tokens
-    import app.auth
-    import app.session_tokens
-
-    for name in app.auth.__all__:
-        assert getattr(app.auth, name) is getattr(api.google_oauth, name), name
-    assert set(app.auth.__all__) == set(api.google_oauth.__all__)
-    for name in ("issue_session_token", "verify_session_token"):
-        assert getattr(app.session_tokens, name) is getattr(api.session_tokens, name)
-
-
-def test_the_api_no_longer_imports_the_ui_auth_modules():
-    """Deleting app/ after the switch must not break the API (R0). 中文：切换以后删 app/ 不能让 API 坏掉。"""
-    import ast
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parent.parent / "api"
-    for path in root.rglob("*.py"):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                assert not node.module.startswith("app"), f"{path.name} imports {node.module}"
-            if isinstance(node, ast.Import):
-                assert not any(alias.name.startswith("app") for alias in node.names), path.name
 
 
 @pytest.mark.parametrize("value", ['["*"]', '["https://compass.example.test/"]', '["https://compass.example.test/x"]',

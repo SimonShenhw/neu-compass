@@ -1,9 +1,9 @@
 # scripts/start_stack.ps1 - one-click launch for the NEU-Compass production stack.
 #
-# Spawns three new PowerShell windows so each service's log is visible:
+# Spawns two new PowerShell windows so each service's log is visible:
 #   1. WSL: uvicorn   (FastAPI backend on :8000, ONNX backend by default ~6s warm)
-#   2. WSL: streamlit (UI on :8501)
-#   3. Win: cloudflared (tunnel `neu-compass` -> api.neu-compass.me + compass.neu-compass.me)
+#   2. Win: cloudflared (tunnel `neu-compass` -> api.neu-compass.me + compass.neu-compass.me)
+# The Streamlit UI it also started went in R8; the web front end runs from web/ (web/README.md).
 #
 # Usage:
 #   scripts\start_stack.ps1                # full stack (default)
@@ -17,8 +17,7 @@
 param(
     [switch]$Local,                        # alias for -NoCloudflared
     [switch]$NoCloudflared,
-    [switch]$NoStreamlit,
-    [switch]$ApiOnly,                      # uvicorn only (implies -NoStreamlit -NoCloudflared)
+    [switch]$ApiOnly,                      # uvicorn only (implies -NoCloudflared)
     [switch]$Pytorch,                      # use pytorch backend instead of ONNX
     [string]$WslDistro = 'Ubuntu-24.04',
     [string]$TunnelName = 'neu-compass'
@@ -30,7 +29,7 @@ $ProjectRoot   = 'H:\neu-compass'
 $WslProject    = '/mnt/h/neu-compass'
 $DataDir       = '~/neu-compass-data'   # in WSL home (ADR-0014)
 
-if ($ApiOnly) { $NoStreamlit = $true; $NoCloudflared = $true }
+if ($ApiOnly) { $NoCloudflared = $true }
 if ($Local)   { $NoCloudflared = $true }
 
 Write-Host ''
@@ -38,7 +37,7 @@ Write-Host '=== NEU-Compass stack launcher ===' -ForegroundColor Cyan
 Write-Host ''
 
 # === 1) Pre-flight ===
-Write-Host '[1/4] Pre-flight checks' -ForegroundColor Yellow
+Write-Host '[1/3] Pre-flight checks' -ForegroundColor Yellow
 
 $bad = $false
 
@@ -92,19 +91,6 @@ if (-not $bad -and -not $Pytorch) {
 }
 
 # cloudflared.exe in PATH (unless -NoCloudflared)
-if (-not $bad -and -not $NoStreamlit) {
-    # Streamlit's first-run "Welcome ... Email:" prompt blocks on stdin and
-    # hangs forever in a non-tty subshell. The `--server.headless` flag does
-    # NOT skip this gate — only credentials.toml does. Delegate to a real .sh
-    # so PowerShell-bash quote translation can't lose the heredoc.
-    $ensureOut = wsl -d $WslDistro -e bash "$WslProject/scripts/ensure_streamlit_cfg.sh" 2>&1
-    if (($ensureOut -join "`n") -match 'OK') {
-        Write-Host '  OK Streamlit config (credentials.toml + config.toml) ensured'
-    } else {
-        Write-Host "  ! could not ensure Streamlit config: $ensureOut" -ForegroundColor Yellow
-    }
-}
-
 if (-not $bad -and -not $NoCloudflared) {
     $cf = Get-Command cloudflared.exe -ErrorAction SilentlyContinue
     if (-not $cf) {
@@ -127,7 +113,7 @@ if (-not $bad -and -not $NoCloudflared) {
 }
 
 # Port collisions (warn, don't fail — user might intend a restart)
-foreach ($port in 8000, 8501) {
+foreach ($port in 8000) {
     $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     if ($conn) {
         $pid_ = $conn.OwningProcess | Select-Object -First 1
@@ -154,7 +140,6 @@ $inferenceEnv = if ($Pytorch) {
 }
 
 $uvicornBash   = "cd $WslProject && env $inferenceEnv uv run uvicorn api.main:app --host 0.0.0.0 --port 8000"
-$streamlitBash = "cd $WslProject && uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false"
 
 # === 3) Spawn windows ===
 # We track the spawned PowerShell.exe PIDs in a state file so stop_stack
@@ -163,7 +148,7 @@ $streamlitBash = "cd $WslProject && uv run streamlit run app/streamlit_app.py --
 $pidFile = Join-Path $ProjectRoot 'scripts\.stack_pids'
 Set-Content -Path $pidFile -Value '' -Encoding ASCII
 
-Write-Host '[2/4] Starting uvicorn (port 8000) in new window' -ForegroundColor Yellow
+Write-Host '[2/3] Starting uvicorn (port 8000) in new window' -ForegroundColor Yellow
 
 $uvicornWin = "`$Host.UI.RawUI.WindowTitle = 'neu-compass : uvicorn (api)' ; wsl -d $WslDistro -e bash -lc '$uvicornBash'"
 $psProc = Start-Process -FilePath 'powershell.exe' `
@@ -173,25 +158,12 @@ Add-Content -Path $pidFile -Value $psProc.Id
 $warmHint = if ($Pytorch) { '~70s' } else { '~6s + first-time HF metadata' }
 Write-Host "  OK spawned (warmup $warmHint -> watch the new window for 'Application startup complete.')"
 
-if (-not $NoStreamlit) {
-    Write-Host '[3/4] Starting streamlit (port 8501) in new window' -ForegroundColor Yellow
-    Start-Sleep -Seconds 2     # let uvicorn start binding 8000 first
-    $streamlitWin = "`$Host.UI.RawUI.WindowTitle = 'neu-compass : streamlit (ui)' ; wsl -d $WslDistro -e bash -lc '$streamlitBash'"
-    $psProc = Start-Process -FilePath 'powershell.exe' `
-        -ArgumentList @('-NoExit', '-Command', $streamlitWin) `
-        -WindowStyle Normal -PassThru
-    Add-Content -Path $pidFile -Value $psProc.Id
-    Write-Host '  OK spawned'
-} else {
-    Write-Host '[3/4] streamlit skipped (-NoStreamlit / -ApiOnly)' -ForegroundColor DarkGray
-}
-
 if (-not $NoCloudflared) {
     # Wait for uvicorn /ready before launching cloudflared. Otherwise the
     # tunnel comes up first, public health checks (and any in-flight user
     # request) hit the not-yet-bound port, and cloudflared spams ~50s of
     # red "connection refused" lines before uvicorn finishes its ONNX warmup.
-    Write-Host '[4/4] Waiting for uvicorn /ready before starting cloudflared' -ForegroundColor Yellow
+    Write-Host '[3/3] Waiting for uvicorn /ready before starting cloudflared' -ForegroundColor Yellow
     $readyDeadline = (Get-Date).AddSeconds(180)
     $ready = $false
     Write-Host -NoNewline '  '
@@ -220,7 +192,7 @@ if (-not $NoCloudflared) {
     Add-Content -Path $pidFile -Value $psProc.Id
     Write-Host "  OK spawned (tunnel: $TunnelName)"
 } else {
-    Write-Host '[4/4] cloudflared skipped (-Local / -NoCloudflared / -ApiOnly)' -ForegroundColor DarkGray
+    Write-Host '[3/3] cloudflared skipped (-Local / -NoCloudflared / -ApiOnly)' -ForegroundColor DarkGray
 }
 
 # === 4) Summary ===
@@ -230,14 +202,10 @@ Write-Host ''
 Write-Host '  Local:'
 Write-Host '    API        http://localhost:8000/health'
 Write-Host '    /ready     http://localhost:8000/ready    (poll until 200)'
-if (-not $NoStreamlit) {
-    Write-Host '    Streamlit  http://localhost:8501'
-}
 if (-not $NoCloudflared) {
     Write-Host ''
     Write-Host '  Public (Cloudflare):'
     Write-Host '    API        https://api.neu-compass.me/health'
-    Write-Host '    Streamlit  https://compass.neu-compass.me'
 }
 Write-Host ''
 Write-Host '  Stop all:    scripts\stop_stack.ps1'

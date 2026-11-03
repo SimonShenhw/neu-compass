@@ -10,7 +10,7 @@ from db.program_plan_repository import ProgramPlanRepository, content_hash
 from db.program_repository import ProgramRepository
 from schemas.program import Program
 from schemas.program_plan import ProgramPlan, RequirementNode
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 
 def selection_data(plan):
@@ -30,16 +30,12 @@ def resolve(conn, plan, **changes):
     return ProgramPlanRepository(conn).resolve_selection(PlanSelection(**(selection_data(plan) | changes)))
 
 
-def test_link_and_request_share_one_strict_selection_schema():
+def test_the_request_takes_one_strict_selection_schema():
     from api.models import ChatRequest
-    from app.program_plan_links import PlanLink
     from schemas.plan_selection import PlanSelection
 
     plan = plans()[5]
-    assert issubclass(PlanLink, PlanSelection)
     selection = PlanSelection(**selection_data(plan))
-    link = PlanLink.from_plan(plan)
-    assert link.model_dump(exclude={"format_version"}) == selection.model_dump()
     assert ChatRequest(query="CS 5800", program_id=plan.program_id, plan=selection).plan == selection
     for program in (None, "another-family"):
         with pytest.raises(ValueError):

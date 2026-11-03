@@ -10,9 +10,7 @@ from pathlib import Path
 import httpx
 import pytest
 from bs4 import BeautifulSoup
-from streamlit.testing.v1 import AppTest
 
-from app.course_requisite_view import legacy_graph_allowed, render_course_requisites
 from db.catalog_source_repository import CatalogSourceRepository
 from db.connection import connect
 from db.course_requisite_repository import CourseRequisiteRepository, content_hash
@@ -29,7 +27,6 @@ from tests.test_course_requisite_contract import source_document
 from tests.test_course_requisite_sources import archive, source_html
 from tests.test_course_requisite_storage import document, target, original_rows
 from tests.test_course_requisite_storage import runtime  # noqa: F401 - Registers the isolated DB fixture.
-from tests.test_course_requisite_view import FakeSt, bundle, app_source
 
 ROOT = Path(__file__).resolve().parent.parent
 URL = "https://catalog.northeastern.edu/course-descriptions/cs/"
@@ -208,7 +205,6 @@ def test_mutated_hours_and_rehashed_bad_bounds_are_rejected_or_quarantined(empty
     empty_db.execute("UPDATE course_requisite_documents SET document=?, content_hash=?", (json.dumps(corrupted), digest))
     state = repo.list_for_course("target")
     assert state.documents == [] and state.unusable_records == 1 and state.has_any_stored_records
-    assert not legacy_graph_allowed(state.model_dump(mode="json"))
 
 
 def replace_capture(manifest, directory, content):
@@ -301,31 +297,3 @@ def test_course_api_exposes_range_without_replacing_course_integer_or_selecting_
     assert "selected_credits" not in doc["credit_hours"]
     response = api_client.get("/course/c-cs-5800/requisites", params={"catalog_year": "2024-2025"})
     assert response.json()["documents"] == []
-
-
-@pytest.mark.parametrize("raw,expected", [(None, "未捕获标题学分"), ("1-4 Hours", "目录范围：1–4"), ("3.5 Hours", "目录固定值：3.5")])
-def test_ui_unknown_range_and_fraction_are_distinct_and_no_fixed_guess(raw, expected):
-    doc = document(course_id="design")
-    if raw is not None:
-        doc = with_hours(doc, raw)
-    st = FakeSt("2026-2027")
-    render_course_requisites(st, bundle(doc), course_id="design", course_code="CS 5004", course_name="Design", key="year")
-    assert any(expected in text for text in st.texts)
-    if raw == "1-4 Hours":
-        assert any("不取端点或平均值" in text for text in st.texts)
-        assert not any("目录固定值" in text for text in st.texts)
-
-
-def test_real_widget_range_is_shown_only_after_edition_choice_with_unknown_section_credit():
-    data = bundle(with_hours(document(course_id="design"), "1-4 Hours"))
-    app = AppTest.from_string(app_source(data)).run(timeout=45)
-    # One recorded edition is shown by default since review 2026-10-03; the
-    # range semantics below are unchanged, and clearing still hides everything.
-    assert not app.exception and app.selectbox[0].value == "2026-2027"
-    app.selectbox[0].set_value("2026-2027").run(timeout=45)
-    assert not app.exception and any("目录范围：1–4" in item.value for item in app.text)
-    assert any("实际班次学分未声明" in item.value for item in app.text)
-    assert not any("目录固定值" in item.value for item in app.text)
-    assert len(app.get("graphviz_chart")) == 0
-    app.selectbox[0].set_value(None).run(timeout=45)
-    assert not app.exception and len(app.text) == 0

@@ -5839,7 +5839,96 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
 
 分支 `feat/web-switch-compass`，从 main 的 `ef61ab4` 开，一个提交。没有使用真实模型、账号、NAS 或生产库。上线要用户点头、定时间：部署（web 重新构建、api 换设置）和改隧道配置里 compass 那条连着做；用户自己在 beta 上验收过了才上。
 
-## 44 — 旧平铺先修边改标目录来源（2026-11-02）
+## 44 — 删掉 Streamlit（R8 的第一个 PR，2026-11-02）
+
+### 范围与原因
+
+11-02 切换以后 compass 是新前端；Streamlit 还在跑，但隧道里已经没有它的路由，按 R7 方案的决定 6 留一周当回退。这一批把它删掉：`app/`、它的配置、只为它存在的代码和测试、compose 的 `ui` 服务、部署脚本对它的探测、`streamlit` 这个依赖。用户定的做法（评审目录 `frontend_react/R8_PLAN.md` 第 4 节，照我的建议）：现在开工；`eval/route_eval.py` 留着，它从 `app/` 借的东西搬进 `eval/`；评测看板删；Bearer 令牌留；依赖这次一起去掉；删 Streamlit 和去掉 beta 分开上线。从 main 的 `f24a72d`（#43 的合并）开 `feat/remove-streamlit`。
+
+线上不变：合并不部署。上线时 api 镜像要重建（依赖少了），`ui` 容器要去掉，什么时候上由用户另外定；11-09 以前上，就没有 Streamlit 这条回退了。
+
+### 已实现
+
+1. **删掉的**（85 个文件）：
+   - `app/`（29 个文件）、`.streamlit/`；
+   - 只有 `app/course_requisite_view.py` 用的 `rag/prereq_graph.py`；
+   - 脚本 `scripts/answer_render_check.py`、`.js`（用 Streamlit 的渲染器手动查回答）、`scripts/ensure_streamlit_cfg.sh`、`scripts/regenerate_page_layout.py`（Streamlit 页面布局快照）；
+   - 只测 Streamlit 的 39 个测试文件、`tests/page_layout_support.py`、`tests/ui_recorder.py`、`tests/fixtures/page_layout/`；
+   - `docs/streamlit_ws_troubleshooting.md`。
+2. **测试怎么分**：先按语法树盘点每个测试用到的名字，跨测试文件也算（盘点脚本在评审目录）。
+   - 整个文件都是 Streamlit 的，删。
+   - 后端测试里夹着的 Streamlit 测试，按名字删掉那些测试，后端断言留着。
+   - 只借了 `app/auth.py`、`app/session_tokens.py`、`app/privacy_view.py`、`app/plan_draft_view.py` 转手的 `api/`、`schemas/` 里的对象的，改成直接从原处导入：`test_app_auth.py` 改名 `test_google_oauth.py`，`test_privacy_view.py` 改名 `test_privacy_text.py`（它测的是 `api/privacy_text.py` 的文字），批次 L 的两个课号解析测试搬进 `test_plan_draft.py`。
+   - 十来个测试是后端断言后面跟一两行和 Streamlit 对照的，去掉那一两行。比如草案接口的三个提示测试、目录学分的隔离测试、方案选择的请求测试，以及 409 里点名的选择框（改成字面写出，并注明新前端对这几种拒绝用自己的话）。
+   - 很多后端测试共用的 `plans()` 原来在一个几乎全是 Streamlit 的文件里，搬到 `tests/program_plan_support.py`。
+3. **离线路由评测**：`eval/route_eval.py` 从 `app/` 借了三样：每轮带的历史和上下文课程、请求失败时页面显示的那句话、每次要 10 门课。
+   - 原样搬进 `eval/route_ui.py`，报告里的值不变。删之前和原代码比过：失败那句在 100 到 599 的每个状态码、十几种响应体和 Retry-After 写法上一致（142,472 个响应），历史和上下文 28 万次随机调用一致。
+   - 两个「和真实 UI 对照」的测试，删之前用现有代码算出对照值，钉成字面值（5 种情况，两边都一样）。原来测那两个函数的测试改指新模块（`tests/test_route_ui.py`），另加失败那句的逐条用例。
+   - 实时评测的代码身份去掉 8 个 `app/` 文件（38 → 30），路由评测的那份加上 `eval/route_ui.py`。
+4. **部署件**：
+   - compose 去掉 `ui`；文件头、OAuth、P4/P6、web、cloudflared 的注释跟着改；backup 那条不再说 UGOS 没有 crontab（11-02 看过有）。
+   - Dockerfile 只开放 8000；`pyarrow` 照旧不排除：ir-datasets（FlagEmbedding 的依赖）还要它，也没人核对过 API 运行时不导入它。
+   - `deploy.ps1` 不再探测 8501，最后打印的 compass 是新前端；`start_stack.ps1`、`stop_stack.ps1` 去掉 Streamlit 窗口。
+   - `.env.example` 去掉只给 Streamlit 的两项；`.gitignore` 照旧忽略 `.streamlit/secrets.toml`，免得哪台机器上留着的旧文件被误提交。
+5. **依赖**：`pyproject.toml` 去掉 `streamlit` 和 wheel 包里的 `app`。`uv lock --offline` 只删了 15 个包（streamlit 和只有它用的 altair、blinker、cachetools、gitdb、gitpython、jsonschema、jsonschema-specifications、narwhals、pydeck、referencing、rpds-py、smmap、toml、watchdog），别的版本一个不动，也没联网。
+6. **API 和设置**（行为不变）：
+   - `api/privacy_text.privacy_sections` 去掉只为区分 Streamlit 页的 `web` 参数，只剩新前端那一版。GET /privacy 在三项设置的 18 种组合下前后逐字节一样。
+   - 设置去掉只有 Streamlit 读的 `api_base_url`、`public_base_url`（`extra="ignore"`，旧环境里还有这两项也不会启动失败）。
+   - Google 跳回地址的代码默认值从 Streamlit 的本机地址改成新前端的开发地址；线上由 compose 设成 compass，不变。
+7. **说明文字**：后端注释和 7 处 OpenAPI 说明不再把 Streamlit 当现在的使用方。重新导出 `web/openapi.json`（只变这 7 处说明）。`web/src/api/schema.ts` 用本机 npm 缓存离线装好生成器（`npm ci --offline --ignore-scripts`，没下载）再生成，只变了注释。
+8. **新加的测试**：仓库里的 Python 文件都不导入 `app` 或 `streamlit`，依赖、wheel 包和锁文件里没有它们，Dockerfile、compose 里没有 8501（取代第 33 节「API 不导入 `app/`」那条）；compose 正好是 api、web、backup、cloudflared 四个服务；部署脚本的探测里没有 8501。
+9. **文档**：
+   - README、README.en：架构图里的使用方、起服务、公网入口、目录树。
+   - `scripts/README.md`：删掉的四个脚本、加 `eval/route_ui.py`。
+   - `docs/api_contract.md` 里讲现在怎么做的句子；`docs/oauth_secret_rotation.md` 去掉重启 Streamlit 那步；`docs/wsl2_setup.md`。
+   - WSL2、Week 8 时期的手册（`system_architecture.md`、`cloudflare_tunnel.md`），以及只讲 Streamlit 的两份（`view-cache.md`、`answer-grounding.md` 的渲染那几条），开头或那一段加一句：Streamlit 已删，留作记录。
+   - `web/README.md`「部署 R7」加 R8 一条。
+   - PLAN、ADR、postmortem 这类历史文档不改。
+
+### 修改文件
+
+- 删（83 个）：`app/` 28、`.streamlit/` 1、`rag/prereq_graph.py`、`scripts/` 4、`docs/streamlit_ws_troubleshooting.md`，`tests/` 48（37 个测试文件、两个支持文件、`fixtures/page_layout/` 9 个）。
+- 改名（2 个）：`tests/test_app_auth.py` → `test_google_oauth.py`，`tests/test_privacy_view.py` → `test_privacy_text.py`。
+- 新加（3 个）：`eval/route_ui.py`、`tests/test_route_ui.py`、`tests/program_plan_support.py`。
+- 改：82 个：API 11、`config/settings.py`、`schemas/` 2、`llm/gemini_client.py`、`eval/route_eval.py`、`scripts/` 5（`deploy.ps1`、`start_stack.ps1`、`stop_stack.ps1`、`eval_answers_live.py`、`README.md`）、`tests/` 42、compose、Dockerfile、`pyproject.toml`、`uv.lock`、`.env.example`、`.gitignore`、`web/` 3（README、`openapi.json`、`schema.ts`）、README 和 README.en、`docs/` 7，以及本节。合计 170 个路径。
+
+### 验证记录
+
+- **后端全量**：4321 条全过（9 分 18 秒）。第 43 节那次是 5346 条，少掉的是删了的 Streamlit 测试。跑前跑后比改动文件的哈希，一样。
+- **前端**：`web/` 只换了生成的类型。本机用 npm 缓存离线装好依赖（没下载），`npm run check`（类型、lint、Vitest、构建）过：Vitest 2830 条过、10 条跳过；`format:check` 和 `gen:api:check` 也过。
+- **对照**：
+  - `eval/route_ui.py` 和 `app/` 原来的代码：失败那句 142,472 个响应、历史和上下文 28 万次随机调用，全部一致；
+  - 两个 UI 对照测试钉的值，删之前用现有代码算过，5 种情况两边一样；
+  - GET /privacy 在 18 种设置组合下前后逐字节一样；
+  - OpenAPI 只变了 7 处说明，`schema.ts` 只变了注释。
+- **变异**：34 个，第一轮漏了 7 个，补了测试以后 33 个都被抓到：
+  - 原来没钉住的：历史窗口的默认 6 条；503 只有 `service_busy` 才算忙；带 JSON 的 3xx 不算失败；409 在历史里的「🧭」前缀；带 JSON 的非 200 成功记为工具错误；`eval/route_ui.py` 在评测的代码身份里。
+  - 剩下一个（去掉 `error_type` 的格式检查）改了以后输出不变：格式不合法的值永远不会等于 `service_busy`、`invalid_response`，所以留着，记在这里。
+  - 删除本身也做了变异：把 `ui` 服务、`streamlit` 依赖、wheel 里的 `app`、对 `app` 的导入、对 8501 的探测、`EXPOSE 8501` 分别加回去，都被新加的测试抓到。
+- **ruff**：改过的 Python 文件里剩 4 条，都是 `f24a72d` 就有的（`test_api_logging.py` 一个没用的导入、`test_catalog_credit_hours.py` 三条夹具的重定义）。
+- **码位**：新加的行里没有 CR，BOM 没变，`diff --check` 干净；表情符号只有 ⚠️、🧭 和 👍／👎，都是仓库原来的写法、测试钉住的产品文字，或本节在说它们。
+- 没有调真实模型，没有联网（锁依赖和 npm 都离线），没有读 `.env`。
+
+### 审查
+
+没开：用户定这一批不开审查。
+
+### 已知、未处理
+
+- **API 409 的 detail 和提示词里的控件名还是 Streamlit 的。**
+  - detail 里是「你的项目（可选）」「方案版本（可选）」，新前端对这几种拒绝按 `reason` 用自己的话，只有 API 的调用方读 detail。
+  - 提示词 4.5 让模型建议学生去「方案版本（可选）」里选，新前端叫「项目」「方案」。CONTENT-01 那批在改提示词，要不要顺手改由用户定，不在这个 PR 里。
+- **Bearer 令牌**留着（用户定的第 4 件）：脚本还在用。
+- **历史文档**里还有 Streamlit 的说法和指向已删文件的链接，照旧不改：PLAN、ADR、postmortem、优化路线图、v3.1 收尾，以及几份设计文档里「当时怎么验证的」那几句。
+- **新前端代码里的注释**有不少写着「和 Streamlit 一样」（`web/src/`），这是在说当初照着什么做的，不改；`web/` 里只换了生成的类型。
+- **上线**：api 镜像重建；`up -d --remove-orphans` 去掉 `ui`。上线以后，切换那次的 `r3_rollback.sh tunnel`（compass 改回 Streamlit）就用不了了。上线计划草稿在评审目录 `frontend_react/r8/DEPLOY_PLAN_DRAFT.md`。
+- **去掉 beta**（11-16 左右以后）另开一个小 PR。
+
+### 发布状态
+
+分支 `feat/remove-streamlit`，从 main 的 `f24a72d` 开。没有使用真实模型、账号、NAS 或生产库。上线要用户点头、定时间。
+
+## 45 — 旧平铺先修边改标目录来源（2026-11-02）
 
 ### 范围与原因
 

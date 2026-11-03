@@ -1,5 +1,8 @@
 # Cloudflare Tunnel · 软启动公开 URL 运维手册 (Week 6)
 
+> **R8（2026-11）：** 这份是 WSL2 时期的手册。生产 Week 10 起在 NAS 上，隧道的路由写在 `docker-compose.yml` 文件头：
+> api → `api:8000`，compass（2026-11-02 起）→ `web:8080`。下面讲 Streamlit（8501）的部分只是记录，R8 把它删了。
+
 > 让 3 人团队从公网访问 WSL2 上跑的 FastAPI + Streamlit, 不开端口/不上云的最小方案。
 > ADR-0014 决定运行时数据在 WSL home; 此运行时也跑在 WSL2 里, Tunnel 进程是同 host 的 user-level daemon.
 

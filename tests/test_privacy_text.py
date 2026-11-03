@@ -1,18 +1,15 @@
-"""Batch T, policy P2: the 数据与隐私 page says what the code does, and its variable parts follow the settings.
+"""Batch T, policy P2: the 数据与隐私 page (api/privacy_text.py, which GET /privacy serves) says what the code does,
+and its variable parts follow the settings.
 
-Synthetic settings and the offline page harness only.
+Synthetic settings only. 中文：「数据与隐私」页的文字说的就是代码的做法，可变的部分跟着设置。只用合成设置。
 """
 
 from types import SimpleNamespace
 
 import pytest
-from streamlit.testing.v1 import AppTest
 
-from app.answer_feedback_view import QUERY_LOG_NOTICE
-from app.privacy_view import BACKUP_COPIES, DELETE_WHAT, privacy_sections
-from tests.page_layout_support import SCRIPT, install_backend, run
+from api.privacy_text import BACKUP_COPIES, DELETE_WHAT, capture_notice, privacy_sections
 
-PRIVACY = "🔒 数据与隐私 · Privacy"
 CONTACT = "synthetic.student@northeastern.edu"
 
 
@@ -88,17 +85,10 @@ def test_the_delete_section_says_what_carries_no_account(days, feedback, line):
 
 
 @pytest.mark.parametrize("days", [90, 30, 0])
-def test_the_consent_notice_says_the_same_retention_as_the_page(monkeypatch, days):
-    """A24 M1: the notice next to the opt-in and the page read the same setting. 中文：勾选旁的说明和页面读同一个设置。"""
-    from app.answer_feedback_view import render_feedback_capture_control
-    from config import settings
-
-    monkeypatch.setattr(settings, "answer_feedback_enabled", True)
-    monkeypatch.setattr(settings, "query_log_retention_days", days)
-    captions = []
-    surface = SimpleNamespace(session_state={}, caption=captions.append, checkbox=lambda label, **kwargs: False)
-    render_feedback_capture_control(surface)
-    notice, page = captions[1], page_text(days=days)
+def test_the_consent_notice_says_the_same_retention_as_the_page(days):
+    """A24 M1: the notice next to the opt-in and the page read the same setting (GET /privacy serves both).
+    中文：勾选旁的说明和页面读同一个设置（GET /privacy 两个都给）。"""
+    notice, page = capture_notice(days), page_text(days=days)
     if days:
         assert f"保存的回答和评价 {days} 天后删除" in notice and "不会自动删除" not in notice.split("已经导出")[0]
         assert "每日备份里最多再留大约两周" in notice and "在备份里最多再多留大约两周" in page
@@ -123,30 +113,6 @@ def test_backup_count_matches_the_backup_sidecar():
     assert module.KEEP == BACKUP_COPIES
 
 
-def test_chat_notice_points_to_the_page_by_its_name():
-    assert "「🔒 数据与隐私」" in QUERY_LOG_NOTICE and PRIVACY.startswith("🔒 数据与隐私")
-
-
-def test_the_page_is_last_in_the_nav_renders_plain_text_and_fetches_nothing(monkeypatch):
-    from config import settings
-
-    backend = install_backend(monkeypatch)
-    monkeypatch.setattr(settings, "query_log_retention_days", 90)
-    monkeypatch.setattr(settings, "privacy_contact_email", CONTACT)
-    app = AppTest.from_string(SCRIPT)
-    app.session_state["nav_page"] = PRIVACY
-    run(app)
-    assert app.radio(key="nav_page").options[-1] == PRIVACY
-    from app.text_render import literal_markdown
-
-    assert [h.value for h in app.subheader] == ["🔒 数据与隐私"]
-    shown = [m.value for m in app.markdown]
-    assert "- " + literal_markdown(f"别的问题或删除请求，写邮件到 {CONTACT}。") in shown
-    assert any("原文保存 90 天" in line for line in shown)
-    assert not app.chat_input and not backend.posts
-    assert all(path == "/ready" for _, path, _ in backend.requests)
-
-
 def compose_environment(service):
     from pathlib import Path
 
@@ -157,17 +123,14 @@ def compose_environment(service):
     return {_unquote(key.strip()): _unquote(value.strip()) for key, _, value in pairs}
 
 
-def test_compose_gives_the_page_the_same_policy_the_api_runs():
+def test_compose_gives_the_api_the_policy_the_page_states():
     from config.settings import Settings
 
-    api, ui = compose_environment("api"), compose_environment("ui")
-    # GET /privacy (R2a) builds the same page from the api's settings, so the contact address is on both.
-    # 中文：GET /privacy（R2a）按 api 的设置生成同一页，所以联系邮箱两边都要有。
-    for name in ("QUERY_LOG_RETENTION_DAYS", "ANSWER_FEEDBACK_ENABLED", "PRIVACY_CONTACT_EMAIL"):
-        assert api[name] == ui[name], name
-    assert (api["QUERY_LOG_RETENTION_DAYS"], api["MODEL_DAILY_CALL_LIMIT"], api["REQUEST_GUARD_ENABLED"]) == ("90", "200", "true")
-    assert Settings(privacy_contact_email=ui["PRIVACY_CONTACT_EMAIL"]).privacy_contact_email == ui["PRIVACY_CONTACT_EMAIL"]
-    assert "MODEL_DAILY_CALL_LIMIT" not in ui
+    api = compose_environment("api")
+    # GET /privacy (R2a) builds the page from the api's own settings. 中文：GET /privacy 按 api 自己的设置生成这一页。
+    assert (api["QUERY_LOG_RETENTION_DAYS"], api["ANSWER_FEEDBACK_ENABLED"], api["MODEL_DAILY_CALL_LIMIT"],
+            api["REQUEST_GUARD_ENABLED"]) == ("90", "true", "200", "true")
+    assert Settings(privacy_contact_email=api["PRIVACY_CONTACT_EMAIL"]).privacy_contact_email == api["PRIVACY_CONTACT_EMAIL"]
 
 
 @pytest.mark.parametrize("value", ["a@b", "<x>@example.com", "x y@example.com", "x@example", "[x](y)@example.com"])
