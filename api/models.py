@@ -149,9 +149,9 @@ class ResolveCourseResponse(BaseModel):
 
 class ChatTurn(BaseModel):
     """One prior conversation turn (client-supplied — /chat is stateless;
-    the Streamlit session owns the transcript and sends a recent window).
-    一轮此前的对话（由客户端提供 —— /chat 本身是无状态的；由 Streamlit
-    会话保管完整记录，只发送最近的一段窗口）。"""
+    the front end owns the transcript and sends a recent window).
+    一轮此前的对话（由客户端提供 —— /chat 本身是无状态的；由前端保管完整
+    记录，只发送最近的一段窗口）。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -271,18 +271,18 @@ class CoopOut(BaseModel):
 
 
 class OAuthCallbackRequest(BaseModel):
-    """Body for POST /auth/callback. The Streamlit page sends the `code`
-    query param Google redirected back with.
-    POST /auth/callback 的请求体。Streamlit 页面发送 Google 重定向带回的
-    `code` 查询参数。"""
+    """Body for POST /auth/callback: the `code` query param Google sent the
+    browser back with.
+    POST /auth/callback 的请求体：Google 把浏览器送回来时带的 `code` 查询参数。"""
 
     model_config = ConfigDict(extra="forbid")
 
     code: str = Field(min_length=1)
     redirect_uri: str | None = None
-    # R2a: "cookie" puts the session token in the API's HttpOnly cookie instead of the body (the new web front end);
-    # "token", the default, is unchanged for Streamlit and scripts. 中文：R2a：cookie 模式把令牌放进 API 的 HttpOnly
-    # cookie，不放在返回体里（新前端用）；默认的 token 模式不变（Streamlit 和脚本用）。
+    # R2a: "cookie" puts the session token in the API's HttpOnly cookie instead of the body (the web front end);
+    # "token", the default, returns it in the body (scripts; the Streamlit page until R8). 中文：R2a：cookie 模式把令牌
+    # 放进 API 的 HttpOnly cookie，不放在返回体里（新前端用）；默认的 token 模式放在返回体里（脚本用；R8 以前还有
+    # Streamlit 页）。
     session: Literal["token", "cookie"] = "token"
 
 
@@ -325,11 +325,9 @@ class PublicConfigResponse(BaseModel):
 
 
 class OAuthCallbackResponse(BaseModel):
-    """Sanitized identity persisted server-side. Streamlit calls
-    state_manager.login with these fields.
+    """Sanitized identity persisted server-side.
 
-    经清洗、已持久化到服务端的身份信息。Streamlit 会用这些字段调用
-    state_manager.login。
+    经清洗、已持久化到服务端的身份信息。
 
     session_token (ADR-0021): signed bearer credential for subsequent API
     calls (`Authorization: Bearer <token>`). None when the server runs

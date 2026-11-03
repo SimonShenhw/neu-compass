@@ -7,7 +7,6 @@ no network, no real data.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import re
@@ -20,7 +19,6 @@ from fastapi.testclient import TestClient
 from api.logging import configure_logging
 from api.plan_draft import DraftCheckOut
 from api.session_cookie import COOKIE_NAME
-from app.text_render import literal_markdown
 from db.alias_repository import AliasRepository
 from db.program_plan_repository import ProgramPlanRepository, content_hash
 from db.program_repository import ProgramRepository
@@ -33,7 +31,7 @@ from schemas.program import Program
 from schemas.program_plan import ProgramPlan
 from tests.conftest import build_test_app
 from tests.test_csrf_cors import ORIGIN, REFUSED, add_user, make_client
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 PLAN = plans()[0]  # cs-ms standard: source_checked, partial coverage. 中文：已核对、只记录了部分规则。
 OTHER = plans()[1]  # a ds-ms plan, for "a plan of another program". 中文：别的项目的方案。
@@ -321,106 +319,7 @@ def test_the_sent_draft_loses_gone_invalid_and_doubled_records_with_a_notice_eac
     assert [c["course_id"] for c in r.json()["courses"]] == ["c-cs-5010", "c-cs-5200"]
 
 
-# === The same input, the same words as the Streamlit page ===
-
-
-class _ApiViaTestClient:
-    """app.api_client.ApiClient's two reads, answered by the same app and database. 中文：同一个应用和库回答的两次读取。"""
-
-    def __init__(self, client):
-        self.client = client
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-    def resolve_course(self, ref):
-        response = self.client.get("/resolve/course", params={"ref": ref})
-        assert response.status_code == 200
-        return response.json()
-
-    def get_course(self, course_id):
-        response = self.client.get(f"/course/{course_id}")
-        assert response.status_code == 200
-        return response.json()
-
-
-class _St:
-    def __init__(self, existing):
-        self.lines, self.session_state = [], {"plan_draft_courses": [c.model_dump() for c in existing]}
-
-    def warning(self, value):
-        self.lines.append(("warning", value))
-
-    def info(self, value):
-        self.lines.append(("info", value))
-
-    def text(self, value):
-        self.lines.append(("text", value))
-
-    def caption(self, value):
-        self.lines.append(("caption", value))
-
-    def spinner(self, _):
-        return contextlib.nullcontext()
-
-
-# Streamlit wraps these in literal_markdown (they quote a code or a name); the others are fixed sentences.
-# 中文：Streamlit 用 literal_markdown 包住这些（里面有课号或课名），其余是固定句子。
-WRAPPED = {"invalid_format", "not_found", "ambiguous", "cross_listed_twin", "also_matches", "primary_code",
-           "invalid_record"}
-
-
-def as_streamlit(answer):
-    lines = []
-    for n in answer["notices"]:
-        lines.append((n["level"], literal_markdown(n["text"]) if n["kind"] in WRAPPED else n["text"]))
-        lines += [("text", c["code"] + " · " + c["name"]) for c in n["candidates"]]
-        if n["candidates_omitted"]:
-            lines.append(("caption", f"另有 {n['candidates_omitted']} 个候选未展开。"))
-    return lines
-
-
-def same_as_streamlit(client, monkeypatch, ids, text):
-    """Streamlit's `_add` on the same draft and input, reading the same app and database, shows the API's notices
-    and ends with the API's draft. 中文：Streamlit 的 `_add` 在同样的草案和输入上、读同一个应用和库，显示的提示和
-    最后的草案都和 API 一样。"""
-    import app.api_client as clients
-    from app.plan_draft_view import _add
-
-    answer = check(client, ids=ids, text=text).json()
-    existing = [DraftCourse(**c) for c in check(client, ids=ids).json()["courses"]]
-    monkeypatch.setattr(clients, "ApiClient", lambda **kwargs: _ApiViaTestClient(client))
-    st = _St(existing)
-    _add(st, text, existing)
-    assert st.lines == as_streamlit(answer)
-    assert st.session_state["plan_draft_courses"] == answer["courses"]
-
-
-@pytest.mark.parametrize("ids,text", [
-    ([], " ".join(f"Q{i}" for i in range(1, 13)) + " CS5010"),
-    ([], " ".join(f"Q{i}" for i in range(1, 11))),
-    (["c-cs-5800"], "Q1"),
-    (["c-cs-5800"], " \n "),
-    ([], " ".join(ZZ)),
-    ([], " ".join(ZZ[:20])),
-    (["c-cs-5800"], "CS5800"),
-    ([f"c-zz-{i:02d}" for i in range(19)], "CS 5010 CS 5200"),
-    ([], "CS 9999 CS 6999 CS 7140 EECE 7397 CS 5810 LNG 6000 CS 5010 CS 5100"),
-    (["c-cs-5800"], "CS 5810"),
-    (["c-cs-5800"], "CS 5810 CS 5010"),
-    ([], "CS 5810 CS 5800"),
-    (["c-cs-7140"], "EECE 7397 CS 5200"),
-    ([], "XLB 7002, XLA 7001"),
-    ([], "XLA 7001, XLB 7002"),
-])
-def test_the_api_says_what_the_streamlit_page_says_and_keeps_the_same_draft(client, monkeypatch, ids, text):
-    same_as_streamlit(client, monkeypatch, ids, text)
-
-
-def test_two_records_under_the_typed_code_are_ambiguous_on_both_pages(client, empty_db, monkeypatch):
+def test_two_records_under_the_typed_code_are_ambiguous(client, empty_db):
     add_course(empty_db, "c-cs-5010-copy", "CS 5010", "Programming Design Paradigm (second record)")
     empty_db.commit()
     r = check(client, text="CS 5010")
@@ -428,10 +327,9 @@ def test_two_records_under_the_typed_code_are_ambiguous_on_both_pages(client, em
     assert [(c["code"], c["name"]) for c in r.json()["notices"][0]["candidates"]] == [
         ("CS 5010", "Programming Design Paradigm"), ("CS 5010", "Programming Design Paradigm (second record)")]
     assert codes(r) == []
-    same_as_streamlit(client, monkeypatch, [], "CS 5010")
 
 
-def test_also_matches_names_at_most_ten_other_codes_once_each(client, empty_db, monkeypatch):
+def test_also_matches_names_at_most_ten_other_codes_once_each(client, empty_db):
     # "AMB 6001" is also an alias of the eleven other AMB courses and of a second AMB 6003 record.
     # 中文：「AMB 6001」也是另外 11 门 AMB 课和第二条 AMB 6003 记录的别名。
     add_course(empty_db, "c-amb-02-copy", "AMB 6003", "Synthetic ambiguous 02 (second record)")
@@ -446,10 +344,9 @@ def test_also_matches_names_at_most_ten_other_codes_once_each(client, empty_db, 
     assert notices(r) == [("also_matches", "warning", "按输入主课号核对 AMB 6001；同一引用也匹配 " + others
                            + "（可能交叉列出）；方案按哪个课号算，请向项目核实。")]
     assert codes(r) == ["AMB 6001"]
-    same_as_streamlit(client, monkeypatch, [], "AMB 6001")
 
 
-def test_a_code_cross_listed_with_two_accepted_courses_names_the_first(client, empty_db, monkeypatch):
+def test_a_code_cross_listed_with_two_accepted_courses_names_the_first(client, empty_db):
     # TWC 7103's record answers to TWA 7101 and TWB 7102; its own code finds only itself.
     # 中文：TWC 7103 的记录也对得上 TWA 7101 和 TWB 7102；输入它自己的课号只找到它。
     for course_id, code in [("c-twa", "TWA 7101"), ("c-twb", "TWB 7102"), ("c-twc", "TWC 7103")]:
@@ -461,7 +358,6 @@ def test_a_code_cross_listed_with_two_accepted_courses_names_the_first(client, e
     assert notices(r)[-1] == ("cross_listed_twin", "warning", "TWC 7103 和 TWA 7101 可能是同一门交叉列出的课，只按 "
                               "TWA 7101 计入；如果是两门不同的课，请向项目核实。")
     assert codes(r) == ["TWA 7101", "TWB 7102"]
-    same_as_streamlit(client, monkeypatch, [], "TWA 7101, TWB 7102, TWC 7103")
 
 
 # === The plan: exact version or a 409 with a reason ===
@@ -728,13 +624,3 @@ def test_a_cookie_bearing_check_needs_the_front_ends_signs(empty_db, monkeypatch
         r = client.post(URL, json={"plan_content_sha256": SHA, "course_ids": [], "input": "CS 5010"},
                         headers={"Origin": ORIGIN, "X-NEU-Compass": "1"})
         assert r.status_code == 200 and r.json()["added"] == ["CS 5010"]
-
-
-# === One home for the input parser ===
-
-
-def test_streamlit_and_the_api_read_input_with_the_same_function():
-    import app.plan_draft_view as view
-    import schemas.plan_draft as shared
-
-    assert view.parse_course_codes is shared.parse_course_codes

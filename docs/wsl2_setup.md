@@ -181,8 +181,7 @@ uv run python scripts/seed_aai6600.py --db-path ~/neu-compass-data/courses.db
 # 启 FastAPI 后端
 uv run uvicorn api.main:app --reload
 
-# 启 Streamlit 前端
-uv run streamlit run app/streamlit_app.py
+# 前端：React 新前端在 web/，本地开发见 web/README.md（Streamlit 版 R8 删了）
 ```
 
 ## 6. 卸载 (如果以后要清理)

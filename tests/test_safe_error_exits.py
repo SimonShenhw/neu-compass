@@ -9,9 +9,7 @@ import json
 import logging
 import re
 import sqlite3
-import tomllib
 import types
-from pathlib import Path
 
 import anyio
 import httpx
@@ -21,8 +19,7 @@ import structlog
 from api.dependencies import get_oauth_exchange_fn
 from api.error_fields import safe_error_fields
 from api.logging import configure_logging
-from app.api_client import ApiClient, ApiError
-from app.auth import exchange_code_for_token
+from api.google_oauth import exchange_code_for_token
 from db.answer_feedback_repository import AnswerFeedbackRepository
 from db.program_repository import ProgramAmbiguous
 from db.query_log_repository import QueryLogRepository
@@ -91,28 +88,6 @@ def test_google_error_field_is_validated(api_client, real_logging, caplog, code)
     assert response.status_code == 401
     _secret_free(caplog, response)
     assert "google_error" not in _event(caplog, "auth.callback.rejected")
-
-
-@pytest.mark.parametrize("payload", ["refused", {}, [], {"user_id": "u"},
-    {"user_id": [], "email": EMAIL}, {"user_id": "u", "email": EMAIL, "contribution_count": MARKER}])
-def test_callback_ui_never_raises_or_renders_raw_detail(monkeypatch, payload):
-    from streamlit.testing.v1 import AppTest
-    import app.api_client as client_module
-    import app.cookie_session as cookie_module
-
-    monkeypatch.setattr(cookie_module, "oauth_state_matches", lambda *args: True)
-    factory = ApiClient
-    status = 401 if payload == "refused" else 200
-    body = {"detail": MARKER} if status == 401 else payload
-    monkeypatch.setattr(client_module, "ApiClient", lambda: factory(transport=httpx.MockTransport(
-        lambda request: httpx.Response(status, json=body))))
-    app = AppTest.from_string("from app.streamlit_auth_ui import handle_oauth_callback\nhandle_oauth_callback()")
-    app.query_params.update(code=MARKER, state="synthetic")
-    app.run(timeout=30)
-    assert not app.exception
-    assert [item.value for item in app.error] == ["Login failed. Please try signing in again."]
-    assert not dict(app.query_params)
-    assert "user_id" not in app.session_state.filtered_state
 
 
 @pytest.mark.parametrize("chained", ["cause", "context"])
@@ -226,31 +201,6 @@ def test_request_id_is_bounded(api_client, value):
     returned = response.headers["x-request-id"]
     assert re.fullmatch(r"[A-Za-z0-9._-]{1,64}", returned)
     assert (returned == value) is (value == "valid_1.2-3")
-
-
-@pytest.mark.parametrize(("status", "body"), [(500, "plain"), (502, "json"), (418, "plain"), (401, "plain")])
-def test_client_error_text_is_fixed(status, body):
-    with ApiClient(transport=httpx.MockTransport(lambda request: httpx.Response(status,
-        **({"json": {"detail": MARKER, "error_type": "upstream_error"}} if body == "json" else {"text": MARKER})))) as api:
-        with pytest.raises(ApiError) as info:
-            api.health()
-    assert info.value.status_code == status
-    assert MARKER not in info.value.detail and MARKER not in str(info.value)
-    if body == "json":
-        assert info.value.error_type == "upstream_error"
-
-
-def test_invalid_success_json_is_apierror():
-    with ApiClient(transport=httpx.MockTransport(lambda request: httpx.Response(200, text=MARKER))) as api:
-        with pytest.raises(ApiError) as info:
-            api.health()
-    assert info.value.status_code == 502 and info.value.error_type == "invalid_response"
-    assert MARKER not in str(info.value)
-
-
-def test_ui_default_hides_traceback():
-    config = tomllib.loads((Path(__file__).parents[1] / ".streamlit/config.toml").read_text())
-    assert config.get("client", {}).get("showErrorDetails") == "type"
 
 
 def test_last_resort_handler_logs_safely(real_logging, caplog):
@@ -480,21 +430,6 @@ def test_google_non_object_error_body_is_a_401(api_client, real_logging, caplog)
     assert "token_exchange_rejected" in _event(caplog, "auth.callback.rejected")
 
 
-@pytest.mark.parametrize("me", [{}, [], {"user_id": ["x"], "email": 5},
-    {"user_id": "u", "email": EMAIL, "contribution_count": "3"},
-    {"user_id": "u", "email": EMAIL, "contribution_count": True},
-    {"user_id": "u", "email": EMAIL, "display_name": 5},
-    {"user_id": "u", "email": EMAIL, "contribution_count": -1}])
-def test_cookie_restore_rejects_malformed_identity(me):
-    from app.cookie_session import restore_login
-    from app.state_manager import init_state, is_logged_in
-    state: dict = {}
-    init_state(state)
-    assert restore_login(state, "synthetic-token", lambda token: me) is False
-    assert not is_logged_in(state) and state["session_token"] is None
-    assert not state.get("_pending_cookie")  # Not a 401: the cookie stays for a later reload.
-
-
 # --- Second review (2026-10-13): only framework wrappers are skipped; identity branches ---
 
 
@@ -554,17 +489,3 @@ def test_only_framework_wrappers_are_skipped_as_causes(scenario, expected):
     with pytest.raises(RuntimeError) as info:
         scenario()
     assert safe_error_fields(info.value).get("cause_type") == expected
-
-
-@pytest.mark.parametrize(("identity", "valid"), [
-    ({"user_id": "", "email": EMAIL}, False), ({"user_id": "u", "email": ""}, False),
-    ({"user_id": "u", "email": EMAIL, "session_token": 5}, False),
-    ({"user_id": "u", "email": EMAIL, "session_token": ["t"]}, False),
-    ({"user_id": ["x"], "email": EMAIL}, False), ({"user_id": "u", "email": 5}, False),
-    ({"user_id": "u", "email": EMAIL}, True),
-    ({"user_id": "u", "email": EMAIL, "contribution_count": 0, "session_token": None, "display_name": None}, True),
-    ({"user_id": "u", "email": EMAIL, "contribution_count": 3, "session_token": "t", "display_name": "Name"}, True),
-])
-def test_valid_identity_branches(identity, valid):
-    from app.state_manager import valid_identity
-    assert valid_identity(identity) is valid

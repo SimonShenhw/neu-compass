@@ -257,10 +257,10 @@ def parse_course_codes(raw: str) -> tuple[list[str], list[str]]:
     """NFKC folds full-width letters, digits and spaces; `、`, `/` and `。` separate codes too. Invisible
     characters copied from a web page (zero-width ones, the left-to-right and right-to-left marks, the soft hyphen)
     are dropped, and a sentence's closing `.` is ignored. A dash or underscore joins subject and number only at the
-    start of a token, so an internal ID such as `neu-cs-6130` stays one invalid token. Shared by the Streamlit draft
-    and the API's draft check (R4b), so both read the same input the same way. 中文：全角字母、数字、空格
+    start of a token, so an internal ID such as `neu-cs-6130` stays one invalid token. The API's draft check (R4b)
+    reads input with it, as the Streamlit draft did until R8. 中文：全角字母、数字、空格
     先归一；「、」「/」「。」也能分隔；从网页复制来的隐形字符（零宽字符、左右方向标记、软连字符）去掉，句末的「.」
-    不算课号的一部分；内部 ID 只报一条格式错误。Streamlit 的草案和 API 的草案核对（R4b）共用这一份。
+    不算课号的一部分；内部 ID 只报一条格式错误。API 的草案核对（R4b）用它读输入，R8 以前 Streamlit 的草案也用这一份。
     """
     raw = unicodedata.normalize("NFKC", raw)
     raw = re.sub(r"[\N{SOFT HYPHEN}\N{ZERO WIDTH SPACE}-\N{RIGHT-TO-LEFT MARK}\N{WORD JOINER}\N{ZERO WIDTH NO-BREAK SPACE}]", "", raw)

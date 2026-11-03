@@ -59,7 +59,7 @@ export interface paths {
     };
     /**
      * Google's login address for the web front end (R2a)
-     * @description Builds the Google OAuth address with the caller's `state`, exactly as the Streamlit login link does (`api.google_oauth.authorize_url`). The front end makes `state`, keeps it, and checks it when Google sends the browser back with `?code=&state=`; then it posts the code to `/auth/callback` with `"session": "cookie"` and the same `redirect_uri`. Google sends the browser back to `redirect_uri`, which must be a web front end's own address, an origin in `WEB_ORIGINS` followed by `/` (R2b); without it, to `GOOGLE_OAUTH_REDIRECT_URI`. The API stores nothing here.
+     * @description Builds the Google OAuth address with the caller's `state` (`api.google_oauth.authorize_url`). The front end makes `state`, keeps it, and checks it when Google sends the browser back with `?code=&state=`; then it posts the code to `/auth/callback` with `"session": "cookie"` and the same `redirect_uri`. Google sends the browser back to `redirect_uri`, which must be a web front end's own address, an origin in `WEB_ORIGINS` followed by `/` (R2b); without it, to `GOOGLE_OAUTH_REDIRECT_URI`. The API stores nothing here.
      */
     get: operations['login_url_auth_login_url_get'];
     put?: never;
@@ -81,7 +81,7 @@ export interface paths {
     put?: never;
     /**
      * Expire the session cookie (R2a)
-     * @description Expires the API's session cookie and answers 204, also when there is none. Bearer tokens are not revoked (they expire on their own; Streamlit logs out by dropping its copy). It must come from an allowed web origin with `X-NEU-Compass: 1`, with or without the cookie, or it gets the fixed CSRF 403 and expires nothing: a page elsewhere must not log the browser out.
+     * @description Expires the API's session cookie and answers 204, also when there is none. Bearer tokens are not revoked (they expire on their own; a client logs out by dropping its copy). It must come from an allowed web origin with `X-NEU-Compass: 1`, with or without the cookie, or it gets the fixed CSRF 403 and expires nothing: a page elsewhere must not log the browser out.
      */
     post: operations['logout_auth_logout_post'];
     delete?: never;
@@ -365,7 +365,7 @@ export interface paths {
     put?: never;
     /**
      * Check a session-only course draft against one exact source-checked plan (computes only)
-     * @description The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.
+     * @description The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in `added`), the notices for that input in order (plain-text sentences: for typed codes the wording the Streamlit page had, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those courses — recorded rules only, not eligibility.
      *
      *     `plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` for no such plan in this program, `draft` for a plan not checked against its sources, `unusable` for one that cannot be verified, `unavailable` when the plans cannot be read now.
      *
@@ -653,9 +653,9 @@ export interface components {
     /**
      * ChatTurn
      * @description One prior conversation turn (client-supplied — /chat is stateless;
-     *     the Streamlit session owns the transcript and sends a recent window).
-     *     一轮此前的对话（由客户端提供 —— /chat 本身是无状态的；由 Streamlit
-     *     会话保管完整记录，只发送最近的一段窗口）。
+     *     the front end owns the transcript and sends a recent window).
+     *     一轮此前的对话（由客户端提供 —— /chat 本身是无状态的；由前端保管完整
+     *     记录，只发送最近的一段窗口）。
      */
     ChatTurn: {
       /** Content */
@@ -1188,10 +1188,10 @@ export interface components {
     };
     /**
      * DraftNoticeOut
-     * @description One line the page shows as plain text, in processing order. For a typed code `text` is the Streamlit page's
+     * @description One line the page shows as plain text, in processing order. For a typed code `text` keeps the Streamlit page's
      *     sentence for the same case; re-reading the sent draft has three of its own (`course_gone`, `invalid_record`,
      *     `duplicate_code`). `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
-     *     中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 是 Streamlit 页面同一情况的那句话；重读草案时的三种
+     *     中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 沿用 Streamlit 页面同一情况的那句话；重读草案时的三种
      *     （`course_gone`、`invalid_record`、`duplicate_code`）是自己的句子。`candidates` 只有 `ambiguous` 有。
      */
     DraftNoticeOut: {
@@ -1418,10 +1418,9 @@ export interface components {
     };
     /**
      * OAuthCallbackRequest
-     * @description Body for POST /auth/callback. The Streamlit page sends the `code`
-     *     query param Google redirected back with.
-     *     POST /auth/callback 的请求体。Streamlit 页面发送 Google 重定向带回的
-     *     `code` 查询参数。
+     * @description Body for POST /auth/callback: the `code` query param Google sent the
+     *     browser back with.
+     *     POST /auth/callback 的请求体：Google 把浏览器送回来时带的 `code` 查询参数。
      */
     OAuthCallbackRequest: {
       /** Code */
@@ -1437,11 +1436,9 @@ export interface components {
     };
     /**
      * OAuthCallbackResponse
-     * @description Sanitized identity persisted server-side. Streamlit calls
-     *     state_manager.login with these fields.
+     * @description Sanitized identity persisted server-side.
      *
-     *     经清洗、已持久化到服务端的身份信息。Streamlit 会用这些字段调用
-     *     state_manager.login。
+     *     经清洗、已持久化到服务端的身份信息。
      *
      *     session_token (ADR-0021): signed bearer credential for subsequent API
      *     calls (`Authorization: Bearer <token>`). None when the server runs

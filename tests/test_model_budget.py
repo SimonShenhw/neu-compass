@@ -287,20 +287,3 @@ def test_chat_without_a_budget_is_unchanged(api_client):
     finally:
         api_client.app.dependency_overrides.pop(get_model_budget, None)
     assert [e["type"] for e in stream] == ["meta", "token", "done"]
-
-
-def test_the_ui_shows_the_daily_limit_notice_as_the_answer(tmp_path):
-    from app.streamlit_app import stream_assistant
-    from api.routes import chat as chat_route
-
-    class Api:
-        def chat_stream(self, body):
-            yield {"type": "meta", "results": [], "matched_via": "hybrid"}
-            yield {"type": "error", "error_type": "daily_limit", "detail": chat_route.STREAM_ERROR_DETAIL["daily_limit"]}
-            yield {"type": "done"}
-
-    state = {}
-    shown = list(stream_assistant(Api(), {"query": "synthetic"}, state))
-    assert shown == ["⚠️ " + chat_route.STREAM_ERROR_DETAIL["daily_limit"]]
-    assert state["last_chat_meta"]["matched_via"] == "hybrid"
-    assert state["last_chat_error"] == chat_route.STREAM_ERROR_DETAIL["daily_limit"]

@@ -92,6 +92,11 @@ def test_the_tunnel_waits_for_the_api_only() -> None:
     assert [name for name, service in SERVICES.items() if "web" in waits_for(service)] == []
 
 
+def test_the_stack_has_no_streamlit_service() -> None:
+    """R8 deleted the Streamlit UI and with it the `ui` service. 中文：R8 删了 Streamlit，也去掉了 `ui` 服务。"""
+    assert set(SERVICES) == {"api", "web", "backup", "cloudflared"}
+
+
 def test_the_web_service_is_built_from_web_and_hardened() -> None:
     assert WEB["build"]["context"] == "./web"
     assert WEB["read_only"] is True

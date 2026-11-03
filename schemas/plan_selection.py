@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from schemas.program_plan import ProgramPlan
 
+# The Streamlit page's plan selector (deleted in R8), which these 409 details still name; the web front end words the
+# refusals itself from `reason` (web/src/models/chatFailure.ts). 中文：Streamlit 页方案选择框的名字；新前端按 reason 说话。
 PLAN_SELECTOR_LABEL = "方案版本（可选）"
 # The page clears the choice on these (and only these) 409s, so each says the question was not answered.
 # 中文：页面只在这几种 409 时清除方案选择，所以每条都说明这个问题还没有回答。

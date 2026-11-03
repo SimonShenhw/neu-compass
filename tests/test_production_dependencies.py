@@ -55,7 +55,7 @@ def test_wheel_packages_contain_all_internal_modules() -> None:
         .get("packages", [])
     )
 
-    expected_packages = ["config", "db", "schemas", "scrapers", "llm", "rag", "api", "app"]
+    expected_packages = ["config", "db", "schemas", "scrapers", "llm", "rag", "api"]  # R8 deleted app/.
     for pkg in expected_packages:
         assert pkg in wheel_packages, f"Package {pkg!r} must be in hatchling wheel packages list"
         pkg_dir = PROJECT_ROOT / pkg
@@ -75,9 +75,10 @@ def test_dockerfile_production_pinning_and_exclusions() -> None:
     assert "--no-install-package torch" in content
     assert "--no-install-package pymupdf" in content
 
-    # 3. ADR-0023: pyarrow must NOT be excluded as it is a hard streamlit requirement
+    # 3. ADR-0023: pyarrow must NOT be excluded. Streamlit needed it at runtime; R8 deleted Streamlit, but
+    #    ir-datasets (FlagEmbedding's) still depends on it and nobody checked the API never imports it.
     assert "--no-install-package pyarrow" not in content, (
-        "pyarrow must NOT be excluded; streamlit dataframe_util requires it"
+        "pyarrow must NOT be excluded; see the Dockerfile's note (ADR-0023)"
     )
 
 
@@ -172,9 +173,30 @@ def test_build_records_the_resolved_out_of_lock_set() -> None:
         "rag.index",
         "rag.retriever",
         "schemas.course",
-        "app.api_client",
     ],
 )
 def test_production_runtime_imports_smoke(module_name: str) -> None:
     mod = importlib.import_module(module_name)
     assert mod is not None
+
+
+def test_nothing_imports_the_deleted_streamlit_ui_and_the_dependency_is_gone() -> None:
+    """R8 deleted the Streamlit UI (app/) and its dependency; R0 had kept the API off app/ so that it could.
+    中文：R8 删了 Streamlit 界面（app/）和这个依赖；R0 起 API 就不导入 app/，就是为了能删。"""
+    import ast
+
+    dirs = ("api", "config", "db", "eval", "llm", "rag", "schemas", "scrapers", "scripts", "tests")
+    paths = [path for name in dirs for path in (PROJECT_ROOT / name).rglob("*.py") if "__pycache__" not in path.parts]
+    assert len(paths) > 100
+    for path in paths:
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8-sig"))):
+            names = ([node.module] if isinstance(node, ast.ImportFrom) and node.module and node.level == 0 else
+                     [alias.name for alias in node.names] if isinstance(node, ast.Import) else [])
+            for name in names:
+                assert name.split(".")[0] not in {"app", "streamlit"}, f"{path.relative_to(PROJECT_ROOT)} imports {name}"
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert not any(re.match(r"streamlit\b", dep, re.I) for dep in pyproject["project"]["dependencies"])
+    assert "app" not in pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
+    assert 'name = "streamlit"' not in (PROJECT_ROOT / "uv.lock").read_text(encoding="utf-8")
+    for name in ("Dockerfile", "docker-compose.yml"):  # Streamlit's port. 中文：Streamlit 的端口。
+        assert "8501" not in (PROJECT_ROOT / name).read_text(encoding="utf-8"), name

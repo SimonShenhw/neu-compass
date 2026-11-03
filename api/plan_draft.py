@@ -2,17 +2,17 @@
 
 The React program page keeps the draft (course IDs) in memory and sends it with each change; this module turns that
 list plus any newly typed codes into the draft the server stands behind, the notices for that input (for typed codes
-the Streamlit page's sentences, three of its own for re-reading the draft), and `evaluate_draft`'s result for one exact
-source-checked plan. The per-code rules mirror
-`app.plan_draft_view._add` step for step (unique match, exact primary code, a cross-listed twin counted once, an alias
+the sentences the Streamlit page had, three of its own for re-reading the draft), and `evaluate_draft`'s result for one
+exact source-checked plan. The per-code rules are the Streamlit page's `_add` (app/plan_draft_view.py, deleted in R8)
+step for step (unique match, exact primary code, a cross-listed twin counted once, an alias
 under another primary code, identity and field checks, the 20-course limit), but run on the
 repositories directly, so a lookup can never half-fail the way an HTTP call can. One addition: a course whose ID the
 request model would refuse is not taken, so the page can always send back what it gets. Nothing here writes a database
 row, query_log or a log line with a course code or ID: the route logs counts only.
 
 中文：草案核对（R4b）：只计算、不存储。React 的培养方案页把草案（课程 ID）放在内存里，每次变化都带过来；这里把它和这次
-新输入的课号变成服务器认可的草案、这次输入的提示（按课号的是 Streamlit 页面的原句，重读草案的三种是自己的句子），以及按
-一份确切的已核对方案算出的 `evaluate_draft` 结果。每个课号的规则和 `app.plan_draft_view._add` 一步一步对应，但直接查仓库，不会像 HTTP 请求那样核对到一半失败。
+新输入的课号变成服务器认可的草案、这次输入的提示（按课号的沿用 Streamlit 页面的原句，重读草案的三种是自己的句子），以及按
+一份确切的已核对方案算出的 `evaluate_draft` 结果。每个课号的规则和 Streamlit 页的 `_add`（app/plan_draft_view.py，R8 删了）一步一步对应，但直接查仓库，不会像 HTTP 请求那样核对到一半失败。
 多了一条：请求模型不收的课程 ID 不加进草案，页面拿到的草案总能原样发回来。
 这里不写数据库、不写 query_log，日志里也没有课号和课程 ID：路由只记个数。
 """
@@ -31,7 +31,7 @@ from schemas.course import Course
 from schemas.plan_draft import MAX_DRAFT_COURSES, DraftCourse, DraftResult, evaluate_draft, parse_course_codes
 from schemas.program_plan import ProgramPlan
 
-MAX_DRAFT_INPUT = 4000  # The Streamlit text area's max_chars. 中文：Streamlit 输入框的字数上限。
+MAX_DRAFT_INPUT = 4000  # The draft box's limit (the web's DRAFT_INPUT_MAX; the Streamlit text area's before). 中文：输入框的字数上限。
 MAX_CANDIDATES = 10
 COURSE_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$"
 
@@ -68,10 +68,10 @@ class DraftCandidateOut(BaseModel):
 
 
 class DraftNoticeOut(BaseModel):
-    """One line the page shows as plain text, in processing order. For a typed code `text` is the Streamlit page's
+    """One line the page shows as plain text, in processing order. For a typed code `text` keeps the Streamlit page's
     sentence for the same case; re-reading the sent draft has three of its own (`course_gone`, `invalid_record`,
     `duplicate_code`). `candidates` only for `ambiguous` (at most 10, the rest counted in `candidates_omitted`).
-    中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 是 Streamlit 页面同一情况的那句话；重读草案时的三种
+    中文：页面按处理顺序当纯文字显示的一行。按课号的 `text` 沿用 Streamlit 页面同一情况的那句话；重读草案时的三种
     （`course_gone`、`invalid_record`、`duplicate_code`）是自己的句子。`candidates` 只有 `ambiguous` 有。"""
     model_config = _ANSWER
     kind: NoticeKind
@@ -156,8 +156,8 @@ def _current(course_ids: list[str], course_repo: CourseRepository) -> tuple[list
 
 def _add(raw: str, existing: list[DraftCourse], *, course_repo: CourseRepository,
          alias_repo: AliasRepository) -> tuple[list[DraftCourse], list[DraftNoticeOut]]:
-    """`app.plan_draft_view._add` on the repositories: the same order, limits and sentences.
-    中文：在仓库上做 `app.plan_draft_view._add`：同样的顺序、上限和句子。"""
+    """The Streamlit page's `_add` (app/plan_draft_view.py, deleted in R8) on the repositories: the same order, limits
+    and sentences. 中文：在仓库上做 Streamlit 页的 `_add`（R8 删了）：同样的顺序、上限和句子。"""
     notices: list[DraftNoticeOut] = []
     codes, invalid = parse_course_codes(raw)
     if len(codes) > MAX_DRAFT_COURSES:
@@ -221,9 +221,9 @@ def _add(raw: str, existing: list[DraftCourse], *, course_repo: CourseRepository
             notices.append(_notice("invalid_record", code + " 返回的课程身份或字段无效，未加入。"))
     if not accepted:
         return [], notices
-    # Streamlit checks the limit again here because its session state can change under it; this list cannot: each
-    # pending code adds at most one course and the check above bounds them, so the merge never passes 20.
-    # 中文：Streamlit 在这里再查一次上限，因为它的会话状态可能被别处改；这里不会：每个待核对的课号最多加一门，
+    # The Streamlit page checked the limit again here because its session state could change under it; this list
+    # cannot: each pending code adds at most one course and the check above bounds them, so the merge never passes 20.
+    # 中文：Streamlit 页在这里再查过一次上限，因为它的会话状态可能被别处改；这里不会：每个待核对的课号最多加一门，
     # 上面已经限住了，合并后不会超过 20。
     merged = {c.code: c for c in existing}
     for course in accepted:

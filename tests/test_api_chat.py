@@ -1,9 +1,9 @@
 """Tests for api.routes.chat — NDJSON streaming /chat endpoint.
 
 Gemini is mocked via app.dependency_overrides[get_chat_stream_fn]; tests
-never hit the live SDK. The Streamlit-side consumer pattern (httpx stream
-+ iter_lines) is verified at test_streamlit_app level — here we just
-assert the wire format produced by the FastAPI handler.
+never hit the live SDK. The web front end's reader has its own tests
+(web/src/api/chatStream.test.ts) — here we just assert the wire format
+produced by the FastAPI handler.
 """
 
 from __future__ import annotations
