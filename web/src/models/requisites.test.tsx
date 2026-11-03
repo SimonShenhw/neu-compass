@@ -10,7 +10,7 @@ import {
   listing,
   twoYears,
 } from '../features/requisites/requisitesTestUtils';
-import { parseRequisites } from './requisites';
+import { legacyCatalogListing, parseRequisites } from './requisites';
 
 const doc = 'documents.0';
 const section = `${doc}.requisites.prerequisite`;
@@ -143,6 +143,7 @@ it.each(invalid.map(([path, value], index) => ({ path, value, index })))(
         course={twoYears.body}
         requisites={data}
         prerequisites={twoYears.body.prerequisites}
+        catalogPrereqCodes={null}
         onOpenCourse={vi.fn()}
       />,
     );
@@ -315,3 +316,22 @@ it('valid optional evidence nulls, archive links and shape-only integers remain 
   edit(data, `${select}.min_courses`, -1);
   expect(parseRequisites(data).kind).toBe('ok');
 });
+it.each([
+  ['CS 5800', ['CS 5800', 'CS 7800'], 'listed'],
+  ['cs  5800', ['CS 5800'], 'listed'],
+  ['CS\n5800', ['CS5800'], 'listed'],
+  ['CS 5800', [' cs 5800 '], 'listed'],
+  ['CS 5100', ['CS 5800', 'CS 7800'], 'unlisted'],
+  ['CS 58', ['CS 5800'], 'unlisted'],
+  ['CS 5800', [], 'unlisted'],
+  ['CS 5800', ['', ' '], 'unlisted'],
+  [null, ['CS 5800'], null],
+  ['', [''], null],
+  [' \n', ['CS 5800'], null],
+  ['CS 5800', null, null],
+] as const)(
+  'a legacy row coded %j against catalog codes %j is %j',
+  (code, codes, expected) => {
+    expect(legacyCatalogListing(code, codes)).toBe(expected);
+  },
+);

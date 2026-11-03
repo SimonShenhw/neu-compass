@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { requisitesFixture } from '../../fixtures/requisitesDemo';
+import { catalogPrereqCodes, evidence } from '../../models/courseDetail';
 import { CourseRequisites, YEAR_EMPTY, YEAR_LABEL } from './CourseRequisites';
 import { PLAN_LABEL } from './ProgramContextPanel';
 import { choose, expandAll, readVisible } from './requisitesTestUtils';
@@ -26,9 +27,9 @@ export const goldens = readdirSync(directory).map(
 const scenarios = goldens.flatMap((golden) =>
   golden.scenarios.map((scenario) => ({ caseName: golden.case, ...scenario })),
 );
-it('freezes all 16 cases and all 34 golden choice scenarios', () => {
-  expect(goldens).toHaveLength(16);
-  expect(scenarios).toHaveLength(34);
+it('freezes all 17 cases and all 35 golden choice scenarios', () => {
+  expect(goldens).toHaveLength(17);
+  expect(scenarios).toHaveLength(35);
 });
 it.each(scenarios)(
   'golden $caseName / $name preserves exact order text kinds and depths',
@@ -40,6 +41,9 @@ it.each(scenarios)(
         course={fixture.body}
         requisites={fixture.body.course_requisites}
         prerequisites={fixture.body.prerequisites}
+        catalogPrereqCodes={catalogPrereqCodes(
+          evidence(fixture.body.answer_evidence),
+        )}
         onOpenCourse={onOpen}
       />,
     );

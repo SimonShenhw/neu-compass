@@ -5928,6 +5928,98 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
 
 分支 `feat/remove-streamlit`，从 main 的 `f24a72d` 开。没有使用真实模型、账号、NAS 或生产库。上线要用户点头、定时间。
 
+## 45 — 旧平铺先修边改标目录来源（2026-11-02）
+
+### 范围与原因
+
+没有年度先修文档的课，课程页把旧边列在「旧平铺先修关系（未核验，仅供导航）」下面，每行标着「必须先修」「建议先修」「可同修」。这和上面那句「旧边不表达 AND/OR……不能用它判断哪些课全部必修」自相矛盾（CONTENT-01 诊断里的「另一个小问题」，修法 C）。
+
+旧边有两个来源：
+- `scripts/backfill_prereq_edges.py` 把目录先修段里的代码一律写成 `required`，OR 也一起拍平；
+- 手工 seed（`data/program_seed/*.json`，35 条）的分级是人定的。
+
+线上 CS 6140 的官方先修是「CS 5800 或 CS 7800」，可页面上 CS 7800（回填）标「必须先修」，CS 5800（seed）标「建议先修」。
+
+拿仓库里 2025-2026 院系页夹具对照，seed 的分级也靠不住：
+- CS 7150 的两个任选都标成 `required`；
+- AAI 6620、6630、6720 在目录里只有一门先修，seed 却标 `recommended`；
+- AAI 6610 的三条、AAI 6640、AAI 6740、CS 7800，目录里都没有先修段，seed 却标 `required`；
+- CS 5008←CS 5004 这条，目录里没有。
+
+几种改法写在评审目录的 `legacy_prereq_labels/PLAN.md`。用户选了乙：去掉分级，按本课的目录记录标来源，不改接口。
+
+只改新前端。compass 11-02 起已经是新前端，Streamlit 没有路由了。这一批开工时 R8 还没合，所以 Streamlit 那边没动：`app/ui_theme.py` 的 `_PREREQ_LABELS`、`app/course_requisite_view.py`、先修小图上的英文 `required` 都保持原样，免得两个 PR 改同一批文件。后来 R8（第 44 节）先合进 main，`app/` 和只有它在用的 `rag/prereq_graph.py` 都删掉了。模型看不到旧边，这个改动不影响聊天回答（回答那边由 CONTENT-01 自己的 PR 处理）。分支 `fix/legacy-prereq-labels`，从 main 的 `f24a72d` 开。
+
+### 已实现
+
+1. **标签规则**（`web/src/models/requisites.ts` 的 `legacyCatalogListing`）：旧边那一行的课号，在本课记录的目录先修代码里，就是 `listed`，不在就是 `unlisted`。以下几种情况一律是 `null`：
+   - 这一行没有课号（先修课不在课程表里），或者课号只有空白；
+   - 本课没有可用的目录快照。
+
+   课号比较时去掉所有空白，不分大小写。规则不看旧边的 `requirement`。
+2. **面板**（`CourseRequisites.tsx`）：
+   - 新增一个必填参数 `catalogPrereqCodes`，没有可用快照时传 `null`。
+   - 什么时候算「没有结构化记录」，仍由 `legacyLabelsAllowed` 判断，条件没变。这时每行按上面的规则标「目录列出」或「目录未列出」，`null` 的行不标。
+   - 只要有一行带标签，原来的说明句后面就接一句「「目录列出」：本课记录的目录先修段提到了这门课，关系仍未核验；「目录未列出」：目录先修段没有提到。」。
+   - 不变的部分：标题、原来那句说明、行的样子（课号 — 课名，或者等宽显示的 ID）、「查看」按钮。有结构化记录时的那一支（「去看看这些先修课」）也不变，照旧不标。
+3. **调用方**：
+   - 课程页（`CourseDetail.tsx`）从详情里已经核过的 `answer_evidence.catalog` 取课号。取的是 `models/courseDetail.ts` 新加的 `catalogPrereqCodes`：快照可用才给课号，缺了或不合格就给 `null`。
+   - 演示页（`RequisitesDemoPage.tsx`）和测试从导出里的同一项取，先 `evidence()` 再 `catalogPrereqCodes()`。
+   - `RequisitesFixture` 的类型加了可选的 `answer_evidence`。
+4. **夹具和标准答案**：
+   - 新加一份真实导出 `cs-6140-legacy-catalog-listing`。它和 `cs-6140-requisites-table-missing` 用同一个合成库：存年度规则的表不存在，所以显示旧边。另外照目录导入的写法，给 CS 6140 存了课程自己的 `prereqs` 和一份目录快照（都是 CS 5800、CS 7800，走真的 `CatalogSourceRepository`）。三行旧边正好是三种情况：目录列出（CS 5800）、没列出（CS 5100）、没有课号。生成脚本是评审目录的 `goldens/make_legacy_catalog_fixture.py`，它复用 R3a 的 `make_requisites_fixtures.py`。
+   - 标准答案照 R3a 的做法，用 Streamlit 的函数跑出来。先在 git archive 出来的 `f24a72d` 副本（那时 Streamlit 还在）里给 Streamlit 打一份参考补丁（`goldens/streamlit_reference.py`，同一条规则用 Python 另写一遍，不进仓库）；再用评审目录的 `expected_panel.py` 生成，这份脚本现在也认得没有标签行的旧边。
+   - 核对过程：没打补丁时先跑一遍，16 份标准答案逐字节相同。打上补丁后，只有带旧边的三份变了（`cs-6140-requisites-table-missing`、`cs-7800-legacy-edges-only`、`derived-older-api-no-requisites`），而且只变旧边那几行：这三份导出都没有目录快照，所以分级都变成了没有标签。新加的那份是第 17 份。
+   - 冻结哈希跟着改（34 个文件）；标准答案测试的数目改成 17 份、35 个场景。
+5. **测试**：
+   - 标签规则 12 种情况：对上、大小写和空白不同、没对上、前缀不算、目录为空、目录里有空串、没有课号、课号为空串、课号只有空白、没有快照。
+   - 面板：列出、未列出、没有课号三种行，以及说明那句在各种情况下的表现（目录有课号、目录为空、没有快照、只剩没有课号的行）。有结构化记录时照旧不标。任何分级字样，已知的、未知的，都不显示。原来那条「只在真正没有结构化记录时才有标签」的测试改用目录课号。axe 多查一个带标签的状态。
+   - 课程页：标签来自详情自己的快照；别的院系的快照（不合格）和没有快照，都不标。
+   - 演示页：新加的那份导出显示两个标签。
+   - 读页面的测试工具（`requisitesTestUtils.tsx`）：没有结构化记录时的行，不管有没有标签，都按课号、课名、ID 读，标签可以是 `null`；跳转链接那一支照旧读成一行字。
+
+### 修改文件
+
+- 改：`web/src/models/requisites.ts`、`web/src/models/courseDetail.ts`、`web/src/features/requisites/CourseRequisites.tsx`、`web/src/features/course-detail/CourseDetail.tsx`、`web/src/pages/RequisitesDemoPage.tsx`、`web/src/fixtures/requisitesDemo.ts`。
+- 测试：`web/src/models/requisites.test.tsx`、`web/src/features/requisites/CourseRequisites.test.tsx`、`CourseRequisites.golden.test.tsx`、`requisitesTestUtils.tsx`、`web/src/features/course-detail/CourseDetail.test.tsx`、`web/src/pages/RequisitesDemoPage.test.tsx`、`web/src/fixtures/requisitesFixtures.test.ts`。
+- 夹具：新加 `web/src/fixtures/requisites/cs-6140-legacy-catalog-listing.json` 和它的标准答案；改了三份标准答案。
+- 文档：`docs/course-requisites.md`（旧边那段）、`web/README.md`（R3a 一节）、本节。
+
+接口、数据库、数据、提示词、Streamlit 都没改。
+
+### 验证记录
+
+- **web**：prettier、类型检查、lint（0 警告）、Vitest（95 个文件 2858 条）、build 都过，首屏 JS gzip 186,554 字节。
+- **标准答案**：见上面第 4 条。基线 16 份逐字节相同；打补丁以后，只有三份里的旧边行变了。
+- **变异**：一共 40 个，全杀。新写和改过的代码 20 个，覆盖标签规则、说明那句的条件、两个标签词、按行取标签、课程页和演示页传课号、快照不合格或没有时的处理、读页面的工具；面板原有的 R3a 变异 M111–M130 也重跑了 20 个。跑法：8 份 `web/` 副本并行，每个变异跑面板、课程页、演示页、模型和夹具的测试（256 条）。
+- **后端全量**：5346 条全过（10 分 46 秒）。跑前跑后比了改动文件的哈希，没变（这个 PR 没改 Python，后端测试也不读这些文档）。
+- **浏览器**：开发服务器（5173）连开发 API（8000，合成数据），看了三处：
+  - 演示页新加的那份显示「目录列出」「目录未列出」和说明那句；
+  - `/course/CS-7800`（只有旧边，开发数据里没有它的目录快照）三行没有分级，也没有标签；
+  - `/course/CS-6140`（有年度规则）照旧是跳转链接。
+
+  控制台只有游客访问 `/auth/me` 的 401。
+- **e2e**：对着 `vite preview` 和开发 API 跑，60 条过，10 条按设备跳过（57.0 秒），和 R7 的结果一样。测试代码没改。
+- **码位**：新加的行里没有格式字符、私用区字符或控制字符。标出来的两个表情（U+1F9E9、U+1F9F1），是新标准答案 `raw` 里 Streamlit 标题自带的，R3a 的标准答案里也有。没有 CR，`diff --check` 干净。
+- **合并 main 以后**（R8 先合了）：web 的 `gen:api:check`、`format:check`、`npm run check` 再跑一遍，都过。Vitest 95 个文件，2848 条过、10 条跳过（共 2858 条）。跳过的 10 条是 `web/src/test/copiedWords.test.ts` 拿前端文字对 `app/` 里的 Python，`app/` 删了就跳过，第 44 节那次也一样，和这个改动无关。首屏 JS gzip 186,554 字节，没变。后端和 e2e 没在本机重跑：这个分支没改 Python，合并后的 Python、测试和开发 API 都和 main 一样，后端测试也不读这里改的文件。这两项交给 CI，CI 对合并后的版本都会跑。
+- **第二次合 main 以后**（#44 先合了）：web 的 `npm run check`、`format:check`、`gen:api:check` 都过，Vitest 还是 2848 条过、10 条跳过，首屏 JS gzip 186,554 字节没变。除了改动记录，这个 PR 改的 20 个文件和合并前逐行一样；`docs/course-requisites.md` 两边都改过，#44 的内容都在。跳过的那 10 条由 #47（第 47 节）修。
+
+### 审查
+
+没开审查：用户决定这一批不开，直接开 PR。上面「验证记录」里的检查就是这一批全部的核对。
+
+### 已知、未处理
+
+- **交叉编号**：先修课在目录里如果写的是另一个交叉编号，会被标成「目录未列出」。回填边不会出这个问题，因为回填本来就是按 `primary_code` 去对目录代码的；只有手工 seed 的边可能这样。
+- **快照只代表记录下来的那一份目录**：快照旧了，标签也跟着旧。「目录未列出」也可能只是那一年的目录没写，别的年份写了。所以说明里只说「本课记录的目录先修段」。
+- **有年度规则时的那一支**（「去看看这些先修课」）：手工 seed 的边照旧列成跳转链接，目录里没有的也列。上面的规则树是准的，这一支只用来跳转，这次没改。
+- **Streamlit 没改**：R8（第 44 节）已经把它从仓库里删了，11-03 也上线了，NAS 上不再跑 Streamlit。
+- **数据本身没动**：线上库里的旧边、seed 文件、回填脚本都没改。要改数据（比如删掉目录里没有的 seed 边）得另外决定，那要动 NAS 上的生产库。
+
+### 发布状态
+
+分支 `fix/legacy-prereq-labels`，从 main 的 `f24a72d` 开。R8 先合进 main 以后，这个分支把 main（`3c4b721`）合了进来：改动记录两边都加了第 44 节，R8 的留 44，本节改成 45；别的文件自动合并。合并后另有一个提交，只改本节里讲 R8 的几句和验证记录。之后 #44（第 46 节）先合进了 main，这个分支又合了一次 main（`a80e4c6`）：本节放回第 44、46 节之间，`docs/course-requisites.md` 自动合并；再一个提交只改本节的这几句。没有使用真实模型、账号、NAS 或生产库，只用了合成数据。合并不会部署；上线随下一次发布，要用户另外点头。
+
 ## 46 — 先修 AND/OR 不明时的说法，选择框用新前端的名字（CONTENT-01：提示词 4.6、检查器 2.7，2026-11-02／03）
 
 ### 范围与原因

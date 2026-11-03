@@ -108,6 +108,13 @@ export function evidence(v: unknown): ParsedAnswerEvidence | null {
     source_review_ids: sources,
   };
 }
+// The prerequisite codes of the course's recorded catalog entry, which label the requisites panel's legacy rows; null
+// without a usable snapshot.
+export function catalogPrereqCodes(parsed: ParsedAnswerEvidence | null) {
+  return parsed?.catalog.kind === 'ok'
+    ? parsed.catalog.snapshot.prereq_codes
+    : null;
+}
 function grading(
   v: unknown,
 ): v is CourseDetailBody['grading_components'][number] {

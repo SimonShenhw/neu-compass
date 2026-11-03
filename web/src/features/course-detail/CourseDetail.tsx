@@ -1,7 +1,10 @@
 import { Button } from '../../components/Button';
 import { CourseCode } from '../../components/CourseCode';
 import { CourseRequisites } from '../requisites/CourseRequisites';
-import { parseCourseDetail } from '../../models/courseDetail';
+import {
+  catalogPrereqCodes,
+  parseCourseDetail,
+} from '../../models/courseDetail';
 import type { DetailView } from '../../models/courseDetail';
 import { MAX_COMPARE_COURSES } from '../../models/compareList';
 import { oneLine, percentEven, pyG } from '../../models/courseDetailFormat';
@@ -73,6 +76,7 @@ export function CourseDetail({
           }}
           requisites={b.course_requisites}
           prerequisites={b.prerequisites}
+          catalogPrereqCodes={catalogPrereqCodes(b.answer_evidence)}
           onOpenCourse={onOpenCourse}
         />
       </div>

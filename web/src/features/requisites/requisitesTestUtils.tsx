@@ -74,9 +74,12 @@ export async function readVisible(container: HTMLElement): Promise<Visible[]> {
       });
       await user.keyboard('{Escape}');
     } else if (kind === 'legacy_row') {
-      const label = element.querySelector('[data-row-label]');
+      const label =
+        element.querySelector('[data-row-label]')?.textContent ?? null;
+      // Without structured records a row is a code and a name, or an ID, with or without its catalog label; next to
+      // them it is one line of text.
       result.push(
-        label
+        element.querySelector('[data-row-code], [data-row-id]')
           ? {
               ...base,
               code:
@@ -84,12 +87,12 @@ export async function readVisible(container: HTMLElement): Promise<Visible[]> {
               name:
                 element.querySelector('[data-row-name]')?.textContent ?? null,
               id: element.querySelector('[data-row-id]')?.textContent ?? null,
-              label: label.textContent,
+              label,
             }
           : {
               ...base,
               text: element.querySelector('[data-row-text]')!.textContent!,
-              label: null,
+              label,
             },
       );
     } else {

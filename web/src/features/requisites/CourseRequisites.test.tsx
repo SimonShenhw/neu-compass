@@ -6,6 +6,7 @@ import type { CourseRequisitesProps } from './CourseRequisites';
 import { CourseRequisites, YEAR_EMPTY, YEAR_LABEL } from './CourseRequisites';
 import { PLAN_EMPTY, PLAN_LABEL } from './ProgramContextPanel';
 import { requisitesFixture } from '../../fixtures/requisitesDemo';
+import { catalogPrereqCodes, evidence } from '../../models/courseDetail';
 import { planLabel } from '../../models/requisiteRules';
 import {
   choose,
@@ -17,10 +18,15 @@ import {
 
 function props(caseName = twoYears.case): CourseRequisitesProps {
   const fixture = requisitesFixture(caseName);
+  // requisitesFixture falls back to the default case for an unknown name.
+  if (fixture.case !== caseName) throw Error(`No fixture ${caseName}`);
   return {
     course: fixture.body,
     requisites: fixture.body.course_requisites,
     prerequisites: fixture.body.prerequisites,
+    catalogPrereqCodes: catalogPrereqCodes(
+      evidence(fixture.body.answer_evidence),
+    ),
     onOpenCourse: vi.fn(),
   };
 }
@@ -166,24 +172,100 @@ it('tree nesting and exact callbacks include grade level and concurrent suffixes
   expect(input.onOpenCourse).toHaveBeenCalledTimes(4);
 });
 it('legacy labels remain only for genuinely absent structured records, including missing schema', () => {
-  const input = props('cs-6140-requisites-table-missing');
-  const { rerender } = render(<CourseRequisites {...input} />);
-  expect(screen.getByText('建议先修')).toBeVisible();
+  const input = {
+    ...props('cs-6140-requisites-table-missing'),
+    catalogPrereqCodes: ['CS 5800', 'CS 7800'],
+  };
+  const { container, rerender } = render(<CourseRequisites {...input} />);
+  expect(screen.getByText('目录列出')).toBeVisible();
+  expect(screen.getByText('目录未列出')).toBeVisible();
   expect(legacyButtons()).toHaveLength(2);
+  const labels = () => container.querySelectorAll('[data-row-label]');
   const data = listing('cs-6140-requisites-table-missing');
   data.unusable_records = 1;
   rerender(<CourseRequisites {...input} requisites={data} />);
-  expect(screen.queryByText('建议先修')).not.toBeInTheDocument();
+  expect(labels()).toHaveLength(0);
   data.unusable_records = 0;
   data.warnings.push('structured_requisite_schema_unusable');
   rerender(<CourseRequisites {...input} requisites={data} />);
-  expect(screen.queryByText('建议先修')).not.toBeInTheDocument();
+  expect(labels()).toHaveLength(0);
   data.warnings = [];
   data.has_any_stored_records = true;
   rerender(<CourseRequisites {...input} requisites={data} />);
-  expect(screen.queryByText('建议先修')).not.toBeInTheDocument();
+  expect(labels()).toHaveLength(0);
+  expect(screen.queryByText(/「目录列出」/)).not.toBeInTheDocument();
 });
-it('unknown legacy labels stay literal; missing course has no View; each callback is exact', async () => {
+const LEGACY_NOTE =
+  '旧边不表达 AND/OR、最低成绩或共修；不能用它判断哪些课全部必修或能否注册。';
+const LISTING_NOTE =
+  '「目录列出」：本课记录的目录先修段提到了这门课，关系仍未核验；「目录未列出」：目录先修段没有提到。';
+it('a legacy row says only whether the course’s catalog entry lists its code; the note explains that only when a row says it', () => {
+  const rows = [
+    {
+      course_id: 'listed',
+      primary_code: 'cs  5800',
+      primary_name: 'Algorithms',
+      requirement: 'recommended',
+    },
+    {
+      course_id: 'unlisted',
+      primary_code: 'CS 5100',
+      primary_name: 'Foundations of Artificial Intelligence',
+      requirement: 'required',
+    },
+    {
+      course_id: 'no-code',
+      primary_code: null,
+      primary_name: 'Name without code',
+      requirement: 'required',
+    },
+  ];
+  const input = { ...props(), requisites: undefined, prerequisites: rows };
+  const { container, rerender } = render(
+    <CourseRequisites {...input} catalogPrereqCodes={['CS 5800', 'CS 7800']} />,
+  );
+  const shown = () =>
+    [...container.querySelectorAll('[data-kind="legacy_row"]')].map(
+      (row) => row.querySelector('[data-row-label]')?.textContent ?? null,
+    );
+  expect(shown()).toEqual(['目录列出', '目录未列出', null]);
+  expect(screen.getByText(LEGACY_NOTE + LISTING_NOTE)).toBeVisible();
+  rerender(<CourseRequisites {...input} catalogPrereqCodes={[]} />);
+  expect(shown()).toEqual(['目录未列出', '目录未列出', null]);
+  expect(screen.getByText(LEGACY_NOTE + LISTING_NOTE)).toBeVisible();
+  // No catalog snapshot, or no row with a code: no labels, and the note says nothing about them.
+  rerender(<CourseRequisites {...input} catalogPrereqCodes={null} />);
+  expect(shown()).toEqual([null, null, null]);
+  expect(screen.getByText(LEGACY_NOTE)).toBeVisible();
+  rerender(
+    <CourseRequisites
+      {...input}
+      prerequisites={[rows[2]]}
+      catalogPrereqCodes={['CS 5800']}
+    />,
+  );
+  expect(shown()).toEqual([null]);
+  expect(screen.getByText(LEGACY_NOTE)).toBeVisible();
+  // Next to structured rules the rows stay plain links, whatever the catalog lists.
+  rerender(
+    <CourseRequisites
+      {...input}
+      requisites={listing()}
+      catalogPrereqCodes={['CS 5800', 'CS 5100']}
+    />,
+  );
+  expect(shown()).toEqual([null, null, null]);
+  expect(screen.queryByText(/「目录列出」/)).not.toBeInTheDocument();
+  for (const tier of [
+    '必须先修',
+    '建议先修',
+    '可同修',
+    'required',
+    'recommended',
+  ])
+    expect(screen.queryByText(tier)).not.toBeInTheDocument();
+});
+it('no requirement tier is shown, known or not; missing course has no View; each callback is exact', async () => {
   const input = props();
   const rows = [
     {
@@ -208,9 +290,9 @@ it('unknown legacy labels stay literal; missing course has no View; each callbac
   const { container, rerender } = render(
     <CourseRequisites {...input} requisites={undefined} prerequisites={rows} />,
   );
-  expect(screen.getByText('constructor')).toBeVisible();
-  expect(screen.getByText('other')).toBeVisible();
-  expect(screen.getByText('可同修')).toBeVisible();
+  for (const tier of ['constructor', 'other', 'concurrent', '可同修'])
+    expect(screen.queryByText(tier)).not.toBeInTheDocument();
+  expect(container.querySelectorAll('[data-row-label]')).toHaveLength(0);
   expect(container.querySelectorAll('[data-row-id]')).toHaveLength(2);
   const user = userEvent.setup();
   // Each says which course it opens, not only 「查看」: a row without a code has none.
@@ -402,15 +484,17 @@ it('keyboard reaches selects disclosures rule leaves and legacy View', async () 
   expect(plan).toBe(true);
   expect(view).toBe(true);
 });
-it.each(['unselected', 'selected', 'legacy', 'invalid'])(
+it.each(['unselected', 'selected', 'legacy', 'legacy listed', 'invalid'])(
   'axe has no violations for %s',
   async (state) => {
     const input = props(
       state === 'legacy'
         ? 'cs-7800-legacy-edges-only'
-        : state === 'invalid'
-          ? 'derived-invalid-tree'
-          : twoYears.case,
+        : state === 'legacy listed'
+          ? 'cs-6140-legacy-catalog-listing'
+          : state === 'invalid'
+            ? 'derived-invalid-tree'
+            : twoYears.case,
     );
     const { container } = render(<CourseRequisites {...input} />);
     if (state === 'selected') {

@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, it } from 'vitest';
+// R3a's 32 files. The legacy rows' catalog labels (2026-11-02) regenerated the three goldens with legacy rows and added
+// cs-6140-legacy-catalog-listing, an export with a catalog snapshot, and its golden.
 const frozen = {
   'expected/cs-5008-one-year-repeated-leaf.json':
     '95608b143637cf1b9b112137021d3ac0b6a8215a29f8ca1199306761574584cc',
   'expected/cs-5800-nothing-listed.json':
     '85743d6c161f719de9737f930e039fcbd75aabaf3072f6d3d9f53cd9c62c0cc6',
+  'expected/cs-6140-legacy-catalog-listing.json':
+    'f1a1c5c76db24cb3b70ce77d28451aac71ef0ea032e807601a6474eae52385c5',
   'expected/cs-6140-program-table-broken.json':
     '01b6f5e2915d9963b53342705dca90888519b05e1173498699fc74a84b24f059',
   'expected/cs-6140-program-table-missing.json':
@@ -14,13 +18,13 @@ const frozen = {
   'expected/cs-6140-requisites-table-broken.json':
     '0b3314c010bca582c514c48e3b46e865265e32b516c265fe93de301856134f51',
   'expected/cs-6140-requisites-table-missing.json':
-    'e8dda7246adf9ce7e6af376a7d7dd903b366fc69369761322fd75e69d25cc61a',
+    '494266f124789cb187b97fd4a41880a5064bda46ffb19ceccffb5b6a8514812f',
   'expected/cs-6140-two-years.json':
     '3ae0a3ecac37e2798d383e19c45e08bd9db5817771a4e96fc75d698bc7cdc99d',
   'expected/cs-6220-one-unusable-row.json':
     '6e72cc8a42631f47f2bd4e69dbc45c3052c31d8349e138415393ce4a74d46561',
   'expected/cs-7800-legacy-edges-only.json':
-    'b214f9b515e2a69cb46ae918ff540ef164e14993a7b525855be7ecd7a4db40bf',
+    '5b2e4e7a3d70ade40e034e89cb983c6a95c805fe294cbc1625e8eabe7479e046',
   'expected/derived-foreign-plan-link.json':
     '2eaa3cf5c3b2cbbaae274b2b1cbdfb07ae9013d78e4d8afff07027a63bbd3139',
   'expected/derived-foreign-source-link.json':
@@ -30,7 +34,7 @@ const frozen = {
   'expected/derived-invalid-tree.json':
     '0d20af682600bc74a32e555150bd7f037e8cddd347caa7033e46c7f2e6194c3e',
   'expected/derived-older-api-no-requisites.json':
-    '862d632affeae3c1beff08a51278a29107c05dc851f0f1fddeaa0320f77f99af',
+    '354e7ca54a9d3ad79aa48a7d167fb682c22d884bfae359e60a3b2410f5967be7',
   'expected/derived-two-documents-one-year.json':
     'ddd2f77eb6526d6965f4ad482377dbe0a9a4b29f320c81524d0fc61a76dde55e',
   'expected/ds-5220-unparsed-old-record.json':
@@ -39,6 +43,8 @@ const frozen = {
     '2afe0aa50156a378aaed233accafac357339cc50b803bba20b294e7dae306688',
   'cs-5800-nothing-listed.json':
     'ef05648d1c378ef681bac165a3e903c4b1d259d0731d96ef7030584b2fff256e',
+  'cs-6140-legacy-catalog-listing.json':
+    '0211e4ded714688c471a65b1bdcad65c41781ae651429ca844e9614a6d104c3e',
   'cs-6140-program-table-broken.json':
     'dec3fdc59ffd911a2836665d3f50ca7206c219a0a1b611e23fce8665d7aaa174',
   'cs-6140-program-table-missing.json':
@@ -68,7 +74,7 @@ const frozen = {
   'ds-5220-unparsed-old-record.json':
     '0d5ca988a2950d7c2ef43f51b383ea0be4e61f227644e4e4b957bb3e498a69a4',
 } as const;
-it('all 32 reviewer fixtures and Python goldens preserve original bytes and filenames', () => {
+it('all 34 reviewer fixtures and Python goldens preserve original bytes and filenames', () => {
   const root = resolve('src/fixtures/requisites');
   expect(
     readdirSync(root)

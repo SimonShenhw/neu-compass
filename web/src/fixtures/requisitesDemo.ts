@@ -7,6 +7,7 @@ export interface RequisitesFixture {
     primary_name: string;
     course_requisites?: unknown;
     prerequisites: unknown;
+    answer_evidence?: unknown;
   };
 }
 const exports = import.meta.glob<RequisitesFixture>('./requisites/*.json', {
