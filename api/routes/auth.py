@@ -2,20 +2,19 @@
 
 POST /auth/callback —— Google OAuth 授权码兑换 + 用户持久化。
 
-Flow:
-  Browser  → google.com/oauth (user clicks Login on Streamlit page)
-           ← redirected back with ?code=XXX
-  Streamlit → POST /auth/callback {code, redirect_uri}
+Flow (the web front end, R2a/R2b):
+  Browser  → GET /auth/login-url → google.com/oauth (user clicks log in)
+           ← redirected back to the site's root with ?code=XXX&state=…
+  Page     → POST /auth/callback {code, redirect_uri, session: "cookie"}
            → exchange_code_for_token (verifies JWT signature + claims)
            → UserRepository.upsert_login (creates or refreshes the row)
-           ← {user_id, email, display_name, contribution_count}
-  Streamlit → state_manager.login(...)
+           ← {user_id, email, display_name, contribution_count}, the session in the API's HttpOnly cookie
+The token mode (the default; the Streamlit page used it until R8) returns the session token in the body instead.
 
-流程：浏览器跳转到 google.com/oauth（用户在 Streamlit 页面点击登录）→
-带 ?code=XXX 跳回；Streamlit 调用 POST /auth/callback，传
-{code, redirect_uri}；exchange_code_for_token 校验 JWT 签名与声明；
-UserRepository.upsert_login 创建或刷新该用户行；返回 {user_id, email,
-display_name, contribution_count}；Streamlit 再调用 state_manager.login(...)。
+流程（新前端）：浏览器先取 GET /auth/login-url，跳转到 google.com/oauth（用户点登录）→ 带 ?code=XXX&state=… 回到
+网站根地址；页面调用 POST /auth/callback，传 {code, redirect_uri, session: "cookie"}；exchange_code_for_token 校验 JWT
+签名与声明；UserRepository.upsert_login 创建或刷新该用户行；返回 {user_id, email, display_name, contribution_count}，
+会话放在 API 的 HttpOnly cookie 里。token 模式（默认；R8 以前 Streamlit 页用它）改为在返回体里给出会话令牌。
 
 The code-exchange and JWT verification both live in api.google_oauth (pure-ish
 helpers). This route only orchestrates + persists.
@@ -328,7 +327,7 @@ def delete_account(
     summary="Expire the session cookie (R2a)",
     description=(
         "Expires the API's session cookie and answers 204, also when there is none. Bearer tokens are not revoked "
-        "(they expire on their own; Streamlit logs out by dropping its copy). It must come from an allowed web "
+        "(they expire on their own; a client logs out by dropping its copy). It must come from an allowed web "
         "origin with `X-NEU-Compass: 1`, with or without the cookie, or it gets the fixed CSRF 403 and expires "
         "nothing: a page elsewhere must not log the browser out."
     ),
@@ -365,7 +364,7 @@ def login_configured() -> bool:
     response_model=LoginUrlResponse,
     summary="Google's login address for the web front end (R2a)",
     description=(
-        "Builds the Google OAuth address with the caller's `state`, exactly as the Streamlit login link does "
+        "Builds the Google OAuth address with the caller's `state` "
         "(`api.google_oauth.authorize_url`). The front end makes `state`, keeps it, and checks it when Google sends "
         "the browser back with `?code=&state=`; then it posts the code to `/auth/callback` with "
         "`\"session\": \"cookie\"` and the same `redirect_uri`. Google sends the browser back to `redirect_uri`, which "

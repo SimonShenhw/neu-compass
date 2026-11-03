@@ -68,16 +68,9 @@ uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
 # 看到 "Application startup complete" + /ready 返回 200 才算真起来
 ```
 
-### 1.4 重启 Streamlit(WSL terminal 2)— **必做**
+### 1.4 (R8 起没有这一步)
 
-> **Week 7 §9.5 踩坑**:`config.settings` 是 lru_cache 单例,Streamlit 边也持有自己的 cache。
-> 只重启 uvicorn 不够 — Streamlit 边发 authorize_url 用旧 secret 路径，会出现"authorize 时 redirect_uri 跟 token 时 不一致" 的 invalid_grant 错误。
-
-```bash
-ps -ef | grep streamlit
-kill <pid>
-uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
-```
+以前这里要重启 Streamlit:它自己也持有一份 `config.settings`,只重启 uvicorn 会出现 invalid_grant(Week 7 §9.5)。R8 删了 Streamlit,登录全在 API 里,重启 API 就够了。
 
 ### 1.5 (可选)cloudflared 重启 — 通常**不需要**
 

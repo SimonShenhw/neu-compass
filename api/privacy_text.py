@@ -1,17 +1,16 @@
 """The words of the 数据与隐私 page and of the notices next to the ask box (batch T, moved here in R2a).
 
-One copy for both front ends: `GET /privacy` builds them from the API's own settings (api/routes/public.py), and the
-Streamlit page (app/privacy_view.py, app/answer_feedback_view.py) from the UI's. Every sentence follows what the code
-does today, and the variable parts come from QUERY_LOG_RETENTION_DAYS, ANSWER_FEEDBACK_ENABLED and
-PRIVACY_CONTACT_EMAIL, so the page cannot promise a cleanup that is switched off. Plain text only: nothing here comes
-from a user, and the contact address is shown as written. No legal promises; it describes practice. Words that point at
-one layout ("见左侧……") stay with that front end.
+`GET /privacy` builds them from the API's own settings (api/routes/public.py) for the web front end; the Streamlit page
+read them too until R8 deleted it. Every sentence follows what the code does today, and the variable parts come from
+QUERY_LOG_RETENTION_DAYS, ANSWER_FEEDBACK_ENABLED and PRIVACY_CONTACT_EMAIL, so the page cannot promise a cleanup that
+is switched off. Plain text only: nothing here comes from a user, and the contact address is shown as written. No legal
+promises; it describes practice. Words that point at the page's layout ("见左侧……") stay with the front end.
 
-中文：「数据与隐私」页和提问框旁边那两段说明的文字（T 批，R2a 搬到这里）。两个前端共用一份：`GET /privacy` 按 API
-自己的设置生成（api/routes/public.py），Streamlit 页（app/privacy_view.py、app/answer_feedback_view.py）按 UI 的设置
-生成。每句话都对应代码现在的做法，可变的部分取自 QUERY_LOG_RETENTION_DAYS、ANSWER_FEEDBACK_ENABLED 和
-PRIVACY_CONTACT_EMAIL，所以页面不会承诺一个没打开的清理。只用纯文字：这里没有用户输入，联系邮箱原样显示。不做法律
-意义上的承诺，只写实际做法。指向某种布局的字（「见左侧……」）留在那个前端里。
+中文：「数据与隐私」页和提问框旁边那两段说明的文字（T 批，R2a 搬到这里）。`GET /privacy` 按 API 自己的设置生成，给新
+前端用（api/routes/public.py）；R8 删掉 Streamlit 页以前，它也读这里。每句话都对应代码现在的做法，可变的部分取自
+QUERY_LOG_RETENTION_DAYS、ANSWER_FEEDBACK_ENABLED 和 PRIVACY_CONTACT_EMAIL，所以页面不会承诺一个没打开的清理。只用
+纯文字：这里没有用户输入，联系邮箱原样显示。不做法律意义上的承诺，只写实际做法。指向页面布局的字（「见左侧……」）
+留在前端里。
 """
 
 from __future__ import annotations
@@ -34,24 +33,23 @@ def capture_notice(days):
             '7 天只是投票凭证的有效期；' if days else
             '7 天只是投票凭证的有效期，数据、备份和导出不会自动删除；')
     # What is kept with the answer is what api/routes/chat.py's _store_completed_answer keeps: the filters, the program
-    # and plan, and context_course_ids, as the question carried them. Both front ends send those with every question:
+    # and plan, and context_course_ids, as the question carried them. The web front end sends those with every question:
     # the courses of the latest answer that listed any, whether or not the question follows up on them (review A34).
-    # Neither front end has a 清空对话 (R6).
+    # It has no 清空对话 (R6).
     # 中文：和回答一起保存的，就是 _store_completed_answer 存的那些：筛选、项目和方案、context_course_ids，提问带了什么
-    # 就存什么。两个前端每次提问都带上它：最近一条列出课程的回答里的那些课，不管这一问是不是接着问（A34 审查）。两个
-    # 前端都没有「清空对话」（R6）。
+    # 就存什么。新前端每次提问都带上它：最近一条列出课程的回答里的那些课，不管这一问是不是接着问（A34 审查）。它没有
+    # 「清空对话」（R6）。
     return ('勾不勾选都不影响上面的查询日志。'
             '勾选后，如果服务可用，本次会话之后正常完成的回答会不公开地保存下来，连同提问时带的条件（筛选、项目和方案、最近一次列出的课程），'
             '即使你不点击 👍／👎 也会保存；对话历史只多记轮数，不多存完整历史文本。'
             + keep + '取消勾选或登出都不会删除已经保存的数据。')
 
 
-def privacy_sections(settings: Any, *, web: bool = False) -> list[tuple[str, list[str]]]:
-    """(heading, sentences) in page order; a pure function of the settings. `web`: for the web front end, where each
-    course page and each program page has its own address, so the browser's history keeps the courses and programs
-    opened (R3e, R4c); the Streamlit page never puts either in its address. 中文：按页面顺序的（标题，句子）。`web`：
-    给新前端用，那里每门课、每个培养方案的页面都有自己的网址，浏览器历史会记下打开过的课和项目（R3e、R4c）；
-    Streamlit 页的网址里从不放这些。"""
+def privacy_sections(settings: Any) -> list[tuple[str, list[str]]]:
+    """(heading, sentences) in page order; a pure function of the settings. Each course page and each program page has
+    its own address, so the browser's history keeps the courses and programs opened (R3e, R4c).
+    中文：按页面顺序的（标题，句子）。每门课、每个培养方案的页面都有自己的网址，浏览器历史会记下打开过的课和项目
+    （R3e、R4c）。"""
     days = settings.query_log_retention_days
     feedback = settings.answer_feedback_enabled is True
     contact = settings.privacy_contact_email
@@ -72,11 +70,10 @@ def privacy_sections(settings: Any, *, web: bool = False) -> list[tuple[str, lis
         ("只有你勾选「允许保存」以后，回答和你的 👍／👎 才会保存，同样不记是谁；不勾选时只有上面的查询日志。" if feedback
          else "回答反馈功能目前关闭：回答不保存。"),
         "选课草案和课程对比只在这次会话里，刷新或登出就清空，不写数据库。",
+        ("每门课、每个培养方案的页面都有自己的网址（比如 /course/CS-6140、/programs/cs-ms）：打开过的这些页面会和"
+         "浏览别的网站一样，留在你这台设备的浏览器历史里，可以在浏览器里清除；分享出去的链接里也带着课号或项目，"
+         "分享一份方案时还带着它的校区、目录年度、路径、concentration 和内容版本。"),
     ]
-    if web:
-        kept.append("每门课、每个培养方案的页面都有自己的网址（比如 /course/CS-6140、/programs/cs-ms）：打开过的这些页面会和"
-                    "浏览别的网站一样，留在你这台设备的浏览器历史里，可以在浏览器里清除；分享出去的链接里也带着课号或项目，"
-                    "分享一份方案时还带着它的校区、目录年度、路径、concentration 和内容版本。")
     who = ["服务器上的数据只有维护者能看，不卖、也不交给第三方；公开的 Co-op 经验按贡献等级给访客看；"
            "生成回答要把问题发给 Google Gemini，见上。",
            "网站经 Cloudflare 转发到服务器：连接在 Cloudflare 那里解密再转发，所以 Cloudflare 能看到传输的内容。"]

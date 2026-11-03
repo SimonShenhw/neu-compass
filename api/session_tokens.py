@@ -1,12 +1,12 @@
 """Signed session tokens — replaces the trusted X-User-Id header (ADR-0021).
 
-Moved here from app/session_tokens.py in R2a (2026-10-22); app/session_tokens.py re-exports these names for the
-Streamlit UI. The same token travels as `Authorization: Bearer` (scripts, Streamlit) or in the API's session cookie
-(the new front end, api/routes/auth.py).
+Moved here from app/session_tokens.py in R2a (2026-10-22); that file re-exported these names for the Streamlit UI
+until R8 deleted it. The same token travels as `Authorization: Bearer` (scripts; the Streamlit page until R8) or in the
+API's session cookie (the web front end, api/routes/auth.py).
 
 签名会话 token —— 取代原先"信任型" X-User-Id 头（ADR-0021）。R2a（2026-10-22）从 app/session_tokens.py 搬到这里，
-app/session_tokens.py 转发这些名字给 Streamlit 版用。同一种令牌，既可以放在 `Authorization: Bearer` 里（脚本、
-Streamlit），也可以放在 API 的会话 cookie 里（新前端，见 api/routes/auth.py）。
+那个文件转发这些名字给 Streamlit 版用，R8 把它删了。同一种令牌，既可以放在 `Authorization: Bearer` 里（脚本；R8
+以前还有 Streamlit），也可以放在 API 的会话 cookie 里（新前端，见 api/routes/auth.py）。
 
 Why: the Week 6 stub trusted whatever X-User-Id the client sent, which made
 the whole OAuth + JWT chain decorative for API authorization — anyone who

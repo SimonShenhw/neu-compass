@@ -16,15 +16,15 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.state_manager import DEFAULTS
 from eval.answer_checks import HARD_FAILURES, check_answer, summarize
+from eval.route_ui import SEARCH_K, context_course_ids, failure_detail, recent_history
 from scripts.eval_answers_live import (checker_identity, code_identity, context_from_records,
                                        context_to_json, course_records)
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE_FILE = ROOT / "eval/route_cases_v1.json"
 LAYER = "offline_synthetic"
-UI_K = min(DEFAULTS["search_k"], 10)
+UI_K = min(SEARCH_K, 10)
 SIGNALS = set(HARD_FAILURES) | {"estimates", "estimates_as_reported", "unattributed", "estimates_identity_unresolved",
                                "course_codes_outside_evidence", "conflicts_missing_values", "caveats_missing"}
 GENERATION_STATES = {"pass", "hard_fail", "stream_error", "no_answer", "not_applicable", "unexpected_http", "not_checked"}
@@ -203,11 +203,8 @@ def score_generation(expected, actual):
 
 
 def execute_turn(world, client, turn, messages, tag):
-    from app.api_client import ApiClient, ApiError
-    from app.chat_view import _context_course_ids, _recent_history
-
-    request = {"k": UI_K, **turn["request"], "history": _recent_history(messages),
-               "context_course_ids": _context_course_ids(messages), "allow_feedback_capture": False}
+    request = {"k": UI_K, **turn["request"], "history": recent_history(messages),
+               "context_course_ids": context_course_ids(messages), "allow_feedback_capture": False}
     world.last_request = request
     world.set_stream(turn["stream"])
     prompts_before = len(world.prompts)
@@ -221,11 +218,8 @@ def execute_turn(world, client, turn, messages, tag):
               "settings": {"hyde_rescue": {"value": world.settings.hyde_rescue, "source": "harness_pin" if turn["stream"].get("rescue") else "code_default"}}}
     if response.status_code != 200:
         require(len(world.prompts) == prompts_before, "HTTP decision unexpectedly generated a prompt")
-        try:
-            ApiClient._unwrap(response)
-        except ApiError as exc:
-            detail = exc.detail
-        else:
+        detail = failure_detail(response)
+        if detail is None:
             raise ValueError("non-200 response was not an API failure")
         result.update(error_type=f"http_{response.status_code}", detail=detail)
         verdict = "not_applicable" if response.status_code == turn["expected"]["http_status"] else "unexpected_http"
@@ -393,7 +387,8 @@ def run_eval(cases=None, *, vector_mode="normal"):
     identity = code_identity()
     # The harness itself plus the route tiers every turn passes through (alias, context, filters, gate, repositories).
     # 中文：评测自身，以及每一轮都会经过的路由各层（别名、上下文、筛选、门控、仓储）。
-    for name in ("eval/route_eval.py", "eval/route_world.py", "eval/route_guard.py", "scripts/eval_route_offline.py",
+    for name in ("eval/route_eval.py", "eval/route_ui.py", "eval/route_world.py", "eval/route_guard.py",
+                 "scripts/eval_route_offline.py",
                  "rag/query_normalizer.py", "rag/followup.py", "rag/filters.py", "rag/rejection.py",
                  "llm/query_filter_extractor.py", "llm/prompts/chat_v3.py", "api/models.py", "db/repository.py",
                  "db/program_repository.py", "db/program_plan_repository.py", "db/alias_repository.py",
@@ -409,7 +404,7 @@ def run_eval(cases=None, *, vector_mode="normal"):
             "case_input_sha256": _digest(cases), "case_scope": scope, "data_kind": "synthetic", "world_sha256": world_sha256,
             "index": {"embedder": "synthetic_topic_vectors/2", "vector_mode": vector_mode, "dimension": len(TOPICS),
                       "reranker": "synthetic_semantic_lexical/2", "manifest": None, "course_count": len(ROWS)},
-            "settings": {**config, "k": {"value": UI_K, "source": "ui_default", "code_default": DEFAULTS["search_k"]}},
+            "settings": {**config, "k": {"value": UI_K, "source": "ui_default", "code_default": SEARCH_K}},
             "population": population, "route_contract": retrieval, "stream_contract": stream_contract, "generation": generation,
             "database": database, "cases": records}
 

@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from streamlit.testing.v1 import AppTest
 
-from app.course_requisite_view import render_course_requisites
 from db.course_requisite_repository import CourseRequisiteRepository
 from db.program_plan_repository import ProgramPlanRepository
 from db.program_repository import ProgramRepository
@@ -17,7 +15,6 @@ from schemas.program import Program
 from schemas.program_plan import ProgramPlan, RequirementNode
 from tests.test_course_requisite_contract import source_document
 from tests.test_course_requisite_storage import document, target
-from tests.test_course_requisite_view import FakeSt, app_source
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -172,90 +169,3 @@ def test_context_bundle_rejects_wrong_or_duplicate_scope(kind):
         context["plans"][0]["source_url"] = "https://evil.test/"
     with pytest.raises(ValueError):
         CourseRequisiteListing.model_validate(data)
-
-
-def ui_bundle():
-    doc = document(course_id="design")
-    doc.description_evidence = CourseDescriptionEvidence.from_paragraphs([
-        'Students may seek permission. <script>bad()</script>', "No approval is required for teamwork."])
-    context = CourseProgramContext(course_code="CS 5004", catalog_year="2026-2027", schema_available=True, plans=[plan()])
-    return CourseRequisiteListing(schema_available=True, has_any_stored_records=True, documents=[doc], program_contexts=[context]).model_dump(mode="json")
-
-
-class ScopeSt(FakeSt):
-    def __init__(self, path=None):
-        super().__init__("2026-2027")
-        self.path = path
-    def selectbox(self, label, options, **kwargs):
-        choice = self.choice if kwargs["key"] == "year" else self.path
-        assert choice in options
-        return choice
-
-
-def test_ui_description_is_plain_text_and_program_scope_default_is_none():
-    st = ScopeSt()
-    render_course_requisites(st, ui_bundle(), course_id="design", course_code="CS 5004", course_name="Design", key="year")
-    assert 'Students may seek permission. <script>bad()</script>' in st.texts
-    assert all("<script>" not in text for text in st.markdowns)
-    assert not any("每门 B 或以上" in text for text in st.texts)
-    st = ScopeSt(plan().plan_id)
-    st.session_state["year-program-2026-2027"] = "stale-plan-id"
-    render_course_requisites(st, ui_bundle(), course_id="design", course_code="CS 5004", course_name="Design", key="year")
-    assert "year-program-2026-2027" not in st.session_state
-    assert any("每门 B 或以上" in text for text in st.texts)
-    assert any("最低成绩：B-" in text for text in st.texts)
-    assert any("用途不同" in text for text in st.captions)
-
-
-@pytest.mark.parametrize("paragraphs,phrase", [(None, "未捕获"), ([], "未列出 description"), (["Studies software."], "未匹配当前有限关键词")])
-def test_ui_distinguishes_old_missing_and_keyword_no_match(paragraphs, phrase):
-    data = ui_bundle()
-    data["program_contexts"] = []
-    data["documents"][0]["description_evidence"] = None if paragraphs is None else CourseDescriptionEvidence.from_paragraphs(paragraphs).model_dump(mode="json")
-    st = ScopeSt()
-    render_course_requisites(st, data, course_id="design", course_code="CS 5004", course_name="Design", key="year")
-    assert any(phrase in text for text in st.texts)
-
-
-def test_wrong_context_source_is_not_rendered_as_link_or_personal_path():
-    data = ui_bundle()
-    data["program_contexts"][0]["plans"][0]["source_url"] = "https://evil.test/"
-    st = ScopeSt()
-    render_course_requisites(st, data, course_id="design", course_code="CS 5004", course_name="Design", key="year")
-    assert st.warnings and not st.texts
-    assert not any("evil.test" in text for text in st.markdowns)
-
-
-def test_free_text_program_scope_notes_and_rule_labels_are_not_markup():
-    data = ui_bundle()
-    stored = data["program_contexts"][0]["plans"][0]
-    payload = '[click](https://evil.test/) <script>bad()</script>'
-    stored["program_id"] = payload
-    stored["concentration"] = payload
-    stored["notes"] = payload
-    stored["requirements"]["children"][-1]["label"] = payload
-    st = ScopeSt(plan().plan_id)
-    render_course_requisites(st, data, course_id="design", course_code="CS 5004", course_name="Design", key="year")
-    assert any(payload in text for text in st.texts)
-    assert not any("evil.test" in text for text in st.markdowns + st.captions)
-
-
-def test_real_widget_separate_year_and_path_selection_plain_text_no_old_graph():
-    app = AppTest.from_string(app_source(ui_bundle())).run(timeout=45)
-    # One recorded edition is shown by default (review 2026-10-03); the program
-    # path below it still requires an explicit choice.
-    assert not app.exception and app.selectbox[0].value == "2026-2027"
-    assert len(app.selectbox) == 2 and app.selectbox[1].value is None
-    app.selectbox[0].set_value("2026-2027").run(timeout=45)
-    assert not app.exception and len(app.selectbox) == 2 and app.selectbox[1].value is None
-    assert any("<script>" in item.value for item in app.text)
-    assert not any("<script>" in item.value for item in app.markdown)
-    assert not any("每门 B 或以上" in item.value for item in app.text)
-    app.selectbox[1].set_value(plan().plan_id).run(timeout=45)
-    assert not app.exception and any("每门 B 或以上" in item.value for item in app.text)
-    assert any("最低成绩：B-" in item.value for item in app.text)
-    assert len(app.get("graphviz_chart")) == 0
-    app.selectbox[0].set_value(None).run(timeout=45)
-    assert not app.exception and len(app.text) == 0 and len(app.selectbox) == 1
-    app.selectbox[0].set_value("2026-2027").run(timeout=45)
-    assert not app.exception and app.selectbox[1].value is None

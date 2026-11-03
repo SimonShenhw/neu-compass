@@ -5,7 +5,7 @@ import pytest
 from schemas.plan_draft import DraftCourse, evaluate_draft
 from schemas.program_plan import ProgramPlan
 from tests.test_plan_draft import course, node
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 
 @pytest.mark.parametrize("wrapped", [False, True], ids=["root", "child"])

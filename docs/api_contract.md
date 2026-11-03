@@ -9,7 +9,8 @@
 > **Base URL** (Week 7 deploy — Cloudflare Tunnel split-subdomain):
 > - Local dev: `http://localhost:8000`
 > - **Public API** (canonical, what frontend hits): `https://api.neu-compass.me`
-> - **Streamlit debug + OAuth callback landing**: `https://compass.neu-compass.me`
+> - **The web front end** (React, `web/`; since the R7 switch on 2026-11-02, and the Streamlit page it replaced went
+>   in R8): `https://compass.neu-compass.me`
 >
 > Both subdomains are CNAMEs to the same `neu-compass` tunnel (UUID
 > `ce52553f-7fc3-…`). FastAPI lives at root path on `api.*`, no `/api`
@@ -465,7 +466,8 @@ Plain JSON, NOT NDJSON — the stream never starts:
 - **422** on invalid request body.
 - **404** for an unknown `program_id`.
 - **409** for a plan selection that does not resolve, a program prefix that matches several programs, or a selected
-  program that conflicts with the prefix in the question. `detail` leads with Chinese, which Streamlit shows.
+  program that conflicts with the prefix in the question. `detail` leads with Chinese; the web front end words these
+  from `reason` instead.
 - **503** while the service warms up; **429** and **503** from the request guard.
 
 ---
@@ -493,13 +495,13 @@ mode (R2b) it may only be the front end's own address: the request's `Origin`
 (one in `WEB_ORIGINS`) followed by `/`, so a code Google sent to one front end
 is redeemed only by that one. Anything else gets **422**
 `redirect_uri must be the web front end's own address.` before the code is
-exchanged. The token mode does not check it (Streamlit sends its own).
+exchanged. The token mode does not check it.
 
 `session` (R2a) is optional: `"token"` (the default) returns the signed token
 in the body as `session_token`, as before; `"cookie"` sets it instead as the
 cookie `__Host-nc_api_session` (HttpOnly, Secure, Path=/, SameSite=Lax, no
 Domain, Max-Age = `SESSION_MAX_AGE_SECONDS`) and returns `session_token: null`.
-The web front end uses the cookie mode; Streamlit and scripts keep the token.
+The web front end uses the cookie mode; scripts keep the token (as the Streamlit page did until R8).
 Without `SESSION_SECRET` there is no token in either mode. The cookie mode must
 come from an allowed web origin with `X-NEU-Compass: 1` (one `Origin` in
 `WEB_ORIGINS`), with or without an existing cookie; otherwise it gets the fixed
@@ -580,7 +582,7 @@ longer works (bad, expired, or its account already gone).
 ## POST /auth/logout
 
 R2a. Expires the session cookie and answers **204** with no body, also when there is none. Bearer tokens are not
-revoked: they expire on their own, and Streamlit logs out by dropping its copy. It must come from an allowed web
+revoked: they expire on their own, and a client logs out by dropping its copy. It must come from an allowed web
 origin with `X-NEU-Compass: 1`, with or without the cookie; otherwise it gets the fixed CSRF **403** and expires
 nothing. A form posted from another site arrives without the SameSite=Lax cookie, so the CSRF middleware alone would
 let it by, and the expiring header in a 204 would still log the browser out.
@@ -590,7 +592,7 @@ let it by, and the expiring header in a 204 would still log the browser out.
 ## GET /auth/login-url
 
 R2a. `?state=<16–128 of A–Z, a–z, 0–9, _ or ->` → `{"url": "<Google's OAuth address>"}`, built by
-`api.google_oauth.authorize_url` exactly as the Streamlit login link. The front end makes `state`, keeps it, and
+`api.google_oauth.authorize_url`. The front end makes `state`, keeps it, and
 checks it when Google sends the browser back to `GOOGLE_OAUTH_REDIRECT_URI` (production: the site root) with
 `?code=&state=`; then it posts the code to `/auth/callback` with `"session": "cookie"`. The API stores nothing, and
 uvicorn's access log records this path without its query, so the state is not logged either.
@@ -598,8 +600,8 @@ uvicorn's access log records this path without its query, so the state is not lo
 R2b: an optional `&redirect_uri=` (at most 2048 characters) says where Google sends the browser back instead, and the
 front end posts the same value to `/auth/callback`. It must be a web front end's own address, an origin in
 `WEB_ORIGINS` followed by `/` (the browser's `location.origin + "/"`), and Google's OAuth client must list it as an
-authorized redirect URI. The web front end always sends its own; Streamlit sends none and keeps
-`GOOGLE_OAUTH_REDIRECT_URI`.
+authorized redirect URI. The web front end always sends its own; a client that sends none gets
+`GOOGLE_OAUTH_REDIRECT_URI` (the Streamlit page did, until R8).
 
 - **422**: a missing or malformed `state` (not echoed), or a `redirect_uri` that is not a web front end's own address
   (`redirect_uri must be the web front end's own address.`).
@@ -612,7 +614,7 @@ authorized redirect URI. The web front end always sends its own; Streamlit sends
 ## GET /privacy
 
 R2a. The 数据与隐私 page, built from this API's own settings (`QUERY_LOG_RETENTION_DAYS`, `ANSWER_FEEDBACK_ENABLED`,
-`PRIVACY_CONTACT_EMAIL`) by `api/privacy_text.py`, the same functions the Streamlit page uses:
+`PRIVACY_CONTACT_EMAIL`) by `api/privacy_text.py`:
 
 ```json
 {"intro": "...", "sections": [{"heading": "记了什么", "sentences": ["..."]}, ...],
@@ -660,8 +662,8 @@ Answer (200, `Cache-Control: no-store`):
 - `notices` come in processing order, each a plain-text sentence with a stable `kind`: `course_gone`,
   `duplicate_code`, `too_many_codes`, `invalid_format`, `invalid_format_more`, `all_present`, `over_limit`,
   `not_found`, `ambiguous` (with up to 10 `candidates`, the rest in `candidates_omitted`), `cross_listed_twin`,
-  `also_matches`, `primary_code`, `invalid_record`, `nothing_new`. For typed codes the sentence is the Streamlit
-  page's; re-reading the sent draft has its own (`course_gone`, `duplicate_code`, and `invalid_record` for a course
+  `also_matches`, `primary_code`, `invalid_record`, `nothing_new`. For typed codes the sentence is the one the
+  Streamlit page had; re-reading the sent draft has its own (`course_gone`, `duplicate_code`, and `invalid_record` for a course
   that cannot be read or no longer fits). Typed text quoted in a sentence is plain text, never markup.
 - A matched course whose ID the request would refuse (outside `course_ids`' pattern) is not added (`invalid_record`),
   so the page can always send back the draft it gets.
@@ -770,12 +772,9 @@ messages routed through the configured root handler are replaced by fixed `stdli
 `stdlib.error` events with safe diagnostics; level, the code-defined logger name, a
 timestamp and request context remain. Successful project events retain their existing fields.
 
-The UI client uses fixed text for 5xx and non-JSON error bodies, retaining status and safe
-error_type; malformed 2xx JSON becomes `ApiError(502, error_type="invalid_response")`.
-The existing fixed invalid-response notice is preserved, as are rate/busy/timeout notices.
-Malformed identity shapes (OAuth callback and cookie restore) fail without modifying
-login state; a malformed restore keeps the cookie, like an outage. Streamlit defaults to
-`client.showErrorDetails="type"`; full details are opt-in for local development only.
+The web front end's client (`web/src/api/client.ts`) shows fixed text for 5xx, 429 and
+timeouts, never the server's own words, and treats a 2xx it cannot read as a failure. (The
+Streamlit client did the same until R8.)
 
 Boundaries: this does not remove successful query text logs or query_log contents, or
 potential sensitive data in request paths/access query strings (course reads and, since R2a,
@@ -786,8 +785,7 @@ domain and the contribution count.) Exceptions after response headers are sent c
 `Exception in ASGI application` traceback (its handler bypasses the root filter) still
 prints the message. `/chat` builds its first (meta) line before the response starts and
 turns model-stream errors into stream error events, so no production path is known to
-reach this. Python `warnings` and the Streamlit process log (uncaught UI exceptions) also
-print full text; the browser shows the exception type only. No general PII-free logging
+reach this. Python `warnings` also print full text. No general PII-free logging
 claim is made.
 
 ## Frontend touch-points (for Andy)

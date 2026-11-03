@@ -511,7 +511,7 @@ def test_production_code_never_imports_the_dev_api():
     tests 里的任何东西；scripts/ 里的工具可以用测试的辅助函数，但不碰开发用的 API。"""
     wheel = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["hatch"]["build"]["targets"]
     packages = wheel["wheel"]["packages"]
-    assert {"api", "app", "scrapers"} <= set(packages)
+    assert {"api", "scrapers"} <= set(packages) and "app" not in packages  # app/ went in R8. 中文：R8 删了 app/。
     for package in packages:
         for path in (ROOT / package).rglob("*.py"):
             assert not any(name.startswith("tests") for name in imported_names(path)), path

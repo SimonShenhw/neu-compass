@@ -135,16 +135,16 @@ def test_the_cookie_login_only_comes_from_the_front_end(empty_db, monkeypatch, h
         assert response.status_code == 403 and response.json() == REFUSED
         assert set_cookie_headers(response) == [] and calls == []
         assert empty_db.execute("SELECT count(*) FROM users").fetchone()[0] == 0
-        # The token mode (Streamlit, scripts) is not checked. 中文：token 模式（Streamlit、脚本）不查。
+        # The token mode (scripts) is not checked. 中文：token 模式（脚本用）不查。
         assert client.post("/auth/callback", json={"code": "synthetic-code"}, headers=headers).status_code == 200
         assert calls == ["synthetic-code"]
 
 
 def test_the_cookie_login_takes_only_the_front_ends_own_address(empty_db, monkeypatch):
     """R2b: the code goes back to Google with the address it was sent to, which must be a web front end's own; checked
-    before the code reaches Google, so nothing is exchanged or written. The token mode is not checked (Streamlit).
+    before the code reaches Google, so nothing is exchanged or written. The token mode is not checked.
     中文：R2b：code 要带着 Google 当初送回的地址再交给 Google，这个地址必须是新前端自己的；在 code 交给 Google 之前查，
-    所以什么也不交换、不写。token 模式不查（Streamlit 用）。"""
+    所以什么也不交换、不写。token 模式不查。"""
     seen = []
 
     def exchange(code, *, redirect_uri=None):

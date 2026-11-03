@@ -43,10 +43,9 @@ HTTP API (FastAPI)
   GET  /health, /ready
 
          ↓                                ↑
-  (Streamlit consumes)         (browser hits via Cloudflare)
-  app/streamlit_app.py
-  render_streamed_answer(st, stream_assistant(...))  (link-filtered)
-  + render_auth_sidebar
+  (the web front end, web/)    (browser hits via Cloudflare)
+  React; api/chatStream.ts reads the NDJSON stream
+  login: the API's HttpOnly session cookie
 
 Query path (alias-first → hybrid → optional rerank)
 ─────────────────────────────────────────────────────
@@ -151,16 +150,15 @@ uv run python eval/run_eval.py --mode hybrid_with_alias --rerank
 uv run python scripts/probe_latency.py                       # p50 ~40ms
 ```
 
-### Run API + UI
+### Run the API
 
 ```bash
 # Terminal 1: FastAPI (lifespan pre-warms bge-m3 ~70s, then accepts traffic)
 uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
 
-# Terminal 2: Streamlit chat UI (consumes /chat NDJSON stream)
-uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+# The front end: the React app in web/, see web/README.md (the Streamlit UI went in R8)
 
-# Terminal 3 (public URL, optional): Cloudflare Tunnel
+# Terminal 2 (public URL, optional): Cloudflare Tunnel
 cloudflared tunnel run neu-compass   # see docs/cloudflare_tunnel.md
 ```
 
@@ -176,8 +174,8 @@ neu-compass/
 ├── llm/            Gemini client (+ stream) + formatter + extract_v1 + chat_v1 + alias_detector + review_enrichment
 ├── rag/            embedder (bge-m3) + FAISS + retriever + hybrid (BM25+RRF + stopwords) + hyde + reranker (bge-reranker-v2-m3)
 ├── eval/           test_set v0.2 (42 q) + run_eval (4 modes) + Ragas + compare_prompts
-├── app/            Streamlit pages + state_manager + auth + api_client + streamlit_auth_ui
 ├── api/            FastAPI: main + dependencies + models + logging + routes/{health,search,course,coop,chat,auth}
+├── web/            the React front end (Vite + TypeScript), on compass since 2026-11-02; see web/README.md
 ├── scripts/        init_db / seed / load_slang / scrape / ingest / rebuild_faiss / mark_indexed / probe_rmp / probe_latency / enrich_course_via_rmp / validate_test_set
 ├── data/           slang_dict.json + ground_truth/ (gitignored)
 ├── docs/           PLAN_v1.3 / v2.0 / v2.1 + ADRs + annotation_guide + pii_redaction + cloudflare_tunnel

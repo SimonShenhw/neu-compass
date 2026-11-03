@@ -14,7 +14,7 @@ from schemas.program_plan import ProgramPlan
 from tests.test_chat_plan_core import selection_data, stored
 from tests.test_chat_structured_requisites import document, seeded
 from tests.test_program_plan_contract import chat_meta, stub_chat
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 
 @pytest.mark.parametrize("selected,expected,other,omitted", [

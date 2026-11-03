@@ -7,7 +7,7 @@ import pytest
 from db.program_plan_repository import content_hash
 from schemas.program_plan import ProgramPlan
 from tests.test_chat_plan_core import resolve, selection_data, stored
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 
 def test_python_selection_is_strict_and_the_schema_never_imports_db():
@@ -79,23 +79,6 @@ def test_a_selected_year_cannot_be_shown_alongside_another_edition(empty_db):
     value = build_answer_evidence(empty_db, [record])[record.course_id].requisites.model_dump()
     with pytest.raises(ValueError):
         RequisiteEvidence.model_validate(value | {"selected_year": "2026-2027", "other_years_recorded": 1})
-
-
-def test_family_clearing_resets_the_bound_plan_even_when_no_widget_is_rendered():
-    from app.chat_plan_view import render_chat_plan_selector
-    class Surface:
-        session_state = {"_chat_plan_family": "cs-ms", "chat_plan_id": "old-choice"}
-    surface = Surface()
-    assert render_chat_plan_selector(surface, None) is None
-    assert surface.session_state["chat_plan_id"] is None
-
-
-def test_plan_sources_never_extend_the_model_answer_link_allowlist():
-    from app.answer_evidence_view import answer_markdown
-    url = plans()[5].source_url
-    assert f"]({url})" not in answer_markdown(f"[plan]({url})")
-    assert "](https://catalog.northeastern.edu/course-descriptions/cs/)" in answer_markdown(
-        "[catalog](https://catalog.northeastern.edu/course-descriptions/cs/)")
 
 
 def test_meta_review_dates_placement_limits_and_ranges_are_validated():

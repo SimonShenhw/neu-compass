@@ -1,6 +1,9 @@
 # NEU-Compass · System Architecture
 
 > **Updated**: 2026-05-05 (Week 8 portfolio packaging, PLAN v2.3 §3.7)
+> **R8 (2026-11)**: a snapshot from Week 8. Production has run on the NAS since Week 10; since 2026-11-02 compass is
+> the React front end (`web/`), and R8 deleted the Streamlit page these diagrams show. For the current stack see
+> `docker-compose.yml` (its header has the tunnel's routes) and `web/README.md`.
 > **Source of truth**: `README.md` ASCII 简版 + 本文 mermaid 详版。
 > **Render to PNG**: `docs/system_architecture.png` (mermaid CLI 转,见 §6)。
 

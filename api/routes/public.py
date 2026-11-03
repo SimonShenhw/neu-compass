@@ -1,12 +1,11 @@
 """GET /privacy and GET /config: what the web front end shows and needs, from the API's own settings (R2a).
 
-The privacy words come from api/privacy_text.py, the same functions the Streamlit page uses; here they are built from
-the API's settings, so the page says what the API that keeps the data actually does. Both routes are public, read only
-and the same for everyone.
+The privacy words come from api/privacy_text.py, built here from the API's settings, so the page says what the API
+that keeps the data actually does. Both routes are public, read only and the same for everyone.
 
 中文：GET /privacy 和 GET /config：新前端要显示的内容和要知道的设置，按 API 自己的设置生成（R2a）。隐私页的文字来自
-api/privacy_text.py，和 Streamlit 页用的是同一批函数；这里按 API 的设置生成，所以页面写的就是保存数据的这个 API 实际
-怎么做。两个接口都公开、只读，对谁都一样。
+api/privacy_text.py，这里按 API 的设置生成，所以页面写的就是保存数据的这个 API 实际怎么做。两个接口都公开、只读，对谁
+都一样。
 """
 
 from __future__ import annotations
@@ -36,7 +35,7 @@ def privacy() -> PrivacyResponse:
     return PrivacyResponse(
         intro=INTRO,
         sections=[PrivacySectionOut(heading=heading, sentences=sentences)
-                  for heading, sentences in privacy_sections(settings, web=True)],
+                  for heading, sentences in privacy_sections(settings)],
         delete_what=DELETE_WHAT,
         query_log_notice=QUERY_LOG_NOTICE_BASE,
         capture_notice=capture_notice(settings.query_log_retention_days)

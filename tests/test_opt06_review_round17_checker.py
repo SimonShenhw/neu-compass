@@ -501,8 +501,9 @@ def test_code_identity_reads_tracked_changes_and_keeps_the_commit(monkeypatch):
     state["fail"] = True
     assert {key: live.code_identity()[key] for key in ("git_commit", "git_dirty")} == {"git_commit": "abc123", "git_dirty": None}
     files = set(identity["code_files_sha256"])
-    # OPT-04 step 2 (F) added the nine files of the selected-plan path, which now shape /chat answers.
-    assert len(files) == 38 and {"api/routes/chat.py", "rag/hybrid.py", "app/streamlit_app.py", "config/settings.py",
+    # OPT-04 step 2 (F) added the nine files of the selected-plan path, which now shape /chat answers; R8 took out the
+    # eight under app/, which it deleted. 中文：R8 删了 app/，那 8 个文件也从列表里去掉了。
+    assert len(files) == 30 and {"api/routes/chat.py", "rag/hybrid.py", "config/settings.py",
                                  "llm/gemini_client.py", "schemas/answer_evidence.py", "schemas/course.py",
-                                 "schemas/plan_selection.py", "db/program_plan_repository.py",
-                                 "app/chat_plan_view.py"} <= files
+                                 "schemas/plan_selection.py", "db/program_plan_repository.py"} <= files
+    assert not any(name.startswith("app/") for name in files)

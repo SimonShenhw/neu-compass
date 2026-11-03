@@ -103,13 +103,12 @@
 | `eval/profile_eval.py` | 按固定的查询顺序做可选的性能分析 | 模块 | — | 在用 |
 | `eval/route_world.py` | 合成的 /chat 世界：真实的路由、FAISS 和 BM25，模型用脚本代替，库只在内存里 | 模块 | 只用合成的内存库和替身模型 | 在用 |
 | `eval/route_eval.py` | 离线合成 /chat 评测：检索、流式和回答分开打分 | 模块 | 只用合成的内存库和替身模型 | 在用 |
+| `eval/route_ui.py` | 离线评测每轮带的历史和上下文课程、请求失败时写进历史的那句话：原来 Streamlit 页的做法，R8 搬来，行为不变 | 模块 | —（纯函数） | 在用 |
 | `eval/route_guard.py` | 离线评测期间的进程审计钩子，拦下真实库、索引、网络和子进程 | 模块 | — | 在用 |
 | `scripts/eval_route_offline.py` | 跑固定的合成 /chat 用例（`eval/route_cases_v1.json`），把报告写进一个新文件 | `--out`（必须是仓库外、已存在目录里的新文件） | 只写 `--out`；不碰真实 API、模型和库 | 在用（改聊天链路时当回归跑） |
 | `scripts/probe_inference_latency.py` | 对指定的 /search 测固定查询序列的延迟 | `--base-url --n --label --out-dir --warmup --timeout` | 联网（请求 `--base-url`，带评测标记）、写文件 | 在用 |
 | `scripts/probe_latency.py` | 进程内的 /search，用本机的库、索引和模型 | `--test-set --warmup --iterations --k --rerank --label` | 读库、本地模型 | 在用 |
 | `scripts/profile_offline_search.py` | 只分析固定的合成内核 | `--trace` | 只用合成的内存库，不碰真实库和模型 | 在用 |
-| `scripts/answer_render_check.py` | 用 Streamlit 真实的渲染器手动检查 `answer_markdown()` | `streamlit run scripts/answer_render_check.py --server.headless true`，再把 `answer_render_check.js` 粘贴到浏览器控制台 | — | 在用（改回答渲染时手动跑） |
-| `scripts/regenerate_page_layout.py` | 页面布局快照：默认只核对，`--write` 才更新 | `--write` | 写快照文件（要加 `--write`） | 在用 |
 
 ## 6. 历史
 
@@ -140,12 +139,10 @@
 | `scripts/deploy.ps1` | 从 PC 把代码推到 NAS：上传代码和 `.env`、`docker compose up -d`、核对健康 | PowerShell，参数见文件开头 | **会碰 NAS**：登录、上传文件、重启容器 | 发布工具（`tests/test_deploy_script.py`） |
 | `scripts/backup.sh` | 每日备份：SQLite 和 FAISS → 本地快照 → Google Drive（rclone） | crontab，见文件开头 | 读本机的库和索引、写文件、联网（rclone 上传） | PC 本地栈时期的备份；NAS 上由 `backup_daemon.py` 负责 |
 | `scripts/enrich_week8_batch.sh` | 对固定的 15 门课逐个跑 `enrich_course_via_rmp.py --live --save`，最后重建 FAISS | `bash scripts/enrich_week8_batch.sh` | 联网、调模型、写库、重建索引 | 数据管线 |
-| `scripts/ensure_streamlit_cfg.sh` | 写 `~/.streamlit` 下的两个配置，免得 Streamlit 第一次启动卡在邮箱提示 | `start_stack.ps1` 会调用；可以重复跑 | 写家目录里的配置文件 | 本机开发栈 |
-| `scripts/start_stack.ps1` | 在 PC 上开三个窗口：uvicorn、streamlit、cloudflared | `scripts\start_stack.ps1 -Local`；`-Pytorch`、`-ApiOnly` 见文件开头 | 读本机的库和索引、本地模型；**不加 `-Local` 时会起 cloudflared 隧道 `neu-compass`，接公网域名** | 本机开发栈。⚠️ 线上已经在 NAS 上跑这两个域名，在 PC 上请加 `-Local`，除非确定要让 PC 接公网流量 |
+| `scripts/start_stack.ps1` | 在 PC 上开两个窗口：uvicorn、cloudflared | `scripts\start_stack.ps1 -Local`；`-Pytorch`、`-ApiOnly` 见文件开头 | 读本机的库和索引、本地模型；**不加 `-Local` 时会起 cloudflared 隧道 `neu-compass`，接公网域名** | 本机开发栈。⚠️ 线上已经在 NAS 上跑这两个域名，在 PC 上请加 `-Local`，除非确定要让 PC 接公网流量 |
 | `scripts/start_stack.bat` | 转发给 `start_stack.ps1`，绕开执行策略 | 双击，或在 cmd 里跑；参数原样转发 | 同 `start_stack.ps1` | 本机开发栈 |
-| `scripts/stop_stack.ps1` | 停掉上面三个服务 | `scripts\stop_stack.ps1`；`-KeepCloudflared` 只停 WSL 里的两个 | 结束本机进程 | 本机开发栈 |
+| `scripts/stop_stack.ps1` | 停掉上面两个服务 | `scripts\stop_stack.ps1`；`-KeepCloudflared` 只停 WSL 里的 uvicorn | 结束本机进程 | 本机开发栈 |
 | `scripts/stop_stack.bat` | 转发给 `stop_stack.ps1` | 双击，或在 cmd 里跑 | 同 `stop_stack.ps1` | 本机开发栈 |
-| `scripts/answer_render_check.js` | 配合 `answer_render_check.py`：页面渲染完以后粘贴到浏览器控制台，只输出计数 | 手动 | — | 在用（改回答渲染时手动跑） |
 
 ## 不是脚本的文件
 

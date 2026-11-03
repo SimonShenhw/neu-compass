@@ -1,5 +1,5 @@
-"""Cross-check UI history and optimized-run safety without external data.
-中文：真实 UI 文本对拍；已发请求后的工具异常也不能丢失 HTTP／日志账目。
+"""The history the eval sends after a failed stream, and optimized-run safety, without external data.
+中文：流失败以后评测发出的历史；已发请求后的工具异常也不能丢失 HTTP／日志账目。
 """
 
 import ast
@@ -29,9 +29,15 @@ def test_error_after_http_response_keeps_status_and_query_log_accounting(monkeyp
     assert report["database"]["query_log_rows"] == report["database"]["http_200_turns"] == 2
 
 
-@pytest.mark.parametrize("chunks,error", [(["Synthetic partial answer"], "upstream_error"), ([], "empty_stream")])
-def test_next_turn_history_matches_the_real_ui_generator(chunks, error):
-    from app.streamlit_app import stream_assistant
+# What the Streamlit page showed for these two streams (its stream_assistant; equal to the eval's history when R8
+# checked them, before deleting app/): the route's error line after whatever had arrived.
+# 中文：Streamlit 页对这两种流显示的文字（R8 删 app/ 之前核对过，和评测写进历史的一样）：已收到的部分加上路由的错误句。
+@pytest.mark.parametrize("chunks,error,shown", [
+    (["Synthetic partial answer"], "upstream_error",
+     "Synthetic partial answer\n\n⚠️ 模型服务暂时出错，这条回答没有完成。请稍后再问一次。"),
+    ([], "empty_stream", "⚠️ 这次模型没有给出回答，可能被它的安全规则拦下了。换个问法再试试。"),
+])
+def test_next_turn_history_keeps_what_the_page_showed(chunks, error, shown):
     from eval.route_eval import load_cases, run_eval
 
     case = copy.deepcopy(next(item for item in load_cases()["cases"] if item["case_id"] == "stream_recovery_good"))
@@ -40,23 +46,7 @@ def test_next_turn_history_matches_the_real_ui_generator(chunks, error):
     first["expected"]["error_type"] = "no_answer" if error == "empty_stream" else "upstream_error"
     first["expected_generation"]["verdict"] = "no_answer" if error == "empty_stream" else "stream_error"
     report = run_eval([case])
-    turn = report["cases"][0]["turns"][0]
-    # Use the actual route error detail by replaying the route with the same script below.
-    from fastapi.testclient import TestClient
-    from eval.route_world import SyntheticWorld
-    import json
-
-    with SyntheticWorld() as world, TestClient(world.app) as client:
-        world.set_stream(first["stream"])
-        events = [json.loads(line) for line in client.post("/chat", json=turn["request"],
-                   headers={"X-Eval-Run": "opt06-ui-parity"}).text.splitlines()]
-
-    class ScriptAPI:
-        def chat_stream(self, body):
-            yield from events
-
-    ui_text = "".join(stream_assistant(ScriptAPI(), turn["request"], {}))
-    assert report["cases"][0]["turns"][1]["request"]["history"][1]["content"] == ui_text
+    assert report["cases"][0]["turns"][1]["request"]["history"][1]["content"] == shown
 
 
 def test_accounting_and_isolation_do_not_depend_on_python_asserts():

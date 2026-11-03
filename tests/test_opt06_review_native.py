@@ -7,7 +7,6 @@ import sqlite3
 import sys
 from types import ModuleType
 
-import httpx
 import pytest
 
 
@@ -74,13 +73,8 @@ def test_same_world_reentry_does_not_replace_the_outer_cleanup_stack():
     assert route_guard._ACTIVE is None
 
 
-@pytest.mark.parametrize("status,body,headers", [
-    (500, {"detail": "synthetic server detail"}, {}),
-    (503, {"detail": "synthetic server detail", "error_type": "service_busy"}, {"Retry-After": "7"}),
-    (404, None, {}),
-])
-def test_http_failure_history_matches_the_actual_api_client(monkeypatch, status, body, headers):
-    from app.api_client import ApiClient, ApiError
+def first_answered_with(monkeypatch, status, body, headers):
+    """run_eval on the first case played twice, its first /chat answered with this response instead of the route's."""
     from eval.route_eval import load_cases, run_eval
     from eval.route_world import SyntheticWorld
     from starlette.responses import JSONResponse, Response
@@ -104,11 +98,30 @@ def test_http_failure_history_matches_the_actual_api_client(monkeypatch, status,
         return world
 
     monkeypatch.setattr(SyntheticWorld, "__enter__", enter)
-    report = run_eval([case])
-    response = lambda request: (httpx.Response(status, json=body, headers=headers) if body is not None
-                                else httpx.Response(status, text="synthetic non-JSON error"))
-    with ApiClient(transport=httpx.MockTransport(response)) as client:
-        with pytest.raises(ApiError) as caught:
-            list(client.chat_stream({"query": "synthetic"}))
-    assert report["cases"][0]["turns"][1]["request"]["history"][1]["content"] == "⚠️ Chat failed: " + caught.value.detail
+    return run_eval([case])
+
+
+# The line the Streamlit page showed for each failure (app/api_client.py's ApiError text, equal to the eval's history
+# when R8 checked them before deleting app/; tests/test_route_ui.py has the rest of its cases), after the page's
+# prefix: 🧭 for a 409's detail, "⚠️ Chat failed:" for the rest.
+# 中文：Streamlit 页对每种失败显示的那句话（R8 删 app/ 之前核对过，和评测写进历史的一样），前面是页面加的前缀。
+@pytest.mark.parametrize("status,body,headers,shown", [
+    (500, {"detail": "synthetic server detail"}, {}, "⚠️ Chat failed: 服务暂时出错，请稍后手动重试。"),
+    (503, {"detail": "synthetic server detail", "error_type": "service_busy"}, {"Retry-After": "7"},
+     "⚠️ Chat failed: 服务正忙，请7 秒后手动重试。"),
+    (404, None, {}, "⚠️ Chat failed: 请求未完成，请稍后手动重试。"),
+    (409, {"detail": "synthetic conflict detail"}, {}, "🧭 synthetic conflict detail"),
+])
+def test_http_failure_history_keeps_what_the_page_showed(monkeypatch, status, body, headers, shown):
+    report = first_answered_with(monkeypatch, status, body, headers)
+    assert report["cases"][0]["turns"][1]["request"]["history"][1]["content"] == shown
     assert report["status"] == "failed"
+
+
+def test_a_non_200_success_is_a_harness_error_not_a_failure_line(monkeypatch):
+    # The page read a 2xx with JSON as an answer, so the eval has no line for it and stops that turn.
+    # 中文：页面把带 JSON 的 2xx 当成功读，评测没有对应的那句话，这一轮记为工具错误。
+    report = first_answered_with(monkeypatch, 202, {"ok": True}, {})
+    turn = report["cases"][0]["turns"][0]
+    assert report["status"] == "incomplete" and turn["error_class"] == "ValueError"
+    assert turn["error_detail"] == "non-200 response was not an API failure"

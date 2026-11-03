@@ -3,7 +3,6 @@
 Synthetic accounts, courses and Co-op rows in temporary databases only; no real login.
 """
 
-import json
 import sqlite3
 
 import pytest
@@ -112,7 +111,7 @@ def test_it_refuses_without_foreign_keys_or_inside_a_transaction(empty_db):
 
 
 def submit(api_client, conn, user_id, payload):
-    from app.session_tokens import issue_session_token
+    from api.session_tokens import issue_session_token
 
     conn.execute("INSERT INTO users(user_id, email, domain) VALUES(?, ?, 'husky.neu.edu')", (user_id, f"{user_id}@husky.neu.edu"))
     conn.commit()
@@ -177,7 +176,7 @@ def secret(monkeypatch):
 
 
 def token(user_id):
-    from app.session_tokens import issue_session_token
+    from api.session_tokens import issue_session_token
 
     return issue_session_token(user_id, f"{user_id}@northeastern.edu")
 
@@ -221,96 +220,7 @@ def test_route_needs_a_valid_session(api_client, empty_db, secret, headers):
 # === The page ===
 
 
-def privacy_page(monkeypatch, status=200):
-    """`status` is the delete call's HTTP status, or the name of an httpx exception the transport raises instead."""
-    import httpx
-    from streamlit.testing.v1 import AppTest
-
-    import app.streamlit_auth_ui as auth
-    from tests.page_layout_support import SCRIPT, install_backend, run
-
-    real_sidebar = auth.render_auth_sidebar
-    backend = install_backend(monkeypatch)
-    monkeypatch.setattr(auth, "render_auth_sidebar", real_sidebar)
-    original = type(backend).__call__
-    deletions = []
-
-    def transport(self, request):
-        if request.url.path == "/auth/delete-account":
-            deletions.append((request.method, request.headers.get("authorization"), request.content))
-            if isinstance(status, str):
-                raise getattr(httpx, status)("synthetic", request=request)
-            body = {"deleted": True, "published_experiences": 0, "unlocks_of_those": 0, "own_unlocks": 0,
-                    "submissions": 1, "credits": 0, "planned_courses": 0, "withdrawn_from_groups": 0} \
-                if status == 200 else {"detail": "synthetic"}
-            return httpx.Response(status, json=body)
-        return original(self, request)
-
-    monkeypatch.setattr(type(backend), "__call__", transport)
-    app = AppTest.from_string(SCRIPT)
-    app.session_state["nav_page"] = "🔒 数据与隐私 · Privacy"
-    for key, value in {"session_token": "synthetic-token", "user_id": "synthetic-user",
-                       "user_email": "synthetic@example.test", "oauth_state": "synthetic-oauth-state"}.items():
-        app.session_state[key] = value
-    return run(app), deletions, run
-
-
-def test_page_delete_needs_the_tick_then_deletes_logs_out_and_says_so(monkeypatch):
-    app, deletions, run = privacy_page(monkeypatch)
-    button = app.button(key="delete-account")
-    assert button.disabled and not deletions
-    app.checkbox(key="delete-account-confirm").check()
-    run(app)
-    app.button(key="delete-account").click()
-    run(app)
-    assert [(method, auth, json.loads(body)) for method, auth, body in deletions] == [
-        ("POST", "Bearer synthetic-token", {"confirm": "delete"})]
-    assert app.session_state["user_id"] is None and app.session_state["session_token"] is None
-    assert any("账号和 Co-op 投稿已经删除" in item.value for item in app.success)
-    assert not [b for b in app.button if b.key == "delete-account"]
-    assert ("clear", "nc_session", None, None) in app.session_state["_pending_cookie"]
-    assert app.radio(key="nav_page").value.startswith("🔒")
-    run(app)  # The message is shown once, not on every later run (B24). 中文：提示只显示一次。
-    assert not any("账号和 Co-op 投稿已经删除" in item.value for item in app.success)
-
-
 NOTHING_DELETED, NOT_KNOWN, EXPIRED = "删除没有完成，什么也没删", "不确定删除有没有完成", "这个登录已经失效"
 # Being a guest after a refresh does not prove the deletion (a login can also expire): the web front end's words (R5c).
 # 中文：刷新后变成游客证明不了删掉了（登录也会自己过期），和新前端同一句。
 NOT_KNOWN_WORDS = "这次没收到服务器的确认，不确定删除有没有完成。刷新后若仍是登录状态，可以再试；若已变成游客但需要确认，请联系维护者。"
-
-
-@pytest.mark.parametrize(("status", "message"), [
-    (500, NOTHING_DELETED), (429, NOTHING_DELETED),
-    # No answer, or a gateway's (the client turns a timeout into 504 and a lost connection into 503): the server may
-    # have committed, so the page must not say nothing was deleted (A24 L5). 中文：没收到回复时不能说什么也没删。
-    (502, NOT_KNOWN), (503, NOT_KNOWN), (504, NOT_KNOWN), ("ReadTimeout", NOT_KNOWN), ("ConnectError", NOT_KNOWN),
-    (401, EXPIRED)])
-def test_page_delete_failure_says_what_is_known(monkeypatch, status, message):
-    app, deletions, run = privacy_page(monkeypatch, status=status)
-    app.checkbox(key="delete-account-confirm").check()
-    run(app)
-    app.button(key="delete-account").click()
-    run(app)
-    assert len(deletions) == 1
-    assert (app.session_state["user_id"] is None) is (message == EXPIRED)
-    # Only an expired login also drops the cookie; otherwise the student stays logged in to try again (B24).
-    # 中文：只有登录失效时才清 cookie；别的情况保持登录，可以再试。
-    pending = app.session_state["_pending_cookie"] if "_pending_cookie" in app.session_state else []
-    assert (("clear", "nc_session", None, None) in pending) is (message == EXPIRED)
-    errors = [item.value for item in app.error]
-    assert any(message in value for value in errors) and "synthetic" not in "".join(errors)
-    assert not any(other in value for value in errors for other in {NOTHING_DELETED, NOT_KNOWN, EXPIRED} - {message})
-    assert (NOT_KNOWN_WORDS in errors) is (message == NOT_KNOWN)
-
-
-def test_guests_see_no_delete_controls(monkeypatch):
-    from streamlit.testing.v1 import AppTest
-
-    from tests.page_layout_support import SCRIPT, install_backend, run
-
-    install_backend(monkeypatch)
-    app = AppTest.from_string(SCRIPT)
-    app.session_state["nav_page"] = "🔒 数据与隐私 · Privacy"
-    run(app)
-    assert not [b for b in app.button if b.key == "delete-account"] and not app.checkbox

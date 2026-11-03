@@ -97,6 +97,7 @@ def test_layer_and_source_identities_are_explicit_and_cannot_be_mixed(report):
     assert report["production_quality_verified"] is False and report["data_kind"] == "synthetic"
     assert len(report["world_sha256"]) == len(report["case_file_sha256"]) == len(report["answer_checks_sha256"]) == 64
     assert len(report["code_files_sha256"]) >= 7 and report["checker_version"]
+    assert "eval/route_ui.py" in report["code_files_sha256"]  # R8: what the eval took from app/. 中文：从 app/ 搬来的。
     assert report["index"]["manifest"] is None
     assert summarize_reports([report, report])["cases_planned"] == 2 * report["population"]["cases_planned"]
     with pytest.raises(ValueError, match="layer"):

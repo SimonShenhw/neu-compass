@@ -53,7 +53,9 @@ class Settings(BaseSettings):
     # 中文:Google OAuth 配置(从第 6 周开始才需要)。
     google_oauth_client_id: str = Field(default="", repr=False)
     google_oauth_client_secret: str = Field(default="", repr=False)
-    google_oauth_redirect_uri: str = "http://localhost:8501/oauth/callback"
+    # Used when a client names no redirect; the web front end always names its own root. The default is the web dev
+    # server's (web/README.md); it was the Streamlit page's until R8. 中文：客户端没给跳回地址时才用；新前端总会给自己的。
+    google_oauth_redirect_uri: str = "http://127.0.0.1:5173/"
 
     # === Storage ===
     # 中文:存储路径配置。
@@ -114,21 +116,6 @@ class Settings(BaseSettings):
     program_policy_bundle_path: Path = PROJECT_ROOT / "data/program_policy_seed/boston_2026_2027_evidence.json"
     program_policy_source_dir: Path | None = None
     program_catalog_source_dir: Path | None = None
-
-    # === API base URL (Streamlit -> FastAPI hop, Week 6) ===
-    # 中文:API 基础 URL(第 6 周起,Streamlit -> FastAPI 之间的跳转地址)。
-    api_base_url: str = "http://localhost:8000"
-
-    # === Public UI origin (deep-link sharing) ===
-    # Where a student's browser reaches the UI — NOT api_base_url (that's the
-    # container-internal hop) and NOT google_oauth_redirect_uri (same value
-    # today by coincidence; it has already moved once, see postmortem_week7).
-    # Only ever used to BUILD copyable ?course= / ?program= share links.
-    # 中文:学生浏览器访问 UI 的地址 —— 不是 api_base_url(那是容器内部的
-    # 跳转地址),也不是 google_oauth_redirect_uri(今天恰好同值而已;它已经
-    # 改过一次,见 postmortem_week7)。仅用于拼出可复制的 ?course= /
-    # ?program= 分享链接。
-    public_base_url: str = "http://localhost:8501"
 
     # === Embedding ===
     # 中文:嵌入模型相关配置。

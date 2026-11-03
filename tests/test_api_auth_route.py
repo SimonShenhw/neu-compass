@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.dependencies import get_oauth_exchange_fn
-from app.auth import OAuthError
+from api.google_oauth import OAuthError
 from db.user_repository import UserRepository
 
 
@@ -132,7 +132,7 @@ def _seed_user(conn: sqlite3.Connection, user_id: str) -> None:
 def test_auth_me_valid_token_returns_identity(
     api_client: TestClient, empty_db: sqlite3.Connection, _session_secret,
 ) -> None:
-    from app.session_tokens import issue_session_token  # noqa: PLC0415
+    from api.session_tokens import issue_session_token  # noqa: PLC0415
 
     _seed_user(empty_db, "u-me")
     token = issue_session_token("u-me", "u-me@husky.neu.edu")
@@ -165,7 +165,7 @@ def test_auth_me_valid_token_unknown_user_401(
     api_client: TestClient, _session_secret,
 ) -> None:
     """Token outlives the user row (account deleted) → same 401 contract."""
-    from app.session_tokens import issue_session_token  # noqa: PLC0415
+    from api.session_tokens import issue_session_token  # noqa: PLC0415
 
     token = issue_session_token("u-ghost", "ghost@husky.neu.edu")
     r = api_client.get(

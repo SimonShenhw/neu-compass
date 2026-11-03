@@ -469,5 +469,6 @@ npm.cmd test --prefix tools/e2e
 - **CI**：新的 web-image job，照 compose 构建并起 `web`（`docker compose up --build --wait web`），用 `deploy/check-site.ts` 从外面核对每一类响应（页面、深链、图标、脚本和样式表、缺的分块、304、带大请求体的 POST、nginx 自己回的 400、健康检查）的头、类型、缓存和回退，构建连的 API 和分享链接的站点；再核对 nginx 以 101 运行、日志里没有一条请求。不碰 NAS。
 - **核对一个跑着的站**：`node deploy/check-site.ts <站点> <API 来源> <分享链接的站点>`，例如 `node deploy/check-site.ts http://127.0.0.1:8510 https://api.neu-compass.me https://compass.neu-compass.me`（Node 24 直接跑 TypeScript）。只对镜像本身（CI、NAS 上的 8510）：经过 Cloudflare 的 compass、beta 都跑不过，Cloudflare 会把 `Server` 换成它自己的，还可能加缓存头。
 - **切换到 compass**（2026-11-02）：分享链接的站点改成 compass，`WEB_ORIGINS` 加上 compass，CI 的 check-site 跟着改。部署时把 NAS 上隧道配置里 compass 那条从 `http://ui:8501` 改成 `http://web:8080`；改回去就是回退，Streamlit 再留一周。beta 再留两周，之后去掉隧道里的 beta 和 `WEB_ORIGINS` 里的 beta。
+- **删掉 Streamlit**（R8）：仓库里的 `app/` 和它的测试删了，compose 去掉 `ui`，`deploy.ps1` 不再探测 8501。web 只换了从 API 重新生成的类型注释（`openapi.json`、`schema.ts`，API 的几处说明不再提 Streamlit）。上线以后，切换那次的回退（compass 改回 `http://ui:8501`）就没有了。
 
-修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 42、43 节。
+修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 42、43、44 节。

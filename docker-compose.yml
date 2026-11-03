@@ -1,7 +1,7 @@
 # NEU-Compass production stack — NAS deploy target.
 #
 # Layout (relative to this file's directory on the NAS):
-#   ./runtime-data/        bind-mounted to /data inside api + ui
+#   ./runtime-data/        bind-mounted to /data inside api + backup
 #     ├── courses.db        SQLite (source of truth, ADR-0013)
 #     ├── faiss_index/      FAISS IndexIDMap (rebuildable from SQLite)
 #     ├── openvino/         fp16 OpenVINO IR (embedder + reranker)
@@ -11,7 +11,7 @@
 #         ├── embedder/     bge-m3 FP16 ONNX (~1.1GB)
 #         └── reranker/     bge-reranker-v2-m3 FP16 ONNX (~570MB)
 #   ./cloudflared/         bind-mounted to /etc/cloudflared (config + creds)
-#   .env                   loaded by api + ui for GEMINI_API_KEY, OAuth, etc.
+#   .env                   loaded by api for GEMINI_API_KEY, OAuth, etc.
 #
 # Cloudflared config.yml on the NAS should route to compose service names:
 #   ingress:
@@ -25,7 +25,6 @@
 #     - hostname: beta.neu-compass.me      # R7's beta: the same front end, for two weeks after the switch
 #       service: http://web:8080
 #     - service: http_status:404
-# compass's way back, for the week Streamlit stays after the switch, is its old service, http://ui:8501.
 
 # Bounded container logs: the api emits one JSON line per request and
 # cloudflared is chatty — the default json-file driver grows UNBOUNDED
@@ -80,12 +79,11 @@ services:
       LOG_LEVEL: INFO
       LOG_FORMAT: json
       # === OAuth callback must be the public URL, not localhost ===
-      # ROOT path on purpose: Streamlit handles ?code= on the main page
-      # (handle_oauth_callback reads st.query_params); a sub-path like
-      # /oauth/callback relies on Streamlit ignoring unknown routes.
-      # Must byte-match BOTH the URI registered in Google Cloud Console
-      # AND the ui service's value below — Google rejects any difference,
-      # trailing slash included.
+      # The redirect GET /auth/login-url and POST /auth/callback use when a
+      # client names none (the Streamlit page relied on that until R8); the
+      # web front end always names its own root, one of WEB_ORIGINS below.
+      # Must byte-match a URI registered in Google Cloud Console — Google
+      # rejects any difference, trailing slash included.
       GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/
       # === Small trial (batch T, 10-21; the user chose these policies) ===
       # P3: question text becomes its keyed hash after 90 days, and saved answers are deleted after 90 days;
@@ -93,9 +91,9 @@ services:
       QUERY_LOG_RETENTION_DAYS: "90"
       # P5: Gemini calls per UTC day (chat answers + HyDE rescues); then /chat streams a fixed notice.
       MODEL_DAILY_CALL_LIMIT: "200"
-      # P6: 👍/👎 with a per-session opt-in that starts unticked. Keep equal to the ui value (joint release).
+      # P6: 👍/👎 with a per-session opt-in that starts unticked.
       ANSWER_FEEDBACK_ENABLED: "true"
-      # P4: GET /privacy (R2a) shows the address as the Streamlit page does. Keep equal to the ui value.
+      # P4: GET /privacy (R2a) shows the address on the web's 数据与隐私 page.
       PRIVACY_CONTACT_EMAIL: shen.haow@northeastern.edu
       # R7: the web front end's origins (a JSON list), which CORS answers, which may send writes with the session
       # cookie, and whose root Google may send a browser back to (Google Cloud Console must list it too). compass
@@ -124,61 +122,15 @@ services:
       retries: 5
       start_period: 120s           # ONNX warm + first OpenVINO compile
 
-  ui:
-    build: .
-    image: neu-compass:latest
-    container_name: neu-compass-ui
-    restart: always
-    logging: *bounded-logging
-    env_file: .env
-    environment:
-      # Streamlit reaches FastAPI by compose service name, not localhost.
-      API_BASE_URL: http://api:8000
-      # Keep byte-identical to the api service value (see comment there).
-      GOOGLE_OAUTH_REDIRECT_URI: https://compass.neu-compass.me/
-      # Where a STUDENT's browser reaches the UI. Same string as the OAuth
-      # redirect today, but tracked separately on purpose: this one only
-      # builds shareable ?course= / ?program= links, and the redirect URI
-      # has already moved once (postmortem_week7).
-      PUBLIC_BASE_URL: https://compass.neu-compass.me
-      # === Small trial (batch T): the 数据与隐私 page states these, so they must equal the api values ===
-      QUERY_LOG_RETENTION_DAYS: "90"
-      ANSWER_FEEDBACK_ENABLED: "true"
-      # P4: the user chose to show their NEU address for questions and deletion requests.
-      PRIVACY_CONTACT_EMAIL: shen.haow@northeastern.edu
-    command:
-      - streamlit
-      - run
-      - app/streamlit_app.py
-      - --server.port=8501
-      - --server.address=0.0.0.0
-      - --server.headless=true
-      - --browser.gatherUsageStats=false
-    ports:
-      - "8501:8501"
-    healthcheck:
-      # Streamlit's built-in liveness endpoint: surfaces a crash-looping UI
-      # as unhealthy in `docker ps`, and deploy.ps1 probes it. cloudflared
-      # no longer waits for it (R7): compass answers 502 for the few seconds
-      # a cold streamlit import takes after a deploy, instead of the whole
-      # tunnel waiting on the UI.
-      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    depends_on:
-      api:
-        condition: service_healthy
-
   web:
     # R7: the React front end (web/Dockerfile): a build of web/, served by nginx with no access log and the build's
     # security headers. Built here on the NAS, as the api is. compass and the beta both route to it since the switch;
-    # ui stays beside it for a week, as the way back. Nothing waits for it, so a web that starts but is not healthy
-    # keeps nothing else down. Its build is another matter: `up --build` builds every image before it starts any, so a
-    # web build that fails stops the whole deploy, the api's included.
-    # 中文：新前端。在 NAS 上构建；切换以后 compass 和 beta 都指向它，ui 再留一周当回退。没有服务等它：它起来了但不健康，
-    # 不影响别的服务。构建不一样：`up --build` 先构建所有镜像再起容器，web 构建失败整次部署都停，API 也上不去。
+    # the Streamlit service beside it went in R8. Nothing waits for it, so a web that starts but is not healthy keeps
+    # nothing else down. Its build is another matter: `up --build` builds every image before it starts any, so a web
+    # build that fails stops the whole deploy, the api's included.
+    # 中文：新前端。在 NAS 上构建；切换以后 compass 和 beta 都指向它，原来旁边的 Streamlit 服务 R8 删了。没有服务等它：
+    # 它起来了但不健康，不影响别的服务。构建不一样：`up --build` 先构建所有镜像再起容器，web 构建失败整次部署都停，API 也
+    # 上不去。
     build:
       context: ./web
       args:
@@ -199,7 +151,7 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - "8510:8080"                # on the NAS LAN/Tailscale, for deploy.ps1's probe, as 8000 and 8501 are
+      - "8510:8080"                # on the NAS LAN/Tailscale, for deploy.ps1's probe, as 8000 is
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 30s
@@ -209,9 +161,8 @@ services:
 
   backup:
     # Daily SQLite snapshot sidecar (scripts/backup_daemon.py). A compose
-    # service, NOT host cron: UGOS has no Task Scheduler / user crontab,
-    # and host-level config doesn't survive UGOS updates anyway (see the
-    # 2026-07-02 outage notes on cloudflared). Reuses the app image —
+    # service, NOT host cron: host-level config doesn't survive UGOS updates
+    # (see the 2026-07-02 outage notes on cloudflared). Reuses the app image —
     # zero extra build; restart: always resurrects it with the stack.
     image: neu-compass:latest
     container_name: neu-compass-backup
@@ -245,8 +196,8 @@ services:
     command: tunnel --no-autoupdate run ce52553f-7fc3-48dc-923d-3dd9ea772f06
     volumes:
       - ./cloudflared:/etc/cloudflared:ro
-    # The api only (R7, decision 5): a front end that is not healthy, ui or web, no longer keeps the tunnel down, and
-    # with it the API and the other front end. Its hostname answers 502 until it is.
+    # The api only (R7, decision 5): a web front end that is not healthy does not keep the tunnel down, and with it
+    # the API. Its hostnames answer 502 until it is.
     depends_on:
       api:
         condition: service_healthy

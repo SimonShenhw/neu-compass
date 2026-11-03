@@ -122,10 +122,10 @@ HTTP API (FastAPI)  · Public:  https://api.neu-compass.me
   GET  /health, /ready
 
   ↓                                    ↑
-  ↓  (Streamlit consumer)              ↑
-  ↓  app/streamlit_app.py              ↑
-  ↓  render_streamed_answer(st, ...)   ↑
-  ↓  + render_auth_sidebar             ↑
+  ↓  (web front end: web/, React)      ↑
+  ↓  api/chatStream.ts reads the       ↑
+  ↓  NDJSON stream; login is the       ↑
+  ↓  API's HttpOnly cookie             ↑
 
 查询路径 (alias-first → program ontology → hybrid + Layer 2 prefix filter → reranker reject)
 ─────────────────────────────────────────────────────
@@ -256,12 +256,12 @@ uv run python eval/sweep_reject_threshold.py   # ADR-0016 9-T ROC
 uv run python scripts/probe_latency.py         # p50 ~40ms hybrid-only
 ```
 
-### 起 API + UI
+### 起 API
 
-**一键启动(推荐,Windows + WSL2 部署用,v3.1 加)**:
+**一键启动(Windows + WSL2,v3.1 加)**:
 
 ```cmd
-scripts\start_stack.bat              # full stack: uvicorn + streamlit + cloudflared
+scripts\start_stack.bat              # uvicorn + cloudflared
 scripts\start_stack.bat -Local       # 本地 only(skip cloudflared)
 scripts\start_stack.bat -Pytorch     # 用 PyTorch backend(~70s 而非 ~6s)
 scripts\start_stack.bat -ApiOnly     # 只起 uvicorn
@@ -269,18 +269,17 @@ scripts\start_stack.bat -ApiOnly     # 只起 uvicorn
 scripts\stop_stack.bat               # 全停(含关 spawned -NoExit 窗口)
 ```
 
-启动器会做 pre-flight check(.env / WSL distro / SQLite + FAISS / ONNX 模型 / cloudflared / 端口冲突 / Streamlit credentials.toml ensure),起三个新 PowerShell 窗口分别跑各 service,window title 用 `neu-compass : <service>` 一眼区分,uvicorn `/ready` 200 才起 cloudflared(避免 startup race 满屏红)。详见 [scripts/start_stack.ps1](scripts/start_stack.ps1) 注释。
+启动器会做 pre-flight check(.env / WSL distro / SQLite + FAISS / ONNX 模型 / cloudflared / 端口冲突),起两个新 PowerShell 窗口分别跑各 service,window title 用 `neu-compass : <service>` 一眼区分,uvicorn `/ready` 200 才起 cloudflared(避免 startup race 满屏红)。⚠️ 线上已经在 NAS 上跑这两个域名,在 PC 上请加 `-Local`。详见 [scripts/start_stack.ps1](scripts/start_stack.ps1) 注释。
 
-**手动三窗口**(老路径,debug 用):
+**手动两窗口**(debug 用):
 
 ```bash
 # Terminal 1: FastAPI (lifespan 预热 ~70s,加载 bge-m3 + bge-reranker)
 uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
 
-# Terminal 2: Streamlit chat UI (course search + Co-op browse,Andy Dong React 前端落地前的 product UI)
-uv run streamlit run app/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+# 前端:React 新前端在 web/,本地开发见 web/README.md(Streamlit 版 R8 删了)
 
-# Terminal 3 (公网): Cloudflare Tunnel — 详见 docs/cloudflare_tunnel.md §11
+# Terminal 2 (公网): Cloudflare Tunnel — 详见 docs/cloudflare_tunnel.md §11
 #   实测部署:Windows 边 cloudflared,api.* + compass.* 双子域映射
 cloudflared tunnel run neu-compass
 ```
@@ -290,7 +289,7 @@ cloudflared tunnel run neu-compass
 | URL | 用途 |
 |---|---|
 | `https://api.neu-compass.me` | FastAPI canonical (Andy 前端 / curl 调) |
-| `https://compass.neu-compass.me` | Streamlit user UI(course search + chat,Andy React 前端落地前 canonical)|
+| `https://compass.neu-compass.me` | 学生用的网站:React 新前端(`web/`),2026-11-02 起;之前的 Streamlit 版 R8 删了 |
 
 Origin 自 Week 10 起跑在 NAS(Tailscale 内网 + cloudflared 容器),PC 不需要常开。NAS-side stack 在 [docker-compose.yml](docker-compose.yml),改完代码 `scripts\deploy.ps1` 一键推送 + 重建 + 健康探测。
 
@@ -306,14 +305,14 @@ neu-compass/
 ├── llm/            Gemini client (+ stream) + formatter + extract_v1 + chat_v1 + chat_v2 (v3.1) + query_filter_extractor (v3.1) + alias_detector + review_enrichment
 ├── rag/            embedder (bge-m3) + FAISS index + retriever + hybrid (BM25+RRF + stopwords) + hyde + reranker (bge-reranker-v2-m3) + onnx_backend (ORT EP) + openvino_backend (optimum-intel direct IR, Week 10)
 ├── eval/           test_set v0.2 (42 q) + run_eval (4 modes) + Ragas + compare_prompts
-├── app/            Streamlit pages (eval_dashboard / streamlit_app / coop_view) + state_manager + auth + api_client + streamlit_auth_ui
 ├── api/            FastAPI: main + dependencies + models + logging + routes/{health,search,course,coop,chat,auth}
+├── web/            React 新前端(Vite + TypeScript),compass 2026-11-02 起用它;见 web/README.md
 ├── scripts/        init_db / seed / load_slang / scrape / ingest / rebuild_faiss / mark_indexed / probe_rmp / probe_latency / enrich_course_via_rmp / validate_test_set / export_models_onnx / export_openvino (Week 10) / start_stack / stop_stack / deploy (Week 10)
 ├── data/           slang_dict.json + ground_truth/ (gitignored)
 ├── docs/           PLAN_v1.3 / v2.0 / v2.1 + ADRs + annotation_guide + pii_redaction + cloudflare_tunnel
 ├── tests/          601 tests / fixtures/ (real NEU + RMP HTML/JSON snapshots)
 ├── Dockerfile      Week 10 — multi-stage prod image, base bookworm + intel-opencl-icd for Iris Xe
-├── docker-compose.yml  Week 10 — api + ui + cloudflared 三服务, /dev/dri 直通 + render/video group_add
+├── docker-compose.yml  api + web + backup + cloudflared, /dev/dri 直通 + render/video group_add
 └── .dockerignore   Week 10 — build context exclusions
 ```
 
@@ -353,7 +352,6 @@ neu-compass/
 | [docs/portfolio_metrics.md](docs/portfolio_metrics.md) | Canonical metrics cheatsheet(latency · quality · scale · cost)|
 | [docs/roadmap_v3.md](docs/roadmap_v3.md) | v3.0+ roadmap(社交层 · learnable blending · ColBERT · 移动端)|
 | [docs/oauth_secret_rotation.md](docs/oauth_secret_rotation.md) | OAuth client_secret rotate runbook(5 min)|
-| [docs/streamlit_ws_troubleshooting.md](docs/streamlit_ws_troubleshooting.md) | Streamlit chat_input WebSocket 排查 SOP |
 | [docs/tensorrt_runbook.md](docs/tensorrt_runbook.md) | ONNX Runtime / TensorRT 加速 runbook(47ms → ~17ms RTX 5090,350ms → ~80ms NAS Iris Xe)|
 | [docs/PLAN_v2.2.md](docs/PLAN_v2.2.md) | Week 7 sprint (shipped — 见 §9 closeout) |
 | [docs/PLAN_v2.1.md](docs/PLAN_v2.1.md) | Week 6 checkpoint (ship state) |

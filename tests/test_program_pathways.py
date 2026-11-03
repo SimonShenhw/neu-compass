@@ -186,24 +186,3 @@ def test_pathway_real_cli_is_additive_readonly_and_idempotent(tmp_path):
     current = [tuple(row) for row in conn.execute("SELECT document FROM program_plans WHERE pathway='standard' ORDER BY plan_id")]
     assert current == old
     conn.close()
-
-
-@pytest.mark.parametrize("index,label", [(0, "Align"), (1, "Bridge")])
-def test_real_pathway_widget_preserves_scope_and_paired_courses(index, label):
-    from streamlit.testing.v1 import AppTest
-    app = AppTest.from_string('''
-import json
-from pathlib import Path
-import streamlit as st
-import app.program_plan_view as view
-root = Path(view.__file__).resolve().parent.parent
-documents = json.loads((root / "data/program_plan_seed/boston_2026_2027_pathway_rules.json").read_text(encoding="utf-8"))
-view.render_program_plans(st, documents, key="pathway-plan")
-''').run(timeout=45)
-    assert len(app.exception) == 0 and app.selectbox[0].value is None
-    app.selectbox[0].set_value(documents()[index]["plan_id"]).run(timeout=45)
-    assert len(app.exception) == 0
-    assert any(label in item.value and "2026-2027" in item.value for item in app.caption)
-    text = "\n".join(item.value for item in app.text)
-    assert "未核验" in text and "全部分支（AND）" in text
-    assert ("CS 5003" if index == 0 else "INFO 5101") in text
