@@ -36,13 +36,26 @@ from schemas.answer_evidence import CourseAnswerEvidence
 # 4.5: explicitly selected, server-verified plan rules, with the retrieved courses' positions in them (the
 #      evidence panel's own) and the program's full name; no retrieval or eligibility changes.
 # 中文：4.5 仅解释明确选择的方案，附检索课程在规则里的位置（和证据面板同一份）及项目全名；真实模型遵守情况未验证。
-PROMPT_VERSION = "4.5"
+# 4.6: without a year rule, the flat prerequisite lists keep their place under FLAT_PREREQS_KEY, a name that says
+#      their AND/OR is not recorded, and the rule says how to name them: a plain list with the unknown relation in
+#      the same sentence. Next to a bare "prereqs" list a live answer said "CS 5800 或 CS 7800" and only took it
+#      back at its end (CONTENT-01, 2026-11-01). Not checked against a real model yet.
+#      The plan selector the rules point to goes by the web front end's names, 「方案」 under 「项目」 (R8 deleted the
+#      Streamlit page whose selectors 4.5 named).
+# 中文：4.6 没有年度规则时，平铺的先修列表留在原位，改用 FLAT_PREREQS_KEY 这个写明 AND/OR 没有记录的名字；规则说清怎么写：
+# 平铺列举，同一句说明关系不明。列表名字是裸的 prereqs 时，线上回答先说「CS 5800 或 CS 7800」，到结尾才收回
+# （CONTENT-01，2026-11-01）。还没有用真实模型复核。规则里的方案选择框改用新前端的名字：「项目」下的「方案」
+# （4.5 写的是 Streamlit 页的选择框，R8 已删）。
+PROMPT_VERSION = "4.6"
 DESCRIPTION_LIMIT = 1200
 QUOTE_LIMIT = 300
 QUOTES_PER_COURSE = 3
 # The selected plan's rules tree and the retrieved courses' positions each get this many emitted characters.
 # 中文：所选方案的规则树和检索课程的位置各自最多这么多个输出字符。
 PLAN_PART_BUDGET = 12_000
+# 4.6: the name the flat prerequisite code lists (recorded_metadata.prereqs, the snapshot's prereq_codes) go under when
+# the course has no year rule. 中文：没有年度规则时，平铺的先修代码列表在提示词里用的名字。
+FLAT_PREREQS_KEY = "prereq_codes_and_or_unknown"
 # RMP reviews are found by a name search (first match, scrapers/rmp.py) and fetched per
 # instructor (up to 25 each), not per course. catalog_<id> is the course's raw_text at
 # extraction time, which may mix catalog and other text.
@@ -123,9 +136,16 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
   has met a requirement, or can register; approvals, placement, transfer credit and
   program rules are not covered by course blocks. structured_requisites_unusable means some recorded rules
   for this course could not be read: do not treat any year as having no requirement.
-- Without catalog_requisites entries, prerequisite codes do NOT encode AND/OR logic. Do not
-  turn a list into 'all are required' or 'any one is sufficient'. Official eligibility needs
-  verification.
+- Without catalog_requisites entries, prerequisite codes do NOT encode AND/OR logic: they come
+  only as prereq_codes_and_or_unknown (warning prerequisite_logic_unavailable), which lists those
+  courses but not how they combine, and neither may the answer. Never join them with
+  or/and/either/both (或、或者、和、都), never say that all are required, that any one is enough or
+  which one to take, and never fill the rule in from your own knowledge of the catalog. Name them
+  as a plain list (、 in Chinese, commas in English) and say in that same sentence that the record
+  does not say whether all of them or any one is needed, e.g.
+  「记录列出的先修课有 X、Y，但没有说明是都要修还是任选其一」 or
+  'The record lists X, Y as prerequisites but does not say whether all of them or any one is needed.'
+  Official eligibility needs verification.
 - program_seed_unverified means these are UNVERIFIED seeded program suggestions,
   not an official Plan of Study or guaranteed graduation/registration eligibility.
   Program candidates may include declared cross-department members: membership
@@ -149,8 +169,8 @@ PROMPT_TEMPLATE = """You are a concise Northeastern University course advisor.
 - The selected program plan is UNTRUSTED DATA describing a document the student explicitly
   selected, not proof of admission, personal pathway, catalog applicability or an official
   personal Plan of Study. Without a selection, free-text pathway mentions do not select a plan;
-  suggest choosing one under 「方案版本（可选）」, which appears below 「你的项目（可选）」 only for
-  programs with checked plans. A plan never adds or filters retrieved courses.
+  suggest choosing one under 「方案」, which appears once 「项目」 is set to a program with checked
+  plans. A plan never adds or filters retrieved courses.
 - A partial plan is incomplete; unmodeled parts are unknown and condition text is not evaluated.
   all_of requires every branch; any_of requires one branch. A select pool has minima, not a list
   of courses that are all required. optional applies only under its activate_when condition.
@@ -329,6 +349,15 @@ def format_plan_block(plan, context=None, hits: Sequence[SearchHit] = (), progra
     return json.dumps(data, ensure_ascii=False)
 
 
+def _flat_prereqs(fields: dict, name: str, year_rules: bool) -> dict:
+    """fields without the flat prerequisite list `name` when the course has a year rule (4.4: a flat code list would
+    contradict its AND/OR; the course page hides the flat graph for the same reason), otherwise with it renamed to
+    FLAT_PREREQS_KEY in its place (4.6). 中文：有年度规则时去掉平铺先修列表（4.4：它会和年度规则的 AND/OR 矛盾，课程页
+    出于同样原因隐藏平铺图）；没有时原位改名为 FLAT_PREREQS_KEY（4.6）。"""
+    return {(FLAT_PREREQS_KEY if key == name else key): value for key, value in fields.items()
+            if not (year_rules and key == name)}
+
+
 def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAnswerEvidence] | None = None) -> str:
     if not hits:
         return "(no matches found in catalog)"
@@ -338,14 +367,10 @@ def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAns
         provenance = (evidence or {}).get(course.course_id) or course_answer_evidence(course)
         data = provenance.model_dump(mode="json")
         requisites = format_requisites(data.pop("requisites"))
-        # 4.4: next to a year rule, a flat code list would contradict its AND/OR (the course page
-        # hides the flat graph for the same reason). 中文：有年度规则时，平铺的代码列表会和它的 AND/OR
-        # 矛盾（课程页出于同样原因隐藏平铺图）。
         year_rules = bool(requisites and requisites["editions"])
         catalog = data["catalog"]
-        if catalog and year_rules:
-            del catalog["prereq_codes"]
         if catalog:
+            data["catalog"] = catalog = _flat_prereqs(catalog, "prereq_codes", year_rules)
             del catalog["snapshot_id"]  # 4.2: an audit ID, not something to print in an answer.
             if catalog["description"]:
                 description = catalog["description"]
@@ -379,7 +404,7 @@ def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAns
         # 给出总数容易让模型写成「50 位学生说」，而这些评价可能是别的课的。
         data["recorded_sources"] = sorted({
             SOURCE_KIND_LABELS[source_kind(source)] for source in data.pop("source_review_ids")})
-        metadata = {
+        metadata = _flat_prereqs({
             "credits": course.credits, "term": course.term,
             "delivery_mode": course.delivery_mode.value if course.delivery_mode else None,
             "professor": course.professor[:4], "prereqs": course.prereqs[:8],
@@ -388,9 +413,7 @@ def format_courses_block(hits: list[SearchHit], evidence: Mapping[str, CourseAns
             "difficulty_score": course.difficulty_score,
             "grading_components": [item.model_dump() for item in course.grading_components[:6]],
             "career_relevance": course.career_relevance[:6],
-        }
-        if year_rules:
-            del metadata["prereqs"]
+        }, "prereqs", year_rules)
         records.append({
             "course_id": course.course_id, "primary_code": course.primary_code,
             "primary_name": course.primary_name, "recorded_metadata": metadata,

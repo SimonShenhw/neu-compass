@@ -442,6 +442,7 @@ def test_an_unparsed_clause_reaches_the_prompt_without_its_internal_reason(empty
 
 def test_flat_code_lists_are_left_out_next_to_a_year_rule(empty_db):
     from db.catalog_source_repository import CatalogSourceRepository  # noqa: PLC0415
+    from llm.prompts.chat_v4 import FLAT_PREREQS_KEY  # noqa: PLC0415
     from scrapers.neu_catalog import CatalogEntry  # noqa: PLC0415
 
     record = seeded(empty_db, document(), prereqs=["CS 5004", "CS 5001"])
@@ -450,14 +451,16 @@ def test_flat_code_lists_are_left_out_next_to_a_year_rule(empty_db):
     CatalogSourceRepository(empty_db).store(record.course_id, snapshot)
     evidence = evidence_for(empty_db, record)
     data = projected(record, evidence)
-    assert "prereqs" not in data["recorded_metadata"]
-    assert "prereq_codes" not in data["answer_evidence"]["catalog"]
+    for name in ("prereqs", "prereq_codes", FLAT_PREREQS_KEY):
+        assert name not in data["recorded_metadata"] and name not in data["answer_evidence"]["catalog"]
     # The evidence the API returns keeps them: the projection never mutates it.
     assert evidence.catalog.prereq_codes == ["CS 5004"]
     empty_db.execute("DELETE FROM course_requisite_documents")
     data = projected(record, evidence_for(empty_db, record))
-    assert data["recorded_metadata"]["prereqs"] == ["CS 5004", "CS 5001"]
-    assert data["answer_evidence"]["catalog"]["prereq_codes"] == ["CS 5004"]
+    # 4.6: without a year rule, under the name that says their AND/OR is not recorded.
+    assert data["recorded_metadata"][FLAT_PREREQS_KEY] == ["CS 5004", "CS 5001"]
+    assert data["answer_evidence"]["catalog"][FLAT_PREREQS_KEY] == ["CS 5004"]
+    assert "prereqs" not in data["recorded_metadata"] and "prereq_codes" not in data["answer_evidence"]["catalog"]
     assert data["catalog_requisites"] == {"editions": [], "editions_not_shown": 0}
 
 
@@ -524,7 +527,7 @@ def test_chat_meta_course_page_and_prompt_share_the_year_rules(api_client):
     CourseRequisiteRepository(conn).store(document("2025-2026", prerequisite="CS 5004"))
     CourseRequisiteRepository(conn).store(document("2026-2027"))
     meta, prompt = capture_chat(api_client)
-    assert meta["prompt_version"] == "4.5"
+    assert meta["prompt_version"] == "4.6"
     evidence = meta["results"][0]["answer_evidence"]
     assert [edition["catalog_year"] for edition in evidence["requisites"]["editions"]] == ["2026-2027", "2025-2026"]
     assert "requisites_differ_by_catalog_year" in evidence["warnings"]

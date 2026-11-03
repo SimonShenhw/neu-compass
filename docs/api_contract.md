@@ -466,8 +466,9 @@ Plain JSON, NOT NDJSON — the stream never starts:
 - **422** on invalid request body.
 - **404** for an unknown `program_id`.
 - **409** for a plan selection that does not resolve, a program prefix that matches several programs, or a selected
-  program that conflicts with the prefix in the question. `detail` leads with Chinese; the web front end words these
-  from `reason` instead.
+  program that conflicts with the prefix in the question. `detail` leads with Chinese and names the web front end's
+  selectors, 「项目」 and 「方案」 (for a plan refusal it is the web's own sentence); the web front end words these from
+  `reason` instead.
 - **503** while the service warms up; **429** and **503** from the request guard.
 
 ---

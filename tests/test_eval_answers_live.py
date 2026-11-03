@@ -71,6 +71,9 @@ def test_case_is_built_like_chat_and_the_context_reflects_the_evidence():
     assert only_5800.unstated == (("CS 5800", "difficulty_score", 4.0),)  # Its quote states the 12 hours.
     assert not only_5800.no_catalog_relevant
     assert {"field_evidence", "recorded_sources", "primary_code"} <= context.prompt_keys
+    # Neither has a year rule: each flat list, as the prompt gave it (4.6), for the relation check.
+    assert context.flat_prereqs == (("CS 5800", ("CS 5002",)), ("CS 5200", ("CS 5002",)))
+    assert "prereq_codes_and_or_unknown" in context.prompt_keys
 
 
 def test_dry_run_writes_prompts_and_makes_no_model_calls(tmp_path):
@@ -347,6 +350,36 @@ def test_context_round_trips_through_results_json():
 
     _, context = build_case(QUESTION, PAYLOADS)
     assert context_from_json(json.loads(json.dumps(context_to_json(context)))) == context
+
+
+def test_a_stated_prerequisite_relation_reaches_the_report_and_old_contexts_say_not_checked(tmp_path):
+    """Checker 2.7 flags an answer that says how a flat list's codes combine (CONTENT-01); a results.json saved before it
+    has no flat_prereqs, still loads and rescores, and its rows say the check did not run. 中文：2.7 标出说了平铺列表课号
+    之间关系的回答；之前保存的 results.json 没有 flat_prereqs，照样能读、能重评，这一项标「没查」。"""
+    from scripts.eval_answers_live import _context_ok, rescore  # noqa: PLC0415
+
+    # The course record lists one code and its catalog snapshot another: the check reads both lists, once each.
+    two = {**payload(), "prereqs": ["CS 5002"]}
+    two["answer_evidence"] = {**two["answer_evidence"], "catalog": {**two["answer_evidence"]["catalog"],
+                                                                   "prereq_codes": ["CS 5004", "CS 5002"]}}
+    question = {**QUESTION, "course_ids": ["neu-cs-5800"]}
+    run([question], {"neu-cs-5800": two}, out=tmp_path / "run", runs=1, max_calls=1,
+        stream_fn=lambda prompt: iter(["这门课的先修是 CS 5002 或 CS 5004。"]))
+    saved = json.loads((tmp_path / "run/results.json").read_text(encoding="utf-8"))
+    assert saved["records"][0]["context"]["flat_prereqs"] == [["CS 5800", ["CS 5002", "CS 5004"]]]
+    assert saved["records"][0]["checks"]["prereq_relation_asserted"][0]["kinds"] == ["or"]
+    assert saved["summary"]["prereq_relation_asserted"] == 1
+    row = (tmp_path / "run/summary.md").read_text(encoding="utf-8").splitlines()[6]
+    assert row.startswith("| Q1 run 1 | none |") and row.endswith("| 1 |")
+    del saved["records"][0]["context"]["flat_prereqs"]  # As checker 2.6 wrote it.
+    (tmp_path / "old.json").write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
+    rescored = rescore(tmp_path / "old.json", out=tmp_path / "rescored")
+    assert rescored["records"][0]["checks"]["prereq_relation_asserted"] is None
+    assert rescored["summary"]["prereq_relation_asserted"] == 0
+    assert (tmp_path / "rescored/summary.md").read_text(encoding="utf-8").splitlines()[6].endswith("| not checked |")
+    for bad in ([["CS 5800", "CS 5002"]], [["CS 5800"]], [[5800, ["CS 5002"]]], [["CS 5800", [5002]]], "CS 5800"):
+        assert not _context_ok({**saved["records"][0]["context"], "flat_prereqs": bad}), bad
+    assert _context_ok({**saved["records"][0]["context"], "flat_prereqs": None})
 
 
 def test_rescore_rechecks_saved_answers_without_any_call(tmp_path, monkeypatch):
