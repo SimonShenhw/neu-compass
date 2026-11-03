@@ -6,6 +6,8 @@ quiet on a good answer.
 
 from __future__ import annotations
 
+import pytest
+
 from eval.answer_checks import AnswerContext, check_answer, number_pattern, sentences, summarize
 
 CATALOG = "https://catalog.northeastern.edu/course-descriptions/cs/"
@@ -241,3 +243,91 @@ def test_summary_counts():
     assert summary["answers"] == 3 and summary["ids_fail"] == 1 and summary["links_fail"] == 0
     assert summary["repeated_saved_copy"] == 1
     assert summary["rmp"] == {"instructor + may be another course": 2, "not used": 1}
+
+
+# CONTENT-01: CS 6140's prerequisites came as a flat list whose AND/OR is not recorded.
+# 中文：CONTENT-01：CS 6140 的先修是 AND/OR 没有记录的平铺列表。
+FLAT = (("CS 6140", ("CS 5800", "CS 7800")),)
+FLAT_ZH = AnswerContext(lang="zh", allowed_urls=frozenset({CATALOG}), prereq_relevant=True, course_codes=("CS 6140",),
+                        flat_prereqs=FLAT)
+FLAT_EN = AnswerContext(lang="en", allowed_urls=frozenset({CATALOG}), prereq_relevant=True, course_codes=("CS 6140",),
+                        flat_prereqs=FLAT)
+
+
+@pytest.mark.parametrize("context, text, kinds", [
+    # The live answer (2026-11-01), which took it back only at its end.
+    (FLAT_ZH, f"根据 [NEU 官方课程目录]({CATALOG})，该课程的先决条件是 CS 5800 或 CS 7800。", ["or"]),
+    (FLAT_ZH, "先修课是 CS 5800 或 7800。", ["or"]),  # A short number shares the department.
+    (FLAT_ZH, "先决条件是 CS 5800/CS 7800。", ["or"]),
+    (FLAT_ZH, "先决条件是 CS 5800／CS 7800。", ["or"]),
+    (FLAT_ZH, "先修课是 **CS 5800** 或 **CS 7800**。", ["or"]),  # Markdown marks around the codes.
+    (FLAT_EN, "You need `CS 5800` and `CS 7800`.", ["and"]),
+    (FLAT_ZH, "先修：CS 5800（最低 C-）或 CS 7800（最低 C-）。", ["or"]),
+    # A caveat about something else, in another clause, does not undo the OR.
+    (FLAT_ZH, "先决条件是 CS 5800 或 CS 7800，但记录没有明确说明成绩要求。", ["or"]),
+    (FLAT_ZH, "需要先修 CS 5800 和 CS 7800。", ["and"]),
+    (FLAT_ZH, "CS 5800、CS 7800 任选其一即可。", ["relation word"]),
+    (FLAT_ZH, "先修课有 CS 5800、CS 7800，任选一门即可。", ["relation word"]),
+    (FLAT_ZH, "先修课有 CS 5800、CS 7800，两门都要修。", ["relation word"]),
+    (FLAT_EN, "The prerequisites are CS 5800 or CS 7800.", ["or"]),
+    (FLAT_EN, "The prerequisites are CS 5800 or CS 7800, though the record is thin.", ["or"]),
+    (FLAT_EN, "CS 5800 and/or CS 7800 is required.", ["or"]),
+    (FLAT_EN, "You need either CS 5800 or CS 7800 before you enroll.", ["or", "relation word"]),
+    (FLAT_EN, "It requires CS 5800 and CS 7800.", ["and"]),
+    (FLAT_EN, "You need both CS 5800 and CS 7800.", ["and", "relation word"]),
+    (AnswerContext(lang="en", flat_prereqs=(("CS 6140", ("CS 5800", "CS 5100", "cs7800")),)),
+     "Take CS 5800, CS 5100, or CS 7800 first.", ["or"]),
+])
+def test_a_relation_stated_between_flat_prerequisites_is_flagged(context, text, kinds):
+    found = check_answer(text, context)["prereq_relation_asserted"]
+    assert [(item["course"], item["kinds"], item["sentence"]) for item in found] == [("CS 6140", kinds, text)]
+    assert not any(check_answer(text, context)[name] for name in HARD)  # A signal for a person, not a hard failure.
+
+
+@pytest.mark.parametrize("context, text", [
+    # The wording 4.6 asks for, in both languages, and a plain list with the caveat in the same sentence.
+    (FLAT_ZH, "记录列出的先修课有 CS 5800、CS 7800，但没有说明是都要修还是任选其一。"),
+    (FLAT_EN, "The record lists CS 5800, CS 7800 as prerequisites but does not say whether all of them or any one is "
+              "needed."),
+    (FLAT_ZH, "记录列出的先修课有 CS 5800 和 CS 7800，但没有说明是否都需要。"),
+    (FLAT_EN, "The record lists CS 5800 and CS 7800 as prerequisites, but it does not say whether you need both or "
+              "either one."),
+    # Questions about the relation name the alternatives themselves.
+    (FLAT_ZH, "记录没有说明是要修 CS 5800 还是 CS 7800，还是两门都要。"),
+    (FLAT_ZH, "记录没有说明是否二选一：CS 5800、CS 7800。"),
+    (FLAT_EN, "The record does not say whether you need CS 5800 or CS 7800 or both."),
+    (FLAT_ZH, "关于先决条件的具体逻辑（例如是全部需要还是任选其一）未在记录中明确说明。"),
+    # No relation stated.
+    (FLAT_ZH, "CS 5800 是这门课的先修课之一。"),
+    (FLAT_ZH, "CS 5800 和 CS 7800 都是算法课。"),
+    (FLAT_EN, "CS 5800 covers graph algorithms."),
+    # A relation word in a clause without a code counts only after a clause naming two of them.
+    (FLAT_ZH, "先修课有 CS 5800，作业都要用 Python 写。"),
+    # Codes of two courses' lists, and a course whose rule is a year rule (its OR is the record's own).
+    (AnswerContext(lang="zh", flat_prereqs=(("CS 6140", ("CS 5800",)), ("CS 6220", ("CS 7800",)))),
+     "CS 6140 的先修是 CS 5800，CS 6220 的先修是 CS 7800；不能说成需要先修 CS 5800 或 CS 7800。"),
+    (AnswerContext(lang="zh", flat_prereqs=()), "这一年的规则是 CS 5800 或 CS 7800 任选其一。"),
+])
+def test_a_plain_list_a_question_or_no_relation_is_not_flagged(context, text):
+    assert check_answer(text, context)["prereq_relation_asserted"] == []
+
+
+def test_the_relation_check_needs_the_lists_and_is_counted():
+    legacy = AnswerContext(lang="zh", prereq_relevant=True)  # Saved before the checker read the flat lists.
+    assert check_answer("先修课是 CS 5800 或 CS 7800。", legacy)["prereq_relation_asserted"] is None
+    flagged = check_answer("先修课是 CS 5800 或 CS 7800。", FLAT_ZH)
+    assert flagged["prereq_relation_asserted"] == [{"course": "CS 6140", "codes": ["CS 5800", "CS 7800"],
+                                                    "kinds": ["or"], "sentence": "先修课是 CS 5800 或 CS 7800。"}]
+    plain = check_answer("记录列出的先修课有 CS 5800、CS 7800，但没有说明是都要修还是任选其一。", FLAT_ZH)
+    assert summarize([flagged, plain, check_answer("先修课是 CS 5800 或 CS 7800。", legacy)])[
+        "prereq_relation_asserted"] == 1
+
+
+def test_the_unknown_relation_caveat_is_recognised_as_answers_write_it():
+    """CONTENT-01's live answer put its caveat as "……未在记录中明确说明", which the words before checker 2.7 missed."""
+    context = AnswerContext(lang="zh", prereq_relevant=True)
+    for caveat in ("关于先决条件的具体逻辑（例如是全部需要还是任选其一）未在记录中明确说明。",
+                   "先修课之间是都要还是任选其一，记录里没说。", "是否需要全部修完，记录并未写明。"):
+        assert check_answer(caveat, context)["caveats_missing"] == [], caveat
+    # A gap in something else is not the AND/OR caveat.
+    assert check_answer("CS 5800 讲算法，记录没有写明工作量。", context)["caveats_missing"] == ["prereq_logic"]
