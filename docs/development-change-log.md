@@ -5948,7 +5948,7 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
 
 几种改法写在评审目录的 `legacy_prereq_labels/PLAN.md`。用户选了乙：去掉分级，按本课的目录记录标来源，不改接口。
 
-只改新前端。compass 11-02 起已经是新前端，Streamlit 没有路由了；R8 会删掉 `app/`，还有只有它在用的 `rag/prereq_graph.py`。所以 Streamlit 那边不动：`app/ui_theme.py` 的 `_PREREQ_LABELS`、`app/course_requisite_view.py`、先修小图上的英文 `required` 都保持原样，免得两个 PR 改同一批文件。模型看不到旧边，这个改动不影响聊天回答（回答那边由 CONTENT-01 自己的 PR 处理）。分支 `fix/legacy-prereq-labels`，从 main 的 `f24a72d` 开。
+只改新前端。compass 11-02 起已经是新前端，Streamlit 没有路由了。这一批开工时 R8 还没合，所以 Streamlit 那边没动：`app/ui_theme.py` 的 `_PREREQ_LABELS`、`app/course_requisite_view.py`、先修小图上的英文 `required` 都保持原样，免得两个 PR 改同一批文件。后来 R8（第 44 节）先合进 main，`app/` 和只有它在用的 `rag/prereq_graph.py` 都删掉了。模型看不到旧边，这个改动不影响聊天回答（回答那边由 CONTENT-01 自己的 PR 处理）。分支 `fix/legacy-prereq-labels`，从 main 的 `f24a72d` 开。
 
 ### 已实现
 
@@ -5968,7 +5968,7 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
    - `RequisitesFixture` 的类型加了可选的 `answer_evidence`。
 4. **夹具和标准答案**：
    - 新加一份真实导出 `cs-6140-legacy-catalog-listing`。它和 `cs-6140-requisites-table-missing` 用同一个合成库：存年度规则的表不存在，所以显示旧边。另外照目录导入的写法，给 CS 6140 存了课程自己的 `prereqs` 和一份目录快照（都是 CS 5800、CS 7800，走真的 `CatalogSourceRepository`）。三行旧边正好是三种情况：目录列出（CS 5800）、没列出（CS 5100）、没有课号。生成脚本是评审目录的 `goldens/make_legacy_catalog_fixture.py`，它复用 R3a 的 `make_requisites_fixtures.py`。
-   - 标准答案照 R3a 的做法，用 Streamlit 的函数跑出来。先在 git archive 出来的副本里给 Streamlit 打一份参考补丁（`goldens/streamlit_reference.py`，同一条规则用 Python 另写一遍，不进仓库）；再用评审目录的 `expected_panel.py` 生成，这份脚本现在也认得没有标签行的旧边。
+   - 标准答案照 R3a 的做法，用 Streamlit 的函数跑出来。先在 git archive 出来的 `f24a72d` 副本（那时 Streamlit 还在）里给 Streamlit 打一份参考补丁（`goldens/streamlit_reference.py`，同一条规则用 Python 另写一遍，不进仓库）；再用评审目录的 `expected_panel.py` 生成，这份脚本现在也认得没有标签行的旧边。
    - 核对过程：没打补丁时先跑一遍，16 份标准答案逐字节相同。打上补丁后，只有带旧边的三份变了（`cs-6140-requisites-table-missing`、`cs-7800-legacy-edges-only`、`derived-older-api-no-requisites`），而且只变旧边那几行：这三份导出都没有目录快照，所以分级都变成了没有标签。新加的那份是第 17 份。
    - 冻结哈希跟着改（34 个文件）；标准答案测试的数目改成 17 份、35 个场景。
 5. **测试**：
@@ -6001,6 +6001,7 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
   控制台只有游客访问 `/auth/me` 的 401。
 - **e2e**：对着 `vite preview` 和开发 API 跑，60 条过，10 条按设备跳过（57.0 秒），和 R7 的结果一样。测试代码没改。
 - **码位**：新加的行里没有格式字符、私用区字符或控制字符。标出来的两个表情（U+1F9E9、U+1F9F1），是新标准答案 `raw` 里 Streamlit 标题自带的，R3a 的标准答案里也有。没有 CR，`diff --check` 干净。
+- **合并 main 以后**（R8 先合了）：web 的 `gen:api:check`、`format:check`、`npm run check` 再跑一遍，都过。Vitest 95 个文件，2848 条过、10 条跳过（共 2858 条）。跳过的 10 条是 `web/src/test/copiedWords.test.ts` 拿前端文字对 `app/` 里的 Python，`app/` 删了就跳过，第 44 节那次也一样，和这个改动无关。首屏 JS gzip 186,554 字节，没变。后端和 e2e 没在本机重跑：这个分支没改 Python，合并后的 Python、测试和开发 API 都和 main 一样，后端测试也不读这里改的文件。这两项交给 CI，CI 对合并后的版本都会跑。
 
 ### 审查
 
@@ -6011,9 +6012,9 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
 - **交叉编号**：先修课在目录里如果写的是另一个交叉编号，会被标成「目录未列出」。回填边不会出这个问题，因为回填本来就是按 `primary_code` 去对目录代码的；只有手工 seed 的边可能这样。
 - **快照只代表记录下来的那一份目录**：快照旧了，标签也跟着旧。「目录未列出」也可能只是那一年的目录没写，别的年份写了。所以说明里只说「本课记录的目录先修段」。
 - **有年度规则时的那一支**（「去看看这些先修课」）：手工 seed 的边照旧列成跳转链接，目录里没有的也列。上面的规则树是准的，这一支只用来跳转，这次没改。
-- **Streamlit 没改**：compass 已经切到新前端，Streamlit 没有路由了，R8 会删掉它。在那之前，直接打开 Streamlit 的端口，还能看到旧的分级。
+- **Streamlit 没改**：R8（第 44 节）已经把它从仓库里删了。R8 上线以前，NAS 上的 Streamlit 还在跑，直接打开它的端口还能看到旧的分级。
 - **数据本身没动**：线上库里的旧边、seed 文件、回填脚本都没改。要改数据（比如删掉目录里没有的 seed 边）得另外决定，那要动 NAS 上的生产库。
 
 ### 发布状态
 
-分支 `fix/legacy-prereq-labels`，从 main 的 `f24a72d` 开，两个提交：第二个只改本节的「审查」「发布状态」两段。没有使用真实模型、账号、NAS 或生产库，只用了合成数据。合并不会部署；上线随下一次发布，要用户另外点头。
+分支 `fix/legacy-prereq-labels`，从 main 的 `f24a72d` 开。R8 先合进 main 以后，这个分支把 main（`3c4b721`）合了进来：改动记录两边都加了第 44 节，R8 的留 44，本节改成 45；别的文件自动合并。合并后另有一个提交，只改本节里讲 R8 的几句和验证记录。没有使用真实模型、账号、NAS 或生产库，只用了合成数据。合并不会部署；上线随下一次发布，要用户另外点头。
