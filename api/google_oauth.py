@@ -1,32 +1,29 @@
 """Google OAuth + NEU domain whitelist (PLAN §3.6 / §4.1).
 
-Moved here from app/auth.py in R2a (2026-10-22): login belongs to the API, and the new front end has no Python side.
-app/auth.py re-exports these names for the Streamlit UI until that UI is retired.
+Moved here from app/auth.py in R2a (2026-10-22): login belongs to the API, and the web front end has no Python side.
+(app/auth.py re-exported these names for the Streamlit UI until R8 deleted it.)
 
 Google OAuth + NEU 域名白名单（PLAN §3.6 / §4.1）。R2a（2026-10-22）从 app/auth.py 搬到这里：登录归 API 管，新前端没有
-Python 那一侧。app/auth.py 转发这些名字，给 Streamlit 版用到它退役为止。
+Python 那一侧。（app/auth.py 转发这些名字给 Streamlit 版用，R8 把它删了。）
 
-Login flow:
-  1. Streamlit page renders the URL from `authorize_url()`. User clicks,
-     Google authenticates, redirects back to `google_oauth_redirect_uri`
-     with `?code=...&state=...`.
-  2. Callback handler (left as a Week 7 follow-up — needs a real
-     OAuth-aware HTTP path; Streamlit's URL handling is limited) exchanges
-     the code for an ID token via authlib.
+Login flow (the web front end, api/routes/auth.py):
+  1. GET /auth/login-url returns `authorize_url()` for the page's `state`
+     and its own root. The browser goes to Google, which authenticates and
+     sends it back to that root with `?code=...&state=...`.
+  2. The page checks `state` and POSTs the code to /auth/callback, which
+     exchanges it for an ID token (`exchange_code_for_token`).
   3. The parsed claims go through `validate_id_token_claims` which raises
-     OAuthError if anything fails. Only on success do we persist to
-     state_manager.login.
+     OAuthError if anything fails. Only on success does the route store the
+     user and hand back the session.
 
-登录流程：
-  1. Streamlit 页面渲染出 `authorize_url()` 给出的 URL。用户点击后，
-     Google 完成认证，带着 `?code=...&state=...` 重定向回
-     `google_oauth_redirect_uri`。
-  2. 回调处理器（作为第 7 周的后续工作留待完成 —— 需要一条真正支持
-     OAuth 的 HTTP 路径；Streamlit 的 URL 处理能力有限）通过 authlib
-     用 code 兑换 ID token。
+登录流程（新前端，见 api/routes/auth.py）：
+  1. GET /auth/login-url 按页面的 `state` 和它自己的根地址给出
+     `authorize_url()`。浏览器跳到 Google，认证后带着
+     `?code=...&state=...` 回到那个根地址。
+  2. 页面核对 `state`，把 code 交给 POST /auth/callback，由它兑换
+     ID token（`exchange_code_for_token`）。
   3. 解析出的 claims 会经过 `validate_id_token_claims`，任何一项失败
-     都会抛出 OAuthError。只有全部通过才会持久化到
-     state_manager.login。
+     都会抛出 OAuthError。只有全部通过，路由才存下用户、交回会话。
 
 `is_email_allowed` is the security boundary that every code path MUST go
 through. Substring matching (e.g. `email.endswith("husky.neu.edu")`) is
@@ -39,12 +36,11 @@ We split on '@' and exact-match the domain part against the whitelist.
 拿域名部分与白名单做精确匹配。
 
 The Authlib client itself isn't constructed here; we hand back the
-authorize URL so any HTTP frontend (Streamlit, FastAPI dev page, manual
-curl) can drive the redirect.
+authorize URL so any HTTP front end (the web front end, a manual curl)
+can drive the redirect.
 
 Authlib 客户端本身不在这里构造；我们只是把 authorize URL 递回去，
-这样任何 HTTP 前端（Streamlit、FastAPI 开发页面、手动 curl）都能
-自己驱动这次重定向。
+这样任何 HTTP 前端（新前端、手动 curl）都能自己驱动这次重定向。
 """
 
 from __future__ import annotations

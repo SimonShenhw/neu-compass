@@ -3,12 +3,12 @@
 Structlog 配置 + 每请求一条的访问日志中间件。
 
 `configure_logging()` is idempotent — safe to call multiple times (e.g. from
-both the FastAPI lifespan and from a Streamlit entrypoint). Uses
+both the FastAPI lifespan and the dev API, tests/support/dev_api.py). Uses
 `structlog.contextvars` so handlers can `.bind(...)` and have the bound
 keys flow into the access-log line emitted on response.
 
 `configure_logging()` 是幂等的 —— 可以安全地多次调用（例如同时被 FastAPI
-的 lifespan 和某个 Streamlit 入口调用）。使用 `structlog.contextvars`，
+的 lifespan 和开发用的 API 调用）。使用 `structlog.contextvars`，
 这样各处理器 `.bind(...)` 绑定的键就能自动流入响应时输出的那条访问
 日志。
 
@@ -173,12 +173,10 @@ def configure_logging() -> structlog.stdlib.BoundLogger:
 
     初始化 structlog。返回项目的根 logger。
 
-    Call once at process start. Subsequent calls are no-ops; this lets a
-    Streamlit page and the FastAPI app share one configuration when they
-    co-locate (Week 6 dev workflow).
+    Call once at process start. Subsequent calls are no-ops, so every caller
+    in a process shares one configuration.
 
-    在进程启动时调用一次。后续调用都是空操作；这样当 Streamlit 页面与
-    FastAPI 应用同进程运行时（Week 6 的开发工作流），二者能共享同一份
+    在进程启动时调用一次。后续调用都是空操作，同一进程里的调用方共享同一份
     配置。
     """
     global _CONFIGURED

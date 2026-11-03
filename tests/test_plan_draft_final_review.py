@@ -10,17 +10,12 @@ from pathlib import Path
 import httpx
 import pytest
 import structlog
-from markdown_it import MarkdownIt
 
-from app.plan_draft_view import _tree_lines, parse_course_codes
-from schemas.plan_draft import DraftNode
-from tests import test_plan_draft_view as draft_view_tests
+from schemas.plan_draft import parse_course_codes
+from tests.program_plan_support import plans
 from tests.test_plan_draft import course, evaluate_rule, node
-from tests.test_plan_draft_view import add, page, shown
-from tests.test_program_plan_links import plans
 from tests.test_safe_error_exits import _json_logs
 
-backend = draft_view_tests.backend
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -55,33 +50,6 @@ def test_a22_lb_list_separators_full_width_input_and_internal_ids(raw, codes, in
     assert parse_course_codes(raw) == (codes, invalid)
 
 
-def test_a22_lb_page_adds_codes_separated_by_the_chinese_list_comma(backend):
-    app = page()
-    add(app, "CS5001、CS5002")
-    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 5001", "CS 5002"]
-    assert "格式不正确" not in shown(app)
-
-
-@pytest.mark.parametrize("raw", ["[x](https:elsewhere.example)", "<https:elsewhere.example>"])
-def test_a22_lb_a_link_that_stays_one_token_is_escaped_in_the_format_warning(backend, raw):
-    # "/" now splits "[x](https://elsewhere.example)" before the warning, so these inputs stay one token.
-    assert parse_course_codes(raw) == ([], [raw])
-    app = page()
-    add(app, raw)
-    assert not backend["calls"] and not app.session_state["plan_draft_courses"]
-    rendered = "\n".join(MarkdownIt("commonmark").render(e.value) for e in app.warning)
-    assert "课号格式不正确" in rendered and "<a href=" not in rendered
-
-
-def test_a22_lc_a_single_match_under_another_code_is_named(backend):
-    backend["crosslisted"]["EECE 7397"] = "CS 7140"
-    app = page()
-    add(app, "EECE7397 CS5001")
-    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140", "CS 5001"]
-    [notice] = [e.value for e in app.warning if "对应主课号" in e.value]
-    assert "EECE 7397" in notice and "CS 7140" in notice and "请向项目核实" in notice
-
-
 @pytest.mark.parametrize("kind", ["all_of", "any_of"])
 def test_a22_ld_a09_a_group_of_only_optional_branches_below_the_root_is_not_met(kind):
     optional = node("optional", activate_when="Thesis approval", children=[node("course", course_code="CS 5001")])
@@ -108,28 +76,6 @@ def test_a22_ld_a07_a_reuse_reason_names_only_groups_that_apply_at_the_same_time
     result = evaluate_rule(node("any_of", children=[node("all_of", children=[group_b, group_a]), exit_c]), [course()])
     [reason] = [r for r in result.children[0].children[0].reasons if "重复计入" in r]
     assert "Group A" in reason and "Exit C" not in reason
-
-
-def test_a22_ld_a14_a15_omitted_candidates_and_reasons_are_announced():
-    lines = _tree_lines(DraftNode(kind="select", label="Synthetic", status="missing", missing=["CS 5001"],
-                                  missing_omitted=2, reasons=["Synthetic reason"], reasons_omitted=3))
-    assert "  另有 2 项候选／子项未展开。" in lines and "  另有 3 项原因未展开。" in lines
-
-
-def test_a22_ld_a17_a18_partial_plan_and_unplaced_course_captions(backend):
-    plan = plans()[0].model_copy(update={"coverage": "partial", "requirements": node("course", course_code="CS 5001")})
-    app = page(plan)
-    add(app, "CS5999")
-    captions = [e.value for e in app.caption]
-    assert "这个方案只记录了部分规则；上述统计不是个人学位或注册审核。" in captions
-    assert "方案里没有写到这门课；不代表不能算，也不代表能算，请向项目核实。" in captions
-
-
-def test_a22_ld_a22_invalid_token_warnings_are_capped_at_ten(backend):
-    app = page()
-    add(app, " ".join(f"bad{i}" for i in range(12)))
-    assert len([e for e in app.warning if "课号格式不正确" in e.value]) == 10
-    assert any("另有 2 项格式不正确" in e.value for e in app.warning) and not backend["calls"]
 
 
 def test_b22_low1_the_api_is_started_at_the_root_path():
@@ -164,41 +110,6 @@ def test_b22_low2b_course_read_lines_drop_allowed_keys_whose_values_are_not_the_
     assert (logged["courses"], logged["frames"], logged["error_type"], logged["duration_ms"]) == (3, [frame], "internal_error", 1.5)
 
 
-def test_b22_low3_each_draft_link_is_exactly_its_own_course_link(backend):
-    from app.deep_links import course_share_ref, share_url
-    from config import settings
-
-    app = page()
-    add(app, "CS5001 CS5002")
-    links = [e.value for e in app.markdown if "课程页／年度先修" in e.value]
-    assert links == [f"[{code} · 课程页／年度先修]({share_url(settings.public_base_url, course=course_share_ref(code))})"
-                     for code in ["CS 5001", "CS 5002"]]
-
-
-@pytest.fixture
-def crosslisted(monkeypatch):
-    """Two course records per cross-listed pair, each matching both refs, as ingest stores them (H2)."""
-    import app.api_client as clients
-
-    original, trace = clients.ApiClient, {"calls": [], "pairs": {"CS 7140": ["CS 7140", "EECE 7397"],
-                                                               "EECE 7397": ["EECE 7397", "CS 7140"]}}
-
-    def handler(request):
-        trace["calls"].append(request.url.path)
-        if request.url.path == "/resolve/course":
-            ref = request.url.params["ref"]
-            return httpx.Response(200, json={"ref": ref, "matches": [
-                {"course_id": code.replace(" ", "-"), "primary_code": code, "primary_name": "Synthetic " + code}
-                for code in trace["pairs"].get(ref, [ref])]})
-        code = request.url.path.rsplit("/", 1)[1].replace("-", " ")
-        return httpx.Response(200, json={"course_id": code.replace(" ", "-"), "primary_code": code,
-                                        "primary_name": "Synthetic " + code, "credits": 4})
-
-    monkeypatch.setattr(clients, "ApiClient", lambda **kwargs: original(
-        base_url="http://synthetic-draft", transport=httpx.MockTransport(handler), **kwargs))
-    return trace
-
-
 def pair_plan():
     rule = node("all_of", label="root", children=[
         node("select", label="Two from list", course_codes=["CS 7140", "EECE 7397", "CS 6140"], min_courses=2),
@@ -208,42 +119,6 @@ def pair_plan():
 
 def twin_notices(app):
     return [e.value for e in app.warning if "可能是同一门交叉列出的课" in e.value]
-
-
-@pytest.mark.parametrize("raw,kept,skipped", [("CS 7140/EECE 7397", "CS 7140", "EECE 7397"),
-                                              ("EECE 7397 CS 7140", "EECE 7397", "CS 7140")])
-def test_recheck1_r1_a_cross_listed_pair_typed_together_counts_once(crosslisted, raw, kept, skipped):
-    app = page(pair_plan())
-    add(app, raw)
-    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == [kept]
-    assert twin_notices(app) == [f"{skipped} 和 {kept} 可能是同一门交叉列出的课，只按 {kept} 计入；如果是两门不同的课，请向项目核实。"]
-    assert crosslisted["calls"].count("/resolve/course") == 2 and len(crosslisted["calls"]) == 3  # No detail GET for the twin.
-    [group] = [line.strip() for e in app.text for line in e.value.splitlines() if "组选（非全部必修） Two from list" in line]
-    assert group.startswith("⬜ 还缺")
-
-
-def test_recheck1_r1_the_twin_of_a_course_already_in_the_draft_is_not_added(crosslisted):
-    app = page(pair_plan())
-    add(app, "CS 7140")
-    add(app, "EECE 7397")
-    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140"]
-    assert twin_notices(app) == ["EECE 7397 和 CS 7140 可能是同一门交叉列出的课，只按 CS 7140 计入；如果是两门不同的课，请向项目核实。"]
-
-
-@pytest.mark.parametrize("listed_by", ["CS 7140", "EECE 7397"])
-def test_recheck1_r1_a_pair_is_caught_when_only_one_record_names_the_other(crosslisted, listed_by):
-    crosslisted["pairs"] = {listed_by: crosslisted["pairs"][listed_by]}
-    app = page(pair_plan())
-    add(app, "CS 7140 EECE 7397")
-    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140"]
-    assert len(twin_notices(app)) == 1
-
-
-def test_recheck1_r1_unrelated_courses_and_a_single_exact_match_are_still_added(crosslisted):
-    app = page(pair_plan())
-    add(app, "CS 7140 CS 6140")
-    assert [c["code"] for c in app.session_state["plan_draft_courses"]] == ["CS 7140", "CS 6140"]
-    assert not twin_notices(app) and any("同一引用也匹配 EECE 7397" in e.value for e in app.warning)
 
 
 def test_recheck1_r2_frames_from_frozen_stdlib_modules_are_kept_on_course_reads(monkeypatch):

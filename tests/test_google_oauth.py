@@ -1,10 +1,11 @@
-"""Tests for app.auth — pure helpers (no Google round-trip)."""
+"""Tests for api.google_oauth — pure helpers (no Google round-trip). The file was test_app_auth.py until R8 deleted
+app/auth.py, which only re-exported these."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.auth import (
+from api.google_oauth import (
     GOOGLE_AUTHORIZE_ENDPOINT,
     OAuthError,
     authorize_url,
@@ -135,7 +136,7 @@ def test_non_dict_payload_raises() -> None:
 
 import httpx  # noqa: E402
 
-from app.auth import exchange_code_for_token
+from api.google_oauth import exchange_code_for_token
 
 
 def _mock_token_endpoint(payload: dict, *, status_code: int = 200,

@@ -1,6 +1,6 @@
 # scripts/stop_stack.ps1 - clean shutdown for the NEU-Compass stack.
 #
-# Kills uvicorn + streamlit inside WSL and cloudflared on Windows. Idempotent —
+# Kills uvicorn inside WSL and cloudflared on Windows. Idempotent —
 # safe to run when nothing is running.
 #
 # Usage:
@@ -19,14 +19,14 @@ Write-Host ''
 Write-Host '=== Stopping NEU-Compass stack ===' -ForegroundColor Cyan
 Write-Host ''
 
-# === 1) WSL: uvicorn + streamlit ===
-Write-Host '[1/3] Stopping uvicorn + streamlit in WSL' -ForegroundColor Yellow
+# === 1) WSL: uvicorn ===
+Write-Host '[1/3] Stopping uvicorn in WSL' -ForegroundColor Yellow
 
 # Kept single-line: multi-line strings lose their quoting going through
 # powershell -> wsl.exe -> bash -lc. Single-quoted grep regex prevents bash
 # from parsing the parens as a subshell. xargs -r skips no-input case.
 # `$2` etc. are escaped with backtick so PowerShell doesn't try to expand them.
-$grepPat = "'(api\.main:app|streamlit_app\.py|streamlit run app/)'"
+$grepPat = "'(api\.main:app)'"
 # bash `[[ ]]` is used instead of `[ ]` because the enclosing PowerShell -> wsl.exe
 # -> bash -lc bridge eats the inner double-quotes; `[ -n $X ]` (unquoted, $X empty)
 # evaluates true because POSIX test sees a single non-empty token "-n". `[[ ]]` is
@@ -77,7 +77,7 @@ if (Test-Path $pidFile) {
 # === 3) Verify ports freed ===
 Write-Host '[3/3] Verifying ports freed' -ForegroundColor Yellow
 $stillBound = $false
-foreach ($port in 8000, 8501) {
+foreach ($port in 8000) {
     $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     if ($conn) {
         $pid_ = $conn.OwningProcess | Select-Object -First 1

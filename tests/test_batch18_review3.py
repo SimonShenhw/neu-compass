@@ -6,14 +6,11 @@ import pytest
 
 import scripts.audit_data_coverage as audit
 from api.dependencies import get_db_conn
-from app.answer_evidence_view import WARNING_LABELS, render_answer_evidence
-from app.course_detail_view import render_course_detail
 from db.course_requisite_repository import CourseRequisiteRepository
 from eval.answer_checks import AnswerContext, check_answer
 from llm.prompts.chat_v4 import PROMPT_TEMPLATE
 from tests import test_audit_data_coverage as coverage
 from tests import test_chat_structured_requisites as structured
-from tests.ui_recorder import Recorder
 
 URL = "https://catalog.northeastern.edu/course-descriptions/cs/"
 NOTES = {"en": "These rules come from a saved copy of the catalog, not a live check. ",
@@ -112,28 +109,6 @@ def test_annual_coverage_includes_all_years_beyond_the_chat_cap(tmp_path):
 def test_warning_rule_text_keeps_both_required_inputs():
     assert "catalog was compared and (the year rules were checked or their table is missing)" in (
         audit.RULES["fields"]["by_department"])
-
-
-@pytest.mark.parametrize("code", structured.NEW_CODES)
-def test_course_source_expander_retains_full_requisite_warnings(api_client, code):
-    conn = api_client.app.dependency_overrides[get_db_conn]()
-    CourseRequisiteRepository(conn).store(structured.document())
-    payload = api_client.get("/course/c-cs-5800").json()
-    payload["answer_evidence"]["warnings"] = [code]
-    st = Recorder()
-    render_course_detail(st, payload, cid="review3")
-    captions = [text for kind, text, _ in st.under("📎 来源与说明（数据从哪来、缺了什么）") if kind == "caption"]
-    assert WARNING_LABELS[code] in captions
-    assert "先修/共修" in WARNING_LABELS[code]
-
-
-def test_answer_cards_show_years_by_default(api_client):
-    conn = api_client.app.dependency_overrides[get_db_conn]()
-    CourseRequisiteRepository(conn).store(structured.document())
-    evidence = api_client.get("/course/c-cs-5800").json()["answer_evidence"]
-    st = Recorder()
-    render_answer_evidence(st, evidence)
-    assert any("课程块原文" in str(text) and "2026-2027" in str(text) for _, text, _ in st.log)
 
 
 @pytest.mark.parametrize("sentence", [

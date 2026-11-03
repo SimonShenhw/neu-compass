@@ -8,38 +8,11 @@ from pathlib import Path
 import subprocess
 import sys
 
-import httpx
 import pytest
 
 
 def test_admission_contract_exists():
     assert importlib.util.find_spec('api.admission') is not None
-
-
-def test_429_is_safe_and_exposes_bounded_retry_hint_without_reposting():
-    from app.api_client import ApiClient, ApiError
-    calls = []
-    def handler(request):
-        calls.append(request)
-        return httpx.Response(429, json={'detail': 'private-overload-canary', 'error_type': 'rate_limited'},
-                              headers={'Retry-After': '7'})
-    with ApiClient(base_url='http://mock', transport=httpx.MockTransport(handler)) as api:
-        with pytest.raises(ApiError) as error:
-            api.search('synthetic')
-    assert error.value.retry_after_seconds == 7 and error.value.error_type == 'rate_limited'
-    assert 'canary' not in str(error.value) and len(calls) == 1
-
-
-def test_chat_eof_without_done_is_not_a_complete_answer():
-    from app.api_client import ApiClient
-    from app.streamlit_app import stream_assistant
-    def handler(request):
-        return httpx.Response(200, content=b'{"type":"token","text":"partial"}\n')
-    state = {'last_chat_feedback': {'stale': True}}
-    with ApiClient(base_url='http://mock', transport=httpx.MockTransport(handler)) as api:
-        chunks = list(stream_assistant(api, {'query': 'synthetic'}, state))
-    assert chunks[0] == 'partial' and state['last_chat_error'] is not None
-    assert state['last_chat_feedback'] is None and len(chunks) == 2
 
 
 class Clock:
@@ -302,81 +275,6 @@ def test_settings_invalid_policy_fails_without_echo(key, value):
     assert 'canary' not in str(error.value)
 
 
-@pytest.mark.parametrize('status,error_type', [(429, 'rate_limited'), (503, 'service_busy'),
-                                             (503, 'service_unavailable'), (504, 'upstream_error'), (408, None)])
-@pytest.mark.parametrize('operation', ['get', 'post', 'chat'])
-def test_ui_transient_statuses_safe_bounded_retry_and_no_automatic_requests(status, error_type, operation):
-    from app.api_client import ApiClient, ApiError
-    calls = []
-    def handler(request):
-        calls.append(request)
-        return httpx.Response(status, json={'detail': 'private-html-token-canary', 'error_type': error_type},
-                              headers={'Retry-After': '11'})
-    with ApiClient(base_url='http://mock', transport=httpx.MockTransport(handler)) as api:
-        with pytest.raises(ApiError) as error:
-            if operation == 'get':
-                api.health()
-            elif operation == 'post':
-                api.submit_answer_feedback({'synthetic': True})
-            else:
-                list(api.chat_stream({'query': 'synthetic'}))
-    assert error.value.status_code == status and error.value.retry_after_seconds == 11
-    assert 'canary' not in str(error.value) and len(calls) == 1
-
-
-@pytest.mark.parametrize('value,expected', [('0', 0), ('3', 3), (' 7 ', 7), ('3600', 3600),
-                                          ('3601', None), ('99999', None), ('-1', None), ('1.5', None),
-                                          ('Infinity', None), ('', None), ('Wed, 21 Oct 2015 07:28:00 GMT', None),
-                                          ('private-header-canary', None), (None, None)])
-def test_retry_after_is_only_a_bounded_delta_seconds_hint(value, expected):
-    from app.api_client import _retry_seconds
-    assert _retry_seconds(value) == expected
-
-
-@pytest.mark.parametrize('exception', [httpx.ReadTimeout, httpx.ConnectError, httpx.ReadError])
-@pytest.mark.parametrize('operation', ['get', 'post'])
-def test_nonstream_transport_failure_hides_exception_and_never_retries(exception, operation):
-    from app.api_client import ApiClient, ApiError
-    calls = []
-    def handler(request):
-        calls.append(request)
-        raise exception('private-network-query-token-canary', request=request)
-    with ApiClient(base_url='http://mock', transport=httpx.MockTransport(handler)) as api:
-        with pytest.raises(ApiError) as error:
-            api.health() if operation == 'get' else api.upload_coop({'synthetic': True})
-    assert error.value.status_code == (504 if exception is httpx.ReadTimeout else 503)
-    assert 'canary' not in str(error.value) and error.value.__cause__ is None and len(calls) == 1
-
-
-@pytest.mark.parametrize('failure', ['timeout', 'read', 'eof', 'done', 'server_error'])
-def test_partial_stream_keeps_tokens_closes_and_never_attaches_feedback_or_replays(failure):
-    from app.api_client import ApiClient
-    from app.streamlit_app import stream_assistant
-    calls, closed = [], []
-    class Stream(httpx.SyncByteStream):
-        def __iter__(self):
-            yield b'{"type":"meta","results":[]}\n{"type":"token","text":"partial"}\n'
-            if failure == 'timeout':
-                raise httpx.ReadTimeout('private-timeout-canary')
-            if failure == 'read':
-                raise httpx.ReadError('private-read-canary')
-            if failure == 'done':
-                yield b'{"type":"done"}\n'
-            if failure == 'server_error':
-                yield b'{"type":"error","detail":"synthetic server failure"}\n'
-        def close(self):
-            closed.append(True)
-    def handler(request):
-        calls.append(request)
-        return httpx.Response(200, stream=Stream())
-    state = {'last_chat_feedback': {'old': True}}
-    with ApiClient(base_url='http://mock', transport=httpx.MockTransport(handler)) as api:
-        chunks = list(stream_assistant(api, {'query': 'synthetic'}, state))
-    assert chunks[0] == 'partial' and state['last_chat_feedback'] is None
-    assert bool(state['last_chat_error']) == (failure != 'done')
-    assert len(calls) == 1 and closed == [True] and 'canary' not in ''.join(chunks)
-
-
 def seeded_guard_app(conn, guard):
     from tests.conftest import build_test_app
     from api.main import create_app
@@ -487,17 +385,6 @@ print('guard_isolated_ok')
     assert not list(tmp_path.iterdir())
 
 
-def test_unknown_unhashable_stream_type_does_not_crash_main_consumer():
-    from app.api_client import ApiClient
-    from app.streamlit_app import stream_assistant
-    data = '[]\nnull\n{"type": []}\n{"type":"token","text":"valid"}\n{"type":"done"}\n'
-    state = {}
-    with ApiClient(base_url='http://mock', transport=httpx.MockTransport(
-        lambda request: httpx.Response(200, content=data.encode()))) as api:
-        assert list(stream_assistant(api, {'query': 'synthetic'}, state)) == ['valid']
-    assert state['last_chat_error'] is None
-
-
 def test_factory_enabled_builds_policy_without_loading_models(monkeypatch):
     import api.main as module
     from api.admission import AdmissionMiddleware
@@ -511,58 +398,3 @@ def test_factory_enabled_builds_policy_without_loading_models(monkeypatch):
     assert (policy.capacity, policy.refill_per_second, policy.max_inflight) == (4, .5, 1)
     assert any(item.cls is AdmissionMiddleware for item in app.user_middleware)
     assert app.user_middleware[0].cls.__name__ == 'RequestLogMiddleware'
-
-
-@pytest.mark.parametrize('failure', ['429', '503', 'timeout', 'stream_timeout'])
-def test_actual_main_widget_safe_failure_partial_text_and_rerun_without_repost(monkeypatch, failure):
-    from streamlit.testing.v1 import AppTest
-    import app.api_client as api_module
-    import app.cookie_session as cookies
-    import app.discover_view as discover
-    import app.program_view as programs
-    import app.streamlit_app as main
-    import app.streamlit_auth_ui as auth
-    from config import settings
-    monkeypatch.setattr(settings, 'answer_feedback_enabled', False)
-    requests, closed = [], []
-    class Stream(httpx.SyncByteStream):
-        def __iter__(self):
-            yield b'{"type":"meta","results":[]}\n{"type":"token","text":"partial answer"}\n'
-            raise httpx.ReadTimeout('private-widget-stream-canary')
-        def close(self):
-            closed.append(True)
-    def handler(request):
-        if request.method == 'GET':
-            return httpx.Response(200, json={'status': 'ready', 'courses_indexed': 3, 'bm25_corpus': 3})
-        requests.append(request)
-        assert request.url.path == '/chat'
-        if failure == 'timeout':
-            raise httpx.ReadTimeout('private-widget-request-canary', request=request)
-        if failure == 'stream_timeout':
-            return httpx.Response(200, stream=Stream())
-        return httpx.Response(int(failure), json={'detail': 'private-widget-response-canary',
-                             'error_type': 'rate_limited' if failure == '429' else 'service_busy'},
-                             headers={'Retry-After': '9'})
-    original = api_module.ApiClient
-    monkeypatch.setattr(api_module, 'ApiClient', lambda **kwargs: original(
-        base_url='http://synthetic-widget', transport=httpx.MockTransport(handler), **kwargs))
-    monkeypatch.setattr(auth, 'handle_oauth_callback', lambda: None)
-    monkeypatch.setattr(auth, 'render_auth_sidebar', lambda: None)
-    monkeypatch.setattr(cookies, 'restore_login_from_cookie', lambda: False)
-    monkeypatch.setattr(cookies, 'flush_pending_cookie', lambda: None)
-    monkeypatch.setattr(discover, 'render_discover', lambda st: None)
-    monkeypatch.setattr(programs, 'get_programs_cached', lambda st: [])
-    monkeypatch.setattr(main, '_render_filters_sidebar', lambda st, state: {})
-    app = AppTest.from_string('from app.streamlit_app import render\nrender()').run(timeout=45)
-    assert not app.exception and not requests
-    app.chat_input[0].set_value('synthetic query').run(timeout=45)
-    assert not app.exception and len(requests) == 1
-    assistant = app.session_state['messages'][-1]
-    assert assistant['role'] == 'assistant' and '⚠️' in assistant['content']
-    assert 'canary' not in assistant['content'] and 'feedback' not in assistant
-    if failure in {'429', '503'}:
-        assert '9 秒后' in assistant['content'] and '手动重试' in assistant['content']
-    if failure == 'stream_timeout':
-        assert 'partial answer' in assistant['content'] and closed == [True]
-    app.run(timeout=45)
-    assert not app.exception and len(requests) == 1 and app.session_state['messages'][-1] == assistant

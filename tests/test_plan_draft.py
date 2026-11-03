@@ -4,8 +4,9 @@ import importlib
 
 import pytest
 
+from schemas.plan_draft import parse_course_codes
 from schemas.program_plan import RequirementNode
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 
 def node(kind, label="Synthetic", **fields):
@@ -297,3 +298,30 @@ def test_valid_partial_condition_child_never_claims_met():
     result = evaluate_draft(plan, [DraftCourse(**course())])
     assert result.root.status == "unknown" and result.root.children[0].status == "unknown"
     assert "文字条件" in " ".join(result.root.children[0].reasons)
+
+
+# Batch L (10-21), L4: the parser the draft route uses. Moved here from test_page_state_l.py when R8
+# deleted the Streamlit tests. 中文：草案接口用的解析器；R8 删 Streamlit 测试时从 test_page_state_l.py 搬来。
+@pytest.mark.parametrize(("raw", "codes"), [
+    ("CS 5800.", ["CS 5800"]),
+    ("CS 5800。", ["CS 5800"]),
+    ("CS 5800, CS 5004.", ["CS 5800", "CS 5004"]),
+    ("CS 5800。CS 5004。", ["CS 5800", "CS 5004"]),
+    ("CS 5800\u200b", ["CS 5800"]),
+    ("\ufeffCS\u200c 5800\u2060", ["CS 5800"]),
+    ("CS 58\u200d00", ["CS 5800"]),
+    # A23 NIT-3: the soft hyphen and the direction marks are invisible on copy too.
+    ("CS 58\N{SOFT HYPHEN}00", ["CS 5800"]),
+    ("CS 5800\N{LEFT-TO-RIGHT MARK}", ["CS 5800"]),
+    ("\N{RIGHT-TO-LEFT MARK}CS 5800", ["CS 5800"]),
+    ("cs5800.", ["CS 5800"]),
+    ("ＣＳ　５８００．", ["CS 5800"]),
+])
+def test_l4_a_closing_period_or_zero_width_character_does_not_break_the_last_code(raw, codes):
+    assert parse_course_codes(raw) == (codes, [])
+
+
+def test_l4_invalid_tokens_are_still_reported_once_without_the_period():
+    assert parse_course_codes("neu-cs-6130.") == ([], ["neu-cs-6130"])
+    assert parse_course_codes("CS 5800 XYZ.") == (["CS 5800"], ["XYZ"])
+    assert parse_course_codes("CS 5800 .") == (["CS 5800"], [])

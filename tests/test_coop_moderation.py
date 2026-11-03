@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.session_tokens import issue_session_token
+from api.session_tokens import issue_session_token
 from config import settings
 from db.coop_repository import CoopRepository
 from db.coop_submission_repository import CoopSubmissionRepository

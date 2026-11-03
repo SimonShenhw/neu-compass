@@ -4,13 +4,11 @@ recovery after a 409, panel and card wording, and the edges the reviewers' mutan
 面板和卡片的文字，以及评审变异体触到的边界。只用合成课程、仓库策展方案和受控 MockTransport，不调模型、不联网。
 """
 
-import copy
 import json
 
-import httpx
 import pytest
 
-from db.program_plan_repository import ProgramPlanRepository, content_hash
+from db.program_plan_repository import ProgramPlanRepository
 from llm.prompts.chat_v4 import PLAN_PART_BUDGET, PROMPT_TEMPLATE, format_courses_block, format_plan_block
 from rag.answer_evidence import build_answer_evidence, build_plan_context
 from rag.retriever import SearchHit
@@ -18,20 +16,13 @@ from schemas.course import Course
 from schemas.course_program_context import CoursePlacement, course_placements
 from schemas.plan_selection import PLAN_SELECTION_MESSAGES
 from schemas.program_plan import ProgramPlan, RequirementNode
-from tests.page_layout_support import install_backend, page, run
 from tests.test_chat_plan_core import resolve, selection_data, stored
-from tests.test_chat_plan_ui import choose, plan_curricula
 from tests.test_chat_structured_requisites import document, seeded
 from tests.test_program_plan_contract import chat_meta, stub_chat
-from tests.test_program_plan_links import plans
+from tests.program_plan_support import plans
 
 PREFIX_CONFLICT = ("上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
                    " (Selected program_id conflicts with the detected program prefix.)")
-
-
-@pytest.fixture
-def chat_page(monkeypatch):
-    return plan_curricula(monkeypatch)
 
 
 def plan_where(**match):
@@ -70,15 +61,6 @@ class Surface:
 
     def markdown(self, text):
         self.markdowns.append(text)
-
-
-def panel(plan, *codes):
-    from app.chat_plan_view import render_plan_context
-    hits = hits_for(*codes)
-    surface = Surface()
-    render_plan_context(surface, build_plan_context(plan, [hit.course for hit in hits]).model_dump(mode="json"),
-                        [{"course_id": hit.course.course_id, "primary_code": hit.course.primary_code} for hit in hits])
-    return surface
 
 
 # Prompt: positions, program name, budgets and rule wording.
@@ -214,52 +196,11 @@ def test_a_missing_selected_year_must_count_every_shown_edition(empty_db):
         RequisiteEvidence.model_validate(requisites.model_dump() | {"other_years_recorded": 0})
 
 
-def test_unreadable_rows_keep_the_selected_year_and_the_card_says_nothing(empty_db):
-    from app.answer_evidence_view import requisite_years_line
-    from db.course_requisite_repository import CourseRequisiteRepository
-    from db.repository import CourseRepository
-    from tests.test_chat_structured_requisites import course
-    first = seeded(empty_db, document())
-    second = course(course_id="c-cs-6140", primary_code="CS 6140", primary_name="Machine Learning")
-    CourseRepository(empty_db).insert(second, raw_text="")
-    empty_db.execute("PRAGMA ignore_check_constraints=ON")
-    empty_db.execute("UPDATE courses SET primary_name=CAST(x'ff' AS TEXT) WHERE course_id='c-cs-6140'")
-    assert CourseRequisiteRepository(empty_db).read_batch([first.course_id, second.course_id]).unreadable == {second.course_id}
-    evidence = build_answer_evidence(empty_db, [first, second], selected_year="2026-2027")[second.course_id]
-    assert evidence.requisites.storage == "schema_unusable" and evidence.requisites.selected_year == "2026-2027"
-    assert "requisite_year_not_recorded" in evidence.warnings
-    assert requisite_years_line(evidence.model_dump(mode="json")) is None
-
-
 def test_the_prompt_keeps_the_selected_year_and_the_other_years_count(empty_db):
     record = seeded(empty_db, document("2025-2026"), document("2026-2027"))
     evidence = build_answer_evidence(empty_db, [record], selected_year="2026-2027")
     block = json.loads(format_courses_block([SearchHit(course=record, score=1)], evidence))[0]
     assert (block["catalog_requisites"]["selected_year"], block["catalog_requisites"]["other_years_recorded"]) == ("2026-2027", 1)
-
-
-@pytest.mark.parametrize("years,expected,absent", [
-    (("2025-2026", "2026-2027"),
-     "先修/共修规则：所选方案 Catalog 2026-2027 的课程块原文；另有 1 个其他年份未用于本次解释（不判断注册适用年度）", None),
-    (("2026-2027",), "先修/共修规则：所选方案 Catalog 2026-2027 的课程块原文（不判断注册适用年度）", "另有"),
-    (("2025-2026",), "所选方案 Catalog 2026-2027 没有可用的课程块规则；展示的其他年份不能替代。", "的课程块原文"),
-    ((), "所选方案 Catalog 2026-2027 没有可用的课程块规则。", "展示的其他年份"),
-])
-def test_the_card_year_line_matches_what_was_shown(empty_db, years, expected, absent):
-    from app.answer_evidence_view import requisite_years_line
-    record = seeded(empty_db, *(document(year) for year in years))
-    evidence = build_answer_evidence(empty_db, [record], selected_year="2026-2027")[record.course_id]
-    line = requisite_years_line(evidence.model_dump(mode="json"))
-    assert line == expected and (absent is None or absent not in line)
-
-
-def test_the_card_year_line_is_silent_without_requisite_storage(empty_db):
-    from app.answer_evidence_view import requisite_years_line
-    record = seeded(empty_db, document())
-    empty_db.execute("DROP TABLE course_requisite_documents")
-    evidence = build_answer_evidence(empty_db, [record], selected_year="2026-2027")[record.course_id]
-    assert evidence.requisites.storage == "schema_missing"
-    assert requisite_years_line(evidence.model_dump(mode="json")) is None
 
 
 # Resolution edges.
@@ -355,219 +296,5 @@ def test_an_archived_source_must_match_the_plan_year():
 
 # Evidence panel and history.
 
-def test_panel_names_partial_coverage_or_branches_unnamed_courses_and_positions_left_out():
-    surface = panel(plan_where(concentration="engineering-theory-modeling"), "CS 5800", "ZZ 9999")
-    assert any("仅部分规则" in text for text in surface.captions)
-    assert any(text.startswith("CS 5800") and "上层有 OR 分支" in text for text in surface.texts)
-    assert "ZZ 9999：方案里没有写到这门课；不代表不能算，也不代表能算，请向项目核实。" in surface.texts
-    info = panel(plan_where(program_id="info-ms", pathway="standard"), "INFO 5200")
-    assert "另有 2 处位置未列出，请到培养方案页核对完整规则。" in info.texts
-
-
-def test_panel_shows_the_activation_text_and_never_calls_a_candidate_required():
-    plan = with_rules(plan_where(pathway="align"), {"kind": "all_of", "label": "root", "children": [
-        {"kind": "optional", "label": "co-op", "activate_when": "only with approval", "children": [
-            {"kind": "course", "label": "leaf", "course_code": "CS 5800"}]},
-        {"kind": "course", "label": "core", "course_code": "CS 5002"}]})
-    assert any("仅适用于可选分支" in text and "条件：only with approval" in text for text in panel(plan, "CS 5800").texts)
-    text = "\n".join(panel(plan_where(program_id="cs-ms", pathway="standard"), "CS 5200").texts)
-    assert "组选候选" in text and "该组至少" in text and "必修课程" not in text
-
-
-def test_each_course_set_guard_holds_on_its_own():
-    from app.chat_plan_view import render_plan_context
-    from app.state_manager import add_message
-    context = build_plan_context(plan_where(pathway="align"), [Course(
-        course_id="c", primary_code="CS 5800", primary_name="S")]).model_dump(mode="json")
-    state = {"messages": []}
-    add_message(state, role="assistant", content="a", evidence=[{"course_id": "other", "primary_code": "CS 5200",
-                "primary_name": "S", "score": 1.0}], plan_context=context)
-    assert "plan_context" not in state["messages"][-1]
-    surface = Surface()
-    render_plan_context(surface, context, [{"course_id": "other", "primary_code": "CS 5200"}])
-    assert surface.captions == surface.texts == surface.markdowns == []
-
 
 # Page: selector, re-selection and 409 recovery.
-
-def test_the_plan_selector_explains_what_choosing_does(chat_page):
-    box = choose(page()).selectbox(key="chat_plan_id")
-    assert "不改变搜索结果" in box.help and "不判断你是否适用" in box.help
-
-
-def test_a_revision_change_without_a_choice_is_silent(chat_page):
-    backend, documents, calls = chat_page
-    app = choose(page())
-    documents["cs-ms"][1]["notes"] += " revised synthetic notes"
-    run(app)
-    assert not any("方案有更新" in item.value for item in app.caption)
-
-
-def test_duplicate_scope_with_distinct_ids_is_not_selectable():
-    from app.chat_plan_view import selectable_chat_plans
-    items = [plan.model_dump(mode="json") for plan in plans() if plan.program_id == "cs-ms"]
-    twin = copy.deepcopy(items[0]) | {"plan_id": items[0]["plan_id"] + "-twin"}
-    assert selectable_chat_plans([items[0], twin], "cs-ms") == []
-
-
-def test_the_student_can_go_back_to_no_plan(chat_page):
-    from app.program_plan_view import PLAN_PLACEHOLDER
-    backend, documents, calls = chat_page
-    app = choose(page(), plan_id=plan_where(pathway="align").plan_id)
-    box = app.selectbox(key="chat_plan_id")
-    assert box.options[0] == PLAN_PLACEHOLDER
-    box.set_value(None)
-    run(app)
-    app.chat_input[0].set_value("question without a plan again")
-    run(app)
-    assert "plan" not in backend.posts[-1]
-
-
-def test_a_choice_made_again_after_a_revision_change_is_kept(chat_page):
-    backend, documents, calls = chat_page
-    align = plan_where(pathway="align")
-    app = choose(page(), plan_id=align.plan_id)
-    documents["cs-ms"][1]["notes"] += " revised synthetic notes"
-    run(app)
-    assert app.selectbox(key="chat_plan_id").value is None
-    app.selectbox(key="chat_plan_id").set_value(align.plan_id)
-    run(app)
-    run(app)
-    assert app.selectbox(key="chat_plan_id").value == align.plan_id
-    assert not any("方案有更新" in item.value for item in app.caption)
-    app.chat_input[0].set_value("question after choosing again")
-    run(app)
-    assert backend.posts[-1]["plan"]["plan_id"] == align.plan_id
-
-
-def test_a_choice_made_again_after_a_plan_409_is_kept(chat_page, monkeypatch):
-    backend, documents, calls = chat_page
-    align = plan_where(pathway="align")
-    original = type(backend).__call__
-
-    def transport(self, request):
-        if request.method == "POST" and not self.posts:
-            self.posts.append(json.loads(request.content))
-            return httpx.Response(409, json={"detail": PLAN_SELECTION_MESSAGES["stale"]})
-        return original(self, request)
-
-    monkeypatch.setattr(type(backend), "__call__", transport)
-    app = choose(page(), plan_id=align.plan_id)
-    app.chat_input[0].set_value("question")
-    run(app)
-    assert app.selectbox(key="chat_plan_id").value is None
-    app.selectbox(key="chat_plan_id").set_value(align.plan_id)
-    run(app)
-    run(app)
-    assert app.selectbox(key="chat_plan_id").value == align.plan_id
-    app.chat_input[0].set_value("question again")
-    run(app)
-    assert backend.posts[-1]["plan"]["plan_id"] == align.plan_id
-
-
-def test_a_family_switch_shows_no_revision_caption(chat_page):
-    app = choose(page(), plan_id=plan_where(pathway="align").plan_id)
-    app.selectbox(key="chat_program_id").set_value("ds-ms")
-    run(app)
-    assert not any("方案有更新" in item.value for item in app.caption)
-
-
-def test_the_plan_panel_sits_before_the_course_list_and_old_answers_keep_their_plan(chat_page, monkeypatch):
-    backend, documents, calls = chat_page
-    align = plan_where(pathway="align")
-    context = build_plan_context(align, [Course(course_id="c-algo", primary_code="CS 5800", primary_name="Synthetic Algorithms")])
-    original = type(backend).__call__
-
-    def transport(self, request):
-        response = original(self, request)
-        if request.method == "POST":
-            events = [json.loads(line) for line in response.text.splitlines()]
-            events[0]["plan_context"] = context.model_dump(mode="json")
-            return httpx.Response(200, content="".join(json.dumps(event) + "\n" for event in events))
-        return response
-
-    monkeypatch.setattr(type(backend), "__call__", transport)
-    app = choose(page(), plan_id=align.plan_id)
-    app.chat_input[0].set_value("CS 5800")
-    run(app)
-    run(app)
-    labels = [getattr(node, "label", None) for node in app.expander]
-    assert labels.index("📘 所选方案与课程位置") < labels.index("📎 相关课程（1 门）")
-    app.selectbox(key="chat_plan_id").set_value(None)
-    run(app)
-    assert any("本回答按方案" in item.value for item in app.caption)
-
-
-def real_cache_page(monkeypatch, curriculum, post):
-    """The real tab view cache over a MockTransport: GET /programs/cs-ms answers curriculum(n) on its nth fetch; a
-    POST answers post(n) on the nth question, or the default backend when that returns None."""
-    backend = install_backend(monkeypatch)
-    backend.programs = [{"program_id": "cs-ms", "full_name": "cs-ms", "prefix": "CS"}]
-    gets = []
-    original = type(backend).__call__
-
-    def transport(self, request):
-        if request.method == "GET" and request.url.path == "/programs/cs-ms":
-            gets.append(request.url.path)
-            return httpx.Response(200, json={"program_id": "cs-ms", "plan_schema_available": True,
-                                             "plans": copy.deepcopy(curriculum(len(gets)))})
-        if request.method == "POST":
-            response = post(len(self.posts) + 1)
-            if response is not None:
-                self.posts.append(json.loads(request.content))
-                return response
-        return original(self, request)
-
-    monkeypatch.setattr(type(backend), "__call__", transport)
-    return backend, gets
-
-
-def test_a_program_conflict_409_keeps_the_plan_and_the_cached_list(monkeypatch):
-    align = plan_where(pathway="align")
-    documents = [plan.model_dump(mode="json") for plan in plans() if plan.program_id == "cs-ms"]
-    backend, gets = real_cache_page(monkeypatch, lambda count: documents,
-                                    lambda count: httpx.Response(409, json={"detail": PREFIX_CONFLICT}))
-    app = choose(page(), plan_id=align.plan_id)
-    app.chat_input[0].set_value("DS foundational courses")
-    run(app)
-    assert app.session_state["chat_plan_id"] == align.plan_id
-    app.chat_input[0].set_value("rewritten question")
-    run(app)
-    assert [post["plan"]["plan_id"] for post in backend.posts] == [align.plan_id] * 2 and len(gets) == 1
-
-
-def test_a_plan_409_refetches_the_family_list_so_choosing_again_sends_the_current_revision(monkeypatch):
-    align = plan_where(pathway="align")
-    first = [plan.model_dump(mode="json") for plan in plans() if plan.program_id == "cs-ms"]
-    revised = copy.deepcopy(first)
-    next(item for item in revised if item["plan_id"] == align.plan_id)["notes"] += " revised synthetic notes"
-    backend, gets = real_cache_page(
-        monkeypatch, lambda count: first if count == 1 else revised,
-        lambda count: httpx.Response(409, json={"detail": PLAN_SELECTION_MESSAGES["stale"]}) if count == 1 else None)
-    app = choose(page(), plan_id=align.plan_id)
-    app.chat_input[0].set_value("first question")
-    run(app)
-    assert app.session_state["chat_plan_id"] is None
-    app.selectbox(key="chat_plan_id").set_value(align.plan_id)
-    run(app)
-    app.chat_input[0].set_value("second question")
-    run(app)
-    expected = [content_hash(ProgramPlan.model_validate(next(item for item in documents if item["plan_id"] == align.plan_id)))
-                for documents in (first, revised)]
-    assert [post["plan"]["plan_content_sha256"] for post in backend.posts] == expected and len(gets) == 2
-
-
-def test_a_plan_409_with_an_unchanged_list_keeps_the_programs_page_choice(monkeypatch):
-    # Expired, not dropped: the refetch is still compared with the last list, so nothing reads as "updated".
-    align = plan_where(pathway="align")
-    documents = [plan.model_dump(mode="json") for plan in plans() if plan.program_id == "cs-ms"]
-    backend, gets = real_cache_page(monkeypatch, lambda count: documents,
-                                    lambda count: httpx.Response(409, json={"detail": PLAN_SELECTION_MESSAGES["unavailable"]}))
-    app = choose(page(), plan_id=align.plan_id)
-    app.session_state["program-plan-cs-ms"] = align.plan_id
-    run(app)
-    app.chat_input[0].set_value("question")
-    run(app)
-    assert len(gets) == 2 and app.session_state["chat_plan_id"] is None
-    assert app.session_state["program-plan-cs-ms"] == align.plan_id
-    assert "_program_plan_revised" not in app.session_state

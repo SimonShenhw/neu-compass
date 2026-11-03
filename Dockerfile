@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
-# NEU-Compass production image. The same image serves both the FastAPI
-# backend and the Streamlit UI — `command:` in docker-compose.yml picks
-# which entrypoint each container runs.
+# NEU-Compass production image: the FastAPI backend. The backup sidecar
+# runs the same image with its own `command:` in docker-compose.yml. (The
+# Streamlit UI ran from it too until R8 deleted it.)
 #
 # Built for NAS deploy (UGREEN DXP 6800 Pro: i5-1235U + Iris Xe 80EU,
 # dual-channel DDR5). ONNX Runtime with OpenVINO EP + Intel iGPU drivers
@@ -53,11 +53,12 @@ ARG SLIM_EXCLUDES="--no-install-package torch --no-install-package triton \
     --no-install-package pymupdf \
     --no-install-package ragas \
     --no-install-package datasets"
-# pyarrow is NOT excludable: it's a hard dependency of streamlit itself (declared in
-# its metadata). Excluding it (ADR-0023 v1) crashed the UI container's chat path with
-# ModuleNotFoundError on the FIRST prod use: st.write_stream (the UI's streaming path
-# until 2026-10-05) imports streamlit/dataframe_util, which does `import pyarrow`
-# unconditionally (eval drives the API directly and never caught it). ~150MB, worth it.
+# pyarrow is NOT excluded. It was a hard dependency of streamlit: excluding it
+# (ADR-0023 v1) crashed the UI container's chat path with ModuleNotFoundError on
+# the FIRST prod use (st.write_stream imported streamlit/dataframe_util, which does
+# `import pyarrow`; eval drives the API directly and never caught it). R8 deleted
+# Streamlit, but ir-datasets (FlagEmbedding's) still depends on it, and nobody has
+# checked that the API never imports it, so it stays.
 
 # Install locked runtime deps. We skip the `onnx` extra here because we want
 # onnxruntime-openvino (Intel-flavor) instead of the generic onnxruntime that
@@ -162,9 +163,9 @@ RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firm
 WORKDIR /app
 COPY --from=builder /app /app
 
-# api: 8000, ui: 8501. cloudflared talks to these by service name on the
-# compose network, not via host ports.
-EXPOSE 8000 8501
+# api: 8000. cloudflared talks to it by service name on the compose network,
+# not via the host port.
+EXPOSE 8000
 
-# Default command runs the API. docker-compose.yml overrides for the UI service.
+# Default command runs the API. docker-compose.yml overrides it for the backup service.
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -64,9 +64,9 @@ log = structlog.get_logger("neu_compass.program")
 def _revisions(plans: list[ProgramPlan]) -> dict[str, str]:
     """{plan_id: plan_content_sha256} for the plans in an answer (R4b): the web front end sends a plan's content
     version back with a draft check or a question and never recomputes Python's JSON hash. Kept at the top level, not
-    in each plan, because the Streamlit page validates every plan against ProgramPlan (extra="forbid").
+    in each plan, because ProgramPlan forbids extra fields (the Streamlit page validated every plan against it).
     中文：回答里每份方案的内容版本（R4b）：新前端在草案核对或提问时原样带回，不用自己重算 Python 的 JSON 摘要。放在顶层
-    而不放进每份方案，因为 Streamlit 页面按 ProgramPlan（extra="forbid"）校验每份方案。"""
+    而不放进每份方案，因为 ProgramPlan 不收多余字段（Streamlit 页面按它校验过每份方案）。"""
     return {plan.plan_id: content_hash(plan) for plan in plans}
 
 
@@ -311,8 +311,8 @@ def get_selected_program_policies(
     description=(
         "The web front end keeps the draft (course IDs) in memory and sends it with every change, plus any newly "
         "typed codes in `input`. The answer is the draft the server stands behind (`courses`; codes newly added in "
-        "`added`), the notices for that input in order (plain-text sentences: the Streamlit page's wording for typed "
-        "codes, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those "
+        "`added`), the notices for that input in order (plain-text sentences: for typed codes the wording the "
+        "Streamlit page had, three of their own for re-reading the sent draft), and the plan's rule tree evaluated on those "
         "courses — recorded rules only, not eligibility.\n\n"
         "`plan_content_sha256` must be the version the page shows (`plan_revisions`). When the exact plan cannot be "
         "confirmed the answer is a 409 with a `reason`: `stale` for another content version or scope, `missing` "

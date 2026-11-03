@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from schemas.program_plan import RequirementNode
-from app.program_plan_view import rule_lines
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -23,38 +22,6 @@ def test_subject_pool_preserves_exceptions_without_listing_all_courses():
     assert rule.subject_codes == ["INFO"]
     assert rule.course_codes == []
     assert rule.excluded_course_codes == ["INFO 5200"]
-
-
-def test_numeric_range_is_not_two_required_endpoint_courses():
-    rule = RequirementNode.model_validate({
-        "kind": "select", "label": "Electives", "min_credits": 12,
-        "course_ranges": [{"start": "CS 5100", "end": "CS 7980"}],
-        "course_codes": ["CS 7990"],
-    })
-    assert rule.course_ranges[0].start == "CS 5100"
-    text = "\n".join(rule_lines(rule))
-    assert "CS 5100–CS 7980" in text and "编号范围" in text
-    assert "不证明" in text  # A numerical interval is not a list of actual offerings.
-
-
-def test_optional_branch_does_not_become_a_common_requirement():
-    rule = RequirementNode.model_validate({
-        "kind": "optional", "label": "Co-op", "activate_when": "选择 Co-op 时",
-        "children": [{"kind": "course", "label": "Preparation", "course_code": "ENCP 6000"}],
-    })
-    assert rule.kind == "optional"
-    text = "\n".join(rule_lines(rule))
-    assert "可选分支" in text and "选择 Co-op 时" in text
-
-
-def test_subject_exclusions_render_separately_from_positive_candidates():
-    rule = RequirementNode.model_validate({
-        "kind": "select", "label": "Other", "min_credits": 12,
-        "subject_codes": ["CSYE", "DAMG", "INFO", "TELE"],
-        "course_codes": ["MUST 5510"], "excluded_course_codes": ["CSYE 6220", "INFO 5200"],
-    })
-    text = "\n".join(rule_lines(rule))
-    assert "科目前缀" in text and "排除：CSYE 6220、INFO 5200" in text
 
 
 @pytest.mark.parametrize("change", [

@@ -7,18 +7,13 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.api_client import ApiClient, ApiError
-from app.program_plan_view import render_program_plans
-from app.program_policy_view import load_selected_program_policy_evidence, render_program_policy_evidence
 from db.program_plan_repository import ProgramPlanRepository, content_hash
 from db.program_repository import ProgramRepository
 from rag.program_policy_evidence import ProgramPolicyReader
 from schemas.program import Program
 from schemas.program_plan import ProgramPlan
-from schemas.program_policy import paragraph_hash
 from schemas.program_policy_view import ProgramPolicyView
 from tests.test_program_policy_evidence import fixture_bundle
-from tests.test_program_plan_view import FakeSurface
 from tests.test_program_plan_contract import chat_meta, seed_plan, stub_chat
 
 
@@ -31,22 +26,6 @@ def assert_no_guessed_schedule(api_client):
     assert meta["notices"] == ["program_schedule_unverified"]
 
 ROOT = Path(__file__).resolve().parent.parent
-
-
-def test_selector_returns_only_the_explicitly_selected_plan():
-    data = json.loads((ROOT / "data/program_plan_seed/boston_2026_2027_extended_rules.json").read_text())[0]
-    assert render_program_plans(FakeSurface(), [data], key="selected") is None
-    selected = render_program_plans(FakeSurface(choice=data["plan_id"]), [data], key="selected")
-    assert selected is not None and selected.plan_id == data["plan_id"]
-
-
-def test_removed_plan_selection_is_cleared_without_a_fallback():
-    data = json.loads((ROOT / "data/program_plan_seed/boston_2026_2027_extended_rules.json").read_text())[0]
-    st = FakeSurface(choice="removed-plan")
-    st.session_state["selected"] = "removed-plan"
-    assert render_program_plans(st, [data], key="selected") is None
-    # Cleared to None, not popped, so the browser's selectbox is reset too (OPT-02 review).
-    assert st.session_state["selected"] is None and not st.texts
 
 
 def test_selected_policy_route_exists_without_reactivating_legacy_guesses(api_client, empty_db):
@@ -213,81 +192,6 @@ def test_wire_contract_rejects_inconsistent_ready_or_nonready_evidence(tmp_path,
         ProgramPolicyView.model_validate(data)
 
 
-def test_ready_view_has_review_provenance_limits_and_plaintext_only(tmp_path):
-    plan, data, reader = setup_reader(tmp_path)
-    marker = '[unsafe](https://evil.test) <script>bad</script>'
-    data["checked_by"] = marker
-    fragment = data["policies"][0]["fragments"][0]
-    fragment["summary"], fragment["limitation"] = marker, marker
-    reader.bundle_file.write_text(json.dumps(data))
-    view = reader.read(plan)
-    st = FakeSurface()
-    render_program_policy_evidence(st, plan, view.model_dump(mode="json"))
-    assert any("仅选定片段" in text and "不合并" in text for text in st.captions)
-    assert any("不证明来源真实" in text for text in st.captions)
-    assert any(marker in text for text in st.texts)
-    assert any("Independent synthetic policy paragraph." == text for text in st.texts)
-    assert all("evil.test" not in text and "<script>" not in text for text in st.markdowns)
-    assert st.markdowns == [f"[官方政策来源]({view.policies[0].source.url})"]
-
-
-def test_even_source_paragraph_html_is_only_displayed_as_plaintext(tmp_path):
-    plan, _, reader = setup_reader(tmp_path)
-    view = reader.read(plan).model_dump(mode="json")
-    marker = '<script>bad</script> [unsafe](https://evil.test)'
-    fragment = view["policies"][0]["fragments"][0]
-    fragment["source_paragraph"], fragment["paragraph_sha256"] = marker, paragraph_hash(marker)
-    st = FakeSurface()
-    render_program_policy_evidence(st, plan, view)
-    assert marker in st.texts and all("evil.test" not in text and "<script>" not in text for text in st.markdowns)
-
-
-@pytest.mark.parametrize("status", ["not_linked", "draft", "stale", "unavailable", "unusable"])
-def test_failed_view_only_warns_without_old_policy_links_or_text(tmp_path, status):
-    plan, _, reader = setup_reader(tmp_path)
-    view = reader.read(plan).model_dump(mode="json")
-    view.update(status=status, policies=[], link=None, checked_on=None, checked_by=None)
-    st = FakeSurface()
-    render_program_policy_evidence(st, plan, view)
-    assert st.captions and st.texts == st.markdowns == []
-
-
-@pytest.mark.parametrize("kind", ["different-plan", "different-current-revision", "different-scope", "bad-format", "bad-url"])
-def test_ui_rechecks_expected_plan_identity_and_wire_before_rendering(tmp_path, kind):
-    plan, _, reader = setup_reader(tmp_path)
-    view = reader.read(plan).model_dump(mode="json")
-    if kind == "different-plan":
-        view["plan_id"] = view["link"]["plan_id"] = "other"
-    elif kind == "different-current-revision":
-        view["plan_content_sha256"] = view["link"]["plan_content_sha256"] = "0" * 64
-    elif kind == "different-scope":
-        view["scope"]["campus"] = view["link"]["campus"] = "seattle"
-    elif kind == "bad-format":
-        view = {}
-    else:
-        view["policies"][0]["source"]["url"] = "javascript:bad"
-    st = FakeSurface()
-    render_program_policy_evidence(st, plan, view)
-    assert st.captions and not st.texts and not st.markdowns
-
-
-@pytest.mark.parametrize("kind", ["empty", "duplicate-id", "duplicate-scope"])
-def test_selector_clears_missing_or_ambiguous_scope_and_never_picks_last(kind):
-    data = json.loads((ROOT / "data/program_plan_seed/boston_2026_2027_extended_rules.json").read_text())[0]
-    docs = []
-    if kind != "empty":
-        duplicate = json.loads(json.dumps(data))
-        if kind == "duplicate-id":
-            duplicate["campus"] = "seattle"
-        else:
-            duplicate["plan_id"] = "other"
-        docs = [data, duplicate]
-    st = FakeSurface(choice=data["plan_id"])
-    st.session_state["selected"] = data["plan_id"]
-    assert render_program_plans(st, docs, key="selected") is None
-    assert "selected" not in st.session_state and not st.texts
-
-
 def seed_fixture_plan(conn, plan):
     ProgramRepository(conn).upsert_program(Program(program_id=plan.program_id, full_name="Legacy family", prefix="CS"))
     ProgramPlanRepository(conn).store(plan)
@@ -347,38 +251,6 @@ def test_api_cannot_return_another_family_or_unusable_plan(api_client, empty_db,
         assert not ProgramPlanRepository(empty_db).available()
 
 
-def test_client_calls_only_the_selected_public_get_and_preserves_auth_header(tmp_path):
-    plan, _, reader = setup_reader(tmp_path)
-    calls = []
-    def handle(request):
-        calls.append(request)
-        return httpx.Response(200, json=reader.read(plan).model_dump(mode="json"))
-    with ApiClient(base_url="http://api.test", session_token="sample", transport=httpx.MockTransport(handle)) as api:
-        response = api.get_program_policies(plan.program_id, plan.plan_id)
-    assert response["status"] == "ready" and len(calls) == 1
-    assert calls[0].method == "GET" and calls[0].url.path == f"/programs/{plan.program_id}/plans/{plan.plan_id}/policies"
-    assert calls[0].headers["authorization"] == "Bearer sample" and not calls[0].url.query
-
-
-@pytest.mark.parametrize("fail", ["timeout", "connect", "404", "bad-json"])
-def test_ui_api_failure_does_not_crash_or_keep_a_previous_policy(tmp_path, monkeypatch, fail):
-    plan, _, _ = setup_reader(tmp_path)
-    def handle(request):
-        if fail == "timeout":
-            raise httpx.ReadTimeout("fail", request=request)
-        if fail == "connect":
-            raise httpx.ConnectError("fail", request=request)
-        if fail == "404":
-            return httpx.Response(404, json={"detail": "<script>private</script>"})
-        return httpx.Response(200, content=b"not-json", headers={"content-type": "application/json"})
-    monkeypatch.setattr("app.api_client.ApiClient", lambda **kwargs:
-        ApiClient(base_url="http://api.test", transport=httpx.MockTransport(handle), **kwargs))
-    st = FakeSurface()
-    load_selected_program_policy_evidence(st, plan)
-    assert any("无法加载" in caption for caption in st.captions) and not st.texts and not st.markdowns
-    assert not any("private" in caption for caption in st.captions)
-
-
 def test_dependency_archive_defaults_follow_sqlite_directory_not_cwd(tmp_path, monkeypatch):
     from api.dependencies import get_program_policy_reader
     from config import settings
@@ -392,91 +264,3 @@ def test_dependency_archive_defaults_follow_sqlite_directory_not_cwd(tmp_path, m
     monkeypatch.setattr(settings, "program_catalog_source_dir", tmp_path / "explicit-program")
     assert get_program_policy_reader().policy_source_dir == tmp_path / "explicit-policy"
     assert get_program_policy_reader().program_source_dir == tmp_path / "explicit-program"
-
-
-def widget_app(monkeypatch, plan, reader, *, backend=None):
-    from streamlit.testing.v1 import AppTest
-    backend = backend if backend is not None else {"plan": plan}
-    class WidgetApi:
-        def __init__(self, **kwargs):
-            pass
-        def __enter__(self):
-            return self
-        def __exit__(self, *args):
-            return False
-        def get_program_curriculum(self, program_id):
-            import streamlit as st
-            st.session_state["curriculum_calls"] = st.session_state.get("curriculum_calls", 0) + 1
-            current = backend["plan"]
-            return dict(program_id=current.program_id, prefix="CS", full_name="Example plan family", semesters=[],
-                plans=[current.model_dump(mode="json")])
-        def get_program_policies(self, program_id, plan_id):
-            import streamlit as st
-            st.session_state["policy_calls"] = st.session_state.get("policy_calls", 0) + 1
-            assert program_id == plan.program_id and plan_id == plan.plan_id
-            if backend.get("outage"):
-                raise ApiError(503, "outage")
-            return reader.read(backend["plan"]).model_dump(mode="json")
-    monkeypatch.setattr("app.api_client.ApiClient", WidgetApi)
-    return AppTest.from_string('''
-import streamlit as st
-from app.program_view import render_program_browser
-st.session_state.setdefault("selected_program_id", "cs-ms")
-render_program_browser(st)
-''').run(timeout=45)
-
-
-def test_real_browser_panel_loads_only_after_choice_and_clears_on_none_or_refresh(tmp_path, monkeypatch):
-    plan, _, reader = setup_reader(tmp_path)
-    app = widget_app(monkeypatch, plan, reader)
-    assert not app.exception and app.selectbox[0].value is None
-    assert app.session_state["curriculum_calls"] == 1
-    assert "policy_calls" not in app.session_state
-    app.selectbox[0].set_value(plan.plan_id).run(timeout=45)
-    assert not app.exception and app.session_state["policy_calls"] == 1
-    assert any(item.value == "Independent synthetic policy paragraph." for item in app.text)
-    app.selectbox[0].set_value(None).run(timeout=45)
-    assert not app.exception and app.session_state["policy_calls"] == 1
-    assert not any("Independent synthetic policy" in item.value for item in app.text)
-    app.selectbox[0].set_value(plan.plan_id).run(timeout=45)
-    assert not app.exception and app.session_state["policy_calls"] == 2
-    next(button for button in app.button if button.key == "prog-refresh-cs-ms").click().run(timeout=45)
-    assert not app.exception and app.selectbox[0].value is None
-    assert app.session_state["curriculum_calls"] == 2 and app.session_state["policy_calls"] == 2
-    assert not any("Independent synthetic policy" in item.value for item in app.text)
-
-
-def test_real_widget_recovers_from_api_outage_without_using_a_prior_ready_response(tmp_path, monkeypatch):
-    plan, _, reader = setup_reader(tmp_path)
-    backend = {"plan": plan}
-    app = widget_app(monkeypatch, plan, reader, backend=backend)
-    app.selectbox[0].set_value(plan.plan_id).run(timeout=45)
-    assert not app.exception and any("Independent synthetic policy" in item.value for item in app.text)
-    backend["outage"] = True
-    app.run(timeout=45)
-    assert not app.exception and any("无法加载" in item.value for item in app.caption)
-    assert not any("Independent synthetic policy" in item.value for item in app.text)
-    backend["outage"] = False
-    next(reader.policy_source_dir.glob("*.html")).unlink()
-    app.run(timeout=45)
-    assert not app.exception and any("来源存档不可用" in item.value for item in app.caption)
-    assert not any("Independent synthetic policy" in item.value for item in app.text)
-
-
-def test_real_widget_current_backend_revision_requires_explicit_refresh_and_reselection(tmp_path, monkeypatch):
-    plan, _, reader = setup_reader(tmp_path)
-    backend = {"plan": plan}
-    app = widget_app(monkeypatch, plan, reader, backend=backend)
-    app.selectbox[0].set_value(plan.plan_id).run(timeout=45)
-    revised = plan.model_dump(mode="json")
-    revised["notes"] += " New backend revision."
-    backend["plan"] = ProgramPlan.model_validate(revised)
-    app.run(timeout=45)
-    assert not app.exception and any("当前所选方案" in item.value for item in app.caption)
-    assert not any("Independent synthetic policy" in item.value for item in app.text)
-    next(button for button in app.button if button.key == "prog-refresh-cs-ms").click().run(timeout=45)
-    assert not app.exception and app.selectbox[0].value is None
-    app.selectbox[0].set_value(plan.plan_id).run(timeout=45)
-    assert not app.exception and any("须重新核对" in item.value for item in app.caption)
-    assert any("New backend revision" in item.value for item in app.text)
-    assert not any("Independent synthetic policy" in item.value for item in app.text)

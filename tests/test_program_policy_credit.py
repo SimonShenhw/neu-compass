@@ -3,14 +3,12 @@
 import copy
 import hashlib
 import json
-from pathlib import Path
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
 import schemas.program_policy as policy_schema
-from app.program_policy_view import render_program_policy_evidence
 from db.program_plan_repository import ProgramPlanRepository
 from db.program_repository import ProgramRepository
 from rag.program_policy_evidence import ProgramPolicyReader
@@ -20,7 +18,6 @@ from schemas.program_policy import PolicyEvidence, PolicyFragment, ProgramPolicy
 from schemas.program_policy_view import ProgramPolicyView
 from scripts.audit_program_policy_sources import audit_bundle
 from scripts.capture_program_policy_sources import capture_policy_sources
-from tests.test_program_plan_view import FakeSurface
 from tests.test_program_policy_evidence import ROOT, fixture_bundle, html, request_data
 
 LIST_TEXT = "Only after approval. Limit applies. Exception needs a petition. No automatic credit."
@@ -169,16 +166,6 @@ def test_reader_and_offline_audit_preserve_whole_list_are_readonly_and_no_networ
     assert {str(p): p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()} == before
 
 
-def test_ui_labels_list_evidence_and_keeps_source_plaintext(tmp_path):
-    _, file, _, policy_dir, program_dir, plan = list_fixture(tmp_path)
-    view = ProgramPolicyReader(file, policy_dir, program_dir).read(plan).model_dump(mode='json')
-    st = FakeSurface()
-    render_program_policy_evidence(st, plan, view)
-    assert LIST_TEXT in st.texts
-    assert any('列表块 0' in text for text in st.texts)
-    assert not any(LIST_TEXT in text for text in st.markdowns)
-
-
 @pytest.mark.parametrize('state', ['unavailable', 'unusable', 'stale'])
 def test_failure_wire_cannot_retain_usable_list_evidence(tmp_path, state):
     _, file, _, policy_dir, program_dir, plan = list_fixture(tmp_path)
@@ -186,20 +173,6 @@ def test_failure_wire_cannot_retain_usable_list_evidence(tmp_path, state):
     data['status'] = state
     with pytest.raises(ValidationError, match='Non-ready'):
         ProgramPolicyView.model_validate(data)
-
-
-def test_real_widget_displays_whole_list_and_removes_it_after_source_failure(tmp_path, monkeypatch):
-    from tests.test_program_policy_view import widget_app
-    data, file, _, policy_dir, program_dir, plan = list_fixture(tmp_path)
-    app = widget_app(monkeypatch, plan, ProgramPolicyReader(file, policy_dir, program_dir))
-    app.selectbox[0].set_value(plan.plan_id).run(timeout=45)
-    assert not app.exception and any(item.value == LIST_TEXT for item in app.text)
-    assert any('列表块 0' in item.value for item in app.text)
-    path = policy_dir / f"{data['policies'][0]['source']['sha256']}.html"
-    path.write_bytes(path.read_bytes().replace(b'No automatic credit.', b'Automatic credit.'))
-    app.run(timeout=45)
-    assert not app.exception and any('校验未通过' in item.value for item in app.caption)
-    assert not any(LIST_TEXT in item.value for item in app.text)
 
 
 def test_list_evidence_api_is_no_store_and_does_not_change_plan_or_db(api_client, empty_db, tmp_path):

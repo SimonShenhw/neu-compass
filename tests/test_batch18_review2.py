@@ -13,8 +13,6 @@ from pydantic import ValidationError
 
 import scripts.audit_data_coverage as audit
 from api.dependencies import get_db_conn
-from app.answer_evidence_view import SHORT_WARNING_LABELS, notice_line
-from app.course_detail_view import render_course_detail
 from db.course_requisite_repository import CourseRequisiteRepository
 from db.repository import CourseRepository
 from eval.answer_checks import AnswerContext, check_answer, summarize
@@ -24,7 +22,6 @@ from schemas.course_requisites import RequisiteSection
 from scripts.eval_answers_live import build_case, course_parts
 from tests import test_audit_data_coverage as coverage
 from tests import test_chat_structured_requisites as structured
-from tests.ui_recorder import Recorder
 
 
 @pytest.fixture
@@ -145,29 +142,6 @@ def test_duplicate_valid_year_is_dropped_without_breaking_course_routes(api_clie
     requisites = meta["results"][0]["answer_evidence"]["requisites"]
     assert [item["catalog_year"] for item in requisites["editions"]] == expected_years
     assert requisites["unusable_records"] == bundle["unusable_records"]
-
-
-def test_course_detail_does_not_claim_its_selector_omits_older_years(api_client):
-    conn = api_client.app.dependency_overrides[get_db_conn]()
-    for year in range(2022, 2027):
-        CourseRequisiteRepository(conn).store(structured.document(f"{year}-{year + 1}"))
-    st = Recorder()
-    render_course_detail(st, api_client.get("/course/c-cs-5800").json(), cid="review2")
-    assert "更早年份没有列出" not in json.dumps(st.log, ensure_ascii=False)
-
-
-def test_course_overview_does_not_present_three_year_chat_warnings_as_all_years(api_client):
-    conn = api_client.app.dependency_overrides[get_db_conn]()
-    CourseRequisiteRepository(conn).store(structured.document(corequisite="CS 5801 and CS 5802 or CS 5803"))
-    st = Recorder()
-    render_course_detail(st, api_client.get("/course/c-cs-5800").json(), cid="review2")
-    captions = [text for kind, text, path in st.log if kind == "caption" and not path]
-    assert all(SHORT_WARNING_LABELS[code] not in text for text in captions for code in structured.NEW_CODES)
-
-
-@pytest.mark.parametrize("code", structured.NEW_CODES)
-def test_short_requisite_labels_include_corequisites(code):
-    assert "先修/共修" in notice_line([code])
 
 
 @pytest.mark.parametrize("digest", ["A" * 64, "a" * 63])

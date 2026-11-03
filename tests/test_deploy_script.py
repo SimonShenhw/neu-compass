@@ -66,10 +66,6 @@ function Invoke-WebRequest {
         }
         return [pscustomobject]@{StatusCode=$httpStatus; Content=$body}
     }
-    if ($Uri -like '*/_stcore/health') {
-        $body = if ($global:reviewScenario -eq 'ui_unhealthy') { '<html>proxy error</html>' } else { 'ok' }
-        return [pscustomobject]@{StatusCode=200; Content=$body}
-    }
     if ($Uri -like '*/resolve/course?ref=CS-5800') {
         $httpStatus = if ($global:reviewScenario -eq 'resolver_missing') { 404 } else { 200 }
         $body = if ($global:reviewScenario -eq 'resolver_empty') {
@@ -177,7 +173,7 @@ def test_deploy_requires_all_readonly_acceptance_probes(scenario: str) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Deploy done" in result.stdout
     assert "REVIEW_PROBE: http://review-only.invalid:8000/ready" in result.stdout
-    assert "REVIEW_PROBE: http://review-only.invalid:8501/_stcore/health" in result.stdout
+    assert ":8501" not in result.stdout  # R8: no Streamlit to probe. 中文：R8 删了 Streamlit，不再探测它。
     assert "REVIEW_PROBE: http://review-only.invalid:8000/resolve/course?ref=CS-5800" in result.stdout
     assert "REVIEW_PROBE: http://review-only.invalid:8000/coop" in result.stdout
     assert "REVIEW_PROBE: http://review-only.invalid:8510/healthz" in result.stdout
@@ -190,7 +186,7 @@ def test_deploy_requires_all_readonly_acceptance_probes(scenario: str) -> None:
     "scenario",
     [
         "compose_failure", "warming", "empty_index", "empty_bm25", "invalid_json",
-        "api_unavailable", "network_failure", "ui_unhealthy", "resolver_missing", "resolver_empty",
+        "api_unavailable", "network_failure", "resolver_missing", "resolver_empty",
         "coop_unavailable", "coop_invalid_json", "coop_wrong_shape",
         # Public list degrades to seeds before v1.3; the header must still fail the deploy.
         "coop_unmigrated", "coop_no_header",
@@ -217,7 +213,7 @@ def test_deploy_acceptance_with_windows_powershell_5(monkeypatch: pytest.MonkeyP
         test_deploy_requires_all_readonly_acceptance_probes(scenario)
     for scenario in (
         "compose_failure", "warming", "empty_index", "empty_bm25", "invalid_json",
-        "api_unavailable", "network_failure", "ui_unhealthy", "resolver_missing", "resolver_empty",
+        "api_unavailable", "network_failure", "resolver_missing", "resolver_empty",
         "coop_unavailable", "coop_invalid_json", "coop_wrong_shape", "coop_unmigrated", "coop_no_header",
         *WEB_FAILURES,
     ):

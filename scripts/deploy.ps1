@@ -6,9 +6,9 @@
 #   3. scp .env             → ${NasUser}@${NasHost}:${NasPath}/.env
 #   4. (opt-in) tar-pipe runtime data via WSL → ${NasPath}/runtime-data/
 #   5. ssh nas "docker compose up -d [--build]"
-#   6. Verify API readiness, UI health, read-only deep-link resolution, Co-op,
-#      and the web front end (R7): its health, and a deep link answered with
-#      the app and its security headers
+#   6. Verify API readiness, read-only deep-link resolution, Co-op, and the
+#      web front end (R7): its health, and a deep link answered with the app
+#      and its security headers
 #
 # Why tar-pipe instead of rsync?
 #   The UGREEN DXP NAS wraps /usr/bin/rsync with an ACL that only allows
@@ -29,7 +29,7 @@
 #   ssh ${NasUser}@${NasHost} 'mkdir -p /volume1/docker/neu-compass/{runtime-data,cloudflared}'
 #   scp -O ~/.cloudflared/{cert.pem,*.json,config.yml} ${NasUser}@${NasHost}:/volume1/docker/neu-compass/cloudflared/
 #   # Edit NAS config.yml: change service URLs from http://localhost:... to
-#   # http://api:8000 and http://ui:8501 (compose service names).
+#   # http://api:8000 and http://web:8080 (compose service names).
 #   ssh -t ${NasUser}@${NasHost} sudo usermod -aG docker ${NasUser}
 #
 # Env var defaults (set in your PowerShell $PROFILE to avoid passing each time):
@@ -253,7 +253,7 @@ if ($SyncData) {
         # dropped faiss_index/id_map.json (FaissIndex.load hard-requires it;
         # a STALE copy mis-maps int ids -> wrong courses with no error) and
         # every OpenVINO model dir's config.json (from_pretrained refuses to
-        # load -> api crash-loops, ui+cloudflared never start).
+        # load -> api crash-loops, and cloudflared, which waits for it, never starts).
         # NEVER ship the dev courses.db over production: the NAS copy holds
         # user-generated rows (users / coop / organic query_log) that exist
         # NOWHERE else. Index/model artifacts still sync; DB changes travel
@@ -285,7 +285,7 @@ if ($DryRun) {
     # Read-only probes: do not call /search or /chat (query_log / Gemini).
     # 中文：只读验收，不污染真实查询日志，也不消耗 Gemini 配额。
     Write-Host ''
-    Write-Host "  Probing API + UI + deep links + Co-op + web (${ReadyTimeoutSeconds}s timeout) " -NoNewline
+    Write-Host "  Probing API + deep links + Co-op + web (${ReadyTimeoutSeconds}s timeout) " -NoNewline
     $deadline = (Get-Date).AddSeconds($ReadyTimeoutSeconds)
     $ok = $false
     $pendingCheck = 'API readiness'
@@ -298,12 +298,6 @@ if ($DryRun) {
             if ($r.StatusCode -ne 200 -or $readyBody.status -ne 'ready' -or
                 [int]$readyBody.courses_indexed -le 0 -or [int]$readyBody.bm25_corpus -le 0) {
                 throw 'API is not ready or its retrieval indexes are empty'
-            }
-
-            $pendingCheck = 'UI health'
-            $ui = Invoke-WebRequest "http://${NasHost}:8501/_stcore/health" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-            if ($ui.StatusCode -ne 200 -or $ui.Content.Trim() -ne 'ok') {
-                throw 'Streamlit health endpoint did not return 200/ok'
             }
 
             $pendingCheck = 'deep-link resolution'
@@ -369,10 +363,10 @@ if ($DryRun) {
     }
     Write-Host ''
     if ($ok) {
-        Write-Host '  OK API ready + UI healthy + deep-link resolution + Co-op available + web serving' -ForegroundColor Green
+        Write-Host '  OK API ready + deep-link resolution + Co-op available + web serving' -ForegroundColor Green
     } else {
         Write-Host "  X deploy checks failed: $pendingCheck ($lastProbeError)" -ForegroundColor Red
-        Write-Host "    ssh $NasTarget 'cd $NasPath && docker compose logs --tail=100 api ui web'" -ForegroundColor DarkGray
+        Write-Host "    ssh $NasTarget 'cd $NasPath && docker compose logs --tail=100 api web'" -ForegroundColor DarkGray
         exit 1
     }
 }
@@ -382,7 +376,7 @@ Write-Host '=== Deploy done ===' -ForegroundColor Green
 Write-Host ''
 Write-Host '  Public:'
 Write-Host '    https://api.neu-compass.me/health'
-Write-Host '    https://compass.neu-compass.me (the web front end once the tunnel routes it there, Streamlit until then)'
+Write-Host '    https://compass.neu-compass.me (the web front end)'
 Write-Host '    https://beta.neu-compass.me (R7 beta: the same front end, for two weeks after the switch)'
 Write-Host ''
 Write-Host "  Logs:  ssh $NasTarget 'cd $NasPath && docker compose logs -f api'"

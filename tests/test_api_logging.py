@@ -17,7 +17,7 @@ def test_configure_logging_returns_bound_logger() -> None:
 
 
 def test_configure_logging_is_idempotent() -> None:
-    """Lifespan and Streamlit can both call this; the second call must not
+    """Lifespan and the dev API can both call this; the second call must not
     duplicate handlers on the root logger."""
     configure_logging()
     handler_count_first = len(logging.getLogger().handlers)
