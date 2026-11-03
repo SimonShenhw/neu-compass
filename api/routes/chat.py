@@ -248,11 +248,12 @@ def chat(
             req, alias_repo, course_repo, hybrid, reranker, program_repo, conn,
         )
     except ProgramAmbiguous as exc:
-        # The UI shows `detail` verbatim to the student — lead with Chinese.
-        # 中文：UI 会把 detail 原样展示给学生，所以中文在前。
+        # The web front end words this refusal itself from `reason`; the detail, Chinese first, is for API clients and
+        # names the web's 「项目」 selector.
+        # 中文：新前端按 reason 用自己的话；detail（中文在前）给 API 的调用方，用新前端「项目」的名字。
         choices = ", ".join(p.program_id for p in exc.programs)
         raise ChatConflict("program_ambiguous", (
-            f"这个专业前缀对应多个项目，请先在上方「你的项目（可选）」里选择：{choices}。"
+            f"这个专业前缀对应多个项目，请先在「项目」里选择：{choices}。"
         )) from exc
     retrieval_ms = (time.perf_counter() - started) * 1000
 
@@ -545,7 +546,7 @@ def _retrieve(
         if program is not None:
             if req.program_id and extracted.program_prefix and program.prefix.upper() != extracted.program_prefix.upper():
                 raise ChatConflict("program_conflict", (
-                    "上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
+                    "「项目」里选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
                     " (Selected program_id conflicts with the detected program prefix.)"
                 ))
             if ProgramPlanRepository(conn).has_records_for_program(program.program_id):

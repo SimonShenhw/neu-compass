@@ -237,9 +237,11 @@ async def plan_selection_conflict_handler(
 class ChatConflict(HTTPException):
     """A /chat 409 (F's plan selection, OPT-04's program prefix) that also carries `reason`, one of REASONS, the way the
     login 401 carries its reason: the web front end words it from `reason` without reading the detail (R3c, R3e).
-    The Chinese detail stays as it was, for API clients; the Streamlit page showed it until R8.
+    The Chinese detail is for API clients and names the web front end's selectors, 「项目」 and 「方案」; for a plan
+    refusal it is the web's own sentence (web/src/models/chatFailure.ts).
     中文：/chat 的 409（F 的方案确认、OPT-04 的项目前缀）另带 `reason`（REASONS 之一），和登录 401 带 reason 一样：
-    新前端按 `reason` 说话、不读 detail（R3c、R3e）。中文的 detail 一字不改，留给 API 的调用方；R8 以前 Streamlit 页显示它。"""
+    新前端按 `reason` 说话、不读 detail（R3c、R3e）。中文的 detail 给 API 的调用方，用新前端选择框的名字「项目」「方案」；
+    方案那几条就是新前端的原话。"""
 
     REASONS = ("plan_missing", "plan_stale", "plan_draft", "plan_unusable", "plan_unavailable", "program_ambiguous",
                "program_conflict")

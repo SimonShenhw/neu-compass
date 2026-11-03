@@ -1,5 +1,6 @@
 """Checks for real /chat answers: internal IDs, links, review counts, RMP attribution, caveats,
-estimate wording, link-label language, repeated disclaimers.
+estimate wording, link-label language, repeated disclaimers, stated relations between prerequisites whose AND/OR is
+not recorded.
 
 Pure functions over the answer text and what the prompt supplied (AnswerContext);
 scripts/eval_answers_live.py runs them against the real model. The patterns were tuned on real
@@ -7,7 +8,7 @@ gemini-2.5-flash answers to prompts 4.1/4.2 (2026-10-05); they flag likely probl
 to read, they do not prove an answer correct.
 
 中文：真实 /chat 回答的检查：内部 ID、链接、评价条数、RMP 归属、各项说明、估计值措辞、链接
-标签语言、重复的免责句。只看回答文本和提示词提供的内容（AnswerContext），是纯函数；
+标签语言、重复的免责句、AND/OR 没有记录的先修课之间被说出的关系。只看回答文本和提示词提供的内容（AnswerContext），是纯函数；
 scripts/eval_answers_live.py 用它们检查真实模型的回答。这些模式是用 2026-10-05 gemini-2.5-flash
 对 4.1/4.2 提示词的真实回答调出来的，作用是标出可能的问题给人看，不能证明回答正确。
 """
@@ -18,7 +19,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.6-plan-year"
+CHECKER_VERSION = "2.7-prereq-relation"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
 ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
 # A second number after a separator shares the first code's department ("CS 5800 和 5200"), unless it reads as a level
@@ -132,15 +133,46 @@ NO_CATALOG = re.compile(
     r"(目录|catalog)[^。\n]{0,10}(缺失|不可用|没有|未找到|找不到)|无法在?[^。\n]{0,6}(目录|catalog)[^。\n]{0,6}(找到|查到|获取)|"
     r"no (?:official |recorded )?catalog|catalog (?:record|entry|snapshot|description|data)s? (?:is |are )?"
     r"(?:not available|unavailable|missing)|lacks? (?:a |an )?(?:official )?catalog|without (?:a |an )?(?:official )?catalog", re.I)
+# Words that say the record leaves something unstated, with up to 8 characters between the negation and the verb:
+# "未在记录中明确说明" is how CONTENT-01's live answer (2026-11-01) put it, and the fixed words before it missed that.
+# 中文：说记录里没有写明的词，否定词和动词之间最多隔 8 个字：「未在记录中明确说明」是 CONTENT-01 那条线上回答
+# （2026-11-01）的说法，原来的固定词认不出。
+UNSTATED_ZH = r"没说|没讲|没写|(?:没有|没|未|并未|并没有)[^。\n，,]{0,8}?(?:说明|写明|标明|注明|指明|列明|说清|讲明|明确)"
 PREREQ_LOGIC = re.compile(
     r"(并且|且|或者|或|和/或|全部|都需要|都要|任一|任意一门|其中一门|组合|是否需要全部)[^。\n]{0,40}"
-    r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|未知|没有标明|需要[^。\n]{0,6}(核实|确认))|"
-    r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|没有标明)[^。\n]{0,40}(并且|且|或|全部|都|任一|其中一门)|"
+    r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|未知|没有标明|" + UNSTATED_ZH + r"|需要[^。\n]{0,6}(核实|确认))|"
+    r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|没有标明|" + UNSTATED_ZH + r")[^。\n]{0,40}"
+    r"(并且|且|或|全部|都|任一|其中一门)|"
     r"(且|或)的?关系|AND/OR|and/or|logical relationship|"
     r"\b(?:all|both|either|any one|any)\b[^.\n]{0,80}\b(?:unclear|not (?:specified|indicated|stated|clear)|"
     r"doesn't (?:say|specify|indicate)|does not (?:say|specify|indicate)|cannot (?:tell|determine|confirm)|unknown)\b|"
     r"\b(?:unclear|not (?:specified|indicated|stated|clear)|doesn't (?:say|specify|indicate)|does not (?:say|specify|indicate)|"
     r"cannot (?:tell|determine|confirm)|unknown)\b[^.\n]{0,80}\b(?:all|both|either|any one|whether)\b", re.I)
+# How two codes of one course's flat prerequisite list (AND/OR not recorded) are joined in an answer: the whole text
+# between them, which may start with a short parenthesis ("（最低 C-）") or a comma, with the Markdown marks of a bold or
+# code-formatted code on either side ("**CS 5800** 或 **CS 7800**"). 中文：回答里同一门课平铺先修列表（AND/OR 没有记录）
+# 的两个课号之间的整段文字；前面可以有短括号（「（最低 C-）」）或逗号，两边可以有加粗、代码格式的 Markdown 标记。
+MARKS = r"[*_`]*"
+JOIN_LEAD = MARKS + r"\s*(?:[（(][^（()）\n]{0,24}[）)])?\s*[，,、]?\s*[（(]?\s*"
+OR_JOIN = re.compile(JOIN_LEAD + r"(?:和/或|或者|还是|或|/|／|\b(?:and/or|or)\b)\s*(?:是|the\b)?\s*" + MARKS, re.I)
+AND_JOIN = re.compile(JOIN_LEAD + r"(?:以及|加上|和|与|及|跟|&|\+|\b(?:and|plus|as well as)\b)\s*(?:the\b)?\s*" + MARKS,
+                      re.I)
+# Words that state how listed prerequisites combine, and words that say a sentence is about taking courses.
+# 中文：说先修课之间怎么组合的词，以及表明这句在讲修课的词。
+PREREQ_RELATION = re.compile(r"任选|任一|任意一门|其中(?:任)?一门|二选一|择一|只需(?:要)?(?:修过?)?(?:一门|其一)|都要|都需要|"
+                             r"都得|都必须|均需|均须|全部(?:都)?(?:需要|要|必修|修完)|两门都|缺一不可|"
+                             r"\b(?:either|both|any one|any of|each of|all of)\b", re.I)
+PREREQ_CUE = re.compile(r"先修|先决|前置|前提|修过|修完|学过|需要|要求|条件|基础|即可|就行|就够|"
+                        r"\b(?:prereq\w*|requir\w*|need\w*|take|taken|taking|complet\w*|background|before|eligib\w*|"
+                        r"enroll\w*)\b", re.I)
+CLAUSE_MARK = re.compile(r"[，,；;：:]")
+# A word that says something is not stated or not known, or asks whether: enough of a caveat in a clause that names the
+# alternatives itself ("没有说明是要修 X 还是 Y", "does not say whether you need X or Y"). 中文：说某事没写明、不知道，或在问
+# 是否的词；分句自己列出了选项时（「没有说明是要修 X 还是 Y」），有它就算说明。
+UNSTATED = re.compile(r"不清楚|不明确|无法确定|无法判断|不确定|未知|是否|" + UNSTATED_ZH + r"|"
+                      r"\b(?:unclear|unknown|not (?:specified|indicated|stated|clear|recorded)|"
+                      r"doesn't (?:say|specify|indicate|state)|does not (?:say|specify|indicate|state)|"
+                      r"cannot (?:tell|determine|confirm)|whether)\b", re.I)
 PROGRAM_CAVEAT = re.compile(
     r"(没有|无|尚无|并无|暂无|缺少)[^。\n]{0,15}(核实|核验|验证|确认|官方)[^。\n]{0,15}(学期|课表|安排|计划|顺序)|"
     r"并非官方|不是官方|非官方|不代表官方|不是[^。\n]{0,8}官方|未经(核实|核验|验证)|"
@@ -318,6 +350,9 @@ class AnswerContext:
     course_codes: tuple[str, ...] | None = None  # None = legacy unknown; () = known empty evidence.
     unstated: tuple[tuple[str, str, float], ...] = ()  # (course code, field, value); old contexts keep unstated_values.
     conflicts: tuple[tuple[str, str, tuple[float, ...]], ...] = ()  # Numeric source disagreements; signals only.
+    # (course code, the prerequisite codes it got as a flat list, AND/OR not recorded); None = a context from before
+    # the checker read them. 中文：（课号，它以平铺列表拿到的先修代码，AND/OR 没有记录）；None 是检查器还不读它们时的上下文。
+    flat_prereqs: tuple[tuple[str, tuple[str, ...]], ...] | None = None
 
 
 def _context(text: str, match: re.Match, width: int = 40) -> str:
@@ -403,25 +438,31 @@ def find_links(text: str) -> list[dict]:
     return links
 
 
-def _course_codes(text: str, known_codes=()) -> set[str]:
+def _code_spans(text: str, known_codes=()) -> list[tuple[str, int, int]]:
+    """Each course code in text with where it stands, in order; a short number after a full code shares its department
+    ("CS 5800 和 5200"). 中文：文本里每个课号和它的位置，按出现顺序；完整课号后面的短编号沿用它的院系。"""
     # ASCII boundaries allow Chinese adjacency; mixed-case ordinary words (Fall 2026) are not departments.
     known = {code.split()[0] for code in (known_codes or ())} | {"CS", "DS", "AAI"}
-    codes = set()
+    spans = []
     for match in ANSWER_COURSE_CODE.finditer(text):
         after = text[match.end():]
         if not (match[1].isupper() or match[1].upper() in known) or FULL_CODE_HYPHEN_LEVEL.match(after) or (
                 match[2].endswith("000") and FULL_CODE_LEVEL.match(after)):
             continue
-        codes.add(f"{match[1]} {match[2]}".upper())
-        tail = text[match.end():]
-        while short := SHORT_CODE.match(tail):
-            rest = tail[short.end():]
+        spans.append((f"{match[1]} {match[2]}".upper(), match.start(), match.end()))
+        position = match.end()
+        while short := SHORT_CODE.match(text, position):
+            rest = text[short.end():]
             if (SHORT_CODE_LEVEL.match(rest) or (short[1].endswith("000") and SHORT_CODE_ROUND_RANGE.match(rest))
                     or (re.fullmatch(r"20[1-3]\d", short[1]) and SHORT_CODE_YEAR.match(rest))):
                 break
-            codes.add(f"{match[1]} {short[1]}".upper())
-            tail = rest
-    return codes
+            spans.append((f"{match[1]} {short[1]}".upper(), short.start(1), short.end(1)))
+            position = short.end()
+    return spans
+
+
+def _course_codes(text: str, known_codes=()) -> set[str]:
+    return {code for code, _, _ in _code_spans(text, known_codes)}
 
 
 def _number_field(sentence: str, number: re.Match, candidates: set[str]) -> str | None:
@@ -637,6 +678,67 @@ def _conflict_signals(parts: list[str], context: AnswerContext) -> list[dict]:
     return missing
 
 
+def _normal_code(code: str) -> str:
+    match = re.fullmatch(r"([A-Za-z]{2,4})\s*(\d{4}[A-Za-z]?)", code.strip())
+    return f"{match[1]} {match[2]}".upper() if match else " ".join(code.upper().split())
+
+
+def _clause(sentence: str, start: int, end: int) -> tuple[int, int]:
+    """Where the clause holding sentence[start:end] begins and ends (CLAUSE_MARK splits clauses).
+    中文：sentence[start:end] 所在分句的起止位置（按 CLAUSE_MARK 分句）。"""
+    begin = max((mark.end() for mark in CLAUSE_MARK.finditer(sentence, 0, start)), default=0)
+    stop = next((mark.start() for mark in CLAUSE_MARK.finditer(sentence, end)), len(sentence))
+    return begin, stop
+
+
+def _prereq_relations(parts: list[str], context: AnswerContext) -> list[dict] | None:
+    """Sentences that say how the codes of a course's flat prerequisite list combine, which the prompt said the record
+    does not (CONTENT-01: "先决条件是 CS 5800 或 CS 7800。"): two of its codes joined by an OR word in a clause with no
+    word of the unstated or unknown (UNSTATED: "does not say whether you need X or Y" asks, it does not state); by an AND
+    word in a sentence about taking courses (PREREQ_CUE) without the unknown-relation caveat (PREREQ_LOGIC) anywhere in
+    it, since "lists X and Y as prerequisites but does not say whether both are needed" is a plain list; or a relation
+    word (PREREQ_RELATION) in a clause without an UNSTATED word that names one of the codes, or names no code right after
+    a clause that names two and has no UNSTATED word either ("X、Y，任选一门即可"). None for a context that did not record
+    the flat lists. A signal for a person to read, not proof.
+    中文：说出某门课平铺先修列表里课号之间怎么组合的句子；提示词说过记录里没有这个关系。三种：两个课号用「或」类词连起来，
+    而这个分句没有「没写明、不知道、是否」这类词（「没有说明要修 X 还是 Y」是在问，不是断言）；用「和」类词连起来，句子在讲
+    修课，整句都没有「关系不明」的说明（「列出 X 和 Y 两门先修课，但没说明是否都要」只是列举）；分句里有关系词、没有那类词，
+    并且点到了其中一门课，或者自己没有课号、而前一个分句点到了两门且也没有那类词（「X、Y，任选一门即可」）。上下文没记录
+    平铺列表时返回 None。只是给人看的信号。"""
+    if context.flat_prereqs is None:
+        return None
+    lists = [(course, {_normal_code(code) for code in codes}) for course, codes in context.flat_prereqs]
+    known = (*(context.course_codes or ()), *(code for _, codes in lists for code in codes))
+    found = []
+    for sentence in parts:
+        spans = _code_spans(sentence, known)
+        for course, codes in lists:
+            named = [span for span in spans if span[0] in codes]
+            kinds = set()
+            for (_, start1, end1), (_, start2, end2) in zip(named, named[1:]):
+                between = sentence[end1:start2]
+                begin, stop = _clause(sentence, start1, end2)
+                if OR_JOIN.fullmatch(between) and not UNSTATED.search(sentence, begin, stop):
+                    kinds.add("or")
+                elif AND_JOIN.fullmatch(between) and PREREQ_CUE.search(sentence) and not PREREQ_LOGIC.search(sentence):
+                    kinds.add("and")
+            for relation in PREREQ_RELATION.finditer(sentence):
+                begin, stop = _clause(sentence, relation.start(), relation.end())
+                if UNSTATED.search(sentence, begin, stop):
+                    continue
+                if any(begin <= start < stop for _, start, _ in named):
+                    kinds.add("relation word")
+                elif begin and not any(begin <= start < stop for _, start, _ in spans):
+                    before, _ = _clause(sentence, begin - 1, begin - 1)
+                    if (sum(before <= start < begin for _, start, _ in named) >= 2
+                            and not UNSTATED.search(sentence, before, begin)):
+                        kinds.add("relation word")
+            if kinds:
+                found.append({"course": course, "codes": sorted({code for code, _, _ in named}),
+                              "kinds": sorted(kinds), "sentence": sentence.strip()[:220]})
+    return found
+
+
 def check_answer(text: str, context: AnswerContext) -> dict:
     """Every check for one answer. Hard failures: ids_fail, links_fail, counts_fail, rmp_fail.
     The rest are signals for a person to read. 中文：一个回答的全部检查。硬失败：ids_fail、links_fail、
@@ -696,6 +798,7 @@ def check_answer(text: str, context: AnswerContext) -> dict:
         "course_codes_outside_evidence": (None if context.course_codes is None else
                                           sorted(_course_codes(text, context.course_codes) - set(context.course_codes))),
         "conflicts_missing_values": _conflict_signals(parts, context),
+        "prereq_relation_asserted": _prereq_relations(parts, context),
         # Sentences, not matches: one sentence often says both 副本 and 非实时.
         # The no-catalog note may also say 副本 / "saved copy"; it is not a repeat of the saved-copy one.
         "saved_copy_mentions": sum(1 for part in parts if _saved_copy_note(part)),
@@ -720,6 +823,7 @@ def summarize(checks: list[dict]) -> dict:
                                              for item in checks for estimate in item["estimates"]),
         "course_codes_outside_evidence": sum(bool(item.get("course_codes_outside_evidence")) for item in checks),
         "conflicts_missing_values": sum(bool(item.get("conflicts_missing_values")) for item in checks),
+        "prereq_relation_asserted": sum(bool(item.get("prereq_relation_asserted")) for item in checks),
         "repeated_saved_copy": sum(1 for item in checks if item["saved_copy_mentions"] > 1),
         "rmp": dict(rmp),
     }

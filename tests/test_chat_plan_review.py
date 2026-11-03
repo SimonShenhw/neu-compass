@@ -5,6 +5,8 @@ recovery after a 409, panel and card wording, and the edges the reviewers' mutan
 """
 
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -21,8 +23,7 @@ from tests.test_chat_structured_requisites import document, seeded
 from tests.test_program_plan_contract import chat_meta, stub_chat
 from tests.program_plan_support import plans
 
-PREFIX_CONFLICT = ("上方「你的项目（可选）」选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
-                   " (Selected program_id conflicts with the detected program prefix.)")
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def plan_where(**match):
@@ -149,10 +150,12 @@ def test_prompt_rules_use_the_positions_and_never_overclaim_the_plan_year():
                    "never call it unrecorded or not applicable", "never present one as that year's rule",
                    "another catalog year that has an entry here, explain that entry as that year's course block",
                    "only the program can confirm it", "point to the 「📘 所选方案与课程位置」 panel",
-                   "Cite the plan in words by program_name", "「方案版本（可选）」, which appears below 「你的项目（可选）」 only for"):
+                   "Cite the plan in words by program_name",
+                   "suggest choosing one under 「方案」, which appears once 「项目」 is set to a program with checked plans"):
         assert phrase in text, phrase
+    # The Streamlit page's selectors (deleted in R8) are named no more. 中文：不再提 Streamlit 页的选择框（R8 已删）。
     for removed in ("counts as explicitly named", "not rules applicable to this student", "suggest the plan selector instead",
-                    "the program confirms)", "point to the evidence panel"):
+                    "the program confirms)", "point to the evidence panel", "方案版本（可选）", "你的项目（可选）"):
         assert removed not in text, removed
 
 
@@ -160,7 +163,20 @@ def test_each_plan_409_says_the_question_was_not_answered_and_names_the_selector
     from schemas.plan_selection import PLAN_SELECTOR_LABEL
     assert set(PLAN_SELECTION_MESSAGES) == {"missing", "stale", "draft", "unusable", "unavailable"}
     for text in PLAN_SELECTION_MESSAGES.values():
-        assert "这个问题还没有回答；方案选择已清除。" in text and PLAN_SELECTOR_LABEL in text and "不选方案直接再问" in text
+        assert "这个问题还没有回答；方案选择已清除。" in text and f"「{PLAN_SELECTOR_LABEL}」" in text and "不选方案直接再问" in text
+        assert "上方" not in text and "（可选）" not in text
+
+
+def test_the_plan_409_details_are_the_web_front_ends_own_sentences():
+    """The web words these refusals from `reason` (web/src/models/chatFailure.ts); API clients get its sentences.
+    中文：新前端按 reason 说话；API 的 detail 和它的说法逐字相同。"""
+    source = (ROOT / "web/src/models/chatFailure.ts").read_text(encoding="utf-8")
+    retry = re.search(r"const planRetry =\s*'([^']*)';", source)
+    assert retry
+    for outcome, text in PLAN_SELECTION_MESSAGES.items():
+        entry = re.search(rf"\[\s*'plan_{outcome}',\s*'([^']*)'(\s*\+\s*planRetry)?,?\s*\]", source)
+        assert entry, outcome
+        assert text == entry.group(1) + (retry.group(1) if entry.group(2) else ""), outcome
 
 
 def test_the_prompt_refuses_positions_from_another_plan_or_for_other_courses():

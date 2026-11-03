@@ -60,9 +60,9 @@ def test_prefix_ambiguity_requests_selection_instead_of_picking_first(api_client
     response = api_client.post("/chat", json={"query": "CS first semester"})
     assert response.status_code == 409 and response.json()["reason"] == "program_ambiguous"
     assert "cs-ms" in response.text and "cs-align" in response.text
-    # The detail names the Streamlit page's selector. The web words these refusals itself (web/src/models/
-    # chatFailure.ts), so only API clients read it. 中文：detail 里是 Streamlit 页选择框的名字；新前端用自己的话。
-    assert "「你的项目（可选）」" in response.json()["detail"]
+    # The detail names the web front end's 「项目」 selector; the web words these refusals itself from `reason`
+    # (web/src/models/chatFailure.ts), so only API clients read it. 中文：detail 用新前端「项目」的名字；新前端按 reason 用自己的话。
+    assert response.json()["detail"] == "这个专业前缀对应多个项目，请先在「项目」里选择：cs-align, cs-ms。"
 
 
 def test_explicit_program_selection_is_accepted(api_client, empty_db):
@@ -180,7 +180,8 @@ def test_explicit_family_and_query_prefix_conflict_requires_clarification(api_cl
     ProgramRepository(empty_db).add_program(Program(program_id="cs-ms", full_name="CS", prefix="CS"))
     response = api_client.post("/chat", json={"query": "AAI first semester", "program_id": "cs-ms"})
     assert response.status_code == 409 and response.json()["reason"] == "program_conflict"
-    assert "「你的项目（可选）」" in response.json()["detail"] and "不指定" in response.json()["detail"]
+    assert response.json()["detail"] == ("「项目」里选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。"
+                                         " (Selected program_id conflicts with the detected program prefix.)")
 
 
 def test_ambiguous_program_does_not_call_model_or_hybrid(api_client, empty_db):

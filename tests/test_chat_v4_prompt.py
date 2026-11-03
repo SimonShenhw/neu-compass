@@ -8,8 +8,8 @@ import re
 import pytest
 
 from llm.prompts.chat_v4 import (
-    DESCRIPTION_LIMIT, QUOTE_LIMIT, QUOTES_PER_COURSE, PROMPT_TEMPLATE, PROMPT_VERSION, SOURCE_KIND_LABELS,
-    build_prompt, format_courses_block,
+    DESCRIPTION_LIMIT, FLAT_PREREQS_KEY, QUOTE_LIMIT, QUOTES_PER_COURSE, PROMPT_TEMPLATE, PROMPT_VERSION,
+    SOURCE_KIND_LABELS, build_prompt, format_courses_block,
 )
 from rag.answer_evidence import SOURCE_KIND_PREFIXES, course_answer_evidence
 from rag.retriever import SearchHit
@@ -23,7 +23,7 @@ def course(**updates):
 
 
 def test_version_and_empty_candidates():
-    assert PROMPT_VERSION == "4.5"
+    assert PROMPT_VERSION == "4.6"
     assert "no matches found in catalog" in build_prompt("unknown", [])
 
 
@@ -58,7 +58,7 @@ def test_internal_ids_never_reach_the_prompt_but_their_meaning_does(description)
     used = projected["answer_evidence"]
     assert set(used) == {"catalog", "field_evidence", "field_evidence_omitted_count", "recorded_sources",
                          "missing_fields", "warnings"}
-    assert set(used["catalog"]) == {"course_code", "course_name", "description", "credits", "prereq_codes",
+    assert set(used["catalog"]) == {"course_code", "course_name", "description", "credits", FLAT_PREREQS_KEY,
                                     "catalog_url", "imported_at", "retrieved_at",
                                     *(["description_truncated"] if description else [])}
     assert used["catalog"]["catalog_url"] == snapshot.catalog_url
@@ -171,6 +171,38 @@ def test_topics_without_source_and_flat_prereqs_are_flagged():
     assert "topics_source_unavailable" in evidence.warnings
     assert "prerequisite_logic_unavailable" in evidence.warnings
     assert "prereqs" not in evidence.missing_fields
+
+
+def test_flat_prerequisites_say_in_their_name_that_their_and_or_is_not_recorded():
+    """4.6 (CONTENT-01): next to a bare "prereqs" list a live answer said "CS 5800 或 CS 7800" and only took it back at
+    its end. Without a year rule both flat lists keep their place under a name that says their AND/OR is unknown, and
+    the rule says how to name them; the evidence the API returns keeps its own names."""
+    record = course(course_id="neu-cs-6140", primary_code="CS 6140", primary_name="Machine Learning",
+                    prereqs=["CS 5800", "CS 7800"])
+    snapshot = CatalogSourceRepository.snapshot(CatalogEntry(
+        course_code="CS 6140", course_name="Machine Learning", description="Learning.", prereqs=["CS 5800", "CS 7800"],
+        catalog_url="https://catalog.northeastern.edu/course-descriptions/cs/"))
+    evidence = course_answer_evidence(record, snapshot)
+    block = format_courses_block([SearchHit(course=record, score=1)], {record.course_id: evidence})
+    data = json.loads(block)[0]
+    assert list(data["recorded_metadata"])[3:5] == ["professor", FLAT_PREREQS_KEY]  # Where "prereqs" stood.
+    assert data["recorded_metadata"][FLAT_PREREQS_KEY] == data["answer_evidence"]["catalog"][FLAT_PREREQS_KEY] == [
+        "CS 5800", "CS 7800"]
+    assert list(data["answer_evidence"]["catalog"])[3:5] == ["credits", FLAT_PREREQS_KEY]  # Where "prereq_codes" stood.
+    assert '"prereqs"' not in block and '"prereq_codes"' not in block
+    assert "prerequisite_logic_unavailable" in data["answer_evidence"]["warnings"]
+    assert evidence.catalog.prereq_codes == ["CS 5800", "CS 7800"]  # The projection never renames API evidence.
+    rules = " ".join(PROMPT_TEMPLATE.split())
+    for sentinel in (f"they come only as {FLAT_PREREQS_KEY} (warning prerequisite_logic_unavailable), which lists "
+                     "those courses but not how they combine, and neither may the answer",
+                     "Never join them with or/and/either/both", "never fill the rule in from your own knowledge",
+                     "say in that same sentence that the record does not say whether all of them or any one is needed",
+                     "「记录列出的先修课有 X、Y，但没有说明是都要修还是任选其一」"):
+        assert sentinel in rules
+    # The examples stay on one line each: a model copies what it is shown.
+    assert "「记录列出的先修课有 X、Y，但没有说明是都要修还是任选其一」" in PROMPT_TEMPLATE
+    assert "'The record lists X, Y as prerequisites but does not say whether all of them or any one is needed.'" in (
+        PROMPT_TEMPLATE)
 
 
 def test_mismatched_numeric_support_is_not_hidden():
