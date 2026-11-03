@@ -6033,8 +6033,8 @@ R7 第一步上线后的线上验收（评审目录 `release_20261101/STEP1_BROW
 ### 验证记录
 
 - **web**：本机用 npm 缓存离线装依赖（没下载）。
-  - `npm run check`（类型、lint、Vitest、构建）、`format:check`、`gen:api:check` 都过。跑 `check` 的时候类型生成器还没装，所以 `schema.test.ts` 的 2 条跳过。
-  - 装上以后重跑 Vitest：95 个文件、2831 条全过，0 条跳过（main 上是 10 条跳过）。
+  - 合 main 以后（`ea04012`），`npm run check`（类型、lint、Vitest、构建）、`format:check`、`gen:api:check` 都过。
+  - Vitest：95 个文件、2832 条全过，0 条跳过（main 上是 10 条跳过）。第一个提交的说明里写的 2831，是加「找不到就失败」那条以前数的。
 - **手工变异 3 个**，都被抓到，改完逐字节还原：
   - 判断用的文件换成已删的 `app/streamlit_app.py`：新加的那条失败（改之前，这种情况只会跳过）；
   - 新前端那句提示的句号换成叹号：对照那条失败；
@@ -6047,4 +6047,4 @@ R7 第一步上线后的线上验收（评审目录 `release_20261101/STEP1_BROW
 
 ### 发布状态
 
-分支 `test/copied-words-after-r8`，从 main 的 `3c4b721` 开。只改测试，不用上线。编号排在 #45（第 45 节）和 #44（第 46 节）后面：它们合进 main 以后，这个分支再合一次 main。
+分支 `test/copied-words-after-r8`，从 main 的 `3c4b721` 开。只改测试，不用上线。#44（第 46 节）先合进了 main，这个分支合了一次 main（`a80e4c6`），本节接在第 46 节后面；#45（第 45 节）放在第 44、46 节之间，两个谁先合都不会再冲突。
