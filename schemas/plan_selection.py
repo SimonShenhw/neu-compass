@@ -8,19 +8,21 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from schemas.program_plan import ProgramPlan
 
-# The Streamlit page's plan selector (deleted in R8), which these 409 details still name; the web front end words the
-# refusals itself from `reason` (web/src/models/chatFailure.ts). 中文：Streamlit 页方案选择框的名字；新前端按 reason 说话。
-PLAN_SELECTOR_LABEL = "方案版本（可选）"
-# The page clears the choice on these (and only these) 409s, so each says the question was not answered.
-# 中文：页面只在这几种 409 时清除方案选择，所以每条都说明这个问题还没有回答。
-_AGAIN = "可以在上方「方案版本（可选）」重新选择后再问，或不选方案直接再问。"
+# The web front end's plan selector, which appears once 「项目」 is set to a program with checked plans
+# (web/src/pages/SearchRoute.tsx). The web words these refusals itself from `reason`; these details, for API clients,
+# are its sentences for them word for word (web/src/models/chatFailure.ts).
+# 中文：新前端的方案选择框（「项目」选了有核对过方案的项目才出现）；新前端按 reason 说话，这几条 detail 给 API 的调用方，和它的说法逐字相同。
+PLAN_SELECTOR_LABEL = "方案"
+# The web front end clears the choice on these (and only these) 409s (web/src/layout/SearchContext.tsx), so each says
+# the question was not answered. 中文：新前端只在这几种 409 时清除方案选择，所以每条都说明这个问题还没有回答。
+_AGAIN = "可以在「方案」里重新选择后再问，或不选方案直接再问。"
 PLAN_SELECTION_MESSAGES = {
     "missing": "所选方案已不可用，这个问题还没有回答；方案选择已清除。" + _AGAIN,
     "stale": "所选方案的范围或内容版本已变化，这个问题还没有回答；方案选择已清除。" + _AGAIN,
     "draft": "所选方案尚未完成来源对照，这个问题还没有回答；方案选择已清除。" + _AGAIN,
     "unusable": "所选方案的身份、范围或格式无法确认，这个问题还没有回答；方案选择已清除。" + _AGAIN,
     "unavailable": ("暂时无法核对所选方案，这个问题还没有回答；方案选择已清除。可以先不选方案直接再问，"
-                    "稍后再到上方「方案版本（可选）」选择。"),
+                    "稍后再到「方案」里选择。"),
 }
 
 

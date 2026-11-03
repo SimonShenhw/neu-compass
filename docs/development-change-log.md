@@ -5928,7 +5928,7 @@ R7 第二步 11-01 夜上线：beta（`https://beta.neu-compass.me`）是新前�
 
 分支 `feat/remove-streamlit`，从 main 的 `f24a72d` 开。没有使用真实模型、账号、NAS 或生产库。上线要用户点头、定时间。
 
-## 46 — 先修 AND/OR 不明时的说法（CONTENT-01：提示词 4.6、检查器 2.7，2026-11-02）
+## 46 — 先修 AND/OR 不明时的说法，选择框用新前端的名字（CONTENT-01：提示词 4.6、检查器 2.7，2026-11-02／03）
 
 ### 范围与原因
 
@@ -5942,6 +5942,8 @@ R7 第一步上线后的线上验收（评审目录 `release_20261101/STEP1_BROW
 - 卡片的两处提示都对：回答下的「先修课之间是都要还是任选不清楚」就是 `prerequisite_logic_unavailable`；详情里的「旧边不表达 AND/OR」是先修接口固定带的 `legacy_prerequisite_edges_not_verified_logic`。
 
 用户选了诊断推荐的修法：提示词升到 4.6，把「关系不明」写进课号旁边的字段名，并写明该怎么说（修法 B）；检查器补上这项检查（修法 F）。课程详情里旧边的「必须／建议先修」标签（修法 C）由另一个会话另做；给更多课导入年度文档（修法 D）要动线上库，另行决定。从 main 的 `f24a72d`（#43 的合并）开 `fix/content01-prereq-relation`。
+
+11-03：R8（删 Streamlit，#46）先合进了 main，这个分支合并 main 的 `3c4b721`；R8 的改动记录也用了第 44 节，本节改成第 46 节（第 45 节给 #45）。用户随后定：Streamlit 已经不用了，提示词和 `/chat` 409 里 Streamlit 页的选择框名字（第 44 节「已知」的第一条）改成新前端的，并进这个 PR。4.6 还没上线，所以提示词不再升版本。
 
 ### 已实现
 
@@ -5957,41 +5959,51 @@ R7 第一步上线后的线上验收（评审目录 `release_20261101/STEP1_BROW
    - 新 `tests/test_content01_prereq_relation.py`：用仓库的目录夹具构造 CS 6140。没有年度规则时，课号只在新字段下，课程块里没有任何「或」；验收那条回答（截图里能看到的部分）在说「或」的那一句被标出，结尾的说明算数；4.6 要的说法通过；有年度规则时「或」是记录自己的，不标。
    - `test_answer_checks.py`：19 个该标的（中英文的「或」「和」、关系词、短编号、斜杠和全角斜杠、括号、加粗和代码格式、三门课、小写课号），14 个不该标的（4.6 的说法、同一句里有说明、问句、两门课各自的列表、年度规则的课、只点到一门课之后的下一分句），旧上下文和计数，说明的识别。
    - `test_eval_answers_live.py`：上下文带上平铺列表（课程记录和快照各有一个课号）；一条说「或」的回答进了报告和 `summary.md`，删掉 `flat_prereqs` 当旧报告重评得到 not checked；坏的形状不收。
-   - `test_chat_v4_prompt.py`：版本、快照的键名，新的一条（两份列表的新名字和原位置、API 证据不变、规则里那几句、示例各在一行）。`test_chat_structured_requisites.py`：平铺列表那条改成新名字，以及版本；文件顶部 Streamlit 卡片的导入和那几条卡片测试没动。`test_answer_grounding.py`、`test_chat_plan_evidence.py`：版本。
+   - `test_chat_v4_prompt.py`：版本、快照的键名，新的一条（两份列表的新名字和原位置、API 证据不变、规则里那几句、示例各在一行）。`test_chat_structured_requisites.py`：平铺列表那条改成新名字，以及版本（文件里 Streamlit 卡片的那几条测试这批没动，后来 R8 删了）。`test_answer_grounding.py`、`test_chat_plan_evidence.py`：版本。
    - `test_chat_plan_absent.py`（没选方案时 meta 和课程块与 `d7c5530` 逐字节相同的冻结哈希）：允许 4.6，哈希前还原 4.6 的改名，其余照旧逐字节比；另断言还原确实用上了。49 个课程块里有 26 个带平铺列表：不还原只有 23 个对得上，还原以后 49 个全对上，所以这次课程块的变化只有改名。
 5. **文档**：`docs/answer-grounding.md`（当前版本、4.6 一条、评测里的新信号）、`docs/course-requisites.md`（聊天回答那节一句）；本节。
+6. **选择框用新前端的名字**（11-03，合并 main 以后）。新前端的两个选择框叫「项目」「方案」，「方案」在「项目」选了有核对过方案的项目以后才出现（`web/src/pages/SearchRoute.tsx`；聊天能选的只有 `source_checked` 的方案）；它对这几种 409 按 `reason` 用自己的话（`web/src/models/chatFailure.ts`），detail 只有 API 的调用方读。
+   - 五条方案 409（`schemas/plan_selection.py`）：`PLAN_SELECTOR_LABEL` 改成「方案」；「可以在上方「方案版本（可选）」重新选择后再问」改成「可以在「方案」里重新选择后再问」，`unavailable` 的末句改成「稍后再到「方案」里选择。」。五条都和 `chatFailure.ts` 的说法逐字相同。注释改成新前端：它只在这五种 409 时清掉方案选择（`web/src/layout/SearchContext.tsx`）。
+   - 两条项目 409（`api/routes/chat.py`）：「这个专业前缀对应多个项目，请先在「项目」里选择：…」「「项目」里选的项目与问题里的专业前缀不一致；请改回「不指定」或改写问题。」，后面的英文照旧。「UI 原样显示 detail」那条注释和 `ChatConflict` 的文档串（`api/exceptions.py`）改成：新前端按 `reason` 说话，detail 给 API 的调用方。
+   - 提示词 4.6：没选方案、学生在问题里提路径时，建议去「方案」里选，「项目」设成有核对过方案的项目以后它才出现（4.5 写的是「方案版本（可选）」和它上面的「你的项目（可选）」）；文件头 4.6 的说明加了一句。
+   - 测试：`test_chat_plan_review.py` 钉新的说法，两个旧名字不再出现；五条方案 409 带「「方案」」、没有「上方」和「（可选）」（标签只剩「方案」两个字以后，原来的 `PLAN_SELECTOR_LABEL in text` 每条都恒真，「方案选择已清除」里就有这两个字；`test_chat_plan_evidence.py` 同样改成带书名号）；新加一条，五条方案 409 和 `chatFailure.ts` 里同一个 reason 的那句逐字比。`PREFIX_CONFLICT` 删了：R8 删掉用它的 Streamlit 测试以后没人用。`test_program_plan_contract.py` 两条项目 409 的 detail 改成整句比较（R8 加的那条注释跟着改）。
+   - 冻结基线 `tests/fixtures/chat_no_plan_d7c5530.json` 照旧不重生成，里面三个 409 是旧的说法：`test_chat_plan_absent.py` 比较前把两条项目 409 开头的新名字换回 `d7c5530` 的，只换开头那一段，其余照旧逐字比较；另断言 53 轮里的 3 个 409（两个前缀有歧义、一个冲突）都用上了这次还原，那个 404 不变。
+   - 新前端的 `web/src/fixtures/search/refused-409-*.json` 按哈希冻结，模拟的是还没有 `reason` 的旧 API，不动。
+   - 文档：`docs/api_contract.md`（409 的 detail 用新前端的两个名字）、`docs/answer-grounding.md` 的 4.6 一条。
 
 ### 修改文件
 
-- 改：`llm/prompts/chat_v4.py`、`eval/answer_checks.py`、`scripts/eval_answers_live.py`。
-- 测试：新 `tests/test_content01_prereq_relation.py`；改 `tests/test_answer_checks.py`、`tests/test_eval_answers_live.py`、`tests/test_chat_v4_prompt.py`、`tests/test_chat_structured_requisites.py`、`tests/test_chat_plan_absent.py`、`tests/test_answer_grounding.py`、`tests/test_chat_plan_evidence.py`。
-- 文档：`docs/answer-grounding.md`、`docs/course-requisites.md`；本节。
+- 改：`llm/prompts/chat_v4.py`、`eval/answer_checks.py`、`scripts/eval_answers_live.py`；选择框的名字：`schemas/plan_selection.py`、`api/routes/chat.py`、`api/exceptions.py`。
+- 测试：新 `tests/test_content01_prereq_relation.py`；改 `tests/test_answer_checks.py`、`tests/test_eval_answers_live.py`、`tests/test_chat_v4_prompt.py`、`tests/test_chat_structured_requisites.py`、`tests/test_chat_plan_absent.py`、`tests/test_answer_grounding.py`、`tests/test_chat_plan_evidence.py`；选择框的名字另改 `tests/test_chat_plan_review.py`、`tests/test_program_plan_contract.py`。
+- 文档：`docs/answer-grounding.md`、`docs/course-requisites.md`、`docs/api_contract.md`；本节。
 
-没改：API 路由、`rag/answer_evidence.py`（证据和警告）、数据库、检索、两套前端、部署文件。
+没改：`rag/answer_evidence.py`（证据和警告）、数据库、检索、新前端（`web/`）、部署文件。API 只改了 409 detail 的字，状态码、`reason`、`error_type` 都不变。
 
 ### 验证记录
 
 - **离线复现**（诊断时，评审目录 `content01/repro_prompt.py`，断网自检、不加载配置）：按 4.5 构造 CS 6140 的提示词，课号旁边和整个数据部分都没有「or／或」；现有检查器对验收那条回答报缺说明，不看断言。修完以后同样的内容由 `tests/test_content01_prereq_relation.py` 固定。
-- **相关测试**：改过和新加的 18 个测试文件 761 条全过；改过的 11 个 Python 文件 ruff（F、E9、B）干净；没有 CR。
-- **全量**：**5387 条**全过（10 分 0 秒），改动的 14 个文件跑前跑后哈希相同。
-- **变异**：43 个全杀。每个在 `/tmp` 下单独一份副本里跑对应的测试，未变异的副本先过（215 条）。提示词 12 个：投影 7（不改名、没有年度规则也去掉、有年度规则也留着、快照那份不动、课程记录那份不动、改名后挪到最后、版本留在 4.5），规则 5（写回旧字段名、去掉「同一句」、允许凭自己知道的、中文示例拆成两行、允许连接）。检查器 23 个：说明的词 2，「或」连接 3，「和」连接 3，关系词 5，连接写法 4（括号、斜杠、全角斜杠、加粗标记），只认本课课号、课号写法、旧上下文、分句、计数、短编号各 1。评测工具 8 个：不带列表、只读课程记录、只读快照、重复、空列表也进、往返不转回、形状不查、not checked 写成 0。
-- **码位**：新加的 552 行（14 个文件）里没有格式字符、私用区、控制字符和表情符号；非 ASCII 只是注释、文档和测试里的中文。
+- **合并前（11-02）**：改过和新加的 18 个测试文件 761 条全过；全量 **5387 条**全过（10 分 0 秒），改动的 14 个文件跑前跑后哈希相同；改过的 11 个 Python 文件 ruff（F、E9、B）干净；没有 CR。
+- **合并 main 以后（11-03）**：合并提交本身（取它的一份副本跑）全量 4362 条全过，就是 R8 的 4321 条加上这批的 41 条。改名以后，相关的 25 个测试文件 904 条全过；全量 **4363 条**全过（9 分 23 秒），相对 main 改动的 20 个文件跑前跑后哈希相同；改过的 16 个 Python 文件 ruff 干净，没有 CR。
+- **变异**：合并前 43 个全杀。每个在 `/tmp` 下单独一份副本里跑对应的测试，未变异的副本先过（215 条）。提示词 12 个：投影 7（不改名、没有年度规则也去掉、有年度规则也留着、快照那份不动、课程记录那份不动、改名后挪到最后、版本留在 4.5），规则 5（写回旧字段名、去掉「同一句」、允许凭自己知道的、中文示例拆成两行、允许连接）。检查器 23 个：说明的词 2，「或」连接 3，「和」连接 3，关系词 5，连接写法 4（括号、斜杠、全角斜杠、加粗标记），只认本课课号、课号写法、旧上下文、分句、计数、短编号各 1。评测工具 8 个：不带列表、只读课程记录、只读快照、重复、空列表也进、往返不转回、形状不查、not checked 写成 0。
+  - 改名 19 个全杀，未变异的副本先过（59 条；副本另带上 `web/src/models/chatFailure.ts`）。方案 409 六个：改回 Streamlit 的、留着「上方」、`unavailable` 改回、两句各和新前端差一个字、标签改回；项目 409 五个：两条各改回、换成别的选择框名字、去掉英文、改了末尾；提示词两个：改回、去掉出现条件；冻结测试的还原不起作用一个。另有五个只用冻结测试跑（两条改回、去掉英文、两条各改了末尾），它照样抓到末尾的改动和用不上的还原。
+- **码位**：合并前新加的 552 行（14 个文件），合并以后相对 main 新加的行（20 个文件），都没有格式字符、私用区、控制字符和表情符号；非 ASCII 只是注释、文档和测试里的中文。
 - 没有用真实模型，没有联网。
 
 ### 审查
 
-没开：提交以后问了用户，用户定了这一批不开审查。真实模型复核也没跑（用户没同意），界面名字也没改（见「已知」）。
+没开：提交以后问了用户，用户定了这一批不开审查，11-03 合并和改名这部分也一样。真实模型复核也没跑（用户没同意）。
 
 ### 已知、未处理
 
 - **真实模型会不会照做没验证**：离线只能证明提示词里有什么。复核要用户同意（`scripts/eval_answers_live.py`，Q4 的英文 CS 6140 先修问题加上验收那句中文，约 2 次 Gemini 调用）；没跑之前，4.6 是否真的消除了先断言后免责，不知道。
 - **检查是正则**：会漏（「两门都要」前一分句没有课号、说明写在同一分句的括号里、"Either one works: X, Y"），也会误报（"X and Y are both algorithms courses"），结果要有人读。
 - **只有一个课号时**，规则要求的「没有说明是都要还是任选其一」读起来别扭；规则没有单独写这种情况（平铺列表本来就不带成绩和别的条件）。
-- **提示词里还有 Streamlit 时代的界面名字**：「方案版本（可选）」「你的项目（可选）」（切换以后新前端叫「方案」「项目」）、前面带书本表情符号的「所选方案与课程位置」、培养方案页「没有网址」（新前端是 `/programs`）。这一批没改，改不改由用户定。
+- **提示词里还有两处 Streamlit 时代的说法**（这次改的是方案、项目两个选择框）：前面带书本表情符号的「所选方案与课程位置」面板（新前端的折叠框叫「所选方案与课程位置」，没有表情符号）；培养方案页「在侧栏、没有网址，不要链接」（新前端在侧栏和手机菜单里，地址是 `/programs`；「不要链接」本身照旧合适，回答里的链接只许指向目录）。4.6 还没上线，要改的话放进这一版就不用再升版本。
+- **新加的逐字对照读的是新前端的源文件**（`web/src/models/chatFailure.ts`）：那边改了这几句，后端这条测试就失败，提醒 API 的 detail 跟着改，这是有意的。
+- **API 的调用方看到的 detail 变了**：谁要是按 detail 的字判断（应该看 `reason`）会受影响；仓库里没有这样的代码。
 - **线上多少门课走这条路径**没查（不碰线上数据）：有平铺先修代码、又没有可用年度文档的课都是。
-- **另做的两件**：课程详情旧边的「必须／建议先修」标签（另一个会话在做）；给更多课导入年度文档，要动线上库，另行决定。
-- **和 R8（删 Streamlit）同时在做**：两边都改了 `tests/test_chat_structured_requisites.py` 和 `docs/answer-grounding.md`，后合的那个合一下；本节的编号也由后合的那个改。
+- **另做的两件**：课程详情旧边的「必须／建议先修」标签（另一个会话在做，#45）；给更多课导入年度文档，要动线上库，另行决定。
 
 ### 发布状态
 
-分支 `fix/content01-prereq-relation`，从 main 的 `f24a72d` 开，两个提交（第二个只改本节的「审查」和这一段）。没有使用真实模型、账号、NAS 或生产库。线上仍是 4.5：合并不部署，上线（只换 api 镜像）要用户点头、定时间。
+分支 `fix/content01-prereq-relation`，从 main 的 `f24a72d` 开，11-03 合并了 main 的 `3c4b721`（R8）。四个提交：改动本身；本节的「审查」和这一段；合并 main；选择框的名字。没有使用真实模型、账号、NAS 或生产库。线上仍是 4.5：合并不部署，上线（只换 api 镜像）要用户点头、定时间。#45 先合进 main 的话，这个分支还要再合一次 main，只在改动记录末尾冲突（第 45、46 节）。
