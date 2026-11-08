@@ -202,7 +202,7 @@ npm.cmd run test:mutations
 - **聊天流：** `src/api/chatStream.ts` 的 `streamChat(request, { signal })` 边收边读 `/chat` 的 NDJSON，给 R3 的搜索和聊天页用；它是 `client.ts` 以外唯一调 fetch 的文件。先 `meta`，再若干 `token`，最后 `done`（可能带反馈凭证，由页面照 Streamlit 的做法核对）；或者中途一个 `error`，它的 `detail` 是 API 给学生看的固定中文，照样显示。等回答开始、等下一块各最多 30 秒；断线、超时、没有 `done` 就结束、有一行不是这四种事件、或者一行（不算行尾）长过 100 万个字符（API 最长的一行也就几十 KB），都在已经收到的内容后面补一句 Streamlit 的话（「连接中断。…」或「回答流未完整结束；…」）。流开始前的失败和别的请求一样是 `ApiError`。不自动重发（每问一次都算模型次数、写查询日志）；能取消。
 - **开发 API 的聊天：** `/chat` 按脚本回答，不调用模型，HyDE 补救也关着。问题里带 `dev:model-error`（模型中途出错）、`dev:no-answer`（没有回答）、`dev:daily-limit`（今天的次数用完）、`dev:no-done`（流没有 `done` 就结束）、`dev:cut`（连接中途断开）、`dev:stall`（停 35 秒，比前端等的久），就换成对应的情况。
 - **测试：** 渲染整个 App 的测试套 `src/test/withApi.tsx` 的 `WithApi`，它预先放好 `/config`、游客身份和顶栏的 `/ready`（R3e），外壳不再发请求（`fetch` 在测试里仍被禁止，要用就 stub；R5d 的接线测试用 `src/test/fakeApi.tsx` 回答页面自己的请求）。
-- **上线（R7）：** API 的 `WEB_ORIGINS` 在 compose 里设好了（见「部署 R7」）；Google OAuth 客户端的 Authorized redirect URI 要有新前端的每个地址（来源加 `/`），少一个 Google 就拒绝从那个站点登录：compass 的 `https://compass.neu-compass.me/` 本来就有（Streamlit 用的也是它），beta 的 `https://beta.neu-compass.me/` 是上 beta 以前用户在 Google Cloud Console 里加的。
+- **上线（R7）：** API 的 `WEB_ORIGINS` 在 compose 里设好了（见「部署 R7」）；Google OAuth 客户端的 Authorized redirect URI 要有新前端的每个地址（来源加 `/`），少一个 Google 就拒绝从那个站点登录：compass 的 `https://compass.neu-compass.me/` 本来就有（Streamlit 用的也是它），beta 的 `https://beta.neu-compass.me/` 是上 beta 以前用户在 Google Cloud Console 里加的，去掉 beta 以后（见「部署 R7」末尾）也从那里删掉。
 
 ## R3c 搜索回答区与演示（2026-10-24）
 
@@ -471,5 +471,6 @@ npm.cmd test --prefix tools/e2e
 - **核对一个跑着的站**：`node deploy/check-site.ts <站点> <API 来源> <分享链接的站点>`，例如 `node deploy/check-site.ts http://127.0.0.1:8510 https://api.neu-compass.me https://compass.neu-compass.me`（Node 24 直接跑 TypeScript）。只对镜像本身（CI、NAS 上的 8510）：经过 Cloudflare 的 compass、beta 都跑不过，Cloudflare 会把 `Server` 换成它自己的，还可能加缓存头。
 - **切换到 compass**（2026-11-02）：分享链接的站点改成 compass，`WEB_ORIGINS` 加上 compass，CI 的 check-site 跟着改。部署时把 NAS 上隧道配置里 compass 那条从 `http://ui:8501` 改成 `http://web:8080`；改回去就是回退，Streamlit 再留一周。beta 再留两周，之后去掉隧道里的 beta 和 `WEB_ORIGINS` 里的 beta。
 - **删掉 Streamlit**（R8）：仓库里的 `app/` 和它的测试删了，compose 去掉 `ui`，`deploy.ps1` 不再探测 8501。web 只换了从 API 重新生成的类型注释（`openapi.json`、`schema.ts`，API 的几处说明不再提 Streamlit）。上线以后，切换那次的回退（compass 改回 `http://ui:8501`）就没有了。
+- **去掉 beta**（R8 方案第 3 节，切换两周以后）：API 的 `WEB_ORIGINS` 只留 compass，`deploy.ps1` 最后不再列 beta。上线时只按新设置重建 api 的容器，镜像不变，web 不动；NAS 上隧道配置去掉 beta 那条规则。beta 的 DNS 记录和 Google OAuth 客户端里 beta 的回调地址由用户删。切换以后在 beta 上分享的链接指向 compass；只有切换以前（beta 期间）分享的链接指向 beta，去掉以后打不开。
 
-修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 42、43、44 节。
+修改经过、验证和已知的问题在 `docs/development-change-log.md` 第 42、43、44、49 节。

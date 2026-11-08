@@ -377,7 +377,6 @@ Write-Host ''
 Write-Host '  Public:'
 Write-Host '    https://api.neu-compass.me/health'
 Write-Host '    https://compass.neu-compass.me (the web front end)'
-Write-Host '    https://beta.neu-compass.me (R7 beta: the same front end, for two weeks after the switch)'
 Write-Host ''
 Write-Host "  Logs:  ssh $NasTarget 'cd $NasPath && docker compose logs -f api'"
 Write-Host ''

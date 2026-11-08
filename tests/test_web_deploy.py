@@ -31,7 +31,6 @@ CI = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encodi
 CI_JOB = CI["jobs"]["web-image"]
 DOCKERFILE = (ROOT / "web" / "Dockerfile").read_text(encoding="utf-8")
 NGINX = (ROOT / "web" / "deploy" / "nginx.conf").read_text(encoding="utf-8")
-BETA = "https://beta.neu-compass.me"
 COMPASS = "https://compass.neu-compass.me"
 API = "https://api.neu-compass.me"
 # CI's last check of the image, whole: nginx runs as 101, and its log holds no request, not even the malformed one
@@ -79,11 +78,12 @@ def test_the_site_shared_links_name_is_one_the_api_takes() -> None:
     assert web_args()["VITE_API_BASE_URL"] == API
 
 
-def test_since_the_switch_links_name_compass_and_the_beta_is_still_taken() -> None:
-    """Decision 2 of the R7 plan, from the switch: links name compass, and the API takes compass and, for the two weeks
-    the beta stays, the beta. Taking the beta down changes this one assertion."""
+def test_links_name_compass_and_the_api_takes_compass_only() -> None:
+    """Decision 2 of the R7 plan, from the switch: links name compass. The beta stayed two weeks after the switch and
+    went in R8 (plan, section 3), so the API takes compass alone. 中文：切换以后分享链接指向 compass；beta 留了两周，R8
+    去掉了，API 只认 compass。"""
     assert web_args()["VITE_PUBLIC_BASE_URL"] == COMPASS
-    assert json.loads(mapping(SERVICES["api"]["environment"])["WEB_ORIGINS"]) == [COMPASS, BETA]
+    assert json.loads(mapping(SERVICES["api"]["environment"])["WEB_ORIGINS"]) == [COMPASS]
 
 
 def test_the_tunnel_waits_for_the_api_only() -> None:
@@ -109,7 +109,7 @@ def test_the_web_service_is_built_from_web_and_hardened() -> None:
                         "security_opt", "ports", "healthcheck"}
     assert WEB["restart"] == "always" and WEB["logging"] == SERVICES["api"]["logging"]
     assert WEB["healthcheck"]["test"] == ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz"]
-    # An image of its own: api, ui and backup run neu-compass:latest, which a build of web must never replace.
+    # An image of its own: api and backup run neu-compass:latest, which a build of web must never replace.
     assert WEB["image"] not in {service.get("image") for name, service in SERVICES.items() if name != "web"}
 
 
@@ -132,9 +132,9 @@ def test_the_web_image_refuses_a_build_argument_that_is_not_an_https_origin() ->
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "VITE_API_BASE_URL": api, "VITE_PUBLIC_BASE_URL": site}
         return subprocess.run(["sh", "-c", guard.group(1)], env=env, capture_output=True, check=False).returncode == 0
 
-    assert accepted(API, BETA)
-    for api, site in [("", BETA), ("   ", BETA), (API, " "), ("http://api.example.test", BETA), ("https://", BETA),
-                      (API, "beta.neu-compass.me")]:
+    assert accepted(API, COMPASS)
+    for api, site in [("", COMPASS), ("   ", COMPASS), (API, " "), ("http://api.example.test", COMPASS),
+                      ("https://", COMPASS), (API, "compass.neu-compass.me")]:
         assert not accepted(api, site), (api, site)
 
 
