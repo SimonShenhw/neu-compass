@@ -6188,3 +6188,55 @@ R7 第一步上线后的线上验收（评审目录 `release_20261101/STEP1_BROW
 ### 发布状态
 
 分支 `fix/checker-prereq-caveat-words`，从 main 的 `9d438d0` 开（这个提交 11-08 01:54 UTC 已上线）。只改评测工具、测试和文档，不用上线。
+
+## 49 — 去掉 beta（R8 方案第 3 节，2026-11-08）
+
+### 范围与原因
+
+- 11-02 切换以后，compass 就是新前端。beta（`beta.neu-compass.me`）是同一个前端，照 R7 方案再留两周，11-16 左右去掉。做法在评审目录 `frontend_react/R8_PLAN.md` 第 3 节：一个小 PR，和删 Streamlit 分开上线（用户定的）。
+- 仓库里只有部署件和说明要改：API 的 `WEB_ORIGINS` 只留 compass。隧道配置在 NAS 上，beta 的 DNS 记录和 Google OAuth 客户端的回调地址也都不在仓库里，上线时另做。
+- 合并不部署。11-16 以前不上线：beta 照常开着，切换以前在 beta 上分享的链接到那时都还能打开。
+
+### 改了什么
+
+- `docker-compose.yml`：
+  - api 的 `WEB_ORIGINS` 从 compass、beta 两个改成只有 compass，注释跟着改；
+  - 文件头抄的隧道规则去掉 beta 那条；
+  - web 服务和构建参数的注释不再说 beta 也指向它。
+- `scripts/deploy.ps1`：部署完最后列出的公网地址去掉 beta。
+- `tests/test_web_deploy.py`：
+  - 原来那条测试的说明就写着「去掉 beta 只改这一条断言」：现在断言 `WEB_ORIGINS` 只有 compass，测试名跟着改；
+  - Dockerfile 检查构建参数那条，合法的分享站点例子从 beta 换成 compass（检查的写法不变）；
+  - 注释里 R8 漏改的「api、ui 和 backup」改成「api 和 backup」。
+- `web/README.md`：「部署 R7」末尾加去掉 beta 一条；Google 回调地址那条加一句：去掉 beta 以后，beta 的地址也从 Google Cloud Console 删掉。
+
+### 修改文件
+
+- `docker-compose.yml`、`scripts/deploy.ps1`、`tests/test_web_deploy.py`、`web/README.md`，以及本节。
+
+### 验证记录
+
+- 读 compose、`deploy.ps1` 或 `WEB_ORIGINS` 的 12 个测试文件：442 条过，没有跳过（`test_deploy_script.py` 经 WSL 互操作，用 Windows PowerShell 跑了 `deploy.ps1`）。全量 4370 条过（8 分 45 秒），5 个改动的文件跑前跑后哈希一致。
+- 变异：compose 那一行改成四种（加回 beta、只有 beta、空列表、beta 在前），每个在单独的副本里跑，未变异的副本先过：4 个都被抓到。
+- ruff 0.5.0（F、E9、B）在改过的 Python 文件上干净；prettier 3.9.10 `--check` 过 `web/README.md`；没有 CR；`deploy.ps1` 的 BOM 还在；`diff --check` 干净。
+- 没有调真实模型，没有碰 NAS、线上或生产库。
+
+### 已知、未处理
+
+- API 照旧能认多个前端来源（`WEB_ORIGINS` 是列表）。`test_public_routes.py`、`test_session_cookie.py` 用 `beta.example.test` 当第二个来源的例子，测的是这个能力，不改。
+- `web/` 的代码和测试里，beta 是一种构建模式的例子（`src/api/apiBase.ts` 和它的测试），`deploy/check-site.ts` 开头用法的例子和 `check-site.test.ts` 的分享站点还写着 beta 的地址（切换以前的写法）。这次不动 web 的构建上下文，都没改。
+- 切换以前（beta 期间）在 beta 上分享的链接指向 beta，去掉以后打不开；没有加跳转。
+- `deploy.ps1` 列出的地址没有测试钉着。
+- 上线（要用户另外点头，11-16 左右以后）：
+  - 只按新设置重建 api 的容器，镜像不变；web、backup 不动；
+  - NAS 上的隧道配置去掉 beta 那条规则，重启 cloudflared；
+  - 用户删 Cloudflare 里 beta 的 DNS 记录、Google OAuth 客户端里 beta 的回调地址。DNS 删掉以前，beta 的请求落到隧道最后那条 404；
+  - 回退：compose 和隧道配置换回去，重建 api 的容器、重启 cloudflared。
+
+### 审查
+
+没开：照计划的小改，只动部署设置、一行打印、测试和说明，不改产品逻辑；上线时另有上线脚本的检查。
+
+### 发布状态
+
+分支 `feat/remove-beta`，从 main 的 `9916844`（#48 的合并）开。合并不部署；上线要用户点头，按计划在 11-16 左右以后。
