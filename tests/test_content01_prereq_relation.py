@@ -15,6 +15,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from db.catalog_source_repository import CatalogSourceRepository
 from eval.answer_checks import HARD_FAILURES, check_answer
 from llm.prompts.chat_v4 import FLAT_PREREQS_KEY, build_prompt, format_courses_block
@@ -42,6 +44,18 @@ ASKED_FOR = (
     "CS 6140 介绍机器学习和数据挖掘的多种技术，包括监督学习、无监督学习和强化学习，并有一个编程项目。\n\n"
     f"根据 [NEU 官方课程目录]({CS})，记录列出的先修课有 CS 5800、CS 7800，但没有说明是都要修还是任选其一，"
     "选课前请向学校确认。以上来自目录的存档副本，不是实时核对。"
+)
+# Prompt 4.6's first live answer to the same question (2026-11-07, `scripts/eval_answers_live.py`, one call): the
+# caveat is in the sentence that names the codes, as 4.6 asks, though the codes are joined by 「和」 where 4.6 asks for
+# 「、」. 中文：4.6 第一次真实模型复核对同一个问题的回答（2026-11-07，一次调用）：说明就在点名课号的那句里，这是 4.6
+# 要的；只是两门课用「和」连，4.6 要的是「、」。
+LIVE_ANSWER_46 = (
+    "CS 6140 机器学习 (Machine Learning) 主要涵盖机器学习和数据挖掘中的多种技术及其应用。课程内容包括决策树归纳、"
+    "人工神经网络、基于实例的学习、概率方法和支持向量机等监督学习算法，以及无监督学习和强化学习。此外，课程还会探讨计算"
+    "学习理论和评估学习算法性能的方法，并包含一个编程学期项目。\n\n"
+    f"根据 [NEU 官方课程目录]({CS})，该课程的先修课有 CS 5800 和 CS 7800，但记录没有说明是需要同时满足还是任选其一。"
+    "因此，这门课适合已具备这些先修课程知识的学生。\n\n"
+    "请注意，以上信息来自课程目录的存档副本，并非实时查询。"
 )
 
 
@@ -103,3 +117,32 @@ def test_with_a_year_rule_the_or_is_the_records_own():
     assert "prerequisite_logic_unavailable" not in record["answer_evidence"]["warnings"]
     assert context.flat_prereqs == () and not context.prereq_relevant
     assert check_answer(LIVE_ANSWER, context)["prereq_relation_asserted"] == []
+
+
+def test_the_46_live_answer_says_the_caveat_in_the_same_sentence():
+    # Checker 2.7 did not count 「没有说明是需要同时满足还是任选其一」: it reported the caveat missing and the sentence's
+    # 「和」 as a stated relation. 中文：2.7 不认这句说明，报了缺说明，还把那句的「和」当成断言。
+    _, _, context = case()
+    checks = check_answer(LIVE_ANSWER_46, context)
+    assert checks["caveats_missing"] == [] and checks["prereq_relation_asserted"] == []
+    assert not any(checks[name] for name in HARD_FAILURES)
+
+
+@pytest.mark.parametrize("sentence", [
+    "记录列出的先修课有 CS 5800、CS 7800，但没有说明能否任选其一。",  # 任选 after the unstated word
+    "记录列出的先修课有 CS 5800、CS 7800，但没有说明是否需要同时满足。",  # 同时满足 after it
+    "记录列出的先修课有 CS 5800、CS 7800，是任选其一还是要两门都修过并未写明。",  # 任选 before it
+    "记录列出的先修课有 CS 5800、CS 7800，是否需要同时满足并未写明。",  # 同时满足 before it
+])
+def test_2_8_counts_these_words_for_how_the_courses_combine(sentence):
+    _, _, context = case()
+    checks = check_answer(f"CS 6140 是一门机器学习课。{sentence}", context)
+    assert "prereq_logic" not in checks["caveats_missing"] and checks["prereq_relation_asserted"] == []
+
+
+@pytest.mark.parametrize("sentence", ["同时，记录没有说明授课方式。", "记录没有说明授课方式，同时也没写开课学期。"])
+def test_a_bare_tongshi_is_no_caveat(sentence):
+    # 「同时」 alone as often means "also": only 「同时满足」 counts. 中文：单独的「同时」也常是「另外」的意思，只认「同时满足」。
+    _, _, context = case()
+    checks = check_answer(f"CS 6140 是一门机器学习课。记录列出的先修课有 CS 5800、CS 7800。{sentence}", context)
+    assert "prereq_logic" in checks["caveats_missing"]
