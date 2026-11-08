@@ -19,7 +19,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-CHECKER_VERSION = "2.7-prereq-relation"
+CHECKER_VERSION = "2.8-prereq-caveat-words"
 NUMERIC_FIELDS = ("workload_hours_per_week", "difficulty_score")
 ANSWER_COURSE_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})[ \t]*(\d{4}[A-Z]?)(?![A-Za-z0-9])", re.I)
 # A second number after a separator shares the first code's department ("CS 5800 和 5200"), unless it reads as a level
@@ -138,11 +138,16 @@ NO_CATALOG = re.compile(
 # 中文：说记录里没有写明的词，否定词和动词之间最多隔 8 个字：「未在记录中明确说明」是 CONTENT-01 那条线上回答
 # （2026-11-01）的说法，原来的固定词认不出。
 UNSTATED_ZH = r"没说|没讲|没写|(?:没有|没|未|并未|并没有)[^。\n，,]{0,8}?(?:说明|写明|标明|注明|指明|列明|说清|讲明|明确)"
+# The caveat: an unstated word with a word of how the courses combine before or after it in the same sentence. 2.8 adds
+# 任选 and 同时满足: prompt 4.6's first live answer (2026-11-07) wrote 「记录没有说明是需要同时满足还是任选其一」, which
+# 2.7 did not count, so it reported the caveat missing and the sentence's 「和」 as a stated relation.
+# 中文：「关系不明」的说明：同一句里，没写明一类的词前后有说组合方式的词。2.8 加上「任选」「同时满足」：4.6 第一次真实模型
+# 复核（2026-11-07）写的是「记录没有说明是需要同时满足还是任选其一」，2.7 认不出，报了缺说明，还把那句的「和」当成断言。
 PREREQ_LOGIC = re.compile(
-    r"(并且|且|或者|或|和/或|全部|都需要|都要|任一|任意一门|其中一门|组合|是否需要全部)[^。\n]{0,40}"
+    r"(并且|且|或者|或|和/或|全部|都需要|都要|任一|任选|任意一门|其中一门|同时满足|组合|是否需要全部)[^。\n]{0,40}"
     r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|未知|没有标明|" + UNSTATED_ZH + r"|需要[^。\n]{0,6}(核实|确认))|"
     r"(不清楚|不明确|无法确定|无法判断|没有说明|未说明|未注明|不确定|没有标明|" + UNSTATED_ZH + r")[^。\n]{0,40}"
-    r"(并且|且|或|全部|都|任一|其中一门)|"
+    r"(并且|且|或|全部|都|任一|任选|其中一门|同时满足)|"
     r"(且|或)的?关系|AND/OR|and/or|logical relationship|"
     r"\b(?:all|both|either|any one|any)\b[^.\n]{0,80}\b(?:unclear|not (?:specified|indicated|stated|clear)|"
     r"doesn't (?:say|specify|indicate)|does not (?:say|specify|indicate)|cannot (?:tell|determine|confirm)|unknown)\b|"
